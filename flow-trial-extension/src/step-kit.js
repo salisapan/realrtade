@@ -46,45 +46,78 @@ const FlowStepKit = (() => {
     return '';
   }
 
-  function doItHTML() {
-    return '<button type="button" class="do-halo flow-chip" aria-label="Do It"><img class="chip-do" src="' + esc(asset('do-it.png')) + '" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>';
+  function labelsFor(cfg) {
+    const ui = (cfg && cfg.uiLang) || ((cfg && cfg.he) ? 'he' : 'en');
+    const base = langOf(ui === 'he');
+    if (typeof FlowDisplay === 'undefined' || typeof FlowDisplay.chrome !== 'function') return base;
+    return Object.assign({}, base, FlowDisplay.chrome(ui));
+  }
+
+  function doItHTML(label, disabled) {
+    const name = label || 'Do It';
+    const off = disabled ? ' disabled aria-disabled="true"' : '';
+    return '<button type="button" class="do-halo flow-chip" aria-label="' + esc(name) + '"' + off + '><img class="chip-do" src="' + esc(asset('do-it.png')) + '" alt=""><span class="doit-dark" role="img" aria-label="' + esc(name) + '">' + esc(name) + '</span></button>';
+  }
+
+  function dateChoicesHTML(choices, selected) {
+    if (!choices || !choices.length) return '';
+    return '<span class="chip-dates" role="group">' + choices.map(function (c) {
+      const on = selected && c && c.iso === selected;
+      return '<button type="button" class="chip-date" data-date-iso="' + esc(c && c.iso) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(c && c.label) + '</button>';
+    }).join('') + '</span>';
   }
 
   function appB(app) { return '<b class="act-app"><bdi>' + esc(app) + '</bdi></b>'; }
 
-  function pillsHTML(a) {
+  function pillsHTML(a, L) {
+    const words = L || {};
     const vis = a.expanded ? a.files : a.files.slice(0, 3);
     const more = a.files.length - 3;
-    return '<span class="act-files" role="group" aria-label="Attachments">' +
+    return '<span class="act-files" role="group" aria-label="' + esc(words.attachments || 'Attachments') + '">' +
       vis.map(function (f, i) {
         return '<button type="button" class="ss-pill" data-f="' + i + '" aria-pressed="' + (f.on ? 'true' : 'false') + '"><span class="ss-pill-ck" aria-hidden="true"></span>' + esc(f.n || f.name) + '</button>';
       }).join('') +
       (a.files.length > 3 ? (a.expanded
-        ? '<button type="button" class="ss-pill ss-pill-more" data-less="1">Less</button>'
+        ? '<button type="button" class="ss-pill ss-pill-more" data-less="1">' + esc(words.less || 'Less') + '</button>'
         : '<button type="button" class="ss-pill ss-pill-more" data-more="1">+' + more + '</button>') : '') +
       '</span>';
   }
 
-  function rowHTML(a) {
+  function shownTag(tag, words) {
+    const L = words || {};
+    if (tag === 'Suggested') return L.suggested || tag;
+    if (tag === 'Added') return L.added || tag;
+    if (tag === 'Manual' || tag === 'Manual · for you') return L.manual || tag;
+    if (tag === 'after Approve') return L.afterApprove || tag;
+    return tag;
+  }
+
+  function rowHTML(a, L) {
+    const words = L || {};
     if (a.kind === 'close') {
       return '<li class="act act-close' + (a.st ? ' ' + a.st : '') + '" data-close="1">' +
         '<span class="act-row"><span class="act-box act-lock" aria-hidden="true"></span>' +
         '<span class="act-glyph" data-glyph="glance">' + glyph('glance') + '</span>' +
         '<span class="act-body"><span class="act-text">' + a.text + '</span>' +
         (a.done ? '<span class="act-res"><span class="act-res-txt">' + a.done + '</span></span>' : '') +
-        '</span><span class="act-tag">' + esc(a.tag || 'after Approve') + '</span></span></li>';
+        '</span><span class="act-tag">' + esc(shownTag(a.tag, words) || words.afterApprove || 'after Approve') + '</span></span></li>';
     }
     if (a.kind === 'manual') {
       return '<li class="act act-manual" data-step-id="' + esc(a.id || '') + '">' +
         '<span class="act-row"><span class="act-box act-none" aria-hidden="true"></span>' +
         '<span class="act-glyph" data-glyph="manual">' + glyph('manual') + '</span>' +
         '<span class="act-body"><span class="act-text">' + esc(a.text) + '</span></span>' +
-        '<span class="act-tag">' + esc(a.tag || 'Manual · for you') + '</span></span></li>';
+        '<span class="act-tag">' + esc(shownTag(a.tag, words) || words.manual || 'Manual · for you') + '</span></span></li>';
     }
     const cls = 'act' + (a.kind === 'suggested' || a.suggested ? ' act-suggested' : '') + (a.added ? ' act-added' : '') + (a.kind === 'multi' ? ' act-multi' : '') + (a.st ? ' ' + a.st : '') + (a.expanded ? ' is-expanded' : '');
     const multi = a.kind === 'multi';
     const text = multi
-      ? 'Save <b class="ss-n">' + a.files.filter(function (f) { return f.on; }).length + '</b> of ' + a.files.length + ' attachments'
+      ? (typeof FlowDisplay !== 'undefined' && FlowDisplay.fillChrome
+        ? FlowDisplay.fillChrome(words.saveFiles || 'Save {on} of {all} attachments', {
+          on: '<b class="ss-n">' + a.files.filter(function (f) { return f.on; }).length + '</b>',
+          all: a.files.length
+        })
+        : ('Save <b class="ss-n">' + a.files.filter(function (f) { return f.on; }).length + '</b> of ' + a.files.length + ' attachments'))
       : esc(a.text || '');
     const res = a.res || '';
     const checked = a.checked !== false;
@@ -95,23 +128,26 @@ const FlowStepKit = (() => {
       '<span class="act-box" aria-hidden="true"></span>' +
       '<span class="act-glyph" data-glyph="' + esc(a.tool || '') + '">' + glyph(a.tool) + '</span>' +
       '<span class="act-body">' +
-        (text ? '<span class="act-text">' + text + '</span>' : '') +
+        (text ? '<span class="act-text"' + (a.user ? ' data-glance-user="1"' : '') + '>' + text + '</span>' : '') +
+        (a.dest ? '<span class="act-dest" dir="ltr" data-glance-dest="1">' + esc(a.dest) + '</span>' : '') +
         (a.out ? '<span class="act-out">' + appB(a.app) + ' · ' + a.out + '</span>' : '') +
         (res ? '<span class="act-res">' + appB(a.app) + ' · <span class="act-res-txt">' + res + '</span></span>' : '') +
       '</span>' +
       (multi ? '</label>' : '') +
-      (a.tag ? '<span class="act-tag ss-tag">' + esc(a.tag) + '</span>' : '') +
-      (multi ? pillsHTML(a) : '') +
+      (a.tag ? '<span class="act-tag ss-tag">' + esc(shownTag(a.tag, words)) + '</span>' : '') +
+      (multi ? pillsHTML(a, words) : '') +
       (multi ? '</div>' : '</label>') + '</li>';
   }
 
   function chipHTML(cfg, L) {
     const c = cfg.chip || { mode: 'count' };
     const hold = c.noHold ? '' : '<button type="button" class="chip-hold">' + L.hold + '</button>';
+    const waiting = c.needsDateChoice === true;
     return '<div class="chip chip-invoice">' + hold +
       (c.icon ? '<span class="ss-chip-glyph" aria-hidden="true">' + glyph(c.icon) + '</span>' : '') +
       '<span class="chip-txt">' + (c.q || '') + '</span>' +
-      '<span class="chip-act"><button type="button" class="chip-x" aria-label="Dismiss">×</button>' + doItHTML() + '</span></div>';
+      dateChoicesHTML(waiting || c.selectedIso ? c.dateChoices : null, c.selectedIso) +
+      '<span class="chip-act"><button type="button" class="chip-x" aria-label="' + esc(L.dismiss || 'Dismiss') + '">×</button>' + doItHTML(L.doIt, waiting) + '</span></div>';
   }
 
   function addHTML(L) {
@@ -120,7 +156,7 @@ const FlowStepKit = (() => {
       '<div class="ss-add-row act-row">' +
         '<span class="act-box act-none" aria-hidden="true"></span>' +
         '<span class="act-glyph" data-glyph="you">' + glyph('you') + '</span>' +
-        '<input type="text" class="ss-add-input" maxlength="80" placeholder="' + esc(L.addPh) + '" aria-label="New step">' +
+        '<input type="text" class="ss-add-input" maxlength="80" placeholder="' + esc(L.addPh) + '" aria-label="' + esc(L.newStep || 'New step') + '">' +
         '<kbd class="ss-kbd">↵</kbd></div></div>';
   }
 
@@ -129,39 +165,41 @@ const FlowStepKit = (() => {
     const disabled = a.disabled === true;
     return '<div class="approve-banner' + (disabled ? ' ss-approve-off' : '') + '">' +
       '<div class="approve-meta"><div class="approve-title">' + esc(a.title) + '</div><div class="approve-sub">' + esc(a.sub) + '</div></div>' +
-      '<button type="button" class="approve-btn"' + (disabled ? ' disabled aria-disabled="true"' : '') + '>Approve close</button></div>';
+      '<button type="button" class="approve-btn"' + (disabled ? ' disabled aria-disabled="true"' : '') + '>' + esc((a && a.approveLabel) || 'Approve close') + '</button></div>';
   }
 
   function headHTML(cfg, L) {
     const icon = cfg.icon === 'done' ? 'living/key-done-512.png' : 'living/key-idle-512.png';
     return '<div class="gs-head"><img class="living-ico" src="' + esc(asset(icon)) + '" alt="" width="26" height="26">' +
       '<div class="gs-head-meta"><div class="gs-brand">' + L.brand + '</div><div class="gs-intent-label">' + L.intentLabel + '</div></div></div>' +
-      '<p class="gs-intent flow-chip-process-name">' + esc(cfg.intent || '') + '</p>';
+      (cfg.intent ? '<p class="gs-intent flow-chip-process-name">' + esc(cfg.intent) + '</p>' : '');
   }
 
-  function rowsHTML(rows) {
+  function rowsHTML(rows, L) {
+    const labels = L || { suggested: 'Suggested', added: 'Added' };
     let html = '';
     let suggestedHead = false;
     let addedHead = false;
     (rows || []).forEach(function (a) {
-      const suggested = a && !a.added && (a.suggested || a.tag === 'Suggested');
+      const suggested = a && !a.added && (a.suggested || a.tag === labels.suggested || a.tag === 'Suggested');
       if (suggested && !suggestedHead) {
         suggestedHead = true;
-        html += '<li class="act-section" data-glance-section="suggested"><span class="acts-label">Suggested</span></li>';
+        html += '<li class="act-section" data-glance-section="suggested"><span class="acts-label">' + esc(labels.suggested) + '</span></li>';
       }
       if (a && a.added && !addedHead) {
         addedHead = true;
-        html += '<li class="act-section" data-glance-section="added"><span class="acts-label">Added</span></li>';
+        html += '<li class="act-section" data-glance-section="added"><span class="acts-label">' + esc(labels.added) + '</span></li>';
       }
-      html += rowHTML(a);
+      html += rowHTML(a, labels);
     });
     return html;
   }
 
   function stageHTML(cfg) {
-    const L = langOf(cfg.he);
+    const L = labelsFor(cfg);
+    if (cfg && cfg.approve && !cfg.approve.approveLabel) cfg.approve.approveLabel = L.approve;
     const label = cfg.label === 'done' ? L.done : cfg.label === 'prepared' ? L.prepared : L.will;
-    const rows = rowsHTML(cfg.rows);
+    const rows = rowsHTML(cfg.rows, L);
     return '<div class="stage stage-live ss-stage" data-state="' + esc(cfg.state || 'propose') + '">' +
       '<div class="glance-surface g19 ss-gs"' + (cfg.he ? ' dir="rtl" lang="he"' : '') + '>' +
       headHTML(cfg, L) +
@@ -175,7 +213,7 @@ const FlowStepKit = (() => {
 
   function syncChip(stage, cfg) {
     if (!stage || !cfg || !cfg.chip) return;
-    const L = langOf(cfg.he);
+    const L = labelsFor(cfg);
     const txt = stage.querySelector('.chip-txt');
     if (!txt) return;
     if (cfg.chip.mode === 'count') {
@@ -196,14 +234,20 @@ const FlowStepKit = (() => {
       stage.classList.toggle('no-actions', sel.length === 0);
       txt.innerHTML = sel.length ? L.count(sel.length, tools, sugg) : L.none;
     } else if (cfg.chip.mode === 'files') {
-      const files = (cfg.rows[0] && cfg.rows[0].files) || [];
-      const on = files.filter(function (f) { return f.on; }).length;
+      let files = [];
+      (cfg.rows || []).forEach(function (r) {
+        if (r && r.kind === 'multi' && r.files && r.files.length) files = r.files;
+      });
+      if (!files.length) files = (cfg.rows[0] && cfg.rows[0].files) || [];
+      const on = files.filter(function (f) { return f.on && !f.skipped; }).length;
       const cb = stage.querySelector('.act-check');
       const target = cfg.chip.target || 'Drive';
       stage.classList.toggle('no-actions', !(on > 0 && cb && cb.checked));
       txt.innerHTML = on
-        ? 'Save <b class="file">' + on + ' of ' + files.length + '</b> attachments to ' + esc(target) + '?'
-        : 'Pick at least one file';
+        ? ((typeof FlowDisplay !== 'undefined' && FlowDisplay.fillChrome)
+          ? FlowDisplay.fillChrome(L.saveAsk || 'Save {on} of {all} attachments to {target}?', { on: '<b class="file">' + on + '</b>', all: files.length, target: esc(target) })
+          : ('Save <b class="file">' + on + ' of ' + files.length + '</b> attachments to ' + esc(target) + '?'))
+        : (L.pickFile || 'Pick at least one file');
     } else {
       txt.innerHTML = cfg.chip.q || '';
     }

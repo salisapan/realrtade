@@ -84,7 +84,7 @@ const FlowOwaParse = (() => {
 
   // Normalize for matching against Graph/sync entries.
   function norm(s) {
-    return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return String(s || '').replace(INLINE_MARKS, '').toLowerCase().replace(/\s+/g, ' ').trim();
   }
 
   function normEmail(s) {
@@ -113,7 +113,8 @@ const FlowOwaParse = (() => {
     if (!pane || !list.length) return null;
     const ids = (e) => [e.messageId, e.outlookIncomingId, e.id].map(canonId).filter(Boolean);
     const convs = (e) => [e.outlookConversationId, e.conversationId, e.threadId, e.base && e.base.threadId].map(canonId).filter(Boolean);
-    const paneId = canonId(pane.itemId || pane.messageId);
+    const hasOpenMsg = Boolean(pane.itemId || pane.messageId);
+    const paneId = canonId(pane.itemId || pane.messageId || (hasOpenMsg ? pane.pathId : null));
     if (paneId) {
       const hit = list.find((e) => ids(e).indexOf(paneId) >= 0 || canonId(e.internetMessageId) === paneId);
       if (hit) return { entry: hit, how: 'message id' };
@@ -237,9 +238,33 @@ const FlowOwaParse = (() => {
     return long.endsWith(short) || long.startsWith(short);
   }
 
+  function labelForms(bytes) {
+    return shownSizeLabels(bytes).map((s) => norm(s).replace(/\s+/g, ''));
+  }
+
+  function labelMatchesSize(label, bytes) {
+    if (!label || bytes == null) return false;
+    return labelForms(bytes).indexOf(label) >= 0;
+  }
+
+  // attachmentsOf stores Math.round(3 * 1024) beside the chip text "3 KB".
+  // Graph's byte count for that same chip is rarely 3072. The label is the
+  // size the person saw. A rounded byte count is not a second measurement.
+  function roundedFromLabel(row) {
+    if (!row || row.size == null || !row.label) return false;
+    const m = String(row.label).match(/^(\d+(?:[.,]\d+)?)(b|kb|mb|gb)$/i);
+    if (!m) return false;
+    const amount = Number(String(m[1]).replace(',', '.'));
+    const unit = m[2].toLowerCase();
+    const mul = unit === 'kb' ? 1024 : unit === 'mb' ? 1024 * 1024 : unit === 'gb' ? 1024 * 1024 * 1024 : 1;
+    return isFinite(amount) && Math.round(amount * mul) === row.size;
+  }
+
   // 'yes' names and sizes agree, including a KB label and a truncated name.
   // 'no' they disagree. 'unknown' the pane did not show a file.
   // A missing size is not a disagreement: the chip could not be read.
+  // A label that displays the Graph size agrees even when the chip also
+  // stored the rounded byte count of that label.
   function fileRelation(paneList, graphList) {
     const pane = fileRows(paneList);
     const graph = fileRows(graphList);
@@ -247,14 +272,15 @@ const FlowOwaParse = (() => {
     if (!graph.length || pane.length !== graph.length) return 'no';
     for (let i = 0; i < pane.length; i++) {
       if (!namesAgree(pane[i].name, graph[i].name)) return 'no';
-      if (pane[i].size != null) {
+      if (pane[i].label && labelMatchesSize(pane[i].label, graph[i].size)) continue;
+      if (pane[i].size != null && !roundedFromLabel(pane[i])) {
         if (pane[i].size !== graph[i].size) return 'no';
         continue;
       }
+      if (pane[i].size != null && pane[i].size === graph[i].size) continue;
+      if (roundedFromLabel(pane[i])) return 'no';
       if (!pane[i].label) continue;
-      if (graph[i].size == null) return 'no';
-      const forms = shownSizeLabels(graph[i].size).map((s) => norm(s).replace(/\s+/g, ''));
-      if (forms.indexOf(pane[i].label) < 0) return 'no';
+      return 'no';
     }
     return 'yes';
   }
@@ -286,20 +312,57 @@ const FlowOwaParse = (() => {
     return true;
   }
 
+  function paneConvId(pane) {
+    if (!pane) return '';
+    const raw = pane.conversationId || ((pane.idSource === 'url-unconfirmed' && pane.pathId) ? pane.pathId : '');
+    return canonId(raw);
+  }
+
   function idHit(pane, m) {
-    const paneConv = canonId(pane && pane.conversationId);
+    const paneConv = paneConvId(pane);
     const paneNet = canonId(pane && pane.internetMessageId);
     const convOk = paneConv && canonId(m.conversationId) === paneConv;
     const netOk = paneNet && canonId(m.internetMessageId) === paneNet;
     return Boolean(convOk || netOk);
   }
 
+  // A file links to the open message. A known conversation, message id, or
+  // internet id that differs is another message: a kilobyte label does not
+  // cross it. An id the page has not confirmed stays unresolved. No
+  // conversation on the pane is not a conflict; the filename may still
+  // name the one matching row.
+  function fileMayLink(pane, m) {
+    if (!pane || !m) return false;
+    if (pane.idSource === 'url-stale') return false;
+    if (pane.idSource === 'url-unconfirmed') {
+      const paneConv = paneConvId(pane);
+      const msgConv = canonId(m.conversationId);
+      if (paneConv && msgConv && paneConv !== msgConv) return false;
+      if (paneConv && msgConv && paneConv === msgConv) return true;
+      return false;
+    }
+    const paneItem = canonId(pane.itemId);
+    const msgId = canonId(m.id);
+    if (paneItem && msgId && paneItem !== msgId) return false;
+    if (paneItem && msgId && paneItem === msgId) return true;
+    const paneNet = canonId(pane.internetMessageId);
+    const msgNet = canonId(m.internetMessageId);
+    if (paneNet && msgNet && paneNet !== msgNet) return false;
+    if (paneNet && msgNet && paneNet === msgNet) return true;
+    const paneConv = paneConvId(pane);
+    const msgConv = canonId(m.conversationId);
+    if (paneConv && msgConv && paneConv !== msgConv) return false;
+    if (paneConv && !msgConv) return false;
+    return true;
+  }
+
   // One subject and sender is not enough. That mail links only when the
-  // query already covered the mailbox and one confirming signal holds: the
-  // open conversation or internet id, or a filename visible on the page that
-  // is on that message. A filename corroborates only when nothing conflicts.
-  // A conversation id, an internet message id, or a parsed clock that does
-  // not match the candidate stays unresolved, even when the filename matches.
+  // query already covered the mailbox and the row is the open message: a
+  // confirmed message id, or the same conversation. A filename and a
+  // kilobyte label corroborate that row. They never select a different
+  // message. An unconfirmed id stays unresolved. A conversation id, an
+  // internet message id, or a parsed clock that does not match the
+  // candidate stays unresolved, even when the filename matches.
   // An empty chip with no id stays unresolved. A failed attachment read is
   // unknown, not an empty list. Several mails are split by the minute and
   // the attachment, after an unmarked 1–12 hour is settled. A file that
@@ -328,7 +391,7 @@ const FlowOwaParse = (() => {
   // True when the open id is actually on one of these Graph rows.
   // A search URL that merely looks like a conversation id is not.
   function idEvidence(pane, messages) {
-    const conv = canonId(pane && pane.conversationId);
+    const conv = paneConvId(pane);
     const net = canonId(pane && pane.internetMessageId);
     let convHit = false;
     let netHit = false;
@@ -386,6 +449,7 @@ const FlowOwaParse = (() => {
       const conflict = idConflict(pane, one) || clockConflict(pane, one, minute);
       if (conflict) return pack(null, (why || 'subject-unique') + ' conflict-' + conflict);
       if (rel === 'no') return pack(null, (why || 'subject-unique') + ' file-disagree');
+      if (!fileMayLink(pane, one)) return pack(null, (why || 'subject-unique') + ' unconfirmed');
       if (idHit(pane, one) || rel === 'yes') return pack(one, why || 'subject-unique');
       return pack(null, (why || 'subject-unique') + ' unconfirmed');
     }
@@ -440,7 +504,7 @@ const FlowOwaParse = (() => {
     }
     pool = agreedId;
     if (fileRows(pane && pane.attachments).length) {
-      const agreed = pool.filter((m) => fileRelation(pane.attachments, m.attachments || m.files) === 'yes');
+      const agreed = pool.filter((m) => fileMayLink(pane, m) && fileRelation(pane.attachments, m.attachments || m.files) === 'yes');
       if (agreed.length === 1) return pack(agreed[0], 'time-file');
       if (!agreed.length) return pack(null, 'file-miss');
       return pack(null, 'file-ambiguous');
@@ -544,7 +608,7 @@ const FlowOwaParse = (() => {
   // node that holds the CONV_ heading; prefer the focused message; take the
   // last in document order. No visibility filter: the prose wrapper's
   // visibility="hidden" attribute has no style and still renders.
-  function openBodyRoot(roots) {
+  function messageBodyPool(roots) {
     const list = (roots || []).filter(Boolean);
     const isSubject = (n) => /^CONV_.*_SUBJECT$/.test(n.id || '') ||
       Boolean(n.querySelector && n.querySelector('[id^="CONV_"][id$="_SUBJECT"]'));
@@ -552,7 +616,24 @@ const FlowOwaParse = (() => {
       Boolean(n.querySelector && n.querySelector('[role="document"]'));
     let pool = list.filter((n) => isBody(n) && !isSubject(n));
     if (!pool.length) pool = list.filter((n) => !isSubject(n));
-    if (!pool.length) return list.find((n) => n.id === 'ReadingPaneContainerId') || null;
+    return pool;
+  }
+
+  function visibleMessageBodyCount(roots) {
+    const pool = messageBodyPool(roots);
+    if (!pool.length) {
+      const list = (roots || []).filter(Boolean);
+      return list.find((n) => n.id === 'ReadingPaneContainerId') ? 1 : 0;
+    }
+    return pool.length;
+  }
+
+  function openBodyRoot(roots) {
+    let pool = messageBodyPool(roots);
+    if (!pool.length) {
+      const list = (roots || []).filter(Boolean);
+      return list.find((n) => n.id === 'ReadingPaneContainerId') || null;
+    }
     const focused = pool.filter((n) => n.closest && n.closest('#focused'));
     if (focused.length) pool = focused;
     pool = pool.slice().sort((a, b) => {
@@ -622,7 +703,8 @@ const FlowOwaParse = (() => {
   function senderOf(container, bodyRoot, own) {
     const mine = new Set((own || []).map((a) => String(a || '').toLowerCase()));
     const ok = (e) => e && !mine.has(e);
-    if (!container || !container.querySelectorAll) return { email: '', name: '' };
+    let ownEmail = '';
+    if (!container || !container.querySelectorAll) return { email: '', name: '', ownEmail: '' };
     const nodes = container.querySelectorAll('a[href^="mailto:"], [title*="@"], [aria-label*="@"], span, button');
     for (const n of nodes) {
       if (inRecipientBlock(n)) continue;
@@ -647,9 +729,12 @@ const FlowOwaParse = (() => {
         if (m) { email = m[2]; name = m[1].trim(); }
       }
       email = normEmail(email);
-      if (EMAIL_RE.test(email) && ok(email)) return { email, name: looksLikeDateTime(name) ? '' : name.slice(0, 80) };
+      if (!EMAIL_RE.test(email)) continue;
+      const clean = looksLikeDateTime(name) ? '' : name.slice(0, 80);
+      if (ok(email)) return { email, name: clean, ownEmail: '' };
+      if (!ownEmail) ownEmail = email;
     }
-    return { email: '', name: '' };
+    return { email: '', name: '', ownEmail: ownEmail };
   }
 
   const HEADINGS = '[role="heading"], h1, h2, h3';
@@ -841,6 +926,7 @@ const FlowOwaParse = (() => {
     if (!d) return null;
     const roots = readingPaneRoots(d);
     const bodyRoot = openBodyRoot(roots);
+    const visibleMessageBodies = visibleMessageBodyCount(roots);
     if (!bodyRoot) return null; // no message body on screen: stay silent rather than read the message list
     const head = headerOf(bodyRoot, d);
     const container = head.container;
@@ -894,18 +980,21 @@ const FlowOwaParse = (() => {
       rawUrlId: ids.raw || null,
       subject: subject === senderName && head.senderName ? '' : subject,
       senderEmail: who.email,
+      ownSenderEmail: who.ownEmail || '',
       senderName: senderName.slice(0, 80),
       text: stripReadingChrome(body),
       to: whoTo.to,
       cc: whoTo.cc,
       rawToLine: whoTo.rawToLine || '',
       receivedDateTime: when.iso,
+      clockFromPane: Boolean(when.iso),
       clockUnread: when.unread,
       clockAmbiguous: when.ambiguous === true,
       clockAlt: when.alt || '',
       pageHour24: pageProves24h(d),
       hourCycle: hourCycleOf(d),
-      attachments: attachmentsOf(container, bodyRoot)
+      attachments: attachmentsOf(container, bodyRoot),
+      visibleMessageBodies: visibleMessageBodies
     };
   }
 

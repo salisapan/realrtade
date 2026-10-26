@@ -28,7 +28,7 @@ const FlowSuggestSave = (() => {
   // decide() applies a cap only when input.uploadLimitBytes is a number.
   const MAX_BYTES = 4 * 1024 * 1024;
 
-  const REASONS = ['suggest:show', 'suggest:other-card', 'suggest:already-saved', 'suggest:dismissed', 'suggest:bulk', 'suggest:no-consent', 'suggest:attachments-unread', 'suggest:negated', 'suggest:too-large', 'suggest:not-inbound', 'suggest:no-files', 'suggest:onedrive-target-on-gmail', 'suggest:drive-target-on-outlook', 'suggest:other-target'];
+  const REASONS = ['suggest:show', 'suggest:other-card', 'suggest:already-saved', 'suggest:dismissed', 'suggest:bulk', 'suggest:no-consent', 'suggest:attachments-unread', 'suggest:negated', 'suggest:too-large', 'suggest:not-inbound', 'suggest:no-files', 'suggest:no-save-ask', 'suggest:onedrive-target-on-gmail', 'suggest:drive-target-on-outlook', 'suggest:other-target'];
 
   function extOf(name) {
     const m = /\.([A-Za-z0-9]{1,8})$/.exec(String(name || ''));
@@ -183,6 +183,16 @@ const FlowSuggestSave = (() => {
       if (ex.step === 'file_save' && files.length >= 2) mode = 'explicit-multi';
       else return quiet('suggest:other-card', { excluded: excluded });
     }
+    const blob = (text + ' ' + subject).trim();
+    const explicit = SAVE_VERB.test(blob) || (J.explicit && J.explicit.step === 'file_save');
+    const presented = /\b(?:find\s+attached|attached\s+(?:is|are)|enclosed|attaching|(?:invoice|report|contract|statement|pdf)\s+is\s+attached)\b|מצורף|מצורפת|צירפתי|שלחתי(?:\s+את)?|מצורפת?\s*$/i.test(blob);
+    const signed = /\b(?:signed|executed|final)\b|חתום|נספח חתום/i.test(blob);
+    const kinds = (J.process && J.process.steps) || [];
+    const otherCard = input.otherCard === true || (J.show === true && (
+      Object.prototype.hasOwnProperty.call(OTHER_CHAIN, String(J.reason))
+      || kinds.some((s) => s && (s.kind === 'calendar' || s.kind === 'googleHold'))
+    )) || (ex && ex.step && ex.step !== 'file_save');
+    if (!explicit && !presented && !signed && !otherCard) return quiet('suggest:no-save-ask', { excluded: excluded });
     const saved = {};
     (input.savedFileIds || []).forEach((id) => { saved[id] = 1; });
     const open = files.filter((f) => !saved[f.id]);
@@ -368,7 +378,8 @@ const FlowSuggestSave = (() => {
       messageId: m.messageId,
       savedFileIds: Array.isArray(m.savedFileIds) ? m.savedFileIds : savedIds(m.log, m.messageId),
       dismissed: dismissed,
-      uploadLimitBytes: Object.prototype.hasOwnProperty.call(m, 'uploadLimitBytes') ? m.uploadLimitBytes : MAX_BYTES
+      uploadLimitBytes: Object.prototype.hasOwnProperty.call(m, 'uploadLimitBytes') ? m.uploadLimitBytes : MAX_BYTES,
+      otherCard: m.otherCard === true
     };
   }
 

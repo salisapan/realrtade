@@ -1,6 +1,7 @@
 // The Outlook runner against a fake Microsoft: read-only, bounded, honest about failure, and it never creates a loop without a tap.
 // Run: node test/outlook-runner-corpus.cjs
 const crypto = require('crypto');
+const { FlowNativeEdit } = require('../src/native-edit.js');
 const { FlowOutlook: O } = require('../src/outlook.js');
 const { FlowOutlookAuth: A } = require('../core/outlook-auth.js');
 const { FlowOutlookConfig: C } = require('../core/outlook-config.js');
@@ -49,7 +50,7 @@ function world(over) {
       w.drafts = w.drafts || {};
       const id = 'draft-' + Object.keys(w.drafts).length + 1;
       const body = init.body ? JSON.parse(init.body) : {};
-      w.drafts[id] = { id, isDraft: true, webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' }, attachments: {} };
+      w.drafts[id] = { id, isDraft: true, changeKey: 'ck-created', lastModifiedDateTime: '2026-10-14T09:00:00.000Z', webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' }, attachments: {} };
       return { ok: true, status: 201, json: async () => w.drafts[id], text: async () => JSON.stringify(w.drafts[id]) };
     }
     const listAtt = u.match(/\/me\/messages\/([^/?]+)\/attachments(?:\?|$)/i);
@@ -81,7 +82,10 @@ function world(over) {
       const method = (init.method || 'GET').toUpperCase();
       w.drafts = w.drafts || {};
       if (method === 'GET') {
-        if (w.drafts[id]) return { ok: true, status: 200, json: async () => ({ id, isDraft: w.drafts[id].isDraft !== false }) };
+        if (w.drafts[id]) {
+          const d = w.drafts[id];
+          return { ok: true, status: 200, json: async () => ({ id, isDraft: d.isDraft !== false, changeKey: d.changeKey || null, lastModifiedDateTime: d.lastModifiedDateTime || null, body: d.body || { content: '' } }) };
+        }
         return { ok: false, status: 404, json: async () => ({}) };
       }
       if (method === 'DELETE') {
@@ -290,6 +294,21 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const reused = await o.createReplyDraft('a1', 'Thanks, will confirm.');
     const postsReuse = w.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url));
     check('a second Do It reuses the draft still in Drafts', reused.ok && reused.reused === true && reused.reason === 'draft-already' && reused.ref === draft.ref && postsReuse.length === 1, reused);
+
+    const page = world({ inbox: [ask], sent: [] });
+    const pageRunner = O.create(Object.assign({}, page.deps(), {
+      planDeps: { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent },
+      actions: FlowActions
+    }));
+    await pageRunner.connect();
+    page.drafts = { 'page-draft': { id: 'page-draft', isDraft: true, webLink: 'https://outlook.office.com/mail/draft/page-draft', body: { content: 'From the page.' }, attachments: {} } };
+    page.store.outlookSync = Object.assign({}, page.store.outlookSync, { glanceDraftByMessage: { a1: 'page-draft' } });
+    const postsBeforePage = page.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url)).length;
+    const fromPage = await pageRunner.createReplyDraft('a1', 'Thanks, will confirm.');
+    const postsAfterPage = page.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url)).length;
+    check('Loops Do It reuses the draft the page already stored for that mail',
+      fromPage.ok && fromPage.reused === true && fromPage.reason === 'draft-already' && fromPage.ref === 'page-draft' && postsAfterPage === postsBeforePage,
+      { fromPage, postsBeforePage, postsAfterPage });
     check('Mail.Send never in requested scopes', CFG.SCOPES.indexOf('Mail.Send') === -1);
     const forbidden = w.calls.filter((c) => /\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(c.url) && c.method !== 'GET');
     check('no /send /reply /replyAll /forward /sendMail ever happens', forbidden.length === 0, forbidden);
@@ -325,6 +344,19 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const draftsBefore = Object.keys(w.drafts).length;
     const noId = await o.createReplyDraft('a1', 'Should not claim a file.', { file: file });
     check('no attachment id deletes the draft and does not claim attached', noId.ok === false && noId.reason === 'outlook-file-found-no-attach' && !(noId.written && /attach/i.test(noId.written)) && Object.keys(w.drafts).length === draftsBefore, noId);
+
+    const typed = await o.createReplyDraft('a-edited', 'Thanks, will confirm.');
+    w.drafts[typed.ref].changeKey = 'ck-user';
+    w.drafts[typed.ref].body = { content: 'I typed this myself.' };
+    const patchesBefore = w.calls.filter((c) => c.method === 'PATCH').length;
+    const leftAlone = await o.undoReplyDraft({ id: typed.ref, created: typed.created });
+    const patchesAfter = w.calls.filter((c) => c.method === 'PATCH').length;
+    check('a draft the person edited is left alone and is not rewritten',
+      leftAlone.ok === false && leftAlone.reason === 'user-edited' &&
+      leftAlone.written === FlowNativeEdit.userEditedLine() &&
+      w.drafts[typed.ref] && w.drafts[typed.ref].body.content === 'I typed this myself.' &&
+      patchesAfter === patchesBefore,
+      { leftAlone, patchesBefore, patchesAfter });
 
     // Silent reauth after 20h
     const w3 = world({ sent: [], inbox: [] });
@@ -387,7 +419,8 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
       token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW },
       account: { address: GMAIL_ME, userPrincipalName: GMAIL_ME },
       ownAddresses: [GMAIL_ME],
-      profile: { mail: '', userPrincipalName: GMAIL_ME, otherMails: [], proxyAddresses: [] }
+      // The stored profile carries the display name; without it the greeting Hi Sali is held as names-pending (0.9.56).
+      profile: { mail: '', userPrincipalName: GMAIL_ME, displayName: 'Sali', otherMails: [], proxyAddresses: [] }
     };
     w2.store.outlookPending = {
       offers: [{ key: 'stale', base: { counterpart: { email: OUT }, threadId: 'ol:convB' }, ask: { what: 'signed vendor contract', direction: 'theirs' } }],
@@ -402,7 +435,7 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const pend2 = w2.store.outlookPending || {};
     check('upgrade wipe: stale self-offer gone after stateVersion bump', !(pend2.offers || []).some((x) => x.key === 'stale' || (x.base && x.base.counterpart && x.base.counterpart.email === OUT)), pend2);
     check('upgrade wipe: stateVersion written to the current version', w2.store.outlookSync && w2.store.outlookSync.stateVersion === O.create(w2.deps()).STATE_VERSION, w2.store.outlookSync);
-    check('upgrade wipe: incoming ask appears after re-judge', (pend2.incoming || []).some((x) => x.messageId === 'a1'), pend2);
+    check('upgrade wipe: incoming ask appears after re-judge', (pend2.incoming || []).some((x) => x.messageId === 'a1'), { ids: (pend2.incoming || []).map((x) => x.messageId), diag: s2 && s2.diagnostics });
     check('upgrade sync ok', s2.ok, s2);
   }
 
@@ -427,6 +460,19 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const undone = (w.store.log || []).filter((e) => e.kind === 'undone' && e.messageId === 'gone1');
     check('gone draft becomes undone with reopen', undone.length >= 1 && undone[0].outlookReopen, undone);
     check('gone draft no longer resolved', (w.store.resolvedMessageIds || []).indexOf('gone1') === -1, w.store.resolvedMessageIds);
+
+    w.storage.getActiveOutlookReceipts = async () => (w.store.log || []).slice();
+    w.store.log.push({
+      ts: NOW, kind: 'written', messageId: 'task1', connectorId: 'outlookTask',
+      ref: { taskId: 'e2e-todo-1', externalId: 'e2e-todo-1' },
+      fetchedBack: true, system: 'microsoft/todo', app: 'outlook'
+    });
+    const before = w.calls.length;
+    const kept = await o.reconcileReceipts();
+    const task = (w.store.log || []).find((e) => e && e.messageId === 'task1' && e.kind === 'written' && !e.undone);
+    const urls = w.calls.slice(before).map((c) => String(c.url));
+    check('reconcile leaves a To Do receipt in the log', !!task && kept.ok === true, { task: task, kept: kept });
+    check('reconcile does not read a task ref as a message id', !urls.some((u) => u.indexOf('object') >= 0 || u.indexOf('e2e-todo') >= 0), urls);
 
     const gone = await o.undoReplyDraft('still-missing');
     check('Undo when draft already missing is success alreadyGone', gone.ok && gone.alreadyGone && /already gone/i.test(gone.written), gone);
@@ -526,8 +572,9 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const aliasSync = await oa.sync({ force: true });
     const aliasIn = (wa.store.outlookPending && wa.store.outlookPending.incoming) || [];
     const aliasDiag = (wa.store.outlookSync && wa.store.outlookSync.diagnostics) || [];
-    check('a same-account sender stays silent', aliasSync.ok && aliasIn.length === 0, aliasIn);
-    check('that silence is own-sender or note-to-self', aliasDiag.some((d) => d && (d.reason === 'own-sender' || d.reason === 'note-to-self')), aliasDiag);
+    check('a mail from the account to itself is not silenced as own-sender',
+      aliasSync.ok && !aliasDiag.some((d) => d && (d.reason === 'own-sender' || d.reason === 'note-to-self')),
+      { incoming: aliasIn, diag: aliasDiag });
     delete global.FlowFileAttach;
     delete global.FlowCloseChains;
   }

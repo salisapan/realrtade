@@ -44,7 +44,8 @@ const FlowFileAttach = (() => {
   const NEED_EN = /\b(?:please\s+(?:send|attach|forward|share|resend|provide|email|enclose)|(?:can|could|would)\s+you\s+(?:please\s+)?(?:send|attach|forward|share|resend|provide|email)|would\s+you\s+mind\s+(?:sending|attaching|forwarding|sharing|emailing)|mind\s+(?:sending|forwarding|emailing|sharing)|kindly\s+(?:send|attach|forward|share|resend|provide|email)|(?:sending|send|attach|forward|share|resend|email)\s+(?:me\s+|us\s+|over\s+)?(?:the|your|our|a|an|that)|(?:i|we)\s+(?:still\s+|also\s+)?need\s+(?:you\s+to\s+(?:send|forward|attach|share|email)\s+)?(?:a\s+copy\s+of\s+)?(?:the|your|our|a|an)|(?:can|could)\s+i\s+(?:please\s+)?(?:get|have)\s+(?:a\s+copy\s+of\s+)?(?:the|your|a|an)|be\s+able\s+to\s+(?:send|forward|share|attach|email|resend|provide)|if\s+you\s+could\s+(?:please\s+)?(?:send|forward|share|attach|email|resend|provide)|pass\s+along\s+(?:the|your|a|an))\b/i;
   // צריך uses a final kaf; צריכה and צריכים use a regular kaf. One optional
   // letter cannot spell both. שלח is bounded so אשלח (a promise) is not a need.
-  const NEED_HE = /(?:תשלח(?:י|ו)?|לשלוח|להעביר|לצרף|(?:^|[^\u0590-\u05FF])שלח(?:י|ו)?(?:\s+לי)?|תצר(?:ף|פי|פו)|צר(?:ף|פי|פו)|תעביר(?:י|ו)?(?:\s+לי)?|אשמח\s+לקבל|אפשר\s+(?:לקבל|לצרף)|אבקש\s+לקבל|(?:צריך|צריכה|צריכים)\s+את|נשמח\s+לקבל|מבקש(?:ת|ים)?\s+לשלוח|תוכל(?:י|ו)?(?:\s+בבקשה)?\s+(?:לשלוח|להעביר|לצרף))/;
+  // לצררף is the slipped-letter form of לצרף. Both ask to attach one file.
+  const NEED_HE = /(?:תשלח(?:י|ו)?|לשלוח|להעביר|לצרר?ף|(?:^|[^\u0590-\u05FF])שלח(?:י|ו)?(?:\s+לי)?|תצר(?:ף|פי|פו)|צר(?:ף|פי|פו)|תעביר(?:י|ו)?(?:\s+לי)?|אשמח\s+לקבל|אפשר\s+(?:לקבל|לצרר?ף)|אבקש\s+לקבל|(?:צריך|צריכה|צריכים)\s+את|נשמח\s+לקבל|מבקש(?:ת|ים)?\s+לשלוח|תוכל(?:י|ו)?(?:\s+בבקשה)?\s+(?:לשלוח|להעביר|לצרר?ף))/;
   const NEG_EN = /\b(?:do not|don't|no need to)\s+(?:send|attach|forward|share|resend|provide)\b/i;
   const NEG_HE = /(?:אל\s+תשלח|אין\s+צורך|לא\s+צריך\s+לשלוח|בלי\s+לצרף)/;
   const HEDGE = /\b(?:maybe|perhaps|possibly|if you want|if you feel like|no rush|any chance|not sure which|whichever)\b|(?:^|[\s,.])אולי(?:[\s,.]|$)|אם בא לך|לא בטוח(?:ה)?\s+איז|איזה\s+קובץ|איזו\s+חשבונית|יש סיכוי/i;
@@ -501,6 +502,101 @@ const FlowFileAttach = (() => {
   // (core/file-path.js) to tell whether finishing an intention takes a file. Several
   // objects, a plural ("the invoices"), a hedge or a negation all mean null:
   // a loop is only file-backed when it is clear which file.
+  // Thread evidence for Drive close chains: only when the mail names a real
+  // attachment and explicitly asks to save, upload, attach to Drive, or sign it.
+  const THREAD_SAVE_EN = /\b(?:save|upload|store|file|put)\b[^.\n]{0,120}\b(?:attach(?:ed|ment)?|the\s+(?:pdf|file)|it)\b|\b(?:save|upload|store)\b[^.\n]{0,60}\b(?:to\s+)?(?:google\s*)?drive\b|\battach(?:ed|ment)?\b[^.\n]{0,60}\b(?:to\s+)?(?:google\s*)?drive\b|\bsign\b[^.\n]{0,80}\b(?:the\s+)?(?:attached|attachment|pdf|nda|contract)\b/i;
+  const THREAD_SAVE_HE = /(?:ל)?(?:שמור|להעלות|תעלה|תצרף|לצרף)[^.\n]{0,80}(?:מצורף|המצורף|קובץ|pdf)|(?:חתום|לחתום)[^.\n]{0,40}(?:מצורף|המצורף|קובץ|nda|חוזה)/i;
+
+  function attachFileName(file) {
+    return String((file && (file.filename || file.name)) || '');
+  }
+
+  function attachMime(file) {
+    return String((file && (file.mimeType || file.contentType)) || '').toLowerCase();
+  }
+
+  function attachIsPdf(file) {
+    const name = attachFileName(file).toLowerCase();
+    return /\.pdf$/i.test(name) || attachMime(file) === 'application/pdf';
+  }
+
+  function attachIsImage(file) {
+    const name = attachFileName(file).toLowerCase();
+    return /\.(jpe?g|png|gif|webp|heic)$/i.test(name) || /^image\//.test(attachMime(file));
+  }
+
+  // Which thread attachment to save when the mail names a document (signed
+  // contract, agreement, NDA, חוזה, הסכם, חתום). PDF beats an image. No guess
+  // when scores tie — the card asks.
+  function pickSaveAttachment(text, attachments) {
+    const list = (attachments || []).filter((a) => a && attachFileName(a));
+    if (list.length <= 1) {
+      return { mode: list.length === 1 ? 'single' : 'none', file: list[0] || null, files: list };
+    }
+    const blob = norm(fresh(String(text || '')));
+    const hints = [
+      { body: /\bsigned\b|חתום|חתומ/, name: /signed|חתום|חתומ/, weight: 48 },
+      { body: /\bcontract\b|חוזה/, name: /contract|חוזה/, weight: 42 },
+      { body: /\bagreement\b|הסכם/, name: /agreement|הסכם/, weight: 40 },
+      { body: /\bnda\b/i, name: /nda/, weight: 36 }
+    ];
+    const scored = list.map((file) => {
+      const name = norm(attachFileName(file));
+      let score = 0;
+      hints.forEach((hint) => {
+        const bodyHit = hint.body.test(blob);
+        const nameHit = hint.name.test(name);
+        if (bodyHit && nameHit) score += hint.weight;
+        else if (nameHit && !bodyHit) score += Math.floor(hint.weight / 5);
+        else if (bodyHit && !nameHit) score += Math.floor(hint.weight / 6);
+      });
+      if (/\bappendix\b|נספח/.test(name) && !/\bappendix\b|נספח/.test(blob)) score -= 40;
+      if (attachIsPdf(file)) score += 14;
+      if (attachIsImage(file)) score -= 10;
+      return { file: file, score: score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored[0].score;
+    const second = scored[1].score;
+    const GAP = 18;
+    if (top >= 28 && top - second >= GAP) {
+      return { mode: 'picked', file: scored[0].file, files: list };
+    }
+    return { mode: 'choice', file: null, files: list };
+  }
+
+  // Multi-attachment file-it: step-list catalog (Gmail + Outlook parity).
+  function saveAttachmentCatalog(attachments) {
+    return (attachments || []).map((meta, i) => {
+      const name = attachFileName(meta);
+      const id = String((meta && meta.id) || (meta && meta.url) || ('att-' + i));
+      return { id: id, name: name, label: name, on: false, skipped: !name };
+    });
+  }
+
+  function enrichFileItChoiceCatalog(process, attachments, pickMode) {
+    if (!process || process.id !== 'file-it' || pickMode !== 'choice') return process;
+    const list = (attachments || []).filter((a) => a && attachFileName(a));
+    if (list.length < 2) return process;
+    const catalog = saveAttachmentCatalog(list);
+    const steps = (process.steps || []).map((step) => {
+      if (!step || (step.kind !== 'driveFile' && step.kind !== 'onedriveFile')) return step;
+      return Object.assign({}, step, {
+        params: Object.assign({}, step.params || {}, { catalog: catalog, files: catalog.slice() })
+      });
+    });
+    return Object.assign({}, process, { steps: steps });
+  }
+
+  function threadEvidenceEligible(text, attachmentCount) {
+    const n = Number(attachmentCount) || 0;
+    if (n <= 0) return false;
+    const body = fresh(text);
+    if (!body.trim() || NEG_EN.test(body) || NEG_HE.test(body)) return false;
+    if (gate(body).kind === 'clear') return true;
+    return THREAD_SAVE_EN.test(body) || THREAD_SAVE_HE.test(body);
+  }
+
   function mention(text) {
     const body = fresh(text);
     if (!body.trim()) return null;
@@ -514,7 +610,7 @@ const FlowFileAttach = (() => {
   }
 
   return {
-    gate, decide, mention, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
+    gate, decide, mention, pickSaveAttachment, saveAttachmentCatalog, enrichFileItChoiceCatalog, threadEvidenceEligible, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
     MAX_CARD_FIELDS, ATTACH_SCORE, MAX_BYTES
   };
 })();

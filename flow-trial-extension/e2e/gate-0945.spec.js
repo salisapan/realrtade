@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const S = require('./support/sentences');
+const { testDay } = require('./support/fixtures');
+const TD = testDay();
 
 const DANA = "I'll send Dana the numbers by Thursday.";
 const NORTHWIND = 'The signed Northwind Supplies agreement is attached.';
@@ -77,8 +79,8 @@ function shownRow(text, id, intent, process, ts) {
 
 test('a live unread pane names the open PDF, and a small chip is a skipped row', async ({ glance }) => {
   test.setTimeout(90000);
-  const when = localIso(2026, 10, 8, 14, 1);
-  const whenSkip = localIso(2026, 10, 8, 13, 46);
+  const when = localIso(TD.y, TD.m, TD.d, 14, 1);
+  const whenSkip = localIso(TD.y, TD.m, TD.d, 13, 46);
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
@@ -96,13 +98,14 @@ test('a live unread pane names the open PDF, and a small chip is a skipped row',
   });
 
   const page = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     unread: true,
     id: LIVE,
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 14:01',
+    receivedLabel: TD.dmy + ' 14:01',
     attachments: [{ name: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   const pane = page.locator('#ReadingPaneContainerId');
@@ -110,13 +113,14 @@ test('a live unread pane names the open PDF, and a small chip is a skipped row',
   await expect(pane.locator('.flow-chip-process-name')).toHaveText('Save the file?');
 
   const skipped = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     unread: true,
     id: SKIP_LIVE,
     subject: 'Northwind agreement - small PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 13:46',
+    receivedLabel: TD.dmy + ' 13:46',
     attachments: [{ name: 'northwind-agreement-signed.pdf', sizeLabel: '800 B' }]
   });
   const skipPane = skipped.locator('#ReadingPaneContainerId');
@@ -126,8 +130,8 @@ test('a live unread pane names the open PDF, and a small chip is a skipped row',
 
 test('a no-ask attachment mail shows the file that is open', async ({ glance }) => {
   test.setTimeout(90000);
-  const alphaWhen = localIso(2026, 10, 8, 14, 37);
-  const betaWhen = localIso(2026, 10, 8, 14, 38);
+  const alphaWhen = localIso(TD.y, TD.m, TD.d, 14, 37);
+  const betaWhen = localIso(TD.y, TD.m, TD.d, 14, 38);
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
@@ -145,13 +149,14 @@ test('a no-ask attachment mail shows the file that is open', async ({ glance }) 
   });
 
   const alpha = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     unread: true,
     id: Q3_CONV,
     subject: 'Q3 fund statement',
     senderEmail: S.SENDER,
     body: Q3,
-    receivedLabel: '08/10/2026 14:37',
+    receivedLabel: TD.dmy + ' 14:37',
     attachments: [{ name: 'statement-q3-alpha.pdf', sizeLabel: '3 KB' }]
   });
   const alphaPane = alpha.locator('#ReadingPaneContainerId');
@@ -159,13 +164,14 @@ test('a no-ask attachment mail shows the file that is open', async ({ glance }) 
   await expect(alphaPane.getByText('statement-q3-beta.pdf')).toHaveCount(0);
 
   const beta = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     unread: true,
     id: Q3_CONV,
     subject: 'Q3 fund statement',
     senderEmail: S.SENDER,
     body: Q3,
-    receivedLabel: '08/10/2026 14:38',
+    receivedLabel: TD.dmy + ' 14:38',
     attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }]
   });
   const betaPane = beta.locator('#ReadingPaneContainerId');
@@ -185,18 +191,20 @@ test('a live pane with no Graph candidate records suggest:no-candidate', async (
     conversation: []
   });
   await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     unread: true,
     id: LIVE,
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 14:01',
+    receivedLabel: TD.dmy + ' 14:01',
     attachments: [{ name: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   await expect.poll(async () => {
     const bag = await glance.storage();
-    return (bag.outlookPageDiag || []).some((d) => d && d.reason === 'suggest:no-candidate');
+    const rows = (bag.suggestLog || []).concat(bag.outlookPageDiag || []);
+    return rows.some((d) => d && d.reason === 'suggest:no-candidate');
   }).toBe(true);
 });
 
@@ -204,6 +212,7 @@ test('Undo returns one Do It on the mail and in Loops, including a legacy undone
   test.setTimeout(90000);
   await glance.seedOutlook();
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: PROMISE,
     subject: 'Numbers for Dana',
     senderEmail: S.SENDER,
@@ -257,6 +266,7 @@ test('Undo returns one Do It on the mail and in Loops, including a legacy undone
     ]
   });
   const legacy = await glance.openOutlook({
+    confirmConversation: true,
     id: LEGACY,
     subject: 'Renew the passport application',
     senderEmail: S.SENDER,
@@ -346,8 +356,8 @@ test('3:05 PM saves the afternoon file, and a bare 3:05 does not', async ({ glan
   await glance.setScenario({
     inboxFilterFails: true,
     inbox: [
-      inboxRow(morningId, conv, 'Clock check', localIso(2026, 10, 8, 3, 5)),
-      inboxRow(afternoonId, conv, 'Clock check', localIso(2026, 10, 8, 15, 5))
+      inboxRow(morningId, conv, 'Clock check', localIso(TD.y, TD.m, TD.d, 3, 5)),
+      inboxRow(afternoonId, conv, 'Clock check', localIso(TD.y, TD.m, TD.d, 15, 5))
     ],
     sent: [],
     messages: {},
@@ -358,30 +368,33 @@ test('3:05 PM saves the afternoon file, and a bare 3:05 does not', async ({ glan
     conversation: []
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: conv,
     subject: 'Clock check',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 3:05 PM',
+    receivedLabel: TD.dmy + ' 3:05 PM',
     attachments: [{ name: 'afternoon.pdf', sizeLabel: '4 KB' }]
   });
   await expect(page.locator('#ReadingPaneContainerId').getByText('Save afternoon.pdf to OneDrive?')).toBeVisible();
   await expect(page.locator('#ReadingPaneContainerId').getByText('morning.pdf')).toHaveCount(0);
 
   const bare = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: conv,
     subject: 'Clock check',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 3:05',
+    receivedLabel: TD.dmy + ' 3:05',
     attachments: [{ name: 'afternoon.pdf', sizeLabel: '4 KB' }]
   });
   await expect(bare.locator('#ReadingPaneContainerId').getByText('Save the file?')).toHaveCount(0);
   await expect.poll(async () => {
     const bag = await glance.storage();
-    return (bag.outlookPageDiag || []).some((d) => d && d.reason === 'suggest:unresolved');
+    const rows = (bag.suggestLog || []).concat(bag.outlookPageDiag || []);
+    return rows.some((d) => d && d.reason === 'suggest:unresolved');
   }).toBe(true);
 });
 
@@ -392,25 +405,26 @@ test('a Hebrew 24-hour pane links one subject, and 14:37 is not 14:38', async ({
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
-    inbox: [inboxRow(northMsg, northConv, 'Northwind agreement - signed PDF', localIso(2026, 10, 8, 14, 1))],
+    inbox: [inboxRow(northMsg, northConv, 'Northwind agreement - signed PDF', localIso(TD.y, TD.m, TD.d, 14, 1))],
     sent: [],
     messages: {},
     attachments: { [northMsg]: pdf('att-nw', 'northwind-agreement-signed.pdf', 3072) },
     conversation: []
   });
   const north = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: northConv,
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: 'ה 08/10/2026 14:01',
+    receivedLabel: TD.heDay + ' ' + TD.dmy + ' 14:01',
     attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   await expect(north.locator('#ReadingPaneContainerId').getByText('Save northwind-agreement-signed.pdf to OneDrive?')).toBeVisible();
 
-  const alphaWhen = localIso(2026, 10, 8, 14, 37);
-  const betaWhen = localIso(2026, 10, 8, 14, 38);
+  const alphaWhen = localIso(TD.y, TD.m, TD.d, 14, 37);
+  const betaWhen = localIso(TD.y, TD.m, TD.d, 14, 38);
   await glance.setScenario({
     inboxFilterFails: true,
     inbox: [
@@ -426,24 +440,26 @@ test('a Hebrew 24-hour pane links one subject, and 14:37 is not 14:38', async ({
     conversation: []
   });
   const alpha = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: Q3_CONV,
     subject: 'Q3 fund statement',
     senderEmail: S.SENDER,
     body: Q3,
-    receivedLabel: '08/10/2026 14:37',
+    receivedLabel: TD.dmy + ' 14:37',
     attachments: [{ shownName: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }]
   });
   await expect(alpha.locator('#ReadingPaneContainerId').getByText('Save statement-q3-alpha.pdf to OneDrive?')).toBeVisible();
   await expect(alpha.locator('#ReadingPaneContainerId').getByText('statement-q3-beta.pdf')).toHaveCount(0);
 
   const beta = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: Q3_CONV,
     subject: 'Q3 fund statement',
     senderEmail: S.SENDER,
     body: Q3,
-    receivedLabel: '08/10/2026 14:38',
+    receivedLabel: TD.dmy + ' 14:38',
     attachments: [{ shownName: '…nt-q3-beta.pdf', sizeLabel: '4 KB' }]
   });
   await expect(beta.locator('#ReadingPaneContainerId').getByText('Save statement-q3-beta.pdf to OneDrive?')).toBeVisible();
@@ -454,6 +470,7 @@ test('a Hebrew To line that names the user offers the Q3 draft', async ({ glance
   test.setTimeout(60000);
   await glance.seedOutlook();
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkGlanceE2EHebrewTo',
     subject: 'Gate A 0.9.41 - quick question on the Q3 summary',
     senderEmail: S.SENDER,
@@ -497,6 +514,7 @@ test('an older undone promise shows one Do It on a mail with the same words', as
     }]
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkPassport34',
     subject: 'Gate 0.9.34 To Do title',
     senderEmail: S.SENDER,
@@ -507,24 +525,20 @@ test('an older undone promise shows one Do It on a mail with the same words', as
   await expect(pane.getByText(line)).toHaveCount(0);
 });
 
-test('Show all keeps the side panel scroll', async ({ glance }) => {
+test('the why line is the current mail only', async ({ glance }) => {
   test.setTimeout(60000);
   const diags = [];
   for (let i = 0; i < 25; i++) {
     diags.push({ key: 'page:quiet|' + i, reason: 'page:quiet-' + i, subject: 'Quiet mail ' + i, at: i });
   }
-  await glance.seedOutlook({ outlookPageDiag: diags });
+  await glance.seedOutlook({
+    outlookPageDiag: diags,
+    glanceWhyCurrent: { reason: 'page:intent-null', subject: 'Quiet mail 24', messageId: 'current' }
+  });
   const popup = await glance.openPopup();
   await popup.locator('button[data-tab="setup"]').click();
-  await popup.setViewportSize({ width: 380, height: 420 });
-  const before = await popup.locator('main').evaluate((el) => {
-    el.scrollTop = 140;
-    return el.scrollTop;
-  });
-  expect(before).toBe(140);
-  await popup.locator('#surface-list summary').evaluate((el) => el.click());
-  await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
-  await popup.locator('#surface-list').getByRole('button', { name: 'Show all' }).evaluate((el) => el.click());
-  await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
-  await expect(popup.locator('#surface-list').getByText('page:quiet-24')).toBeVisible();
+  const lines = popup.locator('#surface-list [data-glance-why-line]');
+  await expect(lines).toHaveCount(1);
+  await expect(lines).toContainText('לא זוהתה בקשה');
+  await expect(popup.locator('#surface-list').getByRole('button', { name: 'Show all' })).toHaveCount(0);
 });

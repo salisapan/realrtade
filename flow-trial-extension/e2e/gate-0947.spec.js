@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const S = require('./support/sentences');
+const { testDay } = require('./support/fixtures');
+const TD = testDay();
 
 const NORTHWIND = 'The signed Northwind Supplies agreement is attached.';
 const DANA = "I'll send Dana the numbers by Thursday.";
@@ -36,7 +38,7 @@ test('a connected Outlook save goes Verifying then Handled on the Graph message'
   test.setTimeout(90000);
   const conv = 'AQQKGlanceE2ESave0947';
   const msg = 'AQMkGlanceE2ESave0947';
-  const when = localIso(2026, 10, 8, 14, 1);
+  const when = localIso(TD.y, TD.m, TD.d, 14, 1);
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
@@ -48,12 +50,13 @@ test('a connected Outlook save goes Verifying then Handled on the Graph message'
     mailboxSettings: { timeFormat: 'HH:mm' }
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: conv,
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 14:01',
+    receivedLabel: TD.dmy + ' 14:01',
     attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   const pane = page.locator('#ReadingPaneContainerId');
@@ -76,17 +79,18 @@ test('a connected Outlook save goes Verifying then Handled on the Graph message'
   }).toBe(true);
 });
 
-test('the header says Outlook connected when Microsoft is on', async ({ glance }) => {
+test('the header says Connected when Microsoft is on', async ({ glance }) => {
   await glance.seedOutlook();
   const popup = await glance.openPopup();
-  await expect(popup.locator('#statusPill')).toHaveText('Outlook connected');
-  await expect(popup.getByText('Connect Google')).toBeVisible();
+  await expect(popup.locator('#statusPill')).toHaveText('מחובר');
+  await expect(popup.getByText('התחבר ל-Google')).toBeVisible();
 });
 
 test('a Hebrew To line in one text node still offers the Q3 draft', async ({ glance }) => {
   test.setTimeout(60000);
   await glance.seedOutlook();
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkGlanceE2EHebrewToInline',
     subject: Q3_SUBJECT,
     senderEmail: S.SENDER,
@@ -121,6 +125,7 @@ test('an older undone promise still matches when OWA adds a translation line', a
     }]
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkPassport34',
     subject: 'Gate 0.9.34 To Do title',
     senderEmail: S.SENDER,
@@ -131,6 +136,7 @@ test('an older undone promise still matches when OWA adds a translation line', a
   await expect(pane.locator('button.flow-chip')).toHaveCount(0);
   await expect(pane.getByText(line)).toHaveCount(0);
   const same = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkPassport35',
     subject: 'Gate 0.9.35 To Do title',
     senderEmail: S.SENDER,
@@ -150,8 +156,8 @@ test('10:05 and 22:05 on one subject stay unresolved without a 24-hour proof', a
     inboxFilterFails: true,
     mailboxSettings: { timeFormat: 'h:mm tt' },
     inbox: [
-      inboxRow(morning, conv, 'Northwind agreement - signed PDF', localIso(2026, 10, 8, 10, 5)),
-      inboxRow(evening, conv, 'Northwind agreement - signed PDF', localIso(2026, 10, 8, 22, 5))
+      inboxRow(morning, conv, 'Northwind agreement - signed PDF', localIso(TD.y, TD.m, TD.d, 10, 5)),
+      inboxRow(evening, conv, 'Northwind agreement - signed PDF', localIso(TD.y, TD.m, TD.d, 22, 5))
     ],
     sent: [],
     messages: {},
@@ -162,18 +168,20 @@ test('10:05 and 22:05 on one subject stay unresolved without a 24-hour proof', a
     conversation: []
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: conv,
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 10:05',
+    receivedLabel: TD.dmy + ' 10:05',
     attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   await expect(page.locator('#ReadingPaneContainerId').getByText('Save the file?')).toHaveCount(0);
   await expect.poll(async () => {
     const bag = await glance.storage();
-    return (bag.outlookPageDiag || []).some((d) => d && d.reason === 'suggest:unresolved' && /hour-ambiguous/.test(String(d.detail || '')));
+    const rows = (bag.suggestLog || []).concat(bag.outlookPageDiag || []);
+    return rows.some((d) => d && d.reason === 'suggest:unresolved' && /hour-ambiguous/.test(String(d.detail || '')));
   }).toBe(true);
 });
 
@@ -181,6 +189,7 @@ test('a To label and a name on the next node still offers the Q3 draft', async (
   test.setTimeout(60000);
   await glance.seedOutlook();
   const page = await glance.openOutlook({
+    confirmConversation: true,
     id: 'AQMkGlanceE2EToSibling',
     subject: Q3_SUBJECT,
     senderEmail: S.SENDER,
@@ -195,7 +204,7 @@ test('a OneDrive save with no file permission says reconnect and does not offer 
   test.setTimeout(90000);
   const conv = 'AQQKGlanceE2ESaveOff';
   const msg = 'AQMkGlanceE2ESaveOff';
-  const when = localIso(2026, 10, 8, 14, 1);
+  const when = localIso(TD.y, TD.m, TD.d, 14, 1);
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
@@ -208,18 +217,24 @@ test('a OneDrive save with no file permission says reconnect and does not offer 
     mailboxSettings: { timeFormat: 'HH:mm' }
   });
   const page = await glance.openOutlook({
+    confirmConversation: true,
     live: true,
     id: conv,
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 14:01',
+    receivedLabel: TD.dmy + ' 14:01',
     attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   const pane = page.locator('#ReadingPaneContainerId');
   await expect(pane.getByText('Save northwind-agreement-signed.pdf to OneDrive?')).toBeVisible();
-  await pane.locator('button.flow-chip').click();
-  await expect(pane.getByText('Reconnect Outlook to allow OneDrive')).toBeVisible();
+  // The card can be re-mounted by a rescan just after it first shows, and a click on the card that was replaced is ignored on
+  // purpose (0.9.55: a stale card must not run). So click the card that is there, and click again on the fresh one when nothing
+  // happened. This write fails by design (no file permission), so a second click can never create anything.
+  await expect(async () => {
+    await pane.locator('button.flow-chip').click();
+    await expect(pane.getByText('Reconnect Outlook to allow OneDrive')).toBeVisible({ timeout: 4000 });
+  }).toPass({ timeout: 30000 });
   await expect(pane.getByText("Couldn't confirm")).toHaveCount(0);
   await expect(pane.getByText('Approve close')).toHaveCount(0);
 });

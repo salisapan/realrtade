@@ -18,6 +18,10 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 
+check('messageIdSpellings tries REST spelling before URL spelling',
+  F.messageIdSpellings('AQMkADBm/j3Plus+Slash_Spelling==').length >= 2 &&
+  F.messageIdSpellings('AQMkADBm/j3Plus+Slash_Spelling==')[0].indexOf('+') < 0);
+
 function background(opts) {
   opts = opts || {};
   const calls = [];
@@ -37,6 +41,7 @@ function background(opts) {
   const routes = opts.routes || [];
   const sandbox = {
     console, URLSearchParams, URL, TextEncoder, Uint8Array, atob, crypto: webcrypto,
+    setTimeout, clearTimeout,
     fetch: async (url, init) => {
       const method = (init && init.method) || 'GET';
       let body = null;
@@ -93,8 +98,8 @@ const PAYLOAD = { params: { content: 'signed', fileName: 'passport.pdf' }, label
 
 function createRoutes(getStatus, getBody) {
   return [
-    { method: 'GET', test: /\/me\/drive\/root:\/passport\.pdf$/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) },
-    { method: 'PUT', test: /\/me\/drive\/root:\/passport\.pdf:\/content$/, reply: () => ({ ok: true, status: 201, json: async () => FILE, text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/root:\/Glance\/passport\.pdf$/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) },
+    { method: 'PUT', test: /\/me\/drive\/root:\/Glance\/passport\.pdf:\/content$/, reply: () => ({ ok: true, status: 201, json: async () => FILE, text: async () => '' }) },
     { method: 'GET', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: getStatus >= 200 && getStatus < 300, status: getStatus, json: async () => getBody, text: async () => '' }) }
   ];
 }
@@ -106,12 +111,24 @@ console.log('\n--- names, scope, one attachment ---\n');
     F.hasWriteScope(['https://graph.microsoft.com/Files.ReadWrite']) === true &&
     F.hasWriteScope(['Files.ReadWrite.All']) === false);
   check('an unknown scope list is not a refusal', F.hasWriteScope(null) === null);
+  check('the file goes into the Glance folder, and the card can say exactly where',
+    F.FOLDER === 'Glance' && F.rootItemPath('passport.pdf') === '/me/drive/root:/Glance/passport.pdf' &&
+    F.createContentPath('a b.pdf') === '/me/drive/root:/Glance/a%20b.pdf:/content' &&
+    F.destination('passport.pdf') === 'OneDrive > Glance > passport.pdf' &&
+    F.destination('passport.pdf', 'Drive') === 'Drive > Glance > passport.pdf' && F.destination('') === '');
   check('a name cannot climb out of the folder', F.safeName('../secret.txt') === '' && F.safeName('passport.pdf') === 'passport.pdf');
   check('inline text is one upload under the simple cap',
     F.prepare(PAYLOAD).ok === true && F.prepare(PAYLOAD).fetchOne === false && F.prepare(PAYLOAD).name === 'passport.pdf');
   const big = { params: { content: 'x'.repeat(F.MAX_BYTES + 1), fileName: 'big.txt' } };
   check('a file over the simple upload cap is unclear', F.prepare(big).ok === false && F.prepare(big).reason === 'unclear');
   check('no bytes and no message is unclear', F.prepare({ label: 'Save' }).ok === false);
+  const twoPick = F.prepare({
+    outlookIncomingId: 'MSG-TWO',
+    params: { messageId: 'MSG-TWO', fileName: 'signed-contract.pdf' }
+  });
+  check('prepare carries fileName for multi-attachment Outlook pick',
+    twoPick.ok === true && twoPick.fetchOne === true && twoPick.fileName === 'signed-contract.pdf' && twoPick.messageId === 'MSG-TWO',
+    twoPick);
   check('save-shaped text is the only sentence that counts attachments',
     G.needsOneAttachment('Please save the attached file to Drive.') === true &&
     G.needsOneAttachment('Please save the attachment to OneDrive.') === true &&
@@ -246,12 +263,63 @@ console.log('\n--- Outlook wording: OneDrive fires, a refusal and shared files d
     outlook(signedNo, 1).show === false && gmail(signedNo, 1).show === false,
     { outlook: outlook(signedNo, 1).reason, gmail: gmail(signedNo, 1).reason });
   const form = 'בבקשה לצרף את טופס 101 לזימון של הדמו ביום שני בשעה 9:00';
-  check('attaching a form to a demo invite stays quiet',
-    outlook(form, 1).show === false && gmail(form, 1).show === false,
-    { outlook: outlook(form, 1).reason, gmail: gmail(form, 1).reason });
+  const formOutlook = outlook(form, 1);
+  const formGmail = gmail(form, 1);
+  function inviteTrack(row) {
+    const kinds = row.process && row.process.steps && row.process.steps.map((s) => s.kind);
+    const taskAt = kinds ? kinds.findIndex((k) => k === 'googleTask' || k === 'outlookTask') : -1;
+    const draftAt = kinds ? kinds.findIndex((k) => k === 'gmailDraft' || k === 'outlookDraft') : -1;
+    const draft = row.process && row.process.steps && row.process.steps[draftAt] && row.process.steps[draftAt].params && row.process.steps[draftAt].params.body;
+    return row.show === true && row.intent && row.intent.label === 'לצרף טופס 101 לזימון' && draft === 'אצרף בהקדם.' && !/מצורף/.test(String(draft || '')) && taskAt !== -1 && draftAt > taskAt;
+  }
+  check('attaching a form to a demo invite is the file track',
+    inviteTrack(formOutlook) && inviteTrack(formGmail),
+    { outlook: { show: formOutlook.show, reason: formOutlook.reason, label: formOutlook.intent && formOutlook.intent.label },
+      gmail: { show: formGmail.show, reason: formGmail.reason, label: formGmail.intent && formGmail.intent.label } });
 }
 
 (async () => {
+console.log('\n--- two attachments: pick by fileName, GET item, PUT ---\n');
+{
+  const signed = { id: 'FILE-SIGNED', name: 'signed-contract.pdf', webUrl: 'https://onedrive.live.com/edit.aspx?id=FILE-SIGNED' };
+  const signedBytes = Buffer.from('signed-pdf-bytes-only');
+  const appendixBytes = Buffer.from('appendix-pdf-different');
+  const signedB64 = signedBytes.toString('base64');
+  const twoRoutes = [
+    { method: 'GET', test: /\/messages\/MSG-TWO\/attachments\?\$select/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      value: [
+        { id: 'att0', name: 'signed-contract.pdf', contentType: 'application/pdf', size: signedBytes.length, isInline: false },
+        { id: 'att1', name: 'appendix.pdf', contentType: 'application/pdf', size: appendixBytes.length, isInline: false }
+      ]
+    }), text: async () => '' }) },
+    { method: 'GET', test: /\/messages\/MSG-TWO\/attachments\/att0$/, reply: () => ({ ok: true, status: 200, json: async () => ({
+      id: 'att0', name: 'signed-contract.pdf', contentType: 'application/pdf', contentBytes: signedB64
+    }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/root:\/Glance\/signed-contract\.pdf$/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) },
+    { method: 'PUT', test: /\/me\/drive\/root:\/Glance\/signed-contract\.pdf:\/content$/, reply: () => ({ ok: true, status: 201, json: async () => signed, text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/items\/FILE-SIGNED$/, reply: () => ({ ok: true, status: 200, json: async () => signed, text: async () => '' }) }
+  ];
+  const env = background({ routes: twoRoutes });
+  const out = await env.fn('outlookFileWrite')({
+    outlookIncomingId: 'MSG-TWO',
+    params: { messageId: 'MSG-TWO', fileName: 'signed-contract.pdf', content: '' },
+    label: 'File'
+  });
+  const itemGet = env.calls.find((c) => c.method === 'GET' && /\/attachments\/att0$/.test(c.url));
+  const put = env.calls.find((c) => c.method === 'PUT' && /signed-contract\.pdf/.test(c.url));
+  const att1Get = env.calls.find((c) => c.method === 'GET' && /\/attachments\/att1$/.test(c.url));
+  let putBuf = null;
+  if (put && put.body != null) {
+    if (Buffer.isBuffer(put.body)) putBuf = put.body;
+    else if (put.body instanceof Uint8Array) putBuf = Buffer.from(put.body);
+    else if (typeof put.body === 'string') putBuf = Buffer.from(put.body, 'binary');
+  }
+  check('two-attachment file-it GETs the chosen Graph attachment then PUTs OneDrive',
+    out.ok === true && out.proof && out.proof.fetchedBack === true && itemGet && put && !att1Get
+    && putBuf && putBuf.equals(signedBytes) && !putBuf.equals(appendixBytes),
+    { out, putLen: putBuf && putBuf.length, calls: env.calls.map((c) => c.method + ' ' + c.url) });
+}
+
 console.log('\n--- create, read back, undo ---\n');
 {
   const env = background({ routes: createRoutes(200, FILE) });
@@ -269,6 +337,18 @@ console.log('\n--- create, read back, undo ---\n');
   const del = env.calls.filter((c) => c.method === 'DELETE');
   check('Undo DELETEs a file this write created',
     undo.ok === true && del.length === 1 && /\/me\/drive\/items\/FILE1$/.test(del[0].url), del.map((c) => c.url));
+  const renamed = background({ routes: [
+    { method: 'GET', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: true, status: 200, json: async () => Object.assign({}, FILE, { name: 'renamed.pdf', eTag: 'user' }), text: async () => '' }) }
+  ] });
+  const kept = await renamed.fn('outlookFileUndo')({
+    fileId: 'FILE1', itemId: 'FILE1', externalId: 'FILE1', created: true,
+    editSnap: { name: 'passport.pdf', eTag: 'created' }
+  });
+  check('a file the person edited is not deleted',
+    kept.ok === false && kept.reason === 'user-edited' &&
+    kept.written === 'You edited this. Undo left it alone.' &&
+    !renamed.calls.some((c) => c.method === 'DELETE' || c.method === 'PUT' || c.method === 'PATCH'),
+    kept);
 }
 
 console.log('\n--- a verify miss is not Handled ---\n');
@@ -284,7 +364,7 @@ console.log('\n--- a verify miss is not Handled ---\n');
 console.log('\n--- update restores a version, and a file with no version is left alone ---\n');
 {
   const routes = [
-    { method: 'GET', test: /\/me\/drive\/root:\/passport\.pdf$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/root:\/Glance\/passport\.pdf$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
     { method: 'GET', test: /\/versions\?\$top=1$/, reply: () => ({ ok: true, status: 200, json: async () => ({ value: [{ id: 'VER1' }] }), text: async () => '' }) },
     { method: 'PUT', test: /\/me\/drive\/items\/FILE1\/content$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
     { method: 'GET', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
@@ -307,13 +387,32 @@ console.log('\n--- update restores a version, and a file with no version is left
     copy.undoHint === 'Undo restores the previous OneDrive file.', copy);
 
   const bare = [
-    { method: 'GET', test: /\/me\/drive\/root:\/passport\.pdf$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
+    { method: 'GET', test: /\/me\/drive\/root:\/Glance\/passport\.pdf$/, reply: () => ({ ok: true, status: 200, json: async () => FILE, text: async () => '' }) },
     { method: 'GET', test: /\/versions\?\$top=1$/, reply: () => ({ ok: true, status: 200, json: async () => ({ value: [] }), text: async () => '' }) }
   ];
   const left = background({ routes: bare });
   const skipped = await left.fn('outlookFileWrite')(PAYLOAD);
   check('no previous version means the file is not overwritten',
     skipped.ok === false && skipped.reason === 'unclear' && !left.calls.some((c) => c.method === 'PUT'), skipped);
+}
+
+console.log('\n--- Undo deletes a file Glance created ---\n');
+{
+  const env = background({ routes: createRoutes(200, FILE).concat([
+    { method: 'DELETE', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ]) });
+  const out = await env.fn('outlookFileWrite')(PAYLOAD);
+  const put = env.calls.find((c) => c.method === 'PUT');
+  check('a new file is put in the Glance folder', out.ok === true && out.ref.created === true && put && /\/me\/drive\/root:\/Glance\/passport\.pdf:\/content$/.test(put.url), put);
+  const undo = await env.fn('outlookFileUndo')(out.ref);
+  const del = env.calls.filter((c) => c.method === 'DELETE');
+  check('Undo deletes that file and says so', undo.ok === true && del.length === 1 && /\/items\/FILE1$/.test(del[0].url) && undo.written === 'OneDrive file removed.', undo);
+  const failing = background({ routes: createRoutes(200, FILE).concat([
+    { method: 'DELETE', test: /\/me\/drive\/items\/FILE1$/, reply: () => ({ ok: false, status: 500, json: async () => ({}), text: async () => '' }) }
+  ]) });
+  const w = await failing.fn('outlookFileWrite')(PAYLOAD);
+  const u = await failing.fn('outlookFileUndo')(w.ref);
+  check('a failed delete is an honest error, not a removed file', u.ok === false && u.reason === 'http-500', u);
 }
 
 console.log('\n--- the write scope is the checkbox ---\n');

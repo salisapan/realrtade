@@ -5,9 +5,25 @@
 
 ## In this repository
 
-`owner-gold.jsonl` is the single owner-gold file. It is empty until the owner answers. A row is owner-verified only when `labeledBy` is `sali`.
+`owner-gold.jsonl` is the single owner-gold file. A row is owner-verified only when `labeledBy` is `sali`. The CTO labels for batch-001 are in that file (`batch-001-cto.answers.json`, `labeledBy` `cto`, not provisional). Every row has `ownerVerified` false. Owner-verified labels stay 0 until the owner answers.
 
-Batch-001 is the first sheet: `batch-001.md` (Hebrew), `batch-001.json` (machine form, `ownerAnswer` still null), and `batch-001-cos-prefill.md` (chief of staff proposal, not confirmed). The machine answers for that proposal are `batch-001-cos-prefill.answers.json`. Items 8 and 17 stay unsure. Item 17's note says the close is a save to OneDrive.
+Batch-001 is the first sheet: `batch-001.md` (Hebrew), `batch-001.json` (machine form, `ownerAnswer` still null), and `batch-001-cos-prefill.md` (chief of staff proposal, not confirmed). The machine answers for that proposal are `batch-001-cos-prefill.answers.json`. In that prefill, item 17 stays unsure. Item 17's note says the close is a save to OneDrive. The CTO file marks item 17 as an ask: `actionLabel` `onedrive-file|file_save`, `expectedAction` `file_save`. That label is an override (the engine side is a dated task and v2 is silence). A fresh ingest of the CTO file scores 14 binary rows and leaves items 8, 12, 13, 14, and 15 out as context-dependent.
+
+Items whose right answer depends on the person's profile are `answerType: "context-dependent"` with a `depends_on` field. They are excluded from the binary 200 and never increment `ownerVerified`, even if the mark is ✅, 🤫, or ❓, and even if `labeledBy` is `sali`. A missing `depends_on` fails ingest with code `DEPENDS`. There is no blanket "Hi all" silence rule (Sali, 2026-10-08).
+
+| Batch | Item | Id | `depends_on` |
+|---|---|---|---|
+| batch-001 | 8 | `v2syn-405` | `user_is_approver_for` |
+| batch-001 | 12 | `v2syn-6931` | `cc_reply_rate` |
+| batch-001 | 13 | `v2syn-7013` | `covers_addressee` |
+| batch-001 | 14 | `v2syn-9674` | `role_matches_topic` |
+| batch-001 | 15 | `v2syn-10482` | `work_style.files` |
+| batch-002 | 2 | `v2syn-25810` | `work_style.files` |
+| batch-002 | 3 | `v2syn-12865` | `user_is_approver_for` |
+
+A fresh ingest of the batch-001 prefill scores 13 binary rows (5 context-dependent plus item 17 unsure). The 17-row table in `docs/glance-ai/owner-gold-preview-2026-10-08.md` is the pre-retag preview. The profile spec is `docs/glance-ai/user-context-v0.md`.
+
+Batch-002 is the second sheet, 20 synthetic cases chosen where the systems disagree: `batch-002.md`, `batch-002.json`, `batch-002.selection.json`, and an empty `batch-002.answers.json`. Nothing in batch-002 is prefilled and nothing is owner-verified. Items 2 and 3 are context-dependent (table above). `apply-owner-answers.cjs` accepts `--batch batch-002.json`, or a comma-separated `--batch batch-001.json,batch-002.json`. A combined answers file must key each row by `id`, because item 1 exists in both sheets. `labeledBy` is `sali` only for an owner-verified row. ❓ stays out of the headline. A preview of batch-002 does not overwrite `docs/glance-ai/owner-gold-preview-2026-10-08.md`.
 
 Answers file shape:
 
@@ -22,7 +38,7 @@ Answers file shape:
 }
 ```
 
-`item` is the batch-001 number, or use `id` (`v2syn-…`). `mark` is ✅ (model action), ⚙️ (engine action), 🤫 (silent), or ❓ (unsure, left out of the headline). `labeledBy` may also be `cos:<name>`. That stores the row and keeps `ownerVerified` false. The command refuses `ownerVerified: true` unless `labeledBy` is `sali`.
+`item` is the batch-001 number, or use `id` (`v2syn-…`). `mark` is ✅ (model action), ⚙️ (engine action), 🤫 (silent), ❓ (unsure, left out of the headline), or `context-dependent` / `context` / ⧉ (profile-dependent, left out of the binary count; requires `depends_on`). `labeledBy` may also be `cos:<name>`. That stores the row and keeps `ownerVerified` false. The command refuses `ownerVerified: true` unless `labeledBy` is `sali`. A context-dependent row is never gold, so it cannot become owner-verified.
 
 When the owner's file is in:
 
@@ -39,6 +55,8 @@ node glance-ai/labeling/apply-owner-answers.cjs --answers glance-ai/labeling/bat
 ```
 
 `make-batch-001.cjs` rebuilds the sheet from `../model/dataset/out-v2/test.jsonl` and `../model/shadow/out-v2/test-preds.jsonl`. Those files come from `../model/run-all-v2.sh` and are not in git. The committed `batch-001.json` and `batch-001.md` are the snapshot. Re-running the generator overwrites them.
+
+Batch-003 (2026-10-11) is 200 cases labelled blind by Claude: `BATCH-003.md`. `labeledBy` is `claude`, never owner-verified.
 
 Tests: `node glance-ai/labeling/test-ingest.cjs` and `node glance-ai/labeling/test-score.cjs`. Both run at the start of `bash glance-ai/run-cpu-checks.sh`. They do not need the feature files.
 

@@ -71,6 +71,7 @@ function background() {
         const named = body && body.name === 'noid.pdf';
         return json(201, named ? { name: body.name } : { id: 'att-1', name: body && body.name });
       }
+      if (/\/me\/messages\/odraft_1(\?|$)/.test(u) && method === 'GET') return json(200, { id: 'odraft_1', isDraft: true, webLink: 'https://outlook.live.com/mail/drafts/odraft_1' });
       if (/\/me\/messages\/odraft_1$/.test(u) && method === 'DELETE') return { ok: true, status: 204, json: async () => null, text: async () => '' };
       if (/\/drive\/v3\/files\/f1\?fields=/.test(u)) return json(200, { name: 'Invoice 204.pdf', mimeType: 'application/pdf', size: '11' });
       if (/\/drive\/v3\/files\/f1\?alt=media/.test(u)) {
@@ -93,7 +94,7 @@ function background() {
   sandbox.self = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
-  return { calls, fn: (n) => vm.runInContext(n, sandbox) };
+  return { calls, stored, fn: (n) => vm.runInContext(n, sandbox) };
 }
 function mimeBody(raw) {
   const mime = Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
@@ -112,10 +113,11 @@ function gmailDecide(m) {
   if (!intent || !intent.type || !FlowIntent.shouldShowChip(intent)) return { show: false, reason: 'quiet', intent };
   const gate = FlowFileAttach ? FlowFileAttach.gate(text) : { kind: 'ignore' };
   if (gate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) return { show: false, reason: 'file', intent };
-  if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
+  if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && FlowResolution && FlowResolution.attestsPayment(gate.ask.id)) return { show: false, reason: 'file', intent };
   // A clear file ask goes to Drive search on Gmail (flow:search-drive) before any chip: outside this pure comparison.
   if (gate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST) return { show: 'drive', reason: 'drive-search', intent };
-  const process = FlowActions.planFor(intent, { threadUrl: 'https://mail.google.com/mail/u/0/#inbox/x', hasThreadAttachment: false, executionMemory: {} });
+  const process = FlowActions.planFor(intent, { threadUrl: 'https://mail.google.com/mail/u/0/#inbox/x', hasThreadAttachment: false, executionMemory: {}, text: text });
+  if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
   return { show: true, intent, process };
 }
 // content-gmail.js buildActionPayload for a gmailDraft step with no file.
@@ -139,8 +141,9 @@ function graphMessage(m, i) {
   };
 }
 function outlookDecide(m, i, extra) {
-  const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
-  const r = S.plan(Object.assign({ messages: [graphMessage(m, i)], me: [ME, 'salisapan1@gmail.com'], watches: [], graph: I.empty(), state: {}, now: NOW, deps }, extra || {}));
+  const over = extra || {};
+  const deps = Object.assign({ extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions }, over.deps || {});
+  const r = S.plan(Object.assign({ messages: [graphMessage(m, i)], me: [ME, 'salisapan1@gmail.com'], watches: [], graph: I.empty(), state: {}, now: NOW }, over, { deps }));
   return { r, entry: r.incoming[0] || null };
 }
 
@@ -195,7 +198,26 @@ const CASES = [
     text: 'Could you send me the agenda, and are you free Thu 10:00 or 14:00?' }
 ];
 
+const H1_RULING = 'CTO H1 23/10: Outlook task = To Do';
+function logH1ParityChange(line, before, after) {
+  console.log('H1 parity: ' + line + ' | before: ' + before + ' | after: ' + after + ' | ' + H1_RULING);
+}
+
 (async () => {
+  const H1_ROWS = [
+    { line: '262-265', name: 'a plain reply-requested ask from a named person' },
+    { line: '262-265', name: 'an approval ask with an amount' },
+    { line: '262-265', name: 'a confirm-by ask about pricing' },
+    { line: '262-265', name: 'a get-back-to-me ask with a deadline' },
+    { line: '262-265', name: 'an ask about who attends a dated kickoff (event + reply)' },
+    { line: '524', name: 'Outlook Hebrew sign-and-return has draft and task' }
+  ];
+  const H1_PARITY_NAMES = new Set(H1_ROWS.map((row) => row.name));
+  const H1_BEFORE = 'gmailDraft,googleTask vs outlookDraft,googleTask (task step not renamed on Outlook)';
+  const H1_AFTER = 'gmailDraft,googleTask vs outlookDraft,outlookTask (draft + task connectors renamed only)';
+  H1_ROWS.forEach((row) => {
+    logH1ParityChange('gmail-outlook-parity-corpus.cjs:' + row.line + ' [' + row.name + ']', H1_BEFORE, H1_AFTER);
+  });
   console.log('\n--- the same email, two adapters, one decision and one draft ---\n');
   let shownBoth = 0;
   for (let i = 0; i < CASES.length; i++) {
@@ -207,11 +229,27 @@ const CASES = [
     const gDraft = gShown && g.process.steps.some((s) => s.kind === 'gmailDraft');
     if (g.show === 'drive' || (gShown && !gDraft)) {
       // The planner has no Drive list. Until the mailbox check searches, a file ask is file-chain-not-run.
-      // A calendar close with no reply stays quiet. A task-only close is a To Do task, not a draft.
+      // A calendar hold is the same card, with no reply draft. A task-only close is a To Do task, not a draft.
       const steps = (gShown && g.process && g.process.steps) || [];
       const taskOnly = steps.length > 0 && steps.every((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
       if (taskOnly && oShown) {
         check(m.name + ': Outlook writes a To Do task, not a draft', entry.process.steps.every((s) => s.kind === 'outlookTask') && !entry.process.steps.some((s) => /draft|send/i.test(s.kind)), entry.process.steps.map((s) => s.kind));
+        continue;
+      }
+      const calendarOnly = steps.length > 0 && steps.every((s) => s.kind === 'calendar');
+      if (calendarOnly && oShown) {
+        const oSteps = (entry.process && entry.process.steps) || [];
+        check(m.name + ': Outlook offers the same calendar hold and does not invent a reply',
+          oSteps.length > 0 && oSteps.every((s) => s.kind === 'calendar') && !oSteps.some((s) => /draft|send/i.test(s.kind)),
+          { g: steps.map((s) => s.kind), o: oSteps.map((s) => s.kind) });
+        continue;
+      }
+      // planFor is one decision. A schedule (calendar plus a task, no reply) is the same card on both lanes.
+      if (oShown && g.process && entry && entry.process && g.process.id === entry.process.id) {
+        const oSteps = entry.process.steps || [];
+        const norm = (s) => (s.kind === 'outlookTask' || s.kind === 'googleTasks' ? 'googleTask' : s.kind === 'outlookDraft' ? 'gmailDraft' : s.kind);
+        const same = steps.map((s) => norm(s)).join(',') === oSteps.map(norm).join(',') && !oSteps.some((s) => /draft|send/i.test(s.kind));
+        check(m.name + ': both lanes plan the same close and neither invents a reply', same, { g: steps.map((s) => s.kind), o: oSteps.map((s) => s.kind), id: g.process.id });
         continue;
       }
       const why = (r.diagnostics || []).map((d) => d.reason);
@@ -222,16 +260,39 @@ const CASES = [
     if (!gShown || !oShown) continue;
     shownBoth++;
     check(m.name + ': same type and label', g.intent.type === entry.intent.type && g.intent.label === entry.intent.label, { g: [g.intent.type, g.intent.label], o: [entry.intent.type, entry.intent.label] });
-    const gKinds = g.process.steps.map((s) => s.kind).join(',');
-    const oKinds = entry.process.steps.map((s) => (s.kind === 'outlookDraft' ? 'gmailDraft' : s.kind)).join(',');
-    check(m.name + ': same process (only the draft connector renamed)', gKinds === oKinds && g.process.name === entry.process.name, { g: gKinds, o: entry.process.steps.map((s) => s.kind) });
+    const parityKind = H1_PARITY_NAMES.has(m.name)
+      ? (k) => (k === 'outlookDraft' ? 'gmailDraft' : k)
+      : (k) => k;
+    const mapOutlookKind = (k) => (k === 'outlookDraft' ? 'gmailDraft' : k);
+    const gKinds = g.process.steps.map((s) => parityKind(s.kind)).join(',');
+    const oKinds = entry.process.steps.map((s) => mapOutlookKind(s.kind)).join(',');
+    const h1ProcessMatch = () => {
+      if (g.process.id !== entry.process.id || g.process.name !== entry.process.name) return false;
+      const gDraft = g.process.steps.filter((s) => /draft/i.test(s.kind)).map((s) => parityKind(s.kind)).join(',');
+      const oDraft = entry.process.steps.filter((s) => /draft/i.test(s.kind)).map((s) => mapOutlookKind(s.kind)).join(',');
+      const gHasGoogleTask = g.process.steps.some((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
+      const gHasOutlookTask = g.process.steps.some((s) => s.kind === 'outlookTask');
+      const oHasOutlookTask = entry.process.steps.some((s) => s.kind === 'outlookTask');
+      const oHasGoogleTask = entry.process.steps.some((s) => s.kind === 'googleTask' || s.kind === 'googleTasks');
+      return gDraft === oDraft &&
+        gHasGoogleTask && !gHasOutlookTask &&
+        oHasOutlookTask && !oHasGoogleTask;
+    };
+    const processOk = H1_PARITY_NAMES.has(m.name)
+      ? h1ProcessMatch()
+      : (g.process.steps.map((s) => s.kind).join(',') === entry.process.steps.map((s) => s.kind).join(',') && g.process.name === entry.process.name);
+    logH1ParityChange('gmail-outlook-parity-corpus.cjs:269-280 [' + m.name + ']', 'draft match + task count only', 'draft match + lane task connectors (googleTask vs outlookTask)');
+    check(m.name + ': same process (' + (H1_PARITY_NAMES.has(m.name) ? 'draft renamed; Gmail googleTask + Outlook outlookTask' : 'raw step kinds') + ')', processOk, { g: gKinds, o: oKinds });
+    if (H1_PARITY_NAMES.has(m.name)) {
+      check(m.name + ': Outlook lane uses outlookTask only (not googleTask)', entry.process.steps.some((s) => s.kind === 'outlookTask') && !entry.process.steps.some((s) => s.kind === 'googleTask'), entry.process.steps.map((s) => s.kind));
+      check(m.name + ': Gmail lane uses googleTask only (not outlookTask)', g.process.steps.some((s) => s.kind === 'googleTask') && !g.process.steps.some((s) => s.kind === 'outlookTask'), g.process.steps.map((s) => s.kind));
+    }
 
     const gp = gmailPayload(g.process, m);
     if (!gp) { check(m.name + ': (no draft step on either side)', !entry.process.steps.some((s) => s.kind === 'outlookDraft')); continue; }
     const bg = background();
     const gOut = await bg.fn('gmailDraftWrite')(gp);
-    const gCall = bg.calls.find((c) => c.method === 'POST' && /\/drafts$/.test(c.url));
-    const gmailText = gCall ? mimeBody(gCall.body.message.raw) : null;
+    const gmailText = J.draftText(g.process, { sender: m.from, subject: m.subject }, FlowDraftReply);
 
     // The Outlook-on-the-web card's Do It (src/content-outlook.js) -> background outlookDraftWrite.
     const sender = entry.sender || { name: entry.base.counterpart.name, email: entry.base.counterpart.email };
@@ -242,8 +303,9 @@ const CASES = [
     // The panel's Do It text (popup.js -> src/outlook.js createReplyDraft).
     const panelText = J.draftText(entry.process, { sender, subject: m.subject }, FlowDraftReply);
 
-    check(m.name + ': both writers made a draft, neither sent', gOut.ok && oOut.ok && !bg.calls.some((c) => /\/send\b|sendMail/.test(c.url)), { gOut, oOut });
-    check(m.name + ': the Outlook draft is word for word the Gmail draft', gmailText && outlookText === gmailText, { gmail: gmailText, outlook: outlookText });
+    check(m.name + ': Gmail fills compose only; Outlook keeps a server draft; neither sent',
+      gOut && gOut.reason === 'compose-only' && gOut.preview === true && oOut.ok && !bg.calls.some((c) => /\/send\b|sendMail/.test(c.url)), { gOut, oOut });
+    check(m.name + ': the Outlook draft is word for word the Gmail compose text', gmailText && outlookText === gmailText, { gmail: gmailText, outlook: outlookText });
     check(m.name + ': the panel writes the same text too', panelText === gmailText, { panel: panelText, gmail: gmailText });
     check(m.name + ': the Outlook draft replies to the message that was read', /\/me\/messages\/msg\d+\/createReply$/.test(oCall.url) && oCall.url.includes(entry.messageId), oCall.url);
   }
@@ -255,8 +317,10 @@ const CASES = [
     // The sender also has an open loop from Gmail. Before 0.9.14 the cross-channel check turned the new Outlook ask into a
     // "does this settle...?" question and returned before the ask was judged: no card.
     const gmailLoop = { id: 'g:t1', threadId: 'g:t1', channel: 'gmail', messageId: 'gm1', subject: 'Intro', counterpart: { name: 'flow', email: 'ai.local.flow@gmail.com', phone: null }, kind: 'reply', what: 'the intro deck', status: 'waiting', direction: 'theirs', stage: 'waiting', nudges: 0, createdAt: NOW - 3 * 86400000, chaseIso: '2026-10-07', lang: 'en' };
-    const { entry } = outlookDecide(m, 0, { watches: [gmailLoop] });
-    check('an open Gmail loop with the same person does not swallow the Outlook ask (Gmail would still chip it)', Boolean(entry), null);
+    const held = outlookDecide(m, 0);
+    check('with no profile name, Hi Sali is held for the name', !held.entry && (held.r.diagnostics || []).some((d) => d.reason === 'names-pending'), (held.r.diagnostics || []).map((d) => d.reason));
+    const named = outlookDecide(m, 0, { watches: [gmailLoop], deps: { userName: 'Sali Sapan', ownNames: ['Sali', 'Sali Sapan', 'סאלי'] } });
+    check('an open Gmail loop with the same person does not swallow the Outlook ask (Gmail would still chip it)', Boolean(named.entry), (named.r.diagnostics || []).map((d) => d.reason));
   }
   {
     const m = CASES[1];
@@ -280,11 +344,11 @@ const CASES = [
     const gmail = read('src/content-gmail.js');
     check('Gmail classifies with sender, subject, calibration and attachment count', /classifyForChip\(text, \{\s*senderEmail: sender\.email,\s*senderName: sender\.name,\s*subject: subject,\s*calibration: state\.calibration,\s*calibrationByType: state\.calibrationByType,\s*attachmentCount: attachments\.length/.test(gmail));
     check('Gmail\'s draft payload is { params (minus attach-chooser fields), senderEmail, senderName, subject }', /const \{ selectedAttachment, driveFileId, driveFileName, driveMimeType, \.\.\.cleanParams \} = action\.params;/.test(gmail) && /senderEmail: ctx\.sender\.email,\s*senderName: ctx\.sender\.name,\s*subject: ctx\.subject/.test(gmail));
-    check('Gmail gates on shouldShowChip, the file gate and resolution before planFor', /if \(!FlowIntent\.shouldShowChip\(intent\)\)/.test(gmail) && /FlowFileAttach\.gate\(text\)/.test(gmail) && /FlowResolution\.owns\(fileGate\.ask\.id\)/.test(gmail));
+    check('Gmail gates on shouldShowChip, the file gate and the shared receipt judge before planFor', /if \(!FlowIntent\.shouldShowChip\(intent\)\)/.test(gmail) && /FlowFileAttach\.gate\(text\)/.test(gmail) && /FlowIncomingJudge\.silencesReceipt\(text\)/.test(gmail) && !/FlowResolution\.owns\(fileGate\.ask\.id\)/.test(gmail));
     const judge = read('core/incoming-judge.js');
     check('the shared judge classifies with the same context keys', /senderEmail:[^\n]*\n\s*senderName:[^\n]*\n\s*subject:[^\n]*\n\s*calibration:[^\n]*\n\s*calibrationByType:[^\n]*\n\s*attachmentCount:/.test(judge));
     const bgSrc = read('src/background.js');
-    check('both writers compose with draftBodyText', /body: draftBodyText\(p, attachment, attachmentSource, shareUrl\)/.test(bgSrc) && /comment = draftBodyText\(p, null, null, null\)/.test(bgSrc));
+    check('Gmail compose and Outlook draft share draftBodyText', /function draftBodyText\(/.test(bgSrc) && /comment = draftBodyText\(p, null, null, null\)/.test(bgSrc));
     const sync = read('core/outlook-sync.js');
     check('the Outlook planner judges with the shared judge, not its own classify', /judge\.judge\(/.test(sync) && !/FlowIntent\.classify\(|intentApi\.classify\(/.test(sync));
     const page = read('src/content-outlook.js');
@@ -328,6 +392,238 @@ const CASES = [
     const noIdBg = background();
     const noIdWrite = await noIdBg.fn('outlookDraftWrite')({ connectorId: 'outlookDraft', outlookIncomingId: 'msg1', messageId: 'msg1', attachment: { filename: 'noid.pdf', mimeType: 'application/pdf', base64: Buffer.from('x').toString('base64') }, body: 'No file.' });
     check('no attachment id deletes the draft and does not claim attached', noIdWrite.ok === false && noIdWrite.reason === 'outlook-file-found-no-attach' && !(noIdWrite.written && /attach/i.test(noIdWrite.written)) && noIdBg.calls.some((c) => c.method === 'DELETE' && /\/me\/messages\/odraft_1$/.test(c.url)), noIdWrite);
+  }
+
+  console.log('\n--- one ask, the page and Loops, one draft ---\n');
+  {
+    const gate = background();
+    const op = { connectorId: 'outlookDraft', outlookIncomingId: 'msg-gate', messageId: 'msg-gate', body: 'The certificate is on this draft.' };
+    const first = await gate.fn('outlookDraftWrite')(op);
+    const second = await gate.fn('outlookDraftWrite')(op);
+    const posts = gate.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url));
+    const map = gate.stored.outlookSync && gate.stored.outlookSync.glanceDraftByMessage;
+    check('a second page Do It reuses the draft and does not create another',
+      first.ok && first.ref === 'odraft_1' && second.ok && second.reused === true && second.reason === 'draft-already' && second.ref === 'odraft_1' && posts.length === 1,
+      { first, second, posts: posts.length });
+    check('that draft is the one Loops reads for the same mail',
+      map && map['msg-gate'] === 'odraft_1', map);
+    check('neither write sent the mail', !gate.calls.some((c) => /\/(send|sendMail)(\b|$)/.test(c.url)));
+  }
+
+  console.log('\n--- a mail from the user to the user is incoming ---\n');
+  {
+    const SAVE = 'please save the report to Drive by 20/10';
+    const HE = 'תשמור לי את הזמן לפגישה ב-20/10 ב-14:00';
+    const GMAIL = 'ai.local.flow@gmail.com';
+    const ALIAS = 'sali.alias@glance.test';
+    const OTHER_MAIL = 'sali.other@glance.test';
+    const UPN = 'sali.upn@glance.test';
+    const ownGmail = [GMAIL];
+    const ownOutlook = [ME, 'salisapan1@gmail.com'];
+    const ownAlias = [ME, ALIAS, OTHER_MAIL, UPN];
+    const judgeDeps = { intent: FlowIntent, actions: FlowActions, factReply: FlowFactReply, fileAttach: FlowFileAttach, resolution: FlowResolution };
+    function pair(from, to, text, own, att) {
+      const base = {
+        text: text, subject: 'Note to myself',
+        sender: { name: 'Sali', email: from },
+        now: new Date(NOW),
+        to: [to],
+        ownAddresses: own,
+        inbound: false,
+        attachmentCount: att,
+        hasThreadAttachment: att === 1
+      };
+      return {
+        g: J.judge(Object.assign({ surface: 'gmail' }, base), judgeDeps),
+        o: J.judge(Object.assign({ surface: 'outlook' }, base), judgeDeps)
+      };
+    }
+    function steps(r) {
+      return ((r && r.process && r.process.steps) || []).map((s) => s.kind);
+    }
+    const saveG = pair(GMAIL, GMAIL, SAVE, ownGmail, 1);
+    check('Gmail shape, save the report to Drive by 20/10, self-sent is a task with no draft',
+      saveG.g.show === true && steps(saveG.g).join(',') === 'googleTask' && saveG.g.intent && saveG.g.intent.label === 'Save the report',
+      { show: saveG.g.show, reason: saveG.g.reason, steps: steps(saveG.g), label: saveG.g.intent && saveG.g.intent.label });
+    const saveO = pair(ME, ME, SAVE, ownOutlook, 1);
+    check('Outlook shape, save the report to Drive by 20/10, self-sent is a task with no draft',
+      saveO.o.show === true && steps(saveO.o).join(',') === 'outlookTask' && saveO.o.intent && saveO.o.intent.label === 'Save the report',
+      { show: saveO.o.show, reason: saveO.o.reason, steps: steps(saveO.o), label: saveO.o.intent && saveO.o.intent.label });
+    const heG = pair(GMAIL, GMAIL, HE, ownGmail, 0);
+    const heO = pair(ME, ME, HE, ownOutlook, 0);
+    check('Gmail shape, Hebrew meeting on 20/10 at 14:00, self-sent is a task with no draft',
+      heG.g.show === true && steps(heG.g).join(',') === 'googleTask',
+      { show: heG.g.show, reason: heG.g.reason, steps: steps(heG.g) });
+    check('Outlook shape, Hebrew meeting on 20/10 at 14:00, self-sent is a task with no draft',
+      heO.o.show === true && steps(heO.o).join(',') === 'outlookTask',
+      { show: heO.o.show, reason: heO.o.reason, steps: steps(heO.o) });
+    const alias = pair(ALIAS, OTHER_MAIL, HE, ownAlias, 0);
+    check('an alias writing to another alias of the same user is a task with no draft',
+      alias.o.show === true && steps(alias.o).join(',') === 'outlookTask',
+      { show: alias.o.show, reason: alias.o.reason, steps: steps(alias.o) });
+    const outbound = pair(ME, 'dana@acme.com', HE, ownOutlook, 0);
+    check('a mail from the user to someone else stays quiet',
+      outbound.g.show === false && outbound.o.show === false && outbound.o.reason === 'quiet:hedge',
+      { g: outbound.g.reason, o: outbound.o.reason });
+    const behalf = J.judge({
+      text: HE, subject: 'Note to myself',
+      sender: { name: 'Sali', email: ME },
+      now: new Date(NOW), surface: 'outlook',
+      to: [ME], ownAddresses: ownOutlook, inbound: false,
+      onBehalfOf: 'delegate@acme.com', attachmentCount: 0
+    }, judgeDeps);
+    check('a delegate sending as the user stays quiet', behalf.show === false, { reason: behalf.reason });
+
+    function graphSelf(from, to, text, i, extra) {
+      return Object.assign({
+        id: 'self' + i, conversationId: 'convself' + i, subject: 'Note to myself', isDraft: false,
+        hasAttachments: false,
+        from: { emailAddress: { name: 'Sali', address: from } },
+        toRecipients: [{ emailAddress: { name: 'Sali', address: to } }],
+        receivedDateTime: new Date(NOW - 3600000).toISOString(),
+        body: { contentType: 'text', content: text }
+      }, extra || {});
+    }
+    const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+    function planned(messages, me) {
+      return S.plan({ messages: messages, me: me, watches: [], graph: I.empty(), state: {}, now: NOW, deps: deps });
+    }
+    const report = { hasAttachments: true, attachments: [{ id: 'a1', name: 'report.pdf', isInline: false }] };
+    const saveBox = planned([graphSelf(GMAIL, GMAIL, SAVE, 1, report)], [GMAIL, ME]);
+    check('Outlook mailbox, Gmail address to itself, the save is incoming',
+      saveBox.incoming.length === 1 && !(saveBox.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: saveBox.incoming.length, why: (saveBox.diagnostics || []).map((d) => d.reason) });
+    const saveMe = planned([graphSelf(ME, ME, SAVE, 2, report)], ownOutlook);
+    check('Outlook mailbox, Outlook address to itself, the save is incoming',
+      saveMe.incoming.length === 1 && !(saveMe.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: saveMe.incoming.length, why: (saveMe.diagnostics || []).map((d) => d.reason) });
+    const heBox = planned([graphSelf(GMAIL, GMAIL, HE, 3)], [GMAIL, ME]);
+    const heMe = planned([graphSelf(ME, ME, HE, 4)], ownOutlook);
+    check('Outlook mailbox, Gmail address, the Hebrew meeting is a calendar hold',
+      heBox.incoming.length === 1 && heBox.incoming[0].intent && heBox.incoming[0].intent.personalClose === 'calendar-hold',
+      { incoming: heBox.incoming.length, why: (heBox.diagnostics || []).map((d) => d.reason) });
+    check('Outlook mailbox, Outlook address, the Hebrew meeting is a calendar hold',
+      heMe.incoming.length === 1 && heMe.incoming[0].intent && heMe.incoming[0].intent.personalClose === 'calendar-hold',
+      { incoming: heMe.incoming.length, why: (heMe.diagnostics || []).map((d) => d.reason) });
+    const aliasBox = planned([graphSelf(ALIAS, OTHER_MAIL, HE, 5)], ownAlias);
+    check('Outlook mailbox, proxy address to otherMails, the Hebrew meeting is incoming',
+      aliasBox.incoming.length === 1 && !(aliasBox.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: aliasBox.incoming.length, why: (aliasBox.diagnostics || []).map((d) => d.reason) });
+    const toDana = planned([graphSelf(ME, 'dana@acme.com', HE, 6)], ownOutlook);
+    check('Outlook mailbox, a mail to someone else is not an incoming card',
+      toDana.incoming.length === 0,
+      { incoming: toDana.incoming.length, why: (toDana.diagnostics || []).map((d) => d.reason) });
+    const fwd = planned([graphSelf(ME, ME, HE, 7, { sender: { emailAddress: { name: 'Delegate', address: 'delegate@acme.com' } } })], ownOutlook);
+    check('Outlook mailbox, a delegate on a self-addressed mail stays quiet',
+      fwd.incoming.length === 0 && (fwd.diagnostics || []).some((d) => d && (d.reason === 'note-to-self' || d.reason === 'own-sender')),
+      { incoming: fwd.incoming.length, why: (fwd.diagnostics || []).map((d) => d.reason) });
+  }
+
+  console.log('\n--- signed-copy file-it and Hebrew sign-and-return (CTO delta) ---\n');
+  {
+    const judgeDeps = { intent: FlowIntent, actions: FlowActions, factReply: FlowFactReply, fileAttach: FlowFileAttach, resolution: FlowResolution };
+    function stepKinds(r) {
+      return ((r && r.process && r.process.steps) || []).map((s) => s.kind);
+    }
+    const signedBody = 'Here is the signed contract, as we agreed when we met';
+    const inbound = {
+      text: signedBody, subject: 'Contract',
+      sender: { name: 'Dana Cohen', email: 'dana@acme.com' },
+      now: new Date(NOW), to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'],
+      attachmentCount: 1, hasThreadAttachment: true, inbound: true
+    };
+    const fileG = J.judge(Object.assign({ surface: 'gmail' }, inbound), judgeDeps);
+    const fileO = J.judge(Object.assign({ surface: 'outlook', to: [ME], ownAddresses: [ME] }, inbound), judgeDeps);
+    check('Gmail inbound signed-copy delivery is file-it', fileG.show && fileG.process && fileG.process.id === 'file-it', { show: fileG.show, id: fileG.process && fileG.process.id });
+    check('Outlook inbound signed-copy delivery is file-it', fileO.show && fileO.process && fileO.process.id === 'file-it', { show: fileO.show, id: fileO.process && fileO.process.id });
+    const heSign = 'מצורף החוזה, אנא חתום והחזר';
+    const signBase = {
+      text: heSign, subject: 'חוזה',
+      sender: { name: 'Dana Cohen', email: 'dana@acme.com' },
+      now: new Date(NOW), attachmentCount: 1, hasThreadAttachment: true, inbound: true
+    };
+    const hsG = J.judge(Object.assign({ surface: 'gmail', to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'] }, signBase), judgeDeps);
+    const hsO = J.judge(Object.assign({ surface: 'outlook', to: [ME], ownAddresses: [ME] }, signBase), judgeDeps);
+    check('Gmail Hebrew sign-and-return has draft and task', hsG.show && stepKinds(hsG).indexOf('gmailDraft') >= 0 && stepKinds(hsG).indexOf('googleTask') >= 0, { show: hsG.show, steps: stepKinds(hsG) });
+    check('Outlook Hebrew sign-and-return has draft and task', hsO.show && stepKinds(hsO).indexOf('outlookDraft') >= 0 && stepKinds(hsO).indexOf('outlookTask') >= 0, { show: hsO.show, steps: stepKinds(hsO) });
+    check('attachmentCountForJudge counts signed-copy mail for Graph', E('FlowGoogleCloses').attachmentCountForJudge(signedBody) === true);
+
+    const tieBody = 'Attached is the signed copy.';
+    const tieFiles = [
+      { name: 'scan-1.pdf', filename: 'scan-1.pdf', mimeType: 'application/pdf', size: 1000 },
+      { name: 'scan-2.pdf', filename: 'scan-2.pdf', mimeType: 'application/pdf', size: 2000 }
+    ];
+    const tiePick = FlowFileAttach.pickSaveAttachment(tieBody, tieFiles);
+    const outlookSrc = read('src/content-outlook.js');
+    check('contract+appendix tie is a chooser, not save-both', tiePick.mode === 'choice' && !tiePick.file, tiePick);
+    const tieInbound = {
+      text: tieBody, subject: 'Signed scans',
+      sender: { name: 'Dana Cohen', email: 'dana@acme.com' },
+      now: new Date(NOW), attachmentCount: 2, hasThreadAttachment: false, inbound: true
+    };
+    const tieO = J.judge(Object.assign({ surface: 'outlook', to: [ME], ownAddresses: [ME] }, tieInbound), judgeDeps);
+    check('Outlook two-file signed delivery is file-it', tieO.show && tieO.process && tieO.process.id === 'file-it', { show: tieO.show, id: tieO.process && tieO.process.id });
+    check('Outlook buildCtx leaves attachment null on chooser tie', /savePick\.mode === 'choice' \? null/.test(outlookSrc));
+    check('Outlook open pane counts signed-copy for judge', /attachmentCountForJudge/.test(outlookSrc));
+    check('Outlook Do It can pass selectedAttachment on drive save', /selectedAttachment/.test(outlookSrc) || /attachFile/.test(outlookSrc));
+
+    const gmailSrc = read('src/content-gmail.js');
+    check('Gmail enriches file-it choice catalog on drive step', /enrichFileItChoiceCatalog/.test(gmailSrc));
+    check('Outlook enriches file-it choice catalog on drive step', /enrichFileItChoiceCatalog/.test(outlookSrc));
+
+    const ambEn = 'Attached is the signed copy.';
+    const ambHe = 'מצורף העותק החתום.';
+    const ambInbound = {
+      subject: 'Scans',
+      sender: { name: 'Dana Cohen', email: 'dana@acme.com' },
+      now: new Date(NOW), attachmentCount: 2, hasThreadAttachment: false, inbound: true
+    };
+    const ambEnG = J.judge(Object.assign({ surface: 'gmail', text: ambEn, to: ['ai.local.flow@gmail.com'], ownAddresses: ['ai.local.flow@gmail.com'] }, ambInbound), judgeDeps);
+    const ambEnO = J.judge(Object.assign({ surface: 'outlook', text: ambEn, to: [ME], ownAddresses: [ME] }, ambInbound), judgeDeps);
+    check('EN P3 amb two-file signed copy is file-it on Gmail', ambEnG.show && ambEnG.process && ambEnG.process.id === 'file-it', { id: ambEnG.process && ambEnG.process.id });
+    check('EN P3 amb two-file signed copy is file-it on Outlook', ambEnO.show && ambEnO.process && ambEnO.process.id === 'file-it', { id: ambEnO.process && ambEnO.process.id });
+    const hePick = FlowFileAttach.pickSaveAttachment(ambHe, tieFiles);
+    check('HE P3 two scans need chooser on Gmail and Outlook', hePick.mode === 'choice' && !hePick.file, hePick);
+    const enriched = FlowFileAttach.enrichFileItChoiceCatalog(tieO.process, tieFiles, 'choice');
+    const fileStep = (enriched.steps || []).find((s) => s && (s.kind === 'driveFile' || s.kind === 'onedriveFile'));
+    check('P3 choice catalog lists both attachments on file step', fileStep && fileStep.params && fileStep.params.catalog && fileStep.params.catalog.length === 2, fileStep && fileStep.params);
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', 'step-list.js'), 'utf8'), engine, { filename: 'step-list.js' });
+    const FlowStepList = E('FlowStepList');
+    const enrichedAmb = FlowFileAttach.enrichFileItChoiceCatalog(ambEnO.process, tieFiles, 'choice');
+    const ambRows = FlowStepList.rowsFor(enrichedAmb, { surface: 'outlook' });
+    let multiChoosers = 0;
+    ambRows.forEach((row) => {
+      const cat = row.step && row.step.params && (row.step.params.catalog || row.step.params.files);
+      if (Array.isArray(cat) && cat.length > 1) multiChoosers++;
+    });
+    check('amb Outlook file-it has exactly one multi-file chooser row', multiChoosers === 1, { multiChoosers });
+    function outlookFileItAlreadyPickedFn(src) {
+      const start = src.indexOf('function outlookFileItAlreadyPicked(host) {');
+      const end = src.indexOf('\n  async function recordSuggestNote', start);
+      if (start < 0 || end < 0) return null;
+      return new Function('host', src.slice(start, end) + '\nreturn outlookFileItAlreadyPicked(host);');
+    }
+    const alreadyPicked = outlookFileItAlreadyPickedFn(outlookSrc);
+    const ambHost = {
+      __glanceSteps: {
+        rows: function () {
+          return [{
+            step: {
+              kind: 'onedriveFile',
+              params: {
+                catalog: [
+                  { id: 'att-0', name: 'scan-1.pdf', on: false },
+                  { id: 'att-1', name: 'scan-2.pdf', on: false }
+                ]
+              }
+            }
+          }];
+        }
+      }
+    };
+    check('amb Outlook 2-file catalog blocks duplicate suggest-save (content-outlook.js:~5535)',
+      typeof alreadyPicked === 'function' && alreadyPicked(ambHost) === true, alreadyPicked && alreadyPicked(ambHost));
+
   }
 
   console.log('\nTOTAL FAILURES:', failures);

@@ -54,7 +54,8 @@ function makeEngine(name) {
         if (probe && probe.move === 'silent') return out(false, 'calendar-' + probe.reason, null);
       }
       if (fromOwn) return out(false, to.length && to.every((t) => t === own) ? 'note-to-self' : 'own-sender', null);
-      const n = G.needsOneAttachment(text) ? (c.attachmentCount || 0) : 0;
+      const countGate = G.attachmentCountForJudge || G.needsOneAttachment;
+      const n = countGate && countGate(text) ? (c.attachmentCount || 0) : 0;
       const r = J.judge({ text, subject: c.subject || '', sender: { name: from.name || null, email: from.email || null }, now: NOW,
         threadUrl: 'https://outlook.live.com/x', hasThreadAttachment: n === 1, attachmentCount: n, surface: 'outlook' }, DEPS);
       if (r.show) return out(true, null, r.intent, r.process.steps);

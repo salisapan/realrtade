@@ -59,21 +59,156 @@ const FlowGoogleCloses = (() => {
   const SHEET_MUTATE = /\b(?:update|edit|change|append|add a row)\b|עדכן|תעדכן|תוסיף\s+שורה/i;
   // Drive and OneDrive are the same one-file save. "our shared files" is not:
   // this write lands in the person's own OneDrive, not a shared library.
-  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
-  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,40}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
-  // A refusal of that save is silence. The negation has to govern the verb,
-  // so a different "no need to" in the same mail does not hide a real save.
-  const SAVE_NO = /\b(?:(?:do not|don't|dont|no need to)\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+צריך\s+ל|אין\s+צורך\s+ל|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
+  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:the\s+)?(?:(?:google\s+)?drive|one\s?drive)\b/i;
+  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
+  // A refusal of that save is silence. The negation has to govern the verb
+  // in the same clause, so a different "no need to" does not hide a real save.
+  // "ned" and "צרכי" are the typos of need and צריך. "don't forget to save"
+  // is not a refusal: forget sits where need would.
+  const SAVE_NO = /\b(?:(?:do not|don't|dont)\s+(?:(?:need|ned)\s+to\s+)?(?:save|file|store|upload)|no\s+(?:need|ned)\s+to\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
+  // אין / לא / אל, then a need-word, then the save verb. The need-word is
+  // צריך or צורך with י or ו slipped or dropped (צרך, צרכי, צרךי). The
+  // letters are the shape, not a list of spellings.
+  function hebrewNeedRefusal(text) {
+    const raw = String(text || '');
+    const re = /(?:^|[^\u0590-\u05FF])(?:אין|לא|אל)\s+(צ[וריכך]{2,4})\s+ל?(?:שמור|שמרי|לשמור|תתייק|תשמור)/g;
+    let m;
+    while ((m = re.exec(raw))) {
+      const word = m[1];
+      if (word.length >= 3 && word.length <= 5 && word.indexOf('ר') >= 0) return true;
+    }
+    return false;
+  }
 
-  // Save-shaped only. The open Outlook page counts file attachments for
-  // this sentence and for no other, so the rest of show and silence stay put.
+  // Save-shaped only. Suggest-save and attachment-save cards use this gate
+  // alone so an inbound signed-copy delivery does not become "Save the file?".
   function needsOneAttachment(text) {
     const t = String(text || '');
     return SAVE_EN.test(t) || SAVE_HE.test(t);
   }
 
+  // Outlook/Gmail judge: count thread files for save-shaped asks and for
+  // signed-copy delivery (parity), without widening suggest-save.
+  function attachmentCountForJudge(text) {
+    const t = String(text || '');
+    return needsOneAttachment(t) || signedCopyDelivered(t);
+  }
+
+  function saveClauses(text) {
+    return String(text || '').split(/[.!?\n\r]+/);
+  }
+
+  function clauseSaves(clause) {
+    return SAVE_EN.test(clause) || SAVE_HE.test(clause);
+  }
+
+  // A later "don't save it" names the same save without saying Drive again.
+  const SAVE_BACK = /\b(?:it|this|that)\b|אותו|את\s+זה/;
+
+  // Quiet when a save clause is itself negated. A "no need" that does not
+  // govern save, in another clause, leaves a real save in place. A later
+  // "don't save" still refuses the whole mail, including when that later
+  // clause only says "it" / "this" / "that" / אותו / את זה.
+  function saveRefused(clause) {
+    return SAVE_NO.test(clause) || hebrewNeedRefusal(clause);
+  }
   function refusesSave(text) {
-    return SAVE_NO.test(String(text || ''));
+    const raw = String(text || '');
+    const clauses = saveClauses(raw);
+    if (clauses.some((clause) => clauseSaves(clause) && saveRefused(clause))) return true;
+    let seenSave = false;
+    for (let i = 0; i < clauses.length; i++) {
+      const clause = clauses[i];
+      if (seenSave && saveRefused(clause) && SAVE_BACK.test(clause)) return true;
+      if (clauseSaves(clause)) seenSave = true;
+    }
+    if (!clauses.some(clauseSaves) && (SAVE_EN.test(raw) || SAVE_HE.test(raw))) return saveRefused(raw);
+    return false;
+  }
+
+  function signedDeliveryClauses(text) {
+    return String(text || '').split(/[.!?\n\r;]+/);
+  }
+
+  function signedDeliveryFuture(clause) {
+    const c = String(clause || '');
+    if (!c.trim()) return false;
+    if (/\b(?:will|wont|won't)\b/i.test(c) || /\bi['’]ll\b/i.test(c) || /\b(?:he|she|they|we)['’]ll\b/i.test(c)) return true;
+    if (/\bgoing\s+to\b/i.test(c)) return true;
+    if (/\bwill\s+be\s+sending\b/i.test(c)) return true;
+    if (/\bI\s+am\s+sending\b/i.test(c) && /\b(?:tomorrow|next\s+week|later)\b/i.test(c)) return true;
+    if (/\b(?:i(?:'|')?m|i am|we(?:'|')?re|we are|i(?:'|')?ll|we(?:'|')?ll)\b[^.!?\n]{0,96}\b(?:send(?:ing)?)\b[^.!?\n]{0,48}\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|this\s+(?:afternoon|evening|tonight)|tonight)\b/i.test(c)) return true;
+    if (/\bthis\s+(?:afternoon|evening|tonight)\b/i.test(c)) return true;
+    if (/\btonight\b/i.test(c) && /\bsend/i.test(c)) return true;
+    if (/אשלח|נשלח/.test(c)) return true;
+    if (/\b(?:tomorrow|next\s+week)\b/i.test(c)) return true;
+    if (/\blater\b/i.test(c)) return true;
+    if (/מחר|בשבוע הבא/.test(c)) return true;
+    if (/ביום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(c) && /(?:אשלח|נשלח|שולח|שולחת)/.test(c)) return true;
+    if (/הערב/.test(c) && /(?:אשלח|שולח|שולחת|נשלח)/.test(c)) return true;
+    if (/\bcomes\s+next\s+week\b/i.test(c)) return true;
+    if (/תגיע\s+בשבוע/.test(c)) return true;
+    if (/\b(?:when|once|after)\b[^.!?\n]{0,100}\b(?:approves?|signs?|is\s+approved|are\s+approved)\b/i.test(c)) return true;
+    if (/כשיאושר|(?:^|[^\u0590-\u05FF])כש[^\n]{0,50}(?:יאושר|יחתום)/.test(c)) return true;
+    if (/אחרי\s+ש[^\n]{0,60}(?:יאושר|יחתום|מאושר)/.test(c)) return true;
+    return false;
+  }
+
+  function signedDeliveryVerb(clause) {
+    const c = String(clause || '');
+    if (!c.trim()) return false;
+    if (/\b(?:attached|attaching|here\s+is|here'?s|enclosed|please\s+find)\b/i.test(c)) return true;
+    if (/\b(?:i(?:'m| am)\s+)?sending\b/i.test(c) && !signedDeliveryFuture(c)) return true;
+    return /(?:^|[^\u0590-\u05FF])(?:מצורף|מצורפת|שולח|שולחת|מעביר|מעבירה|הנה)(?:\s|[^\u0590-\u05FF]|$)/.test(c);
+  }
+
+  function signedFinalDoc(clause) {
+    const c = String(clause || '');
+    if (!c.trim()) return false;
+    return /\b(?:signed|executed|countersigned)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(c) ||
+      /\b(?:final)\s+(?:copy|contract|agreement|nda|document|pdf|version)\b/i.test(c) ||
+      /\b(?:signed|executed|countersigned|final)\b[^.!?\n]{0,48}\b(?:agreement|contract|nda|copy|version|document)\b/i.test(c) ||
+      /\b(?:agreement|contract|nda|copy|version|document)\b[^.!?\n]{0,48}\b(?:signed|executed|countersigned|final)\b/i.test(c) ||
+      /(?:^|[^\u0590-\u05FF])(?:חתום|חתומה|סופי|סופית)[^\n]{0,40}(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)/.test(c) ||
+      /(?:הסכם|חוזה|גרסה|עותק|נספח|מסמך)[^\n]{0,24}(?:חתום|חתומה|סופי|סופית)/.test(c);
+  }
+
+  function hebrewSignedAdjective(text) {
+    const t = String(text || '');
+    if (/חתום\s+על\s+ידי/.test(t)) return true;
+    if (/(?:חוזה|הסכם|עותק|מסמך)\s+חתום/.test(t)) return true;
+    return false;
+  }
+
+  function hebrewAskToSign(text) {
+    const t = String(text || '');
+    if (hebrewSignedAdjective(t)) return false;
+    if (/(?:אנא|בבקשה|נא|תוכל|צריך)[^\n]{0,40}(?:לחתום|לחתימה|חתום|חתמי|תחתום|תחתמי)/.test(t)) return true;
+    if (/(?:^|[.!?\n;]\s*|(?<!(?:^|[^\u0590-\u05FF])לא\s(?:צריך|צריכה|צורך|נדרש)[^,\n]{0,8}),\s*)(?:חתום|חתמי)(?:\s|[^\u0590-\u05FF]|$)[^\n]{0,40}(?:והחזר|והחזירי|ותחזיר)(?![\u0590-\u05FF])/m.test(t)) return true;
+    if (/(?:והחזר|והחזירי|ותחזיר)(?![\u0590-\u05FF])[^\n]{0,30}(?:חתום|חתמי|תחתום|תחתמי)/.test(t)) return true;
+    return /(?:להחזיר|תחזיר|החזר)[^\n]{0,50}חתום|צריך\s+לחתום|יש\s+לחתום/.test(t);
+  }
+
+  // One attached file that is clearly a completed signing delivery (not a bare
+  // "signed", not an ask to sign or return, not a negation or a question).
+  // Delivery verb and signed/final document must sit in the same clause, present
+  // or completed tense — not a future or conditional promise.
+  function signedCopyDelivered(text) {
+    const t = String(text || '');
+    if (!t.trim()) return false;
+    if (/\bnot\s+signed\b|\bnot\s+yet\s+signed\b|\bunsigned\b/i.test(t)) return false;
+    if (/עדיין\s+לא\s+חתום|לא\s+חתום\s+עדיין/.test(t)) return false;
+    if (/\bhave you signed\b|\bdid you sign\b|\bare you signing\b/i.test(t)) return false;
+    if (/(?:האם|כבר)\s*[^?\n]{0,50}חתום\s*\?/.test(t)) return false;
+    if (/\b(?:need(?:s)?|needed)\s+to\s+be\s+signed\b/i.test(t)) return false;
+    if (/\b(?:please\s+)?(?:return|send|get)\b[^.\n]{0,100}\b(?:the\s+)?(?:\w+\s+){0,4}signed\b/i.test(t)) return false;
+    if (/\b(?:please\s+)?sign\b[^.\n]{0,40}\b(?:the|this|attached)\b/i.test(t)) return false;
+    if (hebrewAskToSign(t)) return false;
+    for (const clause of signedDeliveryClauses(t)) {
+      if (!clause.trim() || signedDeliveryFuture(clause)) continue;
+      if (signedDeliveryVerb(clause) && signedFinalDoc(clause)) return true;
+    }
+    return false;
   }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;
@@ -309,8 +444,13 @@ const FlowGoogleCloses = (() => {
       return { silence: true };
     }
 
-    if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
-      if (SAVE_NO.test(text) || input.attachmentCount !== 1) return { silence: true };
+    const OTHER_TARGET = /\bshared\s+(?:folder|drive|files?)\b|\bsharepoint\b|\bdropbox\b|\bbox\.com\b|\bteams\s+(?:folder|channel)\b|(?:ה)?תיקי(?:י)?ה\s+המשותפת|הקבצים\s+המשותפים|שרפוינט|דרופבוקס/i;
+    const noreply = /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(input.senderEmail || '').trim());
+    const signedInbound = Number(input.attachmentCount) >= 1 && signedCopyDelivered(text) && !refusesSave(text)
+      && !OTHER_TARGET.test(text) && !noreply;
+    if (SAVE_EN.test(text) || SAVE_HE.test(text) || signedInbound) {
+      const attachOk = signedInbound ? Number(input.attachmentCount) >= 1 : input.attachmentCount === 1;
+      if (refusesSave(text) || !attachOk || OTHER_TARGET.test(text)) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
       const close = {
@@ -586,21 +726,21 @@ const FlowGoogleCloses = (() => {
   }
 
   // Which message the reading pane should judge. emailLists[i] is the
-  // [email] values on that message, sender first. Newest non-own message
-  // wins. When every message is the account's own mail, a note addressed
-  // only to yourself is still the ask. A message to someone else stays
-  // quiet. -1 means stay quiet.
+  // [email] values on that message, sender first. A newest note addressed
+  // only to yourself is the ask, even when an older message in the thread
+  // came from someone else. Otherwise the newest non-own message wins.
+  // A message you sent to someone else stays quiet. -1 means stay quiet.
   function messageToJudge(emailLists, ownEmail) {
     const own = String(ownEmail || '').trim().toLowerCase();
     if (!own || !Array.isArray(emailLists) || !emailLists.length) return -1;
-    for (let i = emailLists.length - 1; i >= 0; i--) {
+    const newest = emailLists.length - 1;
+    if (noteToSelf(emailLists[newest], own)) return newest;
+    for (let i = newest; i >= 0; i--) {
       const list = Array.isArray(emailLists[i]) ? emailLists[i] : [];
       const sender = String(list[0] || '').trim().toLowerCase();
       if (sender && sender === own) continue;
       return i;
     }
-    const newest = emailLists.length - 1;
-    if (noteToSelf(emailLists[newest], own)) return newest;
     return -1;
   }
 
@@ -619,6 +759,7 @@ const FlowGoogleCloses = (() => {
   return {
     consider: consider,
     needsOneAttachment: needsOneAttachment,
+    attachmentCountForJudge: attachmentCountForJudge,
     refusesSave: refusesSave,
     refusesSave: refusesSave,
     detailMode: detailMode,

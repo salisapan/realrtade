@@ -1,12 +1,12 @@
 # Owner-label preview, 2026-10-08
 
-Glance closes open loops. Gmail is where it starts today.
+Glance closes open loops. Glance's entry point is any surface the user is on.
 
 **provisional / not owner-verified.** Owner-verified labels are still 0. This page scores the chief of staff's proposed answers for batch-001. It is not owner gold.
 
 ## Product definition
 
-Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Gmail is the current primary entry surface. Glance stays silent when it is uncertain, never sends, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Glance's entry point is any surface the user is on. Glance stays silent when it is uncertain, never sends, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
 
 ## Implementation status
 

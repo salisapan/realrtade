@@ -28,7 +28,7 @@ const FlowRequestTypes = (() => {
       he: ['לשלם', 'תשלם', 'תשלמו', 'להחזיר כסף', 'החזר כספי', 'העברת', 'שילמת', 'תעביר', 'תעבירי'] },
     { id: 'sign', days: 2, noun: 'signature',
       en: ['sign', 'signed it', 'countersign', 'initial', 'signature', 'signed copy'],
-      he: ['לחתום', 'תחתום', 'תחתמו', 'חתימה', 'חתימתך', 'חתמת', 'תחתמי'] },
+      he: ['לחתום', 'תחתום', 'תחתמו', 'חתימה', 'חתימתך', 'חתמת', 'תחתמי', 'חתום', 'חתמי'] },
     { id: 'approve', days: 2, noun: 'approval',
       en: ['approve', 'authori[sz]e', 'sign off', 'green-?light', 'approval', 'go-ahead', 'accept'],
       he: ['לאשר', 'תאשר', 'תאשרו', 'אישור', 'אישורך', 'אישרת', 'תאשרי'] },
@@ -100,7 +100,26 @@ const FlowRequestTypes = (() => {
     }
     return null;
   }
-  const findAction = (s) => find(ACTIONS, String(s || ''));
+  function heSignViaAdjectiveForm(sentence) {
+    const s = String(sentence || '');
+    if (/(?:^|[^\u0590-\u05FF])(?:החתום|חתומה)(?=[\s,.!?]|$)/.test(s)) return true;
+    if (/[\u0590-\u05FF]{2,}\s+החתום/.test(s)) return true;
+    if (/חוזה החתום|החוזה החתום|עותק חתום|מסמך חתום/.test(s)) return true;
+    return false;
+  }
+  function findAction(sentence) {
+    const s = String(sentence || '');
+    const he = hasHebrew(s);
+    if (he) {
+      const send = ACTIONS.find((a) => a.id === 'send');
+      const sign = ACTIONS.find((a) => a.id === 'sign');
+      if (send && sign && send.heRe.some((r) => r.test(s)) && sign.heRe.some((r) => r.test(s))) {
+        if (heSignViaAdjectiveForm(s)) return send;
+        return find(ACTIONS, s);
+      }
+    }
+    return find(ACTIONS, s);
+  }
   const findObject = (s) => find(OBJECTS, String(s || ''));
 
   function framed(sentence) {

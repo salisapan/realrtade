@@ -6,8 +6,29 @@
 
 **Implementation status (code reality, this commit; not the product definition).** The entry surface is a Chrome extension that watches Gmail passively. It stays on what you are waiting on until the
 other side really answers, and when an email decides something it puts one `Do It` button next to it that writes the record for you (a Google Calendar event, a Google Task, a Gmail draft; Drive for
-files). Execution today goes through those Google surfaces; WhatsApp Web, Outlook and right-click capture are opt-in and experimental. The judgment engine itself knows nothing about Gmail: it scores plain
+files). Execution today goes through those Google surfaces; WhatsApp Web, Outlook and right-click capture are opt-in and experimental. Meta chats — Messenger, Facebook messages, Business Suite, Instagram, and WhatsApp Web — turn on together from one consent on the options page. The popup links that page when the consent is missing. A draft is still not a send. A chat draft whose message timestamp is more than two minutes ahead of this device stays quiet (`whyNotShown: future`). Those two minutes are an intentional clock-skew margin, in `src/content-messenger.js`. The judgment engine itself knows nothing about Gmail: it scores plain
 text, so Gmail is the first surface, not the architecture's ceiling (see "What is still deliberately narrow" below).
+
+## Live Gate fixture (David)
+
+This page is for an unpacked copy of `flow-trial-extension` from the repo. It is not in the store zip, and a build whose manifest has `update_url` ignores the flag.
+
+1. Load the unpacked `flow-trial-extension` folder from this repo. Do not load the store zip, and do not load a build whose manifest has `update_url`.
+2. On `chrome://extensions`, copy the extension id.
+3. Open the service worker console and run `chrome.storage.local.set({ glanceDevFixture: true })`.
+4. Open `chrome-extension://<ID>/dev/messenger-fixture.html`. No manifest entry is required. The composer should show `דיזנגוף 99` and a maps link. The page has no Send button. The row is dated about an hour ago. The fake event is 8 October 2026 at דיזנגוף 99. Run it while that date is still in last week (through Saturday 17 October 2026).
+5. Each quiet case stays empty, shows one line `[Glance] whyNotShown: <reason>` on the page, and prints that same line in the page console. Nothing is sent.
+   - `?case=two` — two addresses, דיזנגוף 99 and אבן גבירול 30. Reason `conflict`. A draft that was already deleted wins instead: the stored row is `closed`, and the line is `closed`, not `conflict`. If nothing was deleted, the line stays `conflict` and the row is not closed.
+   - `?case=greeting` — the row says היי. Reason `no-ask`.
+   - `?case=group` — the header has a Group chip and the line Chat members. Reason `not-one-to-one`.
+   - `?case=self-last` — the last message is yours. Reason `from-me`.
+   - `?case=stale` — the row is older than 14 days. Reason `stale`.
+   - `?case=future` — the row is five minutes ahead. Reason `future`.
+6. Open `?reset=1` to clear the lane draft store. That removes the hash, state, and time rows under `glanceLaneDrafts` and leaves every other `chrome.storage.local` value in place. The page and the console both say `[Glance] lane store reset`.
+7. `chrome.storage.local.set({ glanceDevFixture: false })` turns the page off.
+8. A store or outlook zip does not contain this page. A manifest with `update_url` ignores `glanceDevFixture`.
+
+דנה ורותם with one profile link whose id is the thread id drafts. The ו before ר is part of the name (the same ו+י/ר surname check as דנה וייס and דנה ורד). The composer gets the draft. Glance does not send it.
 
 Glance is a separate product from Flow (theflow-ai.com's enterprise workflow
 engine for organizations with sensitive or regulated data) — not a stripped
@@ -93,6 +114,8 @@ deletes anything that was already there.
 | **True close**: a short reply with no answer in it never closes a loop; a draft is not a delivery | `docs/true-close.md`, `docs/resolution-paths.md` |
 | Receipts and documents (contract, quote, proposal, signed copy) as a path to a real delivery | `docs/resolution-paths.md`, `docs/true-close.md` §4 |
 | Other apps (WhatsApp Web, Outlook through Graph + Outlook on the web Do It card, right-click capture), opt-in; Outlook drafts on Do It (never send) | Store listing + `src/content-outlook.js` |
+| **Client requests** for accountants and lawyers: what is missing from whom, reminders as drafts. Engine and ledger only, no surface yet (owner rejected a standalone page 2026-10-10); reading mail is **off**, `config/client-requests.public.js` | `docs/glance-ai/client-requests.md` |
+| **Carry until closed**: after the third unanswered nudge, one proposed next move (the app where they answer you, one colleague on the thread, or "Still need this?"). Engine only, never closes or sends; **off**, `config/carry.public.js` (`nextMove`; the real-user A/B `abLive`, counts only, also **off**) | `docs/glance-ai/proposals/2026-10-11-next-move.md` |
 | Hybrid on-device model + masked server for Do It proposals (**dormant**, `config/hybrid.public.js`) | `docs/hybrid-execution-architecture.md` |
 | Pro (Stripe, licence key, server-enforced paid features) | `docs/monetization.md`, `docs/revenue-routines.md` |
 | What is open, blocked or decided | `docs/open-tasks.md` |
@@ -290,8 +313,9 @@ same Web client. Do not put this Web client id into `oauth2.client_id`.
 
 ### 6. Confirm the scopes match
 
-`manifest.json`'s `oauth2.scopes` should already list all five (this ships
-in the repo — nothing to add here unless it's been edited):
+`manifest.json`'s `oauth2.scopes` should already list these (this ships
+in the repo — nothing to add here unless it's been edited). `openid` and
+`userinfo.profile` are on that same consent, so Connect stays one prompt:
 
 ```
 https://www.googleapis.com/auth/tasks
@@ -299,6 +323,8 @@ https://www.googleapis.com/auth/calendar.events
 https://www.googleapis.com/auth/gmail.compose
 https://www.googleapis.com/auth/drive.readonly
 https://www.googleapis.com/auth/drive.file
+openid
+https://www.googleapis.com/auth/userinfo.profile
 ```
 
 `drive.readonly` is read access across the whole Drive. When an open
@@ -595,7 +621,7 @@ core/ (the other ~60 modules)  one line each in `core/README.md`; a test keeps t
 core/ai-ladder.js       the second reading's policy: who may be asked about what, the Free/Pro allowance, the checks an answer passes
 core/resolution.js      multi-step resolution: receipts and the documents the person sends; closes only on a real delivery
 core/follow-up.js       Waiting on, promises, what a reply did to a loop, the true-close rules
-config/                 public switches: oauth.public.js, hybrid.public.js (off), ladder.public.js (on; the server decides)
+config/                 public switches: carry.public.js, client-requests.public.js, connectors.public.js, google-picker.public.js, hybrid.public.js (off), ladder.public.js (on; the server decides), oauth.public.js, release.public.js
 
 src/storage.js          chrome.storage wrapper; log, calibration, weekly/badge counters — Glance's own persistence choices, not core logic
 src/chrome-storage-adapter.js  wires core/execution-memory.js's storage seam to chrome.storage.local

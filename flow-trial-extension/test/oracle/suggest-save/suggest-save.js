@@ -124,6 +124,11 @@
     var ex = J.explicit || null, mode = 'suggest';
     if (!ex && Object.prototype.hasOwnProperty.call(OTHER_CHAIN, String(J.reason))) return quiet('suggest:other-card', { excluded: excluded });
     if (ex) { if (ex.step === 'file_save' && files.length >= 2) mode = 'explicit-multi'; else return quiet('suggest:other-card', { excluded: excluded }); }
+    var blob = (text + ' ' + subject).trim();
+    var explicit = SAVE_VERB.test(blob) || (ex && ex.step === 'file_save');
+    var presented = /\b(?:find\s+attached|attached\s+(?:is|are)|enclosed|attaching|(?:invoice|report|contract|statement|pdf)\s+is\s+attached)\b|מצורף|מצורפת|צירפתי|שלחתי(?:\s+את)?|מצורפת?\s*$/i.test(blob);
+    var signed = /\b(?:signed|executed|final)\b|חתום|נספח חתום/i.test(blob);
+    if (!explicit && !presented && !signed) return quiet('suggest:no-save-ask', { excluded: excluded });
     // 10 dedupe: a ProofOfClose for these files
     var saved = {}; (inp.savedFileIds || []).forEach(function (id) { saved[id] = 1; });
     var open = files.filter(function (f) { return !saved[f.id]; });
@@ -161,7 +166,7 @@
 
   var api = { decide: decide, excludeWhy: excludeWhy, fromGraph: fromGraph, fromGmailPayload: fromGmailPayload, bodyCidsOf: bodyCidsOf, SAVE_NO: SAVE_NO, NEG_SAVE: NEG_SAVE,
     REASONS: ['suggest:show', 'suggest:other-card', 'suggest:already-saved', 'suggest:dismissed', 'suggest:bulk', 'suggest:no-consent', 'suggest:attachments-unread', 'suggest:negated', 'suggest:too-large',
-      'suggest:not-inbound', 'suggest:no-files', 'suggest:onedrive-target-on-gmail', 'suggest:drive-target-on-outlook', 'suggest:other-target'] };
+      'suggest:not-inbound', 'suggest:no-files', 'suggest:no-save-ask', 'suggest:onedrive-target-on-gmail', 'suggest:drive-target-on-outlook', 'suggest:other-target'] };
   root.GlanceSuggestSave = api;
   if (typeof module === 'object' && module && module.exports) module.exports = api;
 })(typeof self !== 'undefined' ? self : globalThis);

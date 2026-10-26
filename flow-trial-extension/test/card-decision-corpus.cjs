@@ -14,6 +14,7 @@ catch (e) {
 
 const ROOT = path.join(__dirname, '..');
 const { FlowDisplay } = require(path.join(ROOT, 'core/display-copy.js'));
+const { FlowOwaParse } = require(path.join(ROOT, 'core/owa-parse.js'));
 const ME = 'glance.salisapan@outlook.com';
 const FLOW = 'ai.local.flow@gmail.com';
 const AVI = 'avi.mizrahi@northwind.example';
@@ -215,10 +216,46 @@ function panel(store) {
   });
   await settle(self);
   const selfRow = records(self.store).find((d) => d.verdict === 'quiet');
-  check('a note to self stores the page reason, not the sync own-sender',
-    selfRow && selfRow.reason === 'note-to-self' && !panel(self.store).some((d) => d.reason === 'own-sender'),
+  check('a mail the user sent to themself is judged, and the sync own-sender line is dropped',
+    selfRow && selfRow.reason !== 'note-to-self' && selfRow.reason !== 'own-sender' && !self.doc.querySelector('.flow-chip-host') && !panel(self.store).some((d) => d.reason === 'own-sender' || d.reason === 'note-to-self'),
     { row: selfRow && selfRow.reason, panel: panel(self.store).map((d) => d.reason) });
   self.w.close();
+
+  const unconfirmed = await boot({
+    url: 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(CONV),
+    diagnostics: [{ reason: 'own-sender', conversationId: CONV, subject: 'Pilot proposal' }],
+    graph: (url) => {
+      if (/\/me\?/.test(url)) return { mail: ME, displayName: 'Glance' };
+      if (/messages/.test(url)) {
+        return { value: [{
+          id: 'MSG-OWN-1',
+          conversationId: CONV,
+          subject: 'Pilot proposal',
+          isDraft: false,
+          from: { emailAddress: { name: 'Glance', address: ME } },
+          toRecipients: [],
+          receivedDateTime: new Date().toISOString(),
+          body: { contentType: 'text', content: "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?" }
+        }] };
+      }
+      return { value: [] };
+    }
+  });
+  showMail(unconfirmed.doc, unconfirmed.w, {
+    id: CONV,
+    url: 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(CONV),
+    subject: 'Pilot proposal',
+    toHtml: 'אל: <span>' + ME + '</span>',
+    ccHtml: '',
+    bodyHtml: lines("Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?"),
+    fromTitle: 'flow <' + FLOW + '>'
+  });
+  await settle(unconfirmed);
+  const unconfirmedWhy = records(unconfirmed.store).map((d) => d.reason);
+  check('an unconfirmed conversation URL still records note-to-self, not page:no-message-id',
+    unconfirmedWhy.indexOf('note-to-self') >= 0 && unconfirmedWhy.indexOf('page:no-message-id') < 0 && !unconfirmed.doc.querySelector('.flow-chip-host'),
+    { page: unconfirmedWhy, sync: ((unconfirmed.store.outlookSync && unconfirmed.store.outlookSync.diagnostics) || []).map((d) => d.reason) });
+  unconfirmed.w.close();
 
   const file = await boot({
     url: 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(CONV),
@@ -347,17 +384,57 @@ function panel(store) {
     hdr.appendChild(mark);
   }
   await settle(fallback);
-  const pickedRow = records(fallback.store).find((d) => d.verdict === 'show' || d.hydrateHow);
-  check('subject fallback records the picked message id and the prior conversation',
-    pickedRow && pickedRow.id === PICKED && pickedRow.hydrateHow === 'subject-fallback' && pickedRow.priorConversationId === CONV
-      && !panel(fallback.store).some((d) => d.reason === 'intent-null'),
-    pickedRow && { id: pickedRow.id, how: pickedRow.hydrateHow, prior: pickedRow.priorConversationId, verdict: pickedRow.verdict, panel: panel(fallback.store).map((d) => d.reason) });
+  const adopted = records(fallback.store).filter((d) => d && (d.id === PICKED || d.messageId === PICKED || d.hydrateHow === 'subject-fallback'));
+  check('Graph lag does not adopt another message as this open mail',
+    adopted.length === 0,
+    { adopted: adopted.map((d) => ({ id: d.id, how: d.hydrateHow, prior: d.priorConversationId, verdict: d.verdict })),
+      panel: panel(fallback.store).map((d) => d.reason) });
   fallback.w.close();
 
   let generation = 'one';
   const hyd = await boot({
     id: 'MSG-HYDRATE-1',
     graph: (url) => {
+      if (generation === 'other-sender') {
+        if (/conversationId/i.test(url)) {
+          return { value: [{
+            id: 'AQMkOther',
+            subject: 'Transfer',
+            conversationId: CONV,
+            from: { emailAddress: { address: 'other@elsewhere.com', name: 'Other' } },
+            toRecipients: [],
+            ccRecipients: [],
+            receivedDateTime: '2026-10-15T09:00:00.000Z'
+          }] };
+        }
+        return { value: [] };
+      }
+      if (generation === 'wrong-file' || generation === 'same-conv') {
+        if (/\$filter=conversationId/i.test(url)) return { value: [] };
+        if (/\$filter=subject/i.test(url) || /startswith\(subject/i.test(url)) {
+          if (generation === 'wrong-file') {
+            return { value: [{
+              id: 'AQMkADAwATM0MDAAB9WFY02AAAA=',
+              subject: 'Signed agreement',
+              conversationId: 'AQQkBobHartConv',
+              from: { emailAddress: { address: 'bob.hart@contoso.example', name: 'Bob Hart' } },
+              toRecipients: [{ emailAddress: { address: ME } }],
+              ccRecipients: [],
+              receivedDateTime: '2026-10-08T12:20:00.000Z'
+            }] };
+          }
+          return { value: [{
+            id: 'm-nw',
+            subject: 'Northwind agreement - signed PDF',
+            conversationId: 'AQQkNw',
+            from: { emailAddress: { address: FLOW, name: 'flow' } },
+            toRecipients: [{ emailAddress: { address: ME } }],
+            ccRecipients: [],
+            receivedDateTime: '2026-10-08T14:01:00.000Z'
+          }] };
+        }
+        return { value: [] };
+      }
       if (generation === 'two-same') {
         if (/\$filter=subject/i.test(url) || /startswith\(subject/i.test(url)) {
           return { value: [
@@ -395,7 +472,142 @@ function panel(store) {
   check('two subject rows are not picked and their recipients are not copied',
     none && none.hydrateHow === 'none' && (!none.to || none.to.length === 0) && (!none.cc || none.cc.length === 0) && none.itemId !== 'MSG-A' && none.itemId !== 'MSG-B',
     { how: none && none.hydrateHow, to: none && none.to, item: none && none.itemId });
+
+  generation = 'wrong-file';
+  await vm.runInContext('__glanceOutlookPage.bumpMailEpoch("wrong-file")', hyd.ctx);
+  const lag = await vm.runInContext('__glanceOutlookPage.hydratePane(' + JSON.stringify({
+    conversationId: 'AQQkADAwATM0MDAAq3rD0aGn5Ks',
+    idKind: 'conversation',
+    idSource: 'open-mail',
+    subject: 'Signed agreement',
+    receivedDateTime: '2026-10-08T12:20:00.000Z',
+    to: [ME],
+    cc: [],
+    text: 'Hi, The signed agreement is attached. Best, Dana',
+    attachments: [{ name: 'agreement-signed.pdf', size: 3072, sizeLabel: '3 KB' }]
+  }) + ')', hyd.ctx);
+  check('Graph lag does not put agreement-signed.pdf from the other message on this pane',
+    lag && lag.itemId !== 'AQMkADAwATM0MDAAB9WFY02AAAA=' && lag.conversationId === 'AQQkADAwATM0MDAAq3rD0aGn5Ks' && lag.hydrateHow === 'none',
+    { item: lag && lag.itemId, conv: lag && lag.conversationId, how: lag && lag.hydrateHow });
+
+  generation = 'same-conv';
+  await vm.runInContext('__glanceOutlookPage.bumpMailEpoch("same-conv")', hyd.ctx);
+  const kept = await vm.runInContext('__glanceOutlookPage.hydratePane(' + JSON.stringify({
+    conversationId: 'AQQkNw',
+    idKind: 'conversation',
+    idSource: 'open-mail',
+    subject: 'Northwind agreement - signed PDF',
+    receivedDateTime: '2026-10-08T14:01:00.000Z',
+    to: [],
+    cc: [],
+    text: 'Please find the signed Northwind agreement attached.'
+  }) + ')', hyd.ctx);
+  check('subject fallback still names the open conversation when that message is the subject hit',
+    kept && kept.itemId === 'm-nw' && kept.conversationId === 'AQQkNw' && kept.hydrateHow === 'subject-fallback',
+    { item: kept && kept.itemId, conv: kept && kept.conversationId, how: kept && kept.hydrateHow });
+
+  generation = 'other-sender';
+  await vm.runInContext('__glanceOutlookPage.bumpMailEpoch("other-sender")', hyd.ctx);
+  const refused = await vm.runInContext('__glanceOutlookPage.hydratePane(' + JSON.stringify({
+    conversationId: CONV,
+    idKind: 'conversation',
+    idSource: 'open-mail',
+    subject: 'Transfer',
+    senderEmail: 'dana@acme.com',
+    senderName: 'Dana',
+    to: [ME],
+    cc: [],
+    text: 'Could you confirm the transfer by Friday?'
+  }) + ')', hyd.ctx);
+  check('a confirmed conversation does not replace the open sender with a different Graph sender',
+    refused && refused.senderEmail === 'dana@acme.com' && refused.senderName === 'Dana' && refused.itemId !== 'AQMkOther',
+    { email: refused && refused.senderEmail, name: refused && refused.senderName, item: refused && refused.itemId });
   hyd.w.close();
+
+  const specPath = path.join(ROOT, '..', 'docs/glance-ai/card-whynotshown-single-source-spec.md');
+  {
+    const MSG_OPEN = 'MSG-OPEN-PICKED-F1';
+    const MSG_WRONG = 'MSG-WRONG-URL-F1';
+    const wrongEntry = {
+      messageId: MSG_WRONG,
+      outlookIncomingId: MSG_WRONG,
+      subject: 'Stale sync row',
+      sender: { email: FLOW, name: 'flow' },
+      intent: { type: 'request', label: 'Wrong message entry' },
+      process: { id: 'reply-track', name: 'Reply', steps: [{ kind: 'outlookDraft', id: 'outlookDraft' }] }
+    };
+    const paneOpen = {
+      itemId: MSG_OPEN,
+      pathId: MSG_WRONG,
+      messageId: MSG_OPEN,
+      subject: 'Pilot proposal',
+      senderEmail: FLOW
+    };
+    const matchedCtrl = FlowOwaParse.matchEntryHow(paneOpen, [wrongEntry]);
+    check('F1: pathId for a different message does not adopt that sync entry when itemId is the open message',
+      !matchedCtrl || matchedCtrl.how !== 'message id' || String(matchedCtrl.entry.messageId) !== MSG_WRONG,
+      { how: matchedCtrl && matchedCtrl.how, id: matchedCtrl && matchedCtrl.entry && matchedCtrl.entry.messageId });
+    const panePathOnly = {
+      pathId: MSG_WRONG,
+      subject: 'Pilot proposal',
+      senderEmail: FLOW
+    };
+    const matchedPathOnly = FlowOwaParse.matchEntryHow(panePathOnly, [wrongEntry]);
+    check('F1: pathId alone for a different message does not adopt that sync entry',
+      !matchedPathOnly || matchedPathOnly.how !== 'message id' || String(matchedPathOnly.entry.messageId) !== MSG_WRONG,
+      { how: matchedPathOnly && matchedPathOnly.how, id: matchedPathOnly && matchedPathOnly.entry && matchedPathOnly.entry.messageId });
+    const owaPath = path.join(ROOT, 'core/owa-parse.js');
+    const owaSrc = fs.readFileSync(owaPath, 'utf8');
+    function pathIdFirstPaneIdSrc(src) {
+      return src.replace(
+        'const paneId = canonId(pane.itemId || pane.messageId || (hasOpenMsg ? pane.pathId : null));',
+        'const paneId = canonId(pane.pathId || pane.itemId || pane.messageId);'
+      );
+    }
+    function pathIdAnyIdSrc(src) {
+      return src.replace(
+        'const hasOpenMsg = Boolean(pane.itemId || pane.messageId);',
+        'const hasOpenMsg = true;'
+      ).replace(
+        'const paneId = canonId(pane.itemId || pane.messageId || (hasOpenMsg ? pane.pathId : null));',
+        'const paneId = canonId(pane.pathId || pane.itemId || pane.messageId);'
+      );
+    }
+    const owaMutSrc = pathIdFirstPaneIdSrc(owaSrc);
+    const biteCtx = vm.createContext({ module: { exports: {} }, exports: {} });
+    biteCtx.exports = biteCtx.module.exports;
+    vm.runInContext(owaMutSrc + '\nmodule.exports = { FlowOwaParse };', biteCtx);
+    const matchedBite = biteCtx.module.exports.FlowOwaParse.matchEntryHow(paneOpen, [wrongEntry]);
+    check('F1 bite: pathId-before-itemId mutation wrongly matches the URL message entry (must fail on control product)',
+      matchedBite && matchedBite.how === 'message id' && String(matchedBite.entry.messageId) === MSG_WRONG,
+      { how: matchedBite && matchedBite.how, id: matchedBite && matchedBite.entry && matchedBite.entry.messageId });
+    const owaAnySrc = pathIdAnyIdSrc(owaSrc);
+    const anyCtx = vm.createContext({ module: { exports: {} }, exports: {} });
+    anyCtx.exports = anyCtx.module.exports;
+    vm.runInContext(owaAnySrc + '\nmodule.exports = { FlowOwaParse };', anyCtx);
+    const matchedAnyBite = anyCtx.module.exports.FlowOwaParse.matchEntryHow(panePathOnly, [wrongEntry]);
+    check('F1 bite: pathId-only pane matches any id when comparison accepts any entry (must fail on control product)',
+      matchedAnyBite && matchedAnyBite.how === 'message id' && String(matchedAnyBite.entry.messageId) === MSG_WRONG,
+      { how: matchedAnyBite && matchedAnyBite.how, id: matchedAnyBite && matchedAnyBite.entry && matchedAnyBite.entry.messageId });
+    const noopCtx = vm.createContext({ module: { exports: {} }, exports: {} });
+    noopCtx.exports = noopCtx.module.exports;
+    vm.runInContext(owaSrc + '\nmodule.exports = { FlowOwaParse };', noopCtx);
+    const matchedNoOp = noopCtx.module.exports.FlowOwaParse.matchEntryHow(paneOpen, [wrongEntry]);
+    check('F1 bite: identity owa-parse patch does not satisfy pathId-first bite',
+      !matchedNoOp || matchedNoOp.how !== 'message id' || String(matchedNoOp.entry.messageId) !== MSG_WRONG,
+      { how: matchedNoOp && matchedNoOp.how });
+  }
+
+  if (!fs.existsSync(specPath)) {
+    console.log('SKIP: card-whynotshown spec is not beside this extension (' + specPath + ')');
+  } else {
+    const spec = fs.readFileSync(specPath, 'utf8');
+    check('the card and Why not shown share commitDecision',
+      spec.indexOf('Nothing in this commit wires the decision record') < 0 &&
+      spec.indexOf('commitDecision') > 0 &&
+      /another conversation is not adopted/.test(spec) &&
+      /does not cross messages/.test(spec));
+  }
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

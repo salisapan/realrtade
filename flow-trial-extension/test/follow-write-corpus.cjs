@@ -96,7 +96,9 @@ function load(opts) {
       runtime: { getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }), onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} }, lastError: null, getURL: (s) => s, id: 'ext' },
       identity: { getAuthToken: (o, cb) => cb('tok'), removeCachedAuthToken: (o, cb) => cb(), launchWebAuthFlow: () => {} },
       storage: { local: { get: async (k) => (typeof k === 'string' ? { [k]: stored[k] } : stored), set: async (p) => { Object.assign(stored, p); }, remove: async (k) => { delete stored[k]; } } },
-      windows: { create() {}, onRemoved: { addListener() {} } }, tabs: { sendMessage() {} }, alarms: { create() {}, onAlarm: { addListener() {} } }
+      windows: { create() {}, onRemoved: { addListener() {} } },
+      tabs: { query: async () => [], sendMessage: async () => ({ ok: false, reason: 'compose-closed' }) },
+      alarms: { create() {}, onAlarm: { addListener() {} } }
     },
     URLSearchParams, btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     crypto: webcrypto, TextEncoder, Uint8Array
@@ -104,6 +106,7 @@ function load(opts) {
   sandbox.self = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
+  vm.runInContext(require('./load-background.cjs').LANE_ACCOUNT_STUB, sandbox);
   return { calls, stored, fn: (n) => vm.runInContext(n, sandbox) };
 }
 const ok = (data) => ({ ok: true, status: 200, json: async () => data });
@@ -175,57 +178,17 @@ async function backgroundTests() {
   r = await w.fn('followTaskReopen')({ taskListId: 'LIST1', taskId: 'T1' }, null);
   check('reopening without a day still reopens', r.ok && w.calls[1].body.status === 'needsAction' && !('due' in w.calls[1].body), w.calls[1]);
 
-  // nudge draft
+  // nudge draft — compose window only (no Gmail drafts API)
   const watch = F.buildWatch({ threadId: 't', messageId: 'm', subject: 'Vendor booking', counterpart: { email: 'dana@acme.com', name: 'Dana Cole' }, ask: F.classifyOutgoing('Please confirm the final figure by Monday so I can book the vendor.', { now: new Date(2026, 9, 1, 12).getTime(), extract: FlowExtract }), now: 1 });
-  w = load({ stored: auth, routes: [
-    [/gmail\.googleapis\.com.*\/threads\?/, { reply: ok({ threads: [{ id: 'THREAD9' }] }) }],
-    [/gmail\.googleapis\.com.*\/drafts$/, { method: 'POST', reply: ok({ id: 'D1' }) }]
-  ] });
+  w = load({ stored: auth, routes: [] });
   r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', toName: 'Dana Cole', subject: 'Vendor booking', body: F.nudgeText(watch) });
-  const search = w.calls.find((c) => /threads\?/.test(c.url));
-  const draft = w.calls.find((c) => /\/drafts$/.test(c.url));
-  const mime = decodeRaw(draft.body.message.raw);
-  check('it looks for the thread by RECIPIENT (the account wrote last)', search && /q=to%3Adana%40acme\.com/.test(search.url), search && search.url);
-  check('the draft is filed into that thread', draft.body.message.threadId === 'THREAD9', draft.body);
-  check('the draft is addressed to the counterpart with a Re: subject', /^To: .*dana@acme\.com/m.test(mime) && /^Subject: Re: Vendor booking/m.test(mime), mime.slice(0, 200));
-  const bodyText = Buffer.from(mime.split('\r\n\r\n').slice(1).join('').replace(/\s+/g, ''), 'base64').toString('utf8');
-  check('its body is the nudge text, restating the earlier ask', /^Hi Dana,/.test(bodyText) && /confirm the final figure/.test(bodyText), bodyText);
-  check('it is saved as a draft, never sent', w.calls.every((c) => !/messages\/send|drafts\/send/.test(c.url)) && r.ok && r.ref.draftId === 'D1', { r, calls: w.calls.map((c) => c.url) });
+  check('without an open Gmail tab, compose fill is refused honestly', r.ok === false && r.reason === 'compose-closed', r);
+  check('follow drafts never hit the Gmail drafts API', !w.calls.some((c) => /gmail\.googleapis\.com.*\/drafts/.test(c.url)), w.calls.map((c) => c.url));
   r = await w.fn('followDraftCreate')({ to: '', body: 'x' });
-  check('no recipient, no draft', r.ok === false && r.reason === 'invalid', r);
-  w = load({ stored: auth, routes: [[/threads\?/, { reply: ok({ threads: [] }) }], [/\/drafts$/, { method: 'POST', reply: ok({ id: 'D2' }) }]] });
-  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: '', body: 'Hi' });
-  const d2 = w.calls.find((c) => /\/drafts$/.test(c.url));
-  check('with no thread found, a standalone draft is still made', r.ok && !('threadId' in d2.body.message), d2.body);
-
-  // a draft with a file: the one in the thread, or the one Drive file. Never a claim without a file.
-  const bytes = (str) => ({ ok: true, status: 200, arrayBuffer: async () => Buffer.from(str).buffer.slice(0, Buffer.from(str).length) });
-  const gmailRoutes = [[/gmail\.googleapis\.com.*\/threads\?/, { reply: ok({ threads: [{ id: 'THREAD9' }] }) }], [/gmail\.googleapis\.com.*\/drafts$/, { method: 'POST', reply: ok({ id: 'D3' }) }]];
-  w = load({ stored: auth, routes: gmailRoutes });
-  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', toName: 'Dana Cole', subject: 'Contract', body: 'Hi Dana,\n\nAttached: contract.pdf', attachment: { filename: 'contract.pdf', mimeType: 'application/pdf', base64: Buffer.from('PDFBYTES').toString('base64') } });
-  let d3 = w.calls.find((c) => /\/drafts$/.test(c.url));
-  let m3 = decodeRaw(d3.body.message.raw);
-  check('a thread attachment becomes a multipart draft with that file name', r.ok && r.attached === 'contract.pdf' && /multipart\/mixed/.test(m3) && /filename="contract\.pdf"/.test(m3), { r, m3: m3.slice(0, 300) });
-  check('it is still only a draft', w.calls.every((c) => !/messages\/send|drafts\/send/.test(c.url)));
-  w = load({ stored: auth, routes: gmailRoutes.concat([
-    [/drive\/v3\/files\/F1\?fields=/, { reply: ok({ name: 'Receipt - Oct.pdf', mimeType: 'application/pdf', size: '8' }) }],
-    [/drive\/v3\/files\/F1\?alt=media/, { reply: bytes('RECEIPT!') }]
-  ]) });
-  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Receipt', body: 'Hi', driveFileId: 'F1' });
-  d3 = w.calls.find((c) => /\/drafts$/.test(c.url));
-  m3 = d3 ? decodeRaw(d3.body.message.raw) : '';
-  check('a Drive file is read by the worker and attached', r.ok && r.attached === 'Receipt - Oct.pdf' && /filename="Receipt - Oct\.pdf"/.test(m3), { r, m3: m3.slice(0, 300) });
-  w = load({ stored: auth, routes: gmailRoutes.concat([
-    [/drive\/v3\/files\/F2\?fields=/, { reply: ok({ name: 'Big.pdf', mimeType: 'application/pdf', size: String(50 * 1024 * 1024) }) }]
-  ]) });
-  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Receipt', body: 'Hi, attached', driveFileId: 'F2' });
-  check('a file that cannot be read writes NO draft (the body claims one is attached)', r.ok === false && r.reason === 'attach' && !w.calls.some((c) => /\/drafts$/.test(c.url)), { r, calls: w.calls.map((c) => c.url) });
-  w = load({ stored: auth, routes: gmailRoutes });
-  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Contract', body: 'Hi', attachment: { filename: 'big.bin', mimeType: 'application/octet-stream', base64: 'A'.repeat(12 * 1024 * 1024) } });
-  check('an oversized thread attachment also writes no draft', r.ok === false && r.reason === 'attach' && !w.calls.some((c) => /\/drafts$/.test(c.url)), r);
-  w = load({ stored: auth, routes: gmailRoutes });
-  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Contract', body: 'Hi' });
-  check('no file requested: the plain draft is unchanged', r.ok && r.attached === null && !/multipart/.test(decodeRaw(w.calls.find((c) => /\/drafts$/.test(c.url)).body.message.raw)), r);
+  check('no recipient, no compose fill', r.ok === false && r.reason === 'invalid', r);
+  w = load({ stored: auth, routes: [[/drive\/v3\/files\/F404\?fields=/, { reply: { ok: false, status: 404, json: async () => ({ error: { code: 404 } }) } }]] });
+  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Receipt', body: 'Hi', driveFileId: 'F404' });
+  check('unreadable Drive file returns drive-scope, not a silent attach fail', r.ok === false && r.reason === 'drive-scope', r);
 }
 
 (async () => {

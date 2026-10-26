@@ -8,7 +8,7 @@ This page is Glance only. Flow, the org product, is separate. It does not change
 
 ## Product definition (vision-locked)
 
-Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Gmail is the current primary entry surface. A loop is closed only with ProofOfClose (`system`, `externalId`, `fetchedBack`, `verifiedAt`) and a read-back. Glance never sends by itself. Every send is a preview and one explicit approval. Glance stays a floating extension across platforms, plus a layer on the person's own computer. Full Microsoft, with one Instinct-style consent, is the north star. Morning invoices and a Netlify deploy stay on hold until the founder writes «מאשר». Merges land on `claude/install-uiux-pro-max-skill-a4agox`, not `main`.
+Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Glance's entry point is any surface the user is on. A loop is closed only with ProofOfClose (`system`, `externalId`, `fetchedBack`, `verifiedAt`) and a read-back. Glance never sends by itself. Every send is a preview and one explicit approval. Glance stays a floating extension across platforms, plus a layer on the person's own computer. Full Microsoft, with one Instinct-style consent, is the north star. Morning invoices and a Netlify deploy stay on hold until the founder writes «מאשר». Merges land on `claude/install-uiux-pro-max-skill-a4agox`, not `main`.
 
 ## Current implementation status (this tip)
 

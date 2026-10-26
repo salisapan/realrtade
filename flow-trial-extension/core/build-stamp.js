@@ -6,5 +6,7 @@ const FlowBuild = (() => {
   return { STAMP: STAMP };
 })();
 
+if (typeof module === 'undefined' && typeof console !== 'undefined') console.log('Glance build ' + FlowBuild.STAMP);
+
 if (typeof module !== 'undefined') module.exports = { FlowBuild };
 else if (typeof globalThis !== 'undefined') globalThis.FlowBuild = FlowBuild;

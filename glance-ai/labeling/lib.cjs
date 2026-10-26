@@ -27,6 +27,9 @@ const MARK = {
   '🤫': 'silent',
   '❓': 'unsure',
   '?': 'unsure',
+  'context-dependent': 'context',
+  context: 'context',
+  '⧉': 'context',
   model: 'model',
   engine: 'engine',
   silent: 'silent',
@@ -67,7 +70,15 @@ function writeJsonl(p, rows) {
 function loadBatch(p) {
   const items = readJson(p);
   if (!Array.isArray(items) || !items.length) throw new Error('batch file is empty: ' + p);
-  return items.map((r, i) => Object.assign({ item: i + 1 }, r));
+  const batchName = path.basename(p, '.json');
+  const { stampRow } = require('./context-tags.cjs');
+  return items.map((r, i) => stampRow(Object.assign({ item: i + 1, batchName }, r)));
+}
+
+function loadBatches(paths) {
+  const out = [];
+  for (const p of paths) out.push.apply(out, loadBatch(p));
+  return out;
 }
 
 function rate(n, d) {
@@ -188,5 +199,5 @@ function parseSheet(md) {
 
 module.exports = {
   OWNER, HERE, SCHEMA_PATH, ACTION_CLOSE,
-  isOwner, normMark, readJson, readJsonl, writeJsonl, loadBatch, rate, stepOf, metricsOf, validateRow, parseSheet
+  isOwner, normMark, readJson, readJsonl, writeJsonl, loadBatch, loadBatches, rate, stepOf, metricsOf, validateRow, parseSheet
 };

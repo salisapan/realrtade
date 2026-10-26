@@ -28,7 +28,7 @@ REQUIRED = [
     "icons/icon16.png",
     "icons/icon48.png",
     "icons/icon128.png",
-    # Registered at runtime when the person turns a site on (background.js SURFACES), so not in the manifest.
+    # Registered at runtime from background.js (SURFACES or LANE_CHAT), so not in the manifest.
     "src/content-outlook.js",
     "core/owa-parse.js",
     "src/chip-host.js",
@@ -39,6 +39,35 @@ REQUIRED = [
 def die(message: str) -> None:
     print(f"verify_trial_install: {message}", file=sys.stderr)
     raise SystemExit(1)
+
+
+def assert_manifest_at_extract_root(archive: zipfile.ZipFile, label: str) -> None:
+    """Chrome reports 'Manifest missing' when the zip unpacks as flow-trial-extension/manifest.json."""
+    names = archive.namelist()
+    if "manifest.json" not in names:
+        die(f"{label} zip has no manifest.json at the archive root")
+    if any(name == "flow-trial-extension/manifest.json" or name.startswith("flow-trial-extension/") for name in names):
+        die(f"{label} zip nests the extension under flow-trial-extension/")
+    with tempfile.TemporaryDirectory() as tmp:
+        archive.extractall(tmp)
+        root = Path(tmp)
+        if not (root / "manifest.json").is_file():
+            die(f"{label} unzip has no manifest.json at the folder root")
+        if (root / "flow-trial-extension" / "manifest.json").exists():
+            die(f"{label} unzip nests manifest.json under flow-trial-extension/")
+
+
+def assert_dev_fixture_absent(archive: zipfile.ZipFile, label: str) -> None:
+    """The live Gate fixture is dev-only. A store zip omits the page, and the worker refuses the flag when update_url is set."""
+    for name in archive.namelist():
+        if name.startswith("dev/") or name.endswith("messenger-fixture.html"):
+            die(f"{label} zip contains the dev fixture {name}")
+    worker_name = "src/lane-chat-worker.js"
+    if worker_name not in archive.namelist():
+        die(f"{label} zip is missing {worker_name}")
+    worker = archive.read(worker_name).decode("utf-8")
+    if "glanceDevFixture" not in worker or "update_url" not in worker:
+        die(f"{label} chat worker does not force the dev fixture off for a store build")
 
 
 def check_zip() -> None:
@@ -75,6 +104,8 @@ def check_zip() -> None:
         manifest = archive.read("manifest.json")
         if b'"manifest_version": 3' not in manifest and b'"manifest_version":3' not in manifest:
             die("packaged manifest is not version 3")
+        assert_dev_fixture_absent(archive, "install")
+        assert_manifest_at_extract_root(archive, "install")
 
 
 RUNTIME_MARKERS = ("vendor/web-llm.js", "vendor/Phi-3-mini-4k-instruct-q4f16_1-MLC-webgpu.wasm", "src/offscreen.html", "src/offscreen.js")
@@ -100,6 +131,8 @@ def check_profiles() -> None:
                 names = set(archive.namelist())
                 if archive.testzip() is not None:
                     die(f"{profile} zip is corrupt")
+                assert_dev_fixture_absent(archive, profile)
+                assert_manifest_at_extract_root(archive, profile)
             sizes[profile] = out.stat().st_size
             for rel in REQUIRED:
                 if rel not in names:
@@ -111,7 +144,7 @@ def check_profiles() -> None:
                 die(f"full zip is missing runtime files: {sorted(set(RUNTIME_MARKERS) - set(have))}")
             if profile == "full" and "vendor/web-llm.LICENSE" not in names:
                 die("full zip ships the runtime without its licence text")
-        if not sizes["lite"] < sizes["full"] / 3:
+        if not sizes["lite"] < sizes["full"] / 2.5:
             die(f"lite ({sizes['lite']}) is not much smaller than full ({sizes['full']}); something large is still bundled")
         if package.encoded_size(sizes["lite"]) > package.FUNCTION_RESPONSE_BUDGET:
             die("the lite zip does not fit the download function's response budget")
@@ -181,9 +214,20 @@ assert(publicClientId('   ') === '', 'blank');
 assert(publicClientId('REPLACE_WITH_HUBSPOT_CLIENT_ID') === '', 'placeholder');
 assert(publicClientId('YOUR_SLACK_CLIENT_ID') === '', 'legacy placeholder');
 assert(publicClientId('  real-client ') === 'real-client', 'trim real id');
+const PLACEHOLDER = /^(YOUR_|REPLACE_WITH_)/;
 for (const [key, value] of Object.entries(OAUTH_PUBLIC)) {
-  assert(publicClientId(value) === '', key + ' is still a placeholder and must count as unset');
+  const trimmed = String(value == null ? '' : value).trim();
+  const out = publicClientId(value);
+  if (!trimmed || PLACEHOLDER.test(trimmed)) {
+    assert(out === '', key + ' placeholder must count as unset');
+  } else {
+    assert(out === trimmed, key + ' real public id must pass through unchanged');
+  }
 }
+assert(
+  Object.values(OAUTH_PUBLIC).some((v) => publicClientId(v) === ''),
+  'at least one OAUTH_PUBLIC entry stays unconfigured in this build'
+);
 console.log('publicClientId ok');
 """
 

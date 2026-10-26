@@ -1,4 +1,4 @@
-# Product identity: AI is the engine, closure is the product
+# Product identity: an Intent Closer; the close is what we sell
 
 > Written 2026-10-02. Companion to `docs/local-first-principle.md` (how we
 > recognise) and `docs/open-loops.md` (what Glance does). This file is about how
@@ -9,6 +9,23 @@
 <!-- LOCKED-IDENTITY:START -->
 **Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
 <!-- LOCKED-IDENTITY:END -->
+
+## Positioning (locked by Sali, 2026-10-18)
+
+The block above is the definition; this section is how Glance is positioned in the market. Source: the positioning analysis of 2026-10-18, sections 3, 5 and 6 (kept outside the repo).
+
+- **Category:** **Intent Closer** (Hebrew: **סוגר כוונות**). Headline: **"לא עוזר. סוגר."** / "Not an assistant. A closer."
+- **Positioning sentence:** For people whose day moves between Gmail, Outlook and WhatsApp, in Hebrew and English, Glance spots anywhere what needs to happen and closes it with one Do It, with proof it was done. No chat, no setup, no bot to manage.
+- **Differentiation (the three things nobody else holds):**
+  1. Cross-provider, inside the place the user already is, with no prompt.
+  2. A strict "done": a close carries a receipt and a read-back (ProofOfClose with `fetchedBack`, `docs/true-close.md` §7). A draft is never a close.
+  3. Hebrew + WhatsApp + Israeli money and admin loops.
+- **First user:** an Israeli freelancer or small business whose office is Gmail + WhatsApp. **Entry story:** «אף שקל לא נופל בין הכיסאות» (invoices, payments, reminders).
+- **What Glance is NOT:** an AI assistant, a chat, a bot, an email assistant.
+
+**Promise = reality.** Public copy claims only what passed a live Gate: today that is Gmail and Outlook, and WhatsApp only as a draft the person sends. Messenger and Instagram are not claimed. "With proof it was done" is said only of actions that have ProofOfClose with a `fetchedBack` read-back; a draft or a reminder is described as what it is.
+
+**Not changed by this lock (pending Sali's decision):** the phrase "never sends on your behalf" in the block above, the receipt word "Handled.", and the distribution channel. They stay exactly as written until Sali decides (`docs/vault/decisions.md`, 2026-10-18).
 
 `test/docs-consistency-corpus.cjs` fails if any file that quotes this block differs from it by a character, so there is one definition. To change it, change it HERE and in every file the test names, in one commit, with the owner's say-so.
 
@@ -23,19 +40,20 @@ When anyone (a person, Claude, a Grok bot, David) describes Glance, the descript
 
 ### Required framing, forbidden framing
 
-Required, in any description of Glance: a system that closes open loops / unfinished intentions; starts today in Gmail; executes through Tasks, Draft and Drive when that is what completion needs; a multi-surface path toward true close; silence when uncertain; preparation is not completion; true close only on real completion or a deliberate release.
+Required, in any description of Glance: an Intent Closer (סוגר כוונות), a system that closes open loops / unfinished intentions; starts today in Gmail; executes through Tasks, Draft and Drive when that is what completion needs; a multi-surface path toward true close; silence when uncertain; preparation is not completion; true close only on real completion or a deliberate release.
 
-Forbidden as the full product definition: "Chrome extension for Gmail", "Gmail add-on", "AI email assistant", "smart inbox", and tracking, a reminder or a prepared draft described as completion. A sentence about the form (it installs in Chrome, it reads the open Gmail thread) is fine when it is plainly a statement of how it works today, not of what it is.
+Forbidden as the full product definition: "Chrome extension for Gmail", "Gmail add-on", "AI email assistant", "AI assistant", "email assistant", "AI helper", "chat", "bot", "smart inbox", and tracking, a reminder or a prepared draft described as completion. A sentence about the form (it installs in Chrome, it reads the open Gmail thread) is fine when it is plainly a statement of how it works today, not of what it is.
 
 ### Standing constraints (the anti-drift list)
 
 1. Glance is not only a Gmail add-on. Gmail is the entry surface.
-2. Glance is not an AI email product. AI is under the hood; outcomes are what we sell.
+2. Glance is an AI product: its own model understands each intention and plans the close; what we sell is the close, proven. It is never "an AI email assistant" that writes for you or "a smart inbox". (Owner, 2026-10-09; it replaces «Glance is not an AI email product». Plan: `docs/glance-ai/ai-product.md`.)
 3. Pro is the personal depth layer: more loops, the money owed, firmer nudges, Draft-It and summaries, and, once the server switch is on, a larger allowance and a stronger second reading. It is not a team or enterprise tier and carries no compliance claim. That is Flow, and it is separate.
 4. Waiting or tracking alone is not success. True close is: the original intention completed in fact, or released on purpose by the person.
 5. Free must stay genuinely useful: Do It without limit, loops that close on the outcome, and, once the server switch is on, the second reading within its allowance. Never a dead demo.
 6. Zero-Prompt is sacred: no chat, no rules screen, no setup questions beyond signing in, one card only when something real is decided; silence when unsure.
 7. Multi-platform means execution and observation across the surfaces where a loop really opens, advances and closes, in service of closure. It does not mean a connector marketplace, inbox-zero, or integrations for their own sake. A new surface is opt-in, read-only, stricter than Gmail, and changes the privacy page and the store text in the same commit (`docs/multi-platform.md`).
+8. Glance never blocks the user. A draft, task, calendar event, or file Glance created stays fully editable in the tool where it lives. Glance does not cover it, disable it, or write it again after the person starts editing. Undo leaves it alone, in one plain line, when a creation snapshot, changeKey, or lastModifiedDateTime shows the person changed it.
 
 ### Before and after
 
@@ -46,13 +64,14 @@ Forbidden as the full product definition: "Chrome extension for Gmail", "Gmail a
 | "Glance reminds you to follow up." | "Glance stays on it until the answer arrives; the reminder is a means, the close is the product." |
 | "Draft ready: handled." | "Draft ready, nothing sent. It closes when you send it with the file." (preparation is not completion) |
 | "An AI email assistant that understands your inbox." | "It stays quiet unless something real is open, and says what is still open." |
+| "Your AI assistant for email and WhatsApp." | "Not an assistant. A closer. Glance spots what needs to happen and closes it with one Do It." |
 | "Glance is a connector to Calendar, Tasks and Drive." | "Glance executes through Calendar, Tasks, Drafts and Drive when that is what completion needs." |
 
 ## The rule
 
-Glance is built with AI techniques and must not be sold, worded or felt as "an AI
-email product". It competes on what stays open until it is closed, not on
-cleverness.
+Glance is an AI product (owner, 2026-10-09). Its own model understands each intention and plans the close, and Glance may say so plainly. It still
+competes on what stays open until it is closed, not on cleverness: the AI is named as what understands and plans, the close is the promise. Never "an AI email
+assistant" that writes for you, never "a smart inbox", and never AI in place of the outcome.
 
 | Under the hood | On the surface |
 |---|---|
@@ -64,6 +83,7 @@ cleverness.
 
 - Sell outcomes: closed loops, protected money, remembered follow-ups. Never
   "smarter email", "AI that understands your inbox", "AI assistant", "smart inbox".
+  The category word is Intent Closer / סוגר כוונות, never assistant, helper, chat or bot.
 - Prefer silence to AI theatre. No sparkle, no "thinking", no chat voice.
 - Free builds trust by closing things locally; Pro protects the expensive open
   loops (every loop, the money owed, firmer nudges). Draft-It and summaries are

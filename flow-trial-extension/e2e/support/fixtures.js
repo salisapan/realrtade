@@ -8,8 +8,91 @@ function esc(value) {
     .replace(/"/g, '&quot;');
 }
 
+// The live Gmail self-sent shape. The address is on the sender chip
+// (email and data-hovercard-id). The recipient is a span whose text is
+// "to me" or אליי, and that chip has no email attribute. The page title
+// is not an address. The account button is.
+function gmailLiveSelf(o) {
+  const own = o.ownEmail || 'ai.local.flow@gmail.com';
+  const name = o.senderName || 'Sali Sapan';
+  const subject = o.subject || 'Reminder';
+  const body = o.body || '';
+  const messageId = o.messageId || 'm-live-self';
+  const threadId = o.threadId || 't-live-self';
+  const langAttr = o.lang ? (' lang="' + esc(o.lang) + '"') : '';
+  const account = accountButton(o, own, name);
+  const titleEmail = o.titleEmail || own;
+  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(titleEmail) + ' - Gmail</title></head><body>' +
+    account +
+    '<div role="main">' +
+    '<h2 class="hP">' + esc(subject) + '</h2>' +
+    '<div role="listitem" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
+    '<h3 class="iw"><span class="gD" email="' + esc(own) + '" name="' + esc(name) + '" data-hovercard-id="' + esc(own) + '">' + esc(name) + '</span></h3>' +
+    '<span class="hb">' + (o.toSelfText === 'אליי' ? '' : 'to ') + '<span class="g2">' + esc(o.toSelfText || 'me') + '</span></span>' +
+    '<div class="a3s">' + esc(body) + '</div>' +
+    '</div></div></body></html>';
+}
+
+function accountButton(o, ownEmail, name) {
+  if (o.accountLabel === false || o.omitAccount === true) return '';
+  const who = String(name || '').trim();
+  // An address with no person. "Glance" is not a loaded name, so a
+  // greeting with no profile still waits. Callers that have a name pass it.
+  const label = o.accountLabel || ('Google Account: ' + (who ? who + ' ' : '') + '(' + ownEmail + ')');
+  return '<a class="gb_d" aria-label="' + esc(label) + '" href="https://accounts.google.com/SignOutOptions"></a>';
+}
+
+// Gmail's own header in a right-to-left account. The collapsed line names the
+// recipients with no label. "Show details" opens a table of label cells
+// (td) and address cells, the labels carry bidi marks and a trailing colon.
+// opts.detailsTable = { to: [], cc: [], expanded: bool, hebrew: bool, bidi: bool, lateMs: number }
+// lateMs: Gmail paints the recipients after the body, so the first scan sees no header.
+function gmailDetailsTable(o, senderEmail, senderName, ownEmail) {
+  const d = o.detailsTable || {};
+  const mark = d.bidi === false ? '' : '\u200f';
+  const label = (he, en) => mark + (d.hebrew === false ? en : he) + ':' + mark;
+  const cell = (a) => '<span email="' + esc(a) + '">' + (String(a).toLowerCase() === String(ownEmail).toLowerCase() ? (d.hebrew === false ? 'me' : 'אני') : esc(a)) + '</span>';
+  const row = (lab, list) => (list && list.length)
+    ? ('<tr class="ajv"><td class="gG">' + lab + '</td><td class="gL">' + list.map(cell).join(', ') + '</td></tr>')
+    : '';
+  const innerTable = '<table class="ajC" role="presentation">' +
+    '<tr class="ajv"><td class="gG">' + label('מאת', 'from') + '</td><td class="gL"><span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span></td></tr>' +
+    row(label('אל', 'to'), d.to) + row(label('עותק', 'cc'), d.cc) +
+    '</table>';
+  const table = '<div class="ajB">' + innerTable + '</div>';
+  const collapsedTo = (d.to || []).map((a) => {
+    const me = String(a).toLowerCase() === String(ownEmail).toLowerCase();
+    return me ? (d.hebrew === false ? 'me' : 'אני') : esc(a);
+  });
+  if ((d.cc || []).some((a) => String(a).toLowerCase() === String(ownEmail).toLowerCase())) {
+    collapsedTo.push(d.hebrew === false ? 'me' : 'אני');
+  }
+  const collapsedPrefix = d.hebrew === false ? 'to' : 'to';
+  const collapsedLine = collapsedTo.length
+    ? ('<div class="gE iv gt"><span>' + collapsedPrefix + ' ' + collapsedTo.join(', ') + '</span></div>')
+    : '';
+  if (d.lateMs) {
+    return '<div class="glance-late-hdr"></div><script>setTimeout(function(){var h=document.querySelector(".glance-late-hdr");if(h)h.innerHTML=' + JSON.stringify(collapsedLine + table).replace(/</g, '\\u003c') + ';},' + Number(d.lateMs) + ');</script>';
+  }
+  if (d.expanded) return collapsedLine + table;
+  const all = (d.to || []).concat(d.cc || []);
+  const names = all.map((a) => '<span email="' + esc(a) + '">' + (String(a).toLowerCase() === String(ownEmail).toLowerCase() ? 'אליי' : esc(a)) + '</span>').join(', ');
+  return '<div class="hb"><span class="ajy" role="button" aria-label="הצג פרטים" data-table="' + esc(table) + '" ' +
+    'onclick="this.parentNode.insertAdjacentHTML(\'afterend\', this.getAttribute(\'data-table\'));this.parentNode.remove()">' + names + '</span></div>';
+}
+
+// opts.threadIdOnHeader: real Gmail puts the thread on h2.hP only, never on the
+// message. opts.noThreadId: no thread id anywhere. opts.threadPermId: only the decimal data-thread-perm-id is there.
+function threadHeaderAttrs(o, threadId) {
+  if (o.noThreadId) return '';
+  if (o.threadPermId) return ' data-thread-perm-id="thread-f:' + esc(o.threadPermId) + '"';
+  if (!o.threadIdOnHeader) return '';
+  return ' data-legacy-thread-id="' + esc(threadId) + '" data-thread-perm-id="thread-f:1"';
+}
+
 function gmailHtml(opts) {
   const o = opts || {};
+  if (o.liveSelf) return gmailLiveSelf(o);
   const senderEmail = o.senderEmail || 'dana@acme.com';
   const senderName = o.senderName || 'Dana';
   const subject = o.subject || 'Hello';
@@ -18,17 +101,52 @@ function gmailHtml(opts) {
   const threadId = o.threadId || 't-1';
   const toList = Array.isArray(o.to) ? o.to : [];
   const ccList = Array.isArray(o.cc) ? o.cc : [];
+  const ownEmail = o.ownEmail || 'me@x.com';
+  const files = Array.isArray(o.attachments) ? o.attachments : [];
   const toLine = toList.length ? ('<div class="to">To: ' + toList.map((a) => '<span email="' + esc(a) + '">' + esc(a) + '</span>').join(' ') + '</div>') : '';
   const ccLine = ccList.length ? ('<div class="cc">Cc: ' + ccList.map((a) => '<span email="' + esc(a) + '">' + esc(a) + '</span>').join(' ') + '</div>') : '';
-  return '<!doctype html><html><head><title>Inbox - me@x.com - Gmail</title></head><body>' +
-    '<div role="main">' +
-    '<h2 class="hP">' + esc(subject) + '</h2>' +
-    '<div role="listitem" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
+  const detailsTable = o.detailsTable ? gmailDetailsTable(o, senderEmail, senderName, ownEmail) : '';
+  const chips = files.map((f) => {
+    const name = (f && (f.name || f.filename)) || 'report.pdf';
+    const mime = (f && f.mimeType) || 'application/pdf';
+    const url = (f && f.url) || ('https://mail.google.com/mail/u/0/?view=att&disp=safe&name=' + encodeURIComponent(name));
+    return '<span download_url="' + esc(mime + ':' + name + ':' + url) + '">' + esc(name) + '</span>';
+  }).join('');
+  const file = o.downloadUrl
+    ? ('<span download_url="' + esc(o.downloadUrl) + '"></span>')
+    : '';
+  const compose = o.composeReply
+    ? ('<form><textarea name="to">' + esc(o.composeTo || senderEmail) + '</textarea>' +
+      '<input name="subjectbox" value="' + esc(o.composeSubject || ('Re: ' + subject)) + '">' +
+      '<div aria-label="Message Body" contenteditable="true" role="textbox"><br>' +
+      '<div class="gmail_signature">' + esc(o.signature || 'Best, Ada') + '</div>' +
+      '<div class="gmail_quote">On Thursday Flow wrote:<blockquote>' + esc(o.quoted || body) + '</blockquote></div>' +
+      '</div></form>')
+    : (o.compose
+      ? ('<form><textarea name="to"></textarea><input name="subjectbox" value="">' +
+        '<div aria-label="Message Body" contenteditable="true" role="textbox"></div></form>')
+      : '');
+  const message = '<div class="' + (o.threadBesideInbox ? 'adn' : '') + '" role="' + (o.threadBesideInbox ? 'article' : 'listitem') + '"' + ((o.threadIdOnHeader || o.noThreadId) ? '' : ' data-legacy-thread-id="' + esc(threadId) + '"') + ' data-legacy-message-id="' + esc(messageId) + '">' +
     '<span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span>' +
-    '<span email="me@x.com"' + (o.userName ? (' name="' + esc(o.userName) + '"') : '') + '>me</span>' +
-    toLine + ccLine +
+    '<span email="' + esc(ownEmail) + '"' + (o.userName ? (' name="' + esc(o.userName) + '"') : '') + '>me</span>' +
+    (o.detailsTable ? detailsTable : toLine + ccLine) + chips +
     '<div class="a3s">' + esc(body) + '</div>' +
-    '</div></div></body></html>';
+    file +
+    '</div>';
+  // The inbox list stays in the page when a thread opens. Those rows are
+  // listitems and they have no message body. The open mail is not one of them.
+  const inbox = o.threadBesideInbox
+    ? '<div role="list"><div role="listitem" data-legacy-thread-id="inbox-other"><span class="y2">older snippet</span></div></div>'
+    : '';
+  const langAttr = o.lang ? (' lang="' + esc(o.lang) + '"') : '';
+  const account = accountButton(o, ownEmail, o.accountName || '');
+  const titleEmail = o.titleEmail || ownEmail;
+  return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(titleEmail) + ' - Gmail</title></head><body>' +
+    account +
+    '<div role="main">' +
+    inbox +
+    '<h2 class="hP"' + threadHeaderAttrs(o, threadId) + '>' + esc(subject) + '</h2>' +
+    message + compose + '</div></body></html>';
 }
 
 function outlookHtml(opts) {
@@ -42,6 +160,11 @@ function outlookHtml(opts) {
   const ccList = Array.isArray(o.cc) ? o.cc : [];
   const files = Array.isArray(o.attachments) ? o.attachments : [];
   const received = o.received && !o.live ? '<div class="received" data-received="' + esc(o.received) + '"></div>' : '';
+  // A conversation id in the address counts only when the open mail's header
+  // shows that same id. The fixture header carries it, the way a confirmed
+  // reading pane does.
+  const convId = o.id && /^A[AQ]Qk/i.test(String(o.id)) ? String(o.id) : '';
+  const convAttr = convId ? (' data-convid="' + esc(convId) + '"') : '';
   const clock = o.live && o.receivedLabel
     ? ('<div class="date">' + esc(o.receivedLabel) + '</div>')
     : '';
@@ -72,12 +195,12 @@ function outlookHtml(opts) {
       : (o.hebrewTo
         ? ('<div class="to"><span>אל</span> <span title="' + esc(toList[0] || '') + '">' + esc(o.toName || 'sali sapan') + '</span></div>')
         : ('<div class="to">To: ' + toList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>')));
-  return '<!doctype html><html lang="en"><head><title>Mail - Glance - Outlook</title></head><body>' +
+  return '<!doctype html><html lang="' + esc(o.lang || 'en') + '"><head><title>Mail - Glance - Outlook</title></head><body>' +
     '<div id="app"><div role="main">' +
     unread +
     '<div id="ReadingPaneContainerId">' +
     '<div role="heading" aria-level="2"><span title="' + esc(subject) + '">' + esc(subject) + '</span></div>' +
-    '<div class="hdr"><span title="' + esc(title) + '">' + esc(senderName) + '</span>' +
+    '<div class="hdr"' + convAttr + '><span title="' + esc(title) + '">' + esc(senderName) + '</span>' +
     received +
     clock +
     toLine +
@@ -92,8 +215,21 @@ function outlookUrl(id) {
   return 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(id);
 }
 
-function gmailUrl(messageId) {
-  return 'https://mail.google.com/mail/u/0/#inbox/' + encodeURIComponent(messageId || 'm-1');
+function gmailUrl(messageId, accountIndex) {
+  const n = accountIndex == null || accountIndex === '' ? '0' : String(accountIndex);
+  return 'https://mail.google.com/mail/u/' + n + '/#inbox/' + encodeURIComponent(messageId || 'm-1');
 }
 
-module.exports = { gmailHtml, outlookHtml, outlookUrl, gmailUrl };
+// The day the date-bound fixtures live on: today, local time. Fixtures that said 2026-10-08 stopped matching the extension's own
+// recency checks once that day passed (gate-0945 and gate-0947 failed from the next day on). The Hebrew letter is the weekday
+// (א ראשון … ו שישי, ש שבת) as the OWA list row shows it before the date.
+function testDay() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const d = { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
+  d.dmy = pad(d.d) + '/' + pad(d.m) + '/' + d.y;
+  d.heDay = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'][now.getDay()];
+  return d;
+}
+
+module.exports = { gmailHtml, outlookHtml, outlookUrl, gmailUrl, testDay };

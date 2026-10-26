@@ -7,6 +7,9 @@ const FlowOnedriveFile = (() => {
   const SYSTEM = 'microsoft/onedrive';
   const CONNECTOR = 'onedriveFile';
   const WRITE_SCOPE = 'Files.ReadWrite';
+  // Every file Glance writes goes into this one folder, so the card can say
+  // exactly where it is and Undo never reaches anything else on the drive.
+  const FOLDER = 'Glance';
   const MAX_BYTES = 4 * 1024 * 1024;
 
   function scopeList(scopes) {
@@ -38,12 +41,35 @@ const FlowOnedriveFile = (() => {
     return encodeURIComponent(name);
   }
 
+  function messageIdCanon(id) {
+    if (!id) return '';
+    let s = String(id);
+    try { s = decodeURIComponent(s); } catch (e) { /* already decoded */ }
+    return s.replace(/^ol:/, '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '').trim();
+  }
+
+  function messageIdSpellings(id) {
+    const raw = String(id || '');
+    const canon = messageIdCanon(raw);
+    const out = [];
+    if (canon) out.push(canon);
+    if (raw && raw !== canon) out.push(raw);
+    return out;
+  }
+
   function rootItemPath(name) {
-    return '/me/drive/root:/' + encodeName(name);
+    return '/me/drive/root:/' + encodeName(FOLDER) + '/' + encodeName(name);
   }
 
   function createContentPath(name) {
-    return '/me/drive/root:/' + encodeName(name) + ':/content';
+    return rootItemPath(name) + ':/content';
+  }
+
+  // 'OneDrive > Glance > passport.pdf'. Empty when there is no file name.
+  function destination(name, app) {
+    const n = String(name || '').trim();
+    if (!n) return '';
+    return (app || 'OneDrive') + ' > ' + FOLDER + ' > ' + n;
   }
 
   function itemPath(id) {
@@ -145,12 +171,17 @@ const FlowOnedriveFile = (() => {
     const params = (input && input.params) || {};
     const messageId = (input && (input.outlookIncomingId || input.messageId)) || params.messageId || '';
     if (!messageId) return { ok: false, reason: 'unclear' };
+    const sel = params.selectedAttachment || {};
+    const fileName = String(params.fileName || sel.name || sel.filename || '').trim();
+    const attachmentId = String(params.attachmentId || sel.id || '').trim();
     return {
       ok: true,
       name: named.name,
       nameLocked: named.nameLocked,
       fetchOne: true,
       messageId: String(messageId),
+      fileName: fileName,
+      attachmentId: attachmentId,
       contentType: 'application/octet-stream'
     };
   }
@@ -166,6 +197,8 @@ const FlowOnedriveFile = (() => {
     SYSTEM: SYSTEM,
     CONNECTOR: CONNECTOR,
     WRITE_SCOPE: WRITE_SCOPE,
+    FOLDER: FOLDER,
+    destination: destination,
     MAX_BYTES: MAX_BYTES,
     hasWriteScope: hasWriteScope,
     safeName: safeName,
@@ -177,6 +210,7 @@ const FlowOnedriveFile = (() => {
     restorePath: restorePath,
     attachmentsPath: attachmentsPath,
     attachmentItemPath: attachmentItemPath,
+    messageIdSpellings: messageIdSpellings,
     bytesFromBase64: bytesFromBase64,
     prepare: prepare,
     versionIdOf: versionIdOf

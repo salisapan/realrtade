@@ -10,6 +10,8 @@ that looks at a message, and never the thing a feature depends on to work.**
    in `core/` (vocabulary tables, patterns, dates, amounts, state). The goal is
    thousands of recognisable cases from data, not a handful of regexes: add
    words and frames to the lexicons, not special cases to the logic.
+> **Owner, 2026-10-09:** Glance becomes an AI product (`docs/glance-ai/ai-product.md`): the device still runs first and keeps the floor, and Glance's own model becomes the main reader of what the device does not settle. Rule 2 below describes today's live path; the model-first path ships behind an off switch and replaces it only together with the new privacy and consent copy.
+
 2. **A model is an optional last resort,** only for what the code genuinely
    cannot decide, only behind masking and the person's one-time yes (Free with
    a monthly allowance, Pro with a larger one and a stronger model: owner

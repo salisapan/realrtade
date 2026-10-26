@@ -14,7 +14,7 @@ function tokens(t) { return norm(cleanText(t)).match(/[a-z'_]+|[\u05D0-\u05EA"'×
 function featuresOf(c, ctx) {
   ctx = ctx || {};
   const f = new Set();
-  const add = (s) => f.add(fnv1a(s) % DIM);
+  const add = (s) => { f.add(fnv1a(s) % DIM); if (ctx.names) ctx.names.push(s); };
   const surface = c.surface || 'gmail', dir = c.direction || 'inbound';
   const att = Math.min(Number(c.attachmentCount || 0), 2);
   add('m:surface=' + surface); add('m:dir=' + dir); add('m:att=' + att); add('m:sa=' + surface + att); add('m:ds=' + dir + surface);

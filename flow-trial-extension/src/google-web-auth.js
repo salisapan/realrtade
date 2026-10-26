@@ -15,14 +15,25 @@
 
 export const GOOGLE_WEB_AUTH_STORAGE_KEY = 'googleWebAuth';
 
+// One status for the panel, Setup, and the popup. A stored Google grant
+// that cannot write is not "Connected".
+export const GOOGLE_RECONNECT_STORAGE_KEY = 'googleReconnect';
+export const GOOGLE_EVER_CONNECTED_STORAGE_KEY = 'googleEverConnected';
+export const GOOGLE_RECONNECT_LABEL = 'חבר מחדש את Google';
+export const GOOGLE_CONNECT_LABEL = 'התחבר ל-Google';
+
+const UNCONFIRMED_EN = "Couldn't confirm it's unchanged. Undo left it alone.";
+const UNCONFIRMED_HE = 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא';
+
 // Used only when manifest oauth2.scopes is missing. Keep this list identical
 // to manifest.json so a fallback grant covers the same APIs as getAuthToken.
 export const GOOGLE_OAUTH_SCOPES = [
-  'https://www.googleapis.com/auth/tasks',
+  'openid',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/gmail.compose',
-  'https://www.googleapis.com/auth/drive.readonly',
-  'https://www.googleapis.com/auth/drive.file'
+  'https://www.googleapis.com/auth/tasks'
 ];
 
 const WEB_TOKEN_SKEW_MS = 60 * 1000;
@@ -57,6 +68,35 @@ export function googleOAuthScopesFrom(scopes) {
   return list.length ? list : GOOGLE_OAUTH_SCOPES.slice();
 }
 
+// The scopes the last consent actually granted. A cached token keeps the
+// old list, so a different version has to drop that token and ask once.
+export const GOOGLE_GRANTED_SCOPES_KEY = 'googleGrantedScopes';
+
+export function scopeVersion(scopes) {
+  const list = Array.isArray(scopes) ? scopes : [];
+  const cleaned = [];
+  list.forEach((s) => {
+    const t = String(s || '').trim();
+    if (t && cleaned.indexOf(t) === -1) cleaned.push(t);
+  });
+  cleaned.sort();
+  return cleaned.join('\n');
+}
+
+// 'use' keeps the silent path. 'upgrade' drops the cached token and asks
+// once. A cancel on this version stays quiet until the next Connect.
+export function googleScopeAction(stored, requiredScopes, mode) {
+  const required = scopeVersion(requiredScopes);
+  const rec = stored && typeof stored === 'object' ? stored : null;
+  const version = rec && typeof rec.version === 'string' ? rec.version : '';
+  const status = rec && rec.status;
+  const same = Boolean(required) && version === required;
+  const interactive = mode === 'interactive' || mode === true;
+  if (same && status === 'granted') return 'use';
+  if (!interactive && same && status === 'asked') return 'use';
+  return 'upgrade';
+}
+
 export function googleImplicitAuthUrl(opts) {
   const options = opts || {};
   const params = new URLSearchParams();
@@ -67,7 +107,40 @@ export function googleImplicitAuthUrl(opts) {
   params.set('include_granted_scopes', 'true');
   if (options.state) params.set('state', options.state);
   if (options.prompt) params.set('prompt', options.prompt);
+  const hint = String(options.loginHint || '').trim();
+  if (hint.indexOf('@') > 0) params.set('login_hint', hint);
   return 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+}
+
+// The implicit redirect may include an OpenID id_token. The email inside it
+// is only a login_hint for the next silent prompt=none. It is not a login.
+function emailFromIdToken(idToken) {
+  const parts = String(idToken || '').split('.');
+  if (parts.length < 2 || !parts[1]) return '';
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const segment = parts[1].replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+  let acc = 0;
+  let bits = 0;
+  const bytes = [];
+  for (let i = 0; i < segment.length; i++) {
+    const v = alphabet.indexOf(segment[i]);
+    if (v < 0) return '';
+    acc = (acc << 6) | v;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((acc >> bits) & 255);
+    }
+  }
+  let raw = '';
+  for (let i = 0; i < bytes.length; i++) raw += String.fromCharCode(bytes[i]);
+  try {
+    const json = JSON.parse(raw);
+    const email = json && typeof json.email === 'string' ? json.email.trim() : '';
+    return email.indexOf('@') > 0 ? email : '';
+  } catch (e) {
+    return '';
+  }
 }
 
 function formParams(serialized) {
@@ -119,8 +192,118 @@ export function parseGoogleImplicitRedirect(redirectUrl, expectedState) {
   const expiresIn = expiresRaw == null || expiresRaw === '' ? null : Number(expiresRaw);
   return {
     accessToken: accessToken.trim(),
-    expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : null
+    expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : null,
+    email: emailFromIdToken(pick('id_token'))
   };
+}
+
+// Browser UI language. he and he-IL use the Hebrew refusal. Anything else
+// stays English. Glance has no separate language setting.
+export function unconfirmedRefusal(lang) {
+  const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
+  if (code === 'he' || code.indexOf('he-') === 0) return UNCONFIRMED_HE;
+  return UNCONFIRMED_EN;
+}
+
+// had a Connect record, and a later write was rejected: Connected is false
+// and every surface reads this same object.
+function statusEnglish(lang) {
+  const code = String(lang || '').trim().toLowerCase().replace(/_/g, '-');
+  return code === 'en' || code.indexOf('en-') === 0;
+}
+
+function everConnectedRecord(value) {
+  return value === true || !!(value && value.connected);
+}
+
+function priorGoogleBag(bag) {
+  const b = bag || {};
+  if (b.googleTasksAuth || b.tasksAuth) return true;
+  const web = b.googleWebAuth || b.webAuth;
+  if (web && (web.accessToken || web.refreshToken)) return true;
+  const undo = b.glanceLaneUndo || b.laneUndo;
+  if (undo && typeof undo === 'object') {
+    const keys = Object.keys(undo);
+    for (let i = 0; i < keys.length; i++) {
+      const row = undo[keys[i]];
+      if (row && Array.isArray(row.steps) && row.steps.length) return true;
+    }
+  }
+  return false;
+}
+
+// One write, the first time an older profile is opened. A marker already
+// stored is left alone. An empty profile stays unmarked.
+export function googleEverConnectedPatch(bag) {
+  const b = bag || {};
+  const marker = b[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || b.googleEverConnected;
+  if (everConnectedRecord(marker)) return null;
+  if (!priorGoogleBag(b)) return null;
+  return { [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true } };
+}
+
+export function googleConnectionState(auth, reconnect, extras) {
+  const extra = extras || {};
+  // A current grant plus the token from that chooser is a connection.
+  // An older scope version is not. A reconnect flag still wins.
+  const tokenHeld = Boolean(extra.webAuth && (extra.webAuth.accessToken || extra.webAuth.refreshToken));
+  const had = Boolean(auth) || (extra.scopesGranted === true && tokenHeld);
+  // Reconnect after any earlier connection: the marker, a stored token,
+  // a Tasks grant, or a Do It that already landed. A person who never
+  // connected sees Connect, even if a stale flag is set.
+  const previous = had || everConnectedRecord(extra.everConnected) || priorGoogleBag(extra);
+  const flagged = Boolean(reconnect && reconnect.needed);
+  const warnOn = Boolean(extra.warning && extra.warning.needed);
+  const needs = (previous && flagged) || (previous && !had && !warnOn);
+  const warn = !needs && warnOn;
+  const english = statusEnglish(extra.lang);
+  const reconnectLabel = english ? 'Reconnect Google' : GOOGLE_RECONNECT_LABEL;
+  const connectLabel = english ? 'Connect Google' : GOOGLE_CONNECT_LABEL;
+  const warningLabel = english ? 'A step did not finish' : 'שלב אחד לא הושלם';
+  const connected = had && !needs && !warn;
+  return {
+    connected: connected,
+    needsReconnect: needs,
+    warning: warn,
+    reconnectLabel: needs ? reconnectLabel : GOOGLE_RECONNECT_LABEL,
+    warningLabel: warn ? warningLabel : '',
+    headerLabel: needs ? reconnectLabel : (warn ? warningLabel : (connected ? 'Connected' : connectLabel)),
+    configured: extra.configured != null ? Boolean(extra.configured) : had,
+    detail: connected ? (extra.detail || null) : null
+  };
+}
+
+// Identity first (interactive false). A signed-out getAuthToken falls back
+// to the stored Connect token. A lapsed stored token may refresh silently.
+// This function never opens a consent window.
+export function laneCredential(deps) {
+  const d = deps || {};
+  const identity = typeof d.getAuthToken === 'function'
+    ? Promise.resolve().then(() => d.getAuthToken(false)).catch(() => '')
+    : Promise.resolve('');
+  return identity.then((chromeToken) => {
+    if (chromeToken) return { token: chromeToken, source: 'chrome' };
+    const read = typeof d.readWebAuth === 'function' ? d.readWebAuth() : Promise.resolve(null);
+    return Promise.resolve(read).then((existing) => {
+      if (webTokenUsable(existing, d.now)) {
+        return { token: existing.accessToken, source: 'web' };
+      }
+      const expired = Boolean(existing && existing.accessToken);
+      if (!expired || typeof d.refreshSilent !== 'function') {
+        throw new Error('The user is not signed in.');
+      }
+      return Promise.resolve().then(() => d.refreshSilent()).then((next) => {
+        if (next && typeof next === 'object' && next.token) {
+          return { token: next.token, source: next.source || 'web' };
+        }
+        if (typeof next === 'string' && next) return { token: next, source: 'web' };
+        throw new Error('The user is not signed in.');
+      }).catch((err) => {
+        if (err && /not signed in/i.test(err.message || '')) throw err;
+        throw new Error('The user is not signed in.');
+      });
+    });
+  });
 }
 
 export function webTokenUsable(record, now, skewMs) {

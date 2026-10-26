@@ -135,6 +135,9 @@ const FlowOutlook = (() => {
         lastIncoming: st.lastIncoming || 0, lastOffers: st.lastOffers || 0,
         error: st.error || null, errorDetail: st.errorDetail || null, aadsts: st.aadsts || null,
         redirectUri: deps.redirectUri(),
+        tokenStatus: (typeof FlowOutlookAuth !== 'undefined' && typeof FlowOutlookAuth.microsoftConnection === 'function')
+          ? FlowOutlookAuth.microsoftConnection(auth, st, Date.now())
+          : 'missing',
         offers: (pending.offers || []).length, asks: (pending.asks || []).length,
         incoming: (pending.incoming || []).length,
         diagnostics: Array.isArray(st.diagnostics) ? st.diagnostics.slice(0, 40) : [],
@@ -215,7 +218,9 @@ const FlowOutlook = (() => {
     // cannot walk the whole mailbox. Overflow stays unread, same as a failed GET.
     async function readMessageAttachments(token, messages) {
       const closes = googleCloses();
-      const needs = closes && typeof closes.needsOneAttachment === 'function' ? closes.needsOneAttachment : null;
+      const needs = closes && typeof closes.attachmentCountForJudge === 'function'
+        ? closes.attachmentCountForJudge
+        : (closes && typeof closes.needsOneAttachment === 'function' ? closes.needsOneAttachment : null);
       let reads = 0;
       const CAP = 20;
       for (const msg of messages || []) {
@@ -261,13 +266,49 @@ const FlowOutlook = (() => {
     async function fetchProfile(token) {
       // Optional fields: never fail the connect because of a refused field.
       try {
-        return await graphGet(token, cfg.GRAPH + '/me?$select=mail,userPrincipalName,displayName,otherMails,proxyAddresses');
+        return await graphGet(token, cfg.GRAPH + '/me?$select=mail,userPrincipalName,displayName,givenName,surname,otherMails,proxyAddresses');
       } catch (e) {
         try { return await graphGet(token, cfg.GRAPH + '/me?$select=mail,userPrincipalName,displayName'); }
         catch (e2) { return null; }
       }
     }
 
+    function profileNameList(profile) {
+      const intentApi = (deps.planDeps && deps.planDeps.intent) || (typeof FlowIntent !== 'undefined' ? FlowIntent : null);
+      if (intentApi && typeof intentApi.readerNamesFrom === 'function') {
+        return intentApi.readerNamesFrom({ profile: profile || null });
+      }
+      const out = [];
+      function add(raw) {
+        const name = String(raw || '').trim();
+        if (!name || name.toLowerCase() === 'me') return;
+        if (out.some((n) => n.toLowerCase() === name.toLowerCase())) return;
+        out.push(name);
+      }
+      const p = profile || {};
+      add(p.displayName);
+      add(p.name);
+      const given = String(p.givenName || p.given_name || '').trim();
+      const surname = String(p.surname || p.familyName || '').trim();
+      add(given);
+      add(surname);
+      if (given && surname) add(given + ' ' + surname);
+      return out;
+    }
+    async function rememberProfileNames(profile) {
+      const names = profileNameList(profile);
+      if (!names.length) return;
+      try {
+        const bag = await deps.storage.get();
+        const prev = Array.isArray(bag && bag.glanceOwnNames) ? bag.glanceOwnNames : [];
+        const merged = prev.slice();
+        names.forEach((name) => {
+          if (!merged.some((n) => String(n).toLowerCase() === String(name).toLowerCase())) merged.push(name);
+        });
+        const same = merged.length === prev.length && merged.every((name, i) => String(name) === String(prev[i]));
+        if (!same) await write('glanceOwnNames', merged);
+      } catch (e) { /* the page still reads the profile on the auth record */ }
+    }
     function buildOwnAddresses(profile, learned) {
       const g = gm();
       if (g && g.ownAddressesFrom) return Array.from(g.ownAddressesFrom(profile, learned));
@@ -300,7 +341,9 @@ const FlowOutlook = (() => {
       const primary = ownAddresses[0] || String(profile.mail || profile.userPrincipalName || '').toLowerCase();
       if (!primary) return { ok: false, error: 'profile' };
       const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
-      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
+      const storedProfile = { mail: profile.mail, userPrincipalName: profile.userPrincipalName, displayName: profile.displayName || null, givenName: profile.givenName || null, surname: profile.surname || null, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] };
+      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: storedProfile });
+      await rememberProfileNames(storedProfile);
       // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
       await clearOutlookJudgmentState();
       // Register the OWA content script (same chip as Gmail) while Outlook is on.
@@ -465,7 +508,6 @@ const FlowOutlook = (() => {
           silence.push({ conversationId: d.conversationId, reason: (chain && chain.reason) || 'file-chain-not-run' });
           continue;
         }
-        const he = chain.requirement && chain.requirement.lang === 'he';
         const from = (msg.from && msg.from.emailAddress) || {};
         const card = chain.card || {};
         const line = [card.line, card.searched, card.why, card.skipped].filter(Boolean).join(' ');
@@ -483,7 +525,7 @@ const FlowOutlook = (() => {
           card: chain.card,
           requirement: chain.requirement,
           promise: chain.promise,
-          doLabel: he ? 'טיוטת תשובת ביניים' : 'Draft a holding reply',
+          doLabel: 'Draft a holding reply',
           intent: { type: 'request', label: line },
           process: {
             id: 'reply-track',
@@ -584,6 +626,18 @@ const FlowOutlook = (() => {
       const watches = await deps.storage.getWatches();
       const graph = await deps.storage.getIdentityGraph();
       const planDeps = Object.assign({}, deps.planDeps, { actions: (deps.planDeps && deps.planDeps.actions) || deps.actions || null });
+      const accountName = (auth.account && (auth.account.name || auth.account.displayName)) || (auth.profile && auth.profile.displayName) || '';
+      await rememberProfileNames(auth.profile);
+      let knownNames = null;
+      try {
+        const bag = await deps.storage.get();
+        knownNames = bag && bag.glanceOwnNames;
+      } catch (e) { knownNames = null; }
+      const intentApi = planDeps.intent;
+      planDeps.userName = accountName;
+      planDeps.ownNames = (intentApi && typeof intentApi.readerNamesFrom === 'function')
+        ? intentApi.readerNamesFrom({ displayName: accountName, profile: auth.profile, knownNames: knownNames })
+        : (knownNames || null);
       const p = deps.plan({ messages, me: meSet, watches, graph, state: st, now, deps: planDeps });
 
       for (const party of p.parties) { try { await deps.storage.observeIdentity(party); } catch (e) { /* optional */ } }
@@ -825,6 +879,7 @@ const FlowOutlook = (() => {
       }
       if (!draft || !draft.id) return { ok: false, error: 'no-draft' };
       const draftUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draft.id);
+      // The body is written once. The From patch below does not send it again.
       if (replyText && draft.isDraft !== false) {
         try {
           await graphWrite(token, 'PATCH', draftUrl, { body: { contentType: 'Text', content: replyText } });
@@ -886,9 +941,37 @@ const FlowOutlook = (() => {
         attachmentId = attached.id;
       }
       await rememberDraft(incomingId, draft.id);
+      let created = null;
+      let readOk = false;
+      for (let attempt = 0; attempt < 2 && !readOk; attempt++) {
+        try {
+          const settled = await graphGet(token, draftUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories');
+          readOk = true;
+          const snap = globalThis.FlowNativeEdit && FlowNativeEdit.snapshotOf ? FlowNativeEdit.snapshotOf(settled) : null;
+          created = snap && Object.keys(snap).length ? snap : null;
+        } catch (e) { created = null; }
+      }
+      if (!readOk) {
+        return {
+          ok: true,
+          fetchedBack: false,
+          reason: 'unverified',
+          ref: draft.id,
+          created: null,
+          proof: null,
+          where: draft.webLink || null,
+          attachmentId: attachmentId,
+          written: "Created, couldn't verify",
+          fromAddress: wantFrom || null,
+          fromSet: fromSet,
+          fromHint: fromHint
+        };
+      }
       return {
         ok: true,
+        fetchedBack: true,
         ref: draft.id,
+        created: created,
         where: draft.webLink || null,
         attachmentId: attachmentId,
         written: attachmentId
@@ -958,14 +1041,16 @@ const FlowOutlook = (() => {
       } catch (e) { /* already gone */ }
     }
 
-    async function undoReplyDraft(draftId) {
+    async function undoReplyDraft(ref) {
+      const draftId = typeof ref === 'string' ? ref : (ref && (ref.id || ref.draftId));
+      const created = ref && typeof ref === 'object' ? (ref.created || null) : null;
       if (!draftId) return { ok: false, error: 'no-ref' };
       const auth = await read(AUTH_KEY, null);
       if (!auth || !auth.token) return { ok: false, error: 'not-connected' };
       const sess = await ensureSession({});
       if (!sess.ok) return { ok: false, error: sess.error };
       const token = holderFor(sess.token);
-      const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft';
+      const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft,subject,body,toRecipients,ccRecipients,importance,categories';
       let msg;
       try { msg = await graphGet(token, getUrl); }
       catch (e) {
@@ -977,6 +1062,19 @@ const FlowOutlook = (() => {
       }
       if (!msg) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
       if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+      if (ref && typeof ref === 'object' && !created) {
+        const line = globalThis.FlowNativeEdit && FlowNativeEdit.unconfirmedLine
+          ? FlowNativeEdit.unconfirmedLine()
+          : "Couldn't confirm it's unchanged. Undo left it alone.";
+        return { ok: false, reason: 'unconfirmed', written: line };
+      }
+      if (created && globalThis.FlowNativeEdit && FlowNativeEdit.compareContent) {
+        const verdict = FlowNativeEdit.compareContent(created, msg);
+        if (verdict === 'edited') return { ok: false, reason: 'user-edited', written: FlowNativeEdit.userEditedLine() };
+        if (verdict === 'unconfirmed') return { ok: false, reason: 'unconfirmed', written: FlowNativeEdit.unconfirmedLine() };
+      } else if (created && globalThis.FlowNativeEdit && FlowNativeEdit.userEdited(created, msg)) {
+        return { ok: false, reason: 'user-edited', written: FlowNativeEdit.userEditedLine() };
+      }
       await graphWrite(token, 'DELETE', cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId), null);
       await forgetDraftMap(null, draftId);
       return { ok: true, written: 'Draft removed from Outlook Drafts.' };
@@ -1006,12 +1104,35 @@ const FlowOutlook = (() => {
       return out;
     }
 
+    // A draft ref is a Graph message id. A To Do or file ref is an object.
+    // Reconcile reads drafts only. Passing that object to /me/messages makes
+    // the URL "[object Object]", and a 404 then hides the real close.
+    function draftMessageId(ref) {
+      if (typeof ref === 'string') {
+        const id = ref.trim();
+        return id && id.indexOf('[object') !== 0 ? id : '';
+      }
+      if (ref && typeof ref === 'object') {
+        const id = ref.draftId || (typeof ref.id === 'string' ? ref.id : '');
+        return typeof id === 'string' ? id.trim() : '';
+      }
+      return '';
+    }
+
+    function draftReceiptsOnly(list) {
+      return (list || []).filter((e) => {
+        if (!e || e.kind !== 'written' || e.connectorId !== 'outlookDraft' || !e.messageId) return false;
+        if (e.undone || e.outlookSent || e.outlookReceipt === false) return false;
+        return !!draftMessageId(e.ref);
+      });
+    }
+
     async function listActiveReceipts() {
       if (typeof deps.storage.getActiveOutlookReceipts === 'function') {
-        return deps.storage.getActiveOutlookReceipts();
+        return draftReceiptsOnly(await deps.storage.getActiveOutlookReceipts());
       }
       const st = await deps.storage.get();
-      return receiptsFromState(st);
+      return draftReceiptsOnly(receiptsFromState(st));
     }
 
     async function dropReceiptAsUndone(messageId, ref) {
@@ -1069,8 +1190,9 @@ const FlowOutlook = (() => {
       const receipts = await listActiveReceipts();
       let dropped = 0, sent = 0, kept = 0;
       for (const r of receipts) {
-        if (!r || !r.ref) continue;
-        const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(r.ref) + '?$select=id,isDraft';
+        const draftId = draftMessageId(r && r.ref);
+        if (!draftId || (r.connectorId && r.connectorId !== 'outlookDraft')) continue;
+        const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft';
         let msg = null;
         let gone = false;
         try { msg = await graphGet(token, getUrl); }

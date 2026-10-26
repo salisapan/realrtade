@@ -1,10 +1,10 @@
 # Glance model lab
 
-Glance closes open loops. Gmail is where it starts today.
+Glance closes open loops. Glance's entry point is any surface the user is on.
 
 ## Product definition
 
-Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Gmail is the current primary entry surface. Execution goes through the places a close really happens. Glance stays silent when it is uncertain, never sends on your behalf, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate. This folder is Glance only.
+Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Glance's entry point is any surface the user is on. Execution goes through the places a close really happens. Glance stays silent when it is uncertain, never sends on your behalf, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate. This folder is Glance only.
 
 ## Implementation status
 
@@ -20,7 +20,7 @@ Large generated data was left out on purpose and is reproducible from the genera
 | `oss/` | OSS LLM eval, veto, cached shadow-combined predictions, parked GPU fine-tune scripts |
 | `specs/` | suggest-save and related specs |
 | `eval-data/` | v2 held-out test, suggest-save v22, shadow-combined cases, SFT v2 val |
-| `labeling/` | Owner-gold schema, batch-001, answer ingest, strict scorer, CPU retrain dry-run. `owner-gold.jsonl` stays empty until the owner answers |
+| `labeling/` | Owner-gold schema, batch-001, answer ingest, strict scorer, CPU retrain dry-run. `owner-gold.jsonl` holds the CTO batch-001 labels (`labeledBy` `cto`, `ownerVerified` false). A row is owner-verified only when `labeledBy` is `sali` |
 | `paths.cjs`, `paths.py` | Repo-relative locations. No machine-specific absolute paths |
 
 ## Which engine

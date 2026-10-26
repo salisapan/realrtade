@@ -1,0 +1,131 @@
+{
+ "labeledBy": "",
+ "labeledAt": null,
+ "consent": false,
+ "batches": [
+  "batch-002"
+ ],
+ "note": "Empty template. Not owner-verified. Fill mark with ✅, ⚙️, 🤫, or ❓. labeledBy is sali only for an owner-verified row. ❓ stays out of the headline.",
+ "answers": [
+  {
+   "item": 1,
+   "id": "v2syn-23763",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 2,
+   "id": "v2syn-25810",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 3,
+   "id": "v2syn-12865",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 4,
+   "id": "v2rtest-follow-up-corpus-696",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 5,
+   "id": "inj-he-4",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 6,
+   "id": "oss-B-prom-05",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 7,
+   "id": "v2syn-9042",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 8,
+   "id": "v2syn-14049",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 9,
+   "id": "oss-he-promise-047",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 10,
+   "id": "oss-en-promise-036",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 11,
+   "id": "oss-en-promise-031",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 12,
+   "id": "v2syn-1096",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 13,
+   "id": "v2syn-22902",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 14,
+   "id": "v2rtest-intent-actions-corpus-887",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 15,
+   "id": "v2syn-12239",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 16,
+   "id": "v2syn-7685",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 17,
+   "id": "oss-he-meet-013",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 18,
+   "id": "v2syn-1033",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 19,
+   "id": "ctrl-he-1",
+   "mark": null,
+   "note": ""
+  },
+  {
+   "item": 20,
+   "id": "v2rtest-intent-actions-corpus-932",
+   "mark": null,
+   "note": ""
+  }
+ ]
+}

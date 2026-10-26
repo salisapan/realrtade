@@ -304,15 +304,16 @@ const FlowFollow = (() => {
       }
       const need = FlowFilePath.askNeed(w.yoursLine);
       if (!need) return null;
-      const found = await send({ type: 'flow:search-drive', query: FlowFilePath.driveQuery(need) });
-      const pick = FlowFilePath.pickDrive(need, found && found.ok ? found.files : null, {}, w.yoursLine);
-      return pick ? { source: 'drive', id: pick.id, name: pick.name, mimeType: pick.mimeType } : null;
+      const query = FlowFilePath.driveQuery(need);
+      if (!query) return null;
+      const search = await send({ type: 'flow:search-drive', query });
+      const files = search && search.files ? search.files : [];
+      const picked = FlowFilePath.pickDrive(need, files, {}, w.yoursLine);
+      return picked ? { source: 'drive', id: picked.id, name: picked.name, mimeType: picked.mimeType } : null;
     } catch (e) { return null; }
   }
 
-  // The first draft of your answer, written into Gmail's Drafts in that thread, with the
-  // one file when there is one. Nothing is sent. Preparing is not closing: the loop
-  // stays yours until you actually send.
+  // A reply draft opened in the compose window — never a server draft. Nothing is sent.
   async function prepareReply(watch, choice, ctx) {
     const payload = { to: watch.counterpart.email, toName: watch.counterpart.name, subject: watch.subject };
     let used = null;
@@ -322,18 +323,18 @@ const FlowFollow = (() => {
     } else if (choice && choice.source === 'drive') {
       payload.driveFileId = choice.id; used = choice.name;
     }
-    let res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, payload, { body: await voiced(FlowFollowUp.replyDraft(watch, { fileName: used }), watch) }) });
-    let withoutFile = false;
-    if (used && res && res.reason === 'attach') {
-      // The file could not be read: the plain draft, never a body that claims a file.
-      used = null; withoutFile = true;
-      res = await send({ type: 'flow:follow-draft', payload: { to: payload.to, toName: payload.toName, subject: payload.subject, body: await voiced(FlowFollowUp.replyDraft(watch, {}), watch) } });
-    }
+    const body = await voiced(FlowFollowUp.replyDraft(watch, { fileName: used }), watch);
+    const res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, payload, { body, threadId: watch.threadId || '' }) });
     track(used ? 'follow_file_prepared' : 'follow_reply_prepared');
     if (res && res.ok) {
       await FlowStorage.updateWatch(watch.id, FlowFilePath.preparedPatch(Date.now(), used));
-      receipt('Draft ready in Gmail' + (used ? ' with ' + used : '') + '. Nothing was sent.' + (withoutFile ? ' I could not attach the file, so add it yourself.' : ''), null);
-    } else receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null);
+      receipt('Draft opened in compose. You send it.' + (used ? ' (' + used + ')' : ''), null);
+    } else if (res && res.reason === 'drive-scope') {
+      const lang = (document.documentElement.lang || '').toLowerCase().startsWith('he') ? 'he' : 'en';
+      const line = (typeof FlowDisplay !== 'undefined' && FlowDisplay.copy(lang).driveFileScope)
+        || 'Glance can’t open that Drive file with the access in this version. Use a thread attachment, or a file Glance already saved for you.';
+      receipt(line, null);
+    } else receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : (res && res.error) || 'Open the thread to draft.', null);
   }
 
   // You answered: the ball goes back to them, and the chase starts again.
@@ -619,7 +620,8 @@ const FlowFollow = (() => {
       if (!list.some((w) => FlowFollowUp.isActive(w) && !FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w))) return false;
       const graph = await FlowStorage.getIdentityGraph();
       const party = partyOfNode(ctx, last);
-      const d = FlowCrossChannel.judge(list, graph, party, ctx.messageText(last), { channel, thread: threadId }, { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
+      const sw = await carrySwitches();
+      const d = FlowCrossChannel.judge(list, graph, party, ctx.messageText(last), { channel, thread: threadId }, { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null, moveLink: sw.nextMove === true });
       if (!d) return false;
       const watch = list.find((w) => w.id === d.watchId);
       if (!watch || (watch.lastReplyMessageId && watch.lastReplyMessageId === lastId) || settling.has(watch.id)) return false;
@@ -795,6 +797,8 @@ const FlowFollow = (() => {
   async function track1(ask, base) {
     ladderOutcome(ask, true);
     const watch = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
+    // An invoice loop keeps its number, and the net figure when it was sent "+ מע\"מ" (core/outside-signals.js matchPayment).
+    if (ask.basis === 'invoice') { watch.invoiceNo = ask.invoiceNo || null; watch.amountNet = ask.amountNet || null; }
     watch.threadUrl = base.threadUrl || null;
     const res = await send({ type: 'flow:follow-task', payload: taskPayload(watch) });
     if (!res || !res.ok) {
@@ -841,6 +845,19 @@ const FlowFollow = (() => {
     watch.resolvedBy = 'declined';
     await FlowStorage.upsertWatch(watch);
     dismiss();
+  }
+
+  // ---- carry until closed (config/carry.public.js, read through the service worker; all off in this build) ----
+  let carryP = null;
+  function carrySwitches() {
+    if (!carryP) carryP = send({ type: 'flow:carry' }).then((r) => (r && r.ok ? r : {})).catch(() => ({}));
+    return carryP;
+  }
+  async function invoiceAsk(ctx, last, text) {
+    const sw = await carrySwitches();
+    if (sw.invoices !== true || typeof FlowOutsideSignals === 'undefined' || !FlowOutsideSignals.invoiceLoop) return null;
+    const atts = ctx.attachmentsOf ? (ctx.attachmentsOf(last) || []) : [];
+    return FlowOutsideSignals.invoiceLoop(text, { enabled: true, now: Date.now(), subject: ctx.subject, attachmentNames: atts.map((a) => a && a.name).filter(Boolean) });
   }
 
   function offerCard(ask, base) {
@@ -978,7 +995,7 @@ const FlowFollow = (() => {
         atts.forEach((a) => { if (a && a.filename) threadFiles.push({ filename: a.filename, by }); });
       });
     }
-    const found = typeof FlowFilePath !== 'undefined' ? await send({ type: 'flow:search-drive', query: FlowFilePath.driveQuery({ label: need.label }) }) : null;
+    const found = null;
     const watches = await FlowStorage.getWatches();
     const person = { email: sender.email, personKey: env.personKey || null };
     const payment = FlowResolution.paymentStatus({ facts: env.facts, person, watches, paymentsSeen: await FlowStorage.getPaymentsSeen(), state: env.state, now: Date.now() });
@@ -1322,6 +1339,8 @@ const FlowFollow = (() => {
     const cls = { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null };
     // What I asked of them comes first; if I asked nothing, what I promised them.
     let ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);
+    // The invoice you sent is the open loop (CARRY.invoices, off): only when nothing above opened one.
+    if (!ask && !watch) ask = await invoiceAsk(ctx, last, mineText);
     // A new surface (a chat) is stricter than Gmail until it has been measured: word-list asks only, no model tiers, no question.
     if (!ask && !watch && !ctx.strict) ask = await lmAsk(mineText);
     recordDecision(mineText, Boolean(ask), key);
