@@ -85,18 +85,30 @@ def check_apis_google_script_guard() -> None:
         "comment.js", b"// whether https://apis.google.com's gapi loader is even\n"
     ):
         die("apis.google guard: must not match line comments")
-    if not entry_loads_remote_google_script(
-        "dynamic.js", b"import('https://apis.google.com/js/api.js');"
+    if entry_loads_remote_google_script(
+        "comment-import.js", b"// import x from 'https://apis.google.com/js/api.js'\n"
     ):
-        die("apis.google guard V3: must detect dynamic import()")
+        die("apis.google guard V3: must not match line-commented import from apis.google.com")
+    if entry_loads_remote_google_script(
+        "block-comment-import.js", b"/* import x from 'https://apis.google.com/js/api.js' */\n"
+    ):
+        die("apis.google guard V3: must not match block-commented import from apis.google.com")
+    if not entry_loads_remote_google_script(
+        "import-from.js", b"import x from 'https://apis.google.com/js/api.js';"
+    ):
+        die("apis.google guard V4: must detect import from apis.google.com")
+    if not entry_loads_remote_google_script(
+        "src-assign.js", b"s.src='https://apis.google.com/js/api.js';"
+    ):
+        die("apis.google guard V5: must detect .src assignment to apis.google.com")
     if not entry_loads_remote_google_script(
         "template.js", b"el.src = `https://apis.google.com/js/api.js`;"
     ):
-        die("apis.google guard V4: must detect template-literal src")
+        die("apis.google guard: must detect template-literal src")
     if not entry_loads_remote_google_script(
         "setattr.js", b"el.setAttribute('src', 'https://apis.google.com/js/api.js');"
     ):
-        die("apis.google guard V5: must detect setAttribute src")
+        die("apis.google guard: must detect setAttribute src")
     background = package.EXTENSION_ROOT / "src" / "background.js"
     if entry_loads_remote_google_script("src/background.js", background.read_bytes()):
         die("apis.google guard: packaged background.js must not look like a remote gapi load")
