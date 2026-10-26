@@ -168,6 +168,35 @@ async function run() {
     check('re-visit still shows download button', /download-trial-zip/.test(res.body || ''), res.body);
     check('send-trial-access skipped on re-visit', !calls.some((c) => c.url.includes('send-trial-access')), calls.map((c) => c.url));
     check('M5b: re-visit does not log the download URL', !logLines.some((line) => /download-trial-zip/.test(line)), logLines.filter((l) => /confirm-signup/.test(l)));
+    const revisitPatch = calls.find((c) => c.method === 'PATCH');
+    check('Z7: re-visit PATCH still scopes by email', revisitPatch && revisitPatch.url.includes('email=eq.' + encodeURIComponent('repeat@example.com')), revisitPatch && revisitPatch.url);
+    check('Z2: re-visit PATCH only targets confirmed_at null rows', revisitPatch && revisitPatch.url.includes('confirmed_at=is.null'), revisitPatch && revisitPatch.url);
+  }
+
+  console.log('\n--- Z2b/Z7b: first-visit PATCH URL must scope email and null confirmed_at ---\n');
+  {
+    calls = [];
+    waitlistRow = null;
+    const email = 'patch-filter@example.com';
+    patchResult = () => ({ ok: true, status: 200, json: async () => [{ id: 9, email }] });
+    const q = signedQuery(email);
+    const res = await handler({ queryStringParameters: q });
+    check('200 on first successful claim', res.statusCode === 200, res);
+    const patch = calls.find((c) => c.method === 'PATCH');
+    check('Z7: claim PATCH filters by email', patch && patch.url.includes('email=eq.' + encodeURIComponent(email)), patch && patch.url);
+    check('Z2: claim PATCH only targets confirmed_at null rows', patch && patch.url.includes('confirmed_at=is.null'), patch && patch.url);
+  }
+
+  console.log('\n--- Z4: PATCH HTTP 500 is write failure with no lookup GET ---\n');
+  {
+    calls = [];
+    waitlistRow = null;
+    patchResult = () => ({ ok: false, status: 500, json: async () => [] });
+    const q = signedQuery('patch-500@example.com');
+    const res = await handler({ queryStringParameters: q });
+    check('Z4: PATCH HTTP 500 returns 503', res.statusCode === 503, res);
+    check('Z4: no lookup GET after failed PATCH', !calls.some((c) => c.method === 'GET' && c.url.includes('select=confirmed_at')), calls.map((c) => ({ method: c.method, url: c.url })));
+    check('Z4: no download link on PATCH failure', !/download-trial-zip/.test(res.body || ''), res.body);
   }
 
   console.log('\n' + (failures ? failures + ' FAILED' : 'all passed'));
