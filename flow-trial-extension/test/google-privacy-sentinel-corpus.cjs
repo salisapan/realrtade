@@ -40,6 +40,20 @@ const GRANTED = {
   source: 'chrome',
   at: 1
 };
+const SCOPE_GMAIL_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose';
+const SCOPE_DRIVE_READONLY = 'https://www.googleapis.com/auth/drive.readonly';
+const GRANTED_NO_COMPOSE = {
+  version: GRANTED.version.split('\n').filter((s) => s !== SCOPE_GMAIL_COMPOSE).join('\n'),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
+const GRANTED_NO_DRIVE = {
+  version: GRANTED.version.split('\n').filter((s) => s !== SCOPE_DRIVE_READONLY).join('\n'),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -188,6 +202,16 @@ function pinDate(w) {
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+function patchJsdomInnerText(doc) {
+  doc.querySelectorAll('.a3s, .a3s.aiL').forEach((el) => {
+    if (el.innerText) return;
+    Object.defineProperty(el, 'innerText', {
+      configurable: true,
+      get() { return this.textContent || ''; }
+    });
+  });
+}
+
 async function clickDo(host) {
   const go = host && (host.querySelector('.do-halo') || host.querySelector('button.flow-chip'));
   if (go) go.click();
@@ -195,7 +219,8 @@ async function clickDo(host) {
   return Boolean(go);
 }
 
-function wireChrome(w, store, pageSent, bgSend, outbound) {
+function wireChrome(w, store, pageSent, bgSend, outbound, hooks) {
+  const h = hooks || {};
   function snapshotGet(k, cb) {
     const snap = JSON.parse(JSON.stringify(store));
     let r;
@@ -212,6 +237,13 @@ function wireChrome(w, store, pageSent, bgSend, outbound) {
       outbound.push({ kind: 'classify-remote', body: msg.payload });
       return bgSend(msg);
     }
+    if (t === 'flow:search-drive') {
+      if (typeof h.searchDrive === 'function') return h.searchDrive(msg);
+      return { ok: true, files: [] };
+    }
+    if (t === 'flow:pro-status') return { ok: true, active: true, record: { key: 'k', valid: true, activeUntil: Date.now() + 1e9 } };
+    if (t === 'flow:connector-status') return { googleTasks: { connected: true, configured: true } };
+    if (t === 'flow:follow-task') return { ok: true, ref: { taskListId: 'LIST_A', taskId: 'T1' } };
     if (t === 'flow:execute-action' || t === 'flow:google-write' || t === 'flow:gmail-compose' || t === 'flow:google-contacts-plan') {
       if (t === 'flow:execute-action') outbound.push({ kind: 'execute', body: msg.payload });
       return bgSend(msg);
@@ -243,7 +275,7 @@ function wireChrome(w, store, pageSent, bgSend, outbound) {
   };
 }
 
-function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
+function bootGmailPage(bodyText, store, pageSent, bgSend, outbound, hooks) {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
   const files = manifest.content_scripts[0].js;
   const html = '<!doctype html><html lang="en"><head><title>Inbox - me@x.com - Gmail</title></head><body>'
@@ -264,12 +296,64 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
     }
     return { ok: true, headers: { get: () => '4' }, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer, blob: async () => ({}) };
   };
-  wireChrome(w, store, pageSent, bgSend, outbound);
+  wireChrome(w, store, pageSent, bgSend, outbound, hooks);
   const ctx = dom.getInternalVMContext();
   for (const f of files) {
     new vm.Script(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }).runInContext(ctx);
   }
+  patchJsdomInnerText(w.document);
   return { w, doc: w.document, dom };
+}
+
+function bootGmailThread(threadRows, store, pageSent, bgSend, outbound, hooks) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
+  const files = manifest.content_scripts[0].js;
+  const items = threadRows.map((row, i) => {
+    const mid = row.messageId || ('m' + (i + 1));
+    const tid = row.threadId || 't1';
+    const from = row.fromEmail || 'vendor@example.com';
+    const fromName = row.fromName || 'Vendor';
+    return '<div role="listitem" data-legacy-thread-id="' + tid + '" data-legacy-message-id="' + mid + '">'
+      + '<span email="' + from + '" name="' + fromName + '">' + fromName + '</span>'
+      + '<div class="a3s aiL">' + (row.body || '') + '</div></div>';
+  }).join('');
+  const html = '<!doctype html><html lang="en"><head><title>Inbox - me@x.com - Gmail</title></head><body>'
+    + '<a aria-label="Google Account: Glance (me@x.com)" href="https://accounts.google.com/SignOutOptions"></a>'
+    + '<h2 class="hP">Vendor booking</h2><div role="main">' + items + '</div>'
+    + '<div aria-label="Message Body" contenteditable="true" role="textbox"></div></body></html>';
+  const dom = new JSDOM(html, { url: 'https://mail.google.com/mail/u/0/#inbox/t1', runScripts: 'outside-only', pretendToBeVisual: true });
+  const w = dom.window;
+  pinDate(w);
+  w.TextEncoder = TextEncoder;
+  w.TextDecoder = TextDecoder;
+  if (!w.crypto || !w.crypto.subtle) Object.defineProperty(w, 'crypto', { value: webcrypto });
+  w.fetch = async (url, o) => {
+    if (isCloudOutbound(url)) {
+      const body = o && o.body ? (() => { try { return JSON.parse(o.body); } catch (e) { return o.body; } })() : null;
+      outbound.push({ kind: 'fetch', url: String(url), body });
+    }
+    return { ok: true, headers: { get: () => '4' }, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer, blob: async () => ({}) };
+  };
+  wireChrome(w, store, pageSent, bgSend, outbound, hooks);
+  const ctx = dom.getInternalVMContext();
+  for (const f of files) {
+    new vm.Script(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }).runInContext(ctx);
+  }
+  patchJsdomInnerText(w.document);
+  return { w, doc: w.document, dom };
+}
+
+function activityLogRefBehaviour(ref) {
+  if (!ref || typeof ref !== 'object') return ref;
+  const out = Object.assign({}, ref);
+  delete out.to;
+  delete out.target;
+  if (out.proof && typeof out.proof === 'object') {
+    const proof = Object.assign({}, out.proof);
+    delete proof.target;
+    out.proof = proof;
+  }
+  return out;
 }
 
 (async () => {
@@ -444,6 +528,107 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
     check('execute-action returns', exec !== undefined, exec);
     check('CT2/CT3: classify/execute outbound has no contact sentinel', !JSON.stringify(outbound).includes(SENT_CONTACT_EMAIL), outbound.length);
     assertNoSentinels('classify path', outbound.map((o) => o.body));
+  }
+
+  console.log('\n--- G1: missing invoice needs-you only when gmail.compose is granted ---\n');
+  {
+    const invoiceAsk = 'Please send me the invoice by Thursday.';
+    const searchDrive = () => ({ ok: true, files: [] });
+    const outbound = [];
+    const bg = createBackground(baseStored, (url) => (/oauth2\/v3\/userinfo/.test(url) ? res(200, { email: 'me@x.com' }) : null), outbound, []);
+    const pageSent = [];
+    const withCompose = JSON.parse(JSON.stringify(baseStored));
+    const { w: wYes } = bootGmailPage(invoiceAsk, withCompose, pageSent, bg.send, outbound, { searchDrive });
+    await wYes.__glanceGmailPage.rescan();
+    await sleep(800);
+    const needsYes = wYes.document.querySelector('.flow-chip-host[data-glance-chain="needs-you"]');
+    check('G1: with gmail.compose a missing invoice shows needs-you', Boolean(needsYes), Boolean(needsYes));
+    wYes.close();
+    const noComposeStore = JSON.parse(JSON.stringify(baseStored));
+    noComposeStore.googleGrantedScopes = GRANTED_NO_COMPOSE;
+    const pageSent2 = [];
+    const { w: wNo } = bootGmailPage(invoiceAsk, noComposeStore, pageSent2, bg.send, outbound, { searchDrive });
+    await wNo.__glanceGmailPage.rescan();
+    await sleep(800);
+    const needsNo = wNo.document.querySelector('.flow-chip-host[data-glance-chain="needs-you"]');
+    check('G1: without gmail.compose no needs-you card on the page', !needsNo, Boolean(needsNo));
+    wNo.close();
+  }
+
+  console.log('\n--- G2/G3: follow receipt offers draft only when gmail.compose is granted ---\n');
+  {
+    const thread = [
+      { messageId: 'm1', fromEmail: 'vendor@example.com', fromName: 'Vendor', body: 'Can you send the numbers for the vendor?' },
+      { messageId: 'm2', fromEmail: 'me@x.com', fromName: 'Me', body: 'Please confirm the final figure by Monday so I can book the vendor.' },
+      { messageId: 'm3', fromEmail: 'vendor@example.com', fromName: 'Vendor', body: 'Which vendor do you mean? We have two.' }
+    ];
+    const watch = {
+      id: 't1', threadId: 't1', messageId: 'm2', subject: 'Vendor booking',
+      counterpart: { email: 'vendor@example.com', name: 'Vendor' },
+      status: 'waiting', taskRef: { taskListId: 'LIST_A', taskId: 'T9' },
+      chaseIso: '2026-10-05', kind: 'reply', what: 'Please confirm the final figure by Monday', nudges: 0, lang: 'en',
+      createdAt: Date.now()
+    };
+    const outbound = [];
+    const bg = createBackground(baseStored, () => null, outbound, []);
+    const withCompose = JSON.parse(JSON.stringify(baseStored));
+    withCompose.followWatches = [watch];
+    const pageSent = [];
+    const { w: wYes } = bootGmailThread(thread, withCompose, pageSent, bg.send, outbound, { searchDrive: () => ({ ok: true, files: [] }) });
+    await wYes.__glanceGmailPage.rescan();
+    await sleep(1200);
+    const cardYes = wYes.document.getElementById('flow-follow-host');
+    check('G2: with gmail.compose the follow card offers Prepare my reply', cardYes && /Prepare my reply/.test(cardYes.textContent || ''), cardYes && cardYes.textContent);
+    wYes.close();
+    const noCompose = JSON.parse(JSON.stringify(baseStored));
+    noCompose.googleGrantedScopes = GRANTED_NO_COMPOSE;
+    noCompose.followWatches = [watch];
+    const { w: wNo } = bootGmailThread(thread, noCompose, pageSent, bg.send, outbound, { searchDrive: () => ({ ok: true, files: [] }) });
+    await wNo.__glanceGmailPage.rescan();
+    await sleep(1200);
+    const cardNo = wNo.document.getElementById('flow-follow-host');
+    check('G3: without gmail.compose the follow card has no draft action', cardNo && !/Prepare my reply/.test(cardNo.textContent || ''), cardNo && cardNo.textContent);
+    check('G3: without gmail.compose no flow:follow-draft is sent', !pageSent.some((m) => m.type === 'flow:follow-draft'), pageSent.map((m) => m.type));
+    wNo.close();
+  }
+
+  console.log('\n--- I1/I2: drive-search-unavailable means no invoice needs-you or prepare card ---\n');
+  {
+    const outbound = [];
+    const bg = createBackground(baseStored, () => null, outbound, []);
+    const unavailable = { ok: false, reason: 'drive-search-unavailable' };
+    const store = JSON.parse(JSON.stringify(baseStored));
+    store.googleGrantedScopes = GRANTED_NO_DRIVE;
+    const pageSent = [];
+    const { w } = bootGmailPage('Please send me the invoice by Thursday.', store, pageSent, bg.send, outbound, { searchDrive: () => unavailable });
+    await w.__glanceGmailPage.rescan();
+    await sleep(800);
+    check('I1: drive search unavailable — no needs-you card', !w.document.querySelector('[data-glance-chain="needs-you"]'), w.document.body.innerHTML.indexOf('needs-you'));
+    const store2 = JSON.parse(JSON.stringify(baseStored));
+    store2.googleGrantedScopes = GRANTED_NO_DRIVE;
+    const pageSent2 = [];
+    const { w: w2 } = bootGmailPage('Please send me the invoice.', store2, pageSent2, bg.send, outbound, {
+      searchDrive: () => unavailable
+    });
+    await w2.__glanceGmailPage.rescan();
+    await sleep(800);
+    check('I2: drive search unavailable — no prepare Do It card', !w2.document.querySelector('[data-glance-chain="prepare"]'), w2.document.body.innerHTML.indexOf('prepare'));
+    w.close();
+    w2.close();
+  }
+
+  console.log('\n--- P1/P3: activity log ref strips recipient fields (behaviour, not source grep) ---\n');
+  {
+    const gmail = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
+    const slice = gmail.slice(gmail.indexOf('function activityLogRef'), gmail.indexOf('function sendExecuteAction'));
+    const sandbox = { console };
+    vm.createContext(sandbox);
+    vm.runInContext(slice + '\nthis.out = activityLogRef({ to: "a@b.com", target: "a@b.com", draftId: "d1", proof: { target: "secret", fetchedBack: true } });', sandbox);
+    const logged = sandbox.out;
+    check('P1/P3: activityLogRef removes ref.to and target', logged && !logged.to && !logged.target && logged.draftId === 'd1', logged);
+    check('P1/P3: activityLogRef removes proof.target', logged && logged.proof && !logged.proof.target && logged.proof.fetchedBack === true, logged && logged.proof);
+    const mirrored = activityLogRefBehaviour({ to: 'x', target: 'y', proof: { target: 'z', system: 'gmail' } });
+    check('P1/P3: mirrored strip matches page helper', !mirrored.to && !mirrored.target && !(mirrored.proof && mirrored.proof.target), mirrored);
   }
 
   {

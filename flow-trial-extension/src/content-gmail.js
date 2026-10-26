@@ -4250,17 +4250,20 @@ function glanceUiCopy(kind) {
     return !!FlowGoogleComposePage.findBody(document);
   }
 
-  // No compose window is open. Gmail drafts are filled in the DOM only;
-  // the Gmail drafts API (gmail.compose) is not in the OAuth grant.
+  // No compose window open: write through the lane (gmail.compose is enforced in core/google-drafts.js).
   async function saveReplyDraft(payload, input) {
-    return {
-      ok: false,
-      reason: 'compose-closed',
-      preview: true,
-      closes: false,
-      sent: false,
-      error: glanceUiCopy('composeClosed') || (glanceUiHebrew() ? 'פתח קודם תשובה. Glance לא לוחץ על שליחה.' : 'Open Reply first. Glance does not press Send.')
-    };
+    const planned = typeof FlowGoogleCompose !== 'undefined' && typeof FlowGoogleCompose.plan === 'function'
+      ? FlowGoogleCompose.plan(input)
+      : { ok: false };
+    const threadId = (payload && payload.threadId) || '';
+    if (!planned.ok || !threadId) {
+      return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false, error: glanceUiHebrew() ? 'לא הצלחתי להכין טיוטת תשובה בשרשור הזה.' : 'Could not prepare a reply draft in this thread.' };
+    }
+    return sendRuntime(Object.assign({
+      type: 'flow:google-write',
+      connectorId: 'googleReplyDraft',
+      input: { to: planned.to, subject: planned.subject, body: planned.body, threadId: threadId }
+    }, laneAccountContext()));
   }
 
   async function sendGmailCompose(payload) {
@@ -6428,7 +6431,8 @@ function glanceUiCopy(kind) {
       if (!message) return null;
       const shown = await showGoogleContactsChip(message, c);
       return shown ? message.querySelector('.flow-chip-host') : null;
-    }
+    },
+    rescan: () => scanReadingPane()
   };
 
   // An offer below the fold pops up in view on its own (src/chip-peek.js). It points at the card and writes nothing.

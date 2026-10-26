@@ -31,10 +31,11 @@ function check(name, cond, detail) {
 async function run() {
   const gmail = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
 
-  check('saveReplyDraft does not call googleReplyDraft when compose is closed',
+  const saveDraftSlice = gmail.slice(gmail.indexOf('async function saveReplyDraft'), gmail.indexOf('async function sendGmailCompose'));
+  check('saveReplyDraft uses the lane googleReplyDraft path when the compose window is closed',
     /async function saveReplyDraft/.test(gmail)
-    && !/saveReplyDraft[\s\S]{0,400}googleReplyDraft/.test(gmail)
-    && /reason: 'compose-closed'/.test(gmail.slice(gmail.indexOf('async function saveReplyDraft'), gmail.indexOf('async function saveReplyDraft') + 600)));
+    && /connectorId: 'googleReplyDraft'/.test(saveDraftSlice)
+    && /type: 'flow:google-write'/.test(saveDraftSlice));
 
   check('mailbox Drive search unavailable is not a why-not-shown line',
     C.searchSilence({ ok: false, reason: 'drive-search-unavailable' }) === null);

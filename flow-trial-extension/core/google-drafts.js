@@ -179,7 +179,8 @@ const FlowGoogleDrafts = (() => {
     const C = cfg();
     const i = input || {};
     const scopes = i.scopes || i.grantedScopes || null;
-    if (C && !C.gmailDraftApiAllowed(scopes)) {
+    // Unknown scope list (null): lane still tries the write. CASA hides only when the grant is known and lacks compose.
+    if (C && scopes != null && !C.gmailDraftApiAllowed(scopes)) {
       return {
         ok: false,
         reason: 'compose-closed',
