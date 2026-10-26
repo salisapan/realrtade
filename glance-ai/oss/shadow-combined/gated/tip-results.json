@@ -30,28 +30,28 @@
  "v2 held-out 400 / tip": {
   "wdi": 11,
   "sil": 218,
-  "miss": 58,
+  "miss": 57,
   "show": 182,
   "he": [
    19,
    90
   ],
   "en": [
-   39,
+   38,
    92
   ]
  },
  "v2 held-out 400 / ai": {
   "wdi": 11,
   "sil": 218,
-  "miss": 51,
+  "miss": 50,
   "show": 182,
   "he": [
    17,
    90
   ],
   "en": [
-   34,
+   33,
    92
   ]
  },
@@ -114,28 +114,28 @@
  "ALL pooled 786 / tip": {
   "wdi": 25,
   "sil": 464,
-  "miss": 129,
+  "miss": 128,
   "show": 322,
   "he": [
    57,
    153
   ],
   "en": [
-   72,
+   71,
    169
   ]
  },
  "ALL pooled 786 / ai": {
   "wdi": 25,
   "sil": 464,
-  "miss": 87,
+  "miss": 86,
   "show": 322,
   "he": [
    29,
    153
   ],
   "en": [
-   58,
+   57,
    169
   ]
  },
@@ -143,7 +143,7 @@
   "cards": 42,
   "planned": 42,
   "watched": 32,
-  "cloud": 228,
+  "cloud": 227,
   "wrongModel": []
  }
 }
