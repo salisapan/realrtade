@@ -100,7 +100,18 @@ const FlowRequestTypes = (() => {
     }
     return null;
   }
-  const findAction = (s) => find(ACTIONS, String(s || ''));
+  function findAction(sentence) {
+    const s = String(sentence || '');
+    const he = hasHebrew(s);
+    if (he) {
+      const send = ACTIONS.find((a) => a.id === 'send');
+      const sign = ACTIONS.find((a) => a.id === 'sign');
+      if (send && sign && send.heRe.some((r) => r.test(s)) && sign.heRe.some((r) => r.test(s))) {
+        return send;
+      }
+    }
+    return find(ACTIONS, s);
+  }
   const findObject = (s) => find(OBJECTS, String(s || ''));
 
   function framed(sentence) {
