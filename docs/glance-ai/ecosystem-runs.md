@@ -888,3 +888,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-payment-ask-corpus.cjs` +4 bills and 6 quiet lines; 2 new cases in `e2e/chat-whatsapp-card.spec.js`; the chat specs (whatsapp-card, payment-close, chase-draft, document-close) pass, 39; every `test/*corpus.cjs` green. Phone-card `CoreBundle.js` rebuilt.
 - **Open:** live Gate; a "paid" claim does not close an invoice-number task (the close matches by amount); no Messenger or Instagram spec for this task.
+
+### Run 108 (2026-10-26)
+- **Capability shipped (behind `CHAT_TASK_CARD` and `CHAT_PROMISE_CARD`, off):** the loop that run 107 opened is closed. After "Pay invoice 2231" (or "Pay 500 NIS") is on the person's task list from a chat, their own "I paid invoice 2231" / «שילמתי את חשבונית מספר 2231» / "I paid 500 NIS" offers Mark done on exactly that task; Do It completes it and reads it back, Undo reopens it, an edited task is left alone.
+- **Code:** `core/chat-payment-claim.js` (`fitsOwn`, the invoice number on the claim), `src/chat-task-card.js` (the own-message branch).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `e2e/chat-own-paid-close.spec.js` (4 cases: close and Undo, Hebrew, an edited task, no card for a promise, another invoice or a question); `test/chat-payment-claim-corpus.cjs` +7 checks (one caught a real bug of mine, Hebrew invoice numbers with letters, fixed); the five chat specs pass (43); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; an own "I paid" does not yet close a Pay task written from mail (only chat-written ones are in this chat's log); no Messenger or Instagram spec for this close; the own-message path needs `CHAT_PROMISE_CARD` too (the existing own-message switch).

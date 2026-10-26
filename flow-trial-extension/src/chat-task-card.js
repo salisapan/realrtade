@@ -565,6 +565,21 @@ const FlowChatTaskCard = (() => {
       }
     }
 
+    // The person says they paid what they were asked for ("I paid invoice 2231", «שילמתי 500 ש"ח») while this chat has a "Pay ..." task Glance wrote for
+    // it: the card offers to mark it done. The invoice number or the amount names the task; a claim that names neither fits only the one open pay task.
+    // Glance has not seen the payment.
+    if (own && typeof FlowChatPaymentClaim !== 'undefined' && typeof FlowChatPaymentClaim.fitsOwn === 'function') {
+      let paid = null;
+      try { paid = FlowChatPaymentClaim.recognize(i.text); } catch (e) { paid = null; }
+      if (paid && paid.kind === 'claim') {
+        const mine = (await findOpenWaiting(chatKey)).filter((t) => !t.waiting);
+        const fitting = FlowChatPaymentClaim.fitsOwn(paid, mine);
+        if (fitting.length === 1) {
+          return offerClose(i, chatKey, mount, { row: fitting[0].row, connectorId: fitting[0].row.connectorId }, paid.lang === 'he', paid.lang === 'he' ? 'שולם? ' : 'Paid? ', 'own-paid');
+        }
+      }
+    }
+
     // The other side says they paid ("I transferred 500 NIS", «העברתי לך 500 ש"ח») while this chat has a "Waiting on ...: Payment" task
     // Glance wrote (Google Tasks): the card offers to mark that task done. One amount matches one task; no amount needs exactly one.
     if (!own && typeof FlowChatPaymentClaim !== 'undefined') {

@@ -37,10 +37,32 @@ const FlowChatPaymentClaim = (() => {
     if (!CLAIM_EN.test(raw) && !CLAIM_HE.test(raw)) return { kind: 'none', reason: 'no-claim' };
     if (DOC_SENT.test(raw) && !AMOUNT.test(raw) && !/\b(?:payment|transfer|money|paid)\b|תשלום|כסף/i.test(raw)) return { kind: 'none', reason: 'a-document-not-a-payment' };
     const a = amountOf(raw);
-    return { kind: 'claim', amount: a ? a.amount : null, currency: a ? a.currency : null, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+    return { kind: 'claim', amount: a ? a.amount : null, currency: a ? a.currency : null, ref: refOf(raw), lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
-  return { recognize: recognize };
+  // The invoice number a claim names ("I paid invoice 2231", «שילמתי את חשבונית מספר 2231»), or ''.
+  function refOf(raw) {
+    const m = String(raw || '').match(/\b(?:invoice|bill)\s*(?:#|no\.?|number)?\s*([A-Za-z]{0,4}-?\d{2,10})\b|חשבונית\s+(?:מס(?:פר|\x27)?\.?\s*)?([A-Za-z]{0,4}-?\d{2,10})\b/i);
+    return m ? String(m[1] || m[2] || '') : '';
+  }
+
+  // The person's OWN "I paid ..." closes one of their own "Pay ..." tasks: the task whose invoice number or amount the claim names; a claim that
+  // names neither fits only when exactly one pay task is open. tasks: [{ title, ... }]. Returns the fitting tasks (a caller acts on exactly one).
+  function fitsOwn(claim, tasks) {
+    const pay = [];
+    for (const t of Array.isArray(tasks) ? tasks : []) {
+      const m = t && typeof t.title === 'string' ? t.title.match(/^(?:Pay|לשלם) (?:(?:invoice|חשבונית) (\S+)|(\d+(?:\.\d+)?) ([A-Z]{3}))(?: · .*)?$/) : null;
+      if (m) pay.push({ task: t, ref: m[1] || '', amount: m[2] || '', currency: m[3] || '' });
+    }
+    if (!claim || claim.kind !== 'claim') return [];
+    let hit;
+    if (claim.ref) hit = pay.filter((c) => c.ref && c.ref.toLowerCase() === claim.ref.toLowerCase());
+    else if (claim.amount) hit = pay.filter((c) => c.amount === claim.amount && (!claim.currency || c.currency === claim.currency));
+    else hit = pay.length === 1 ? pay : [];
+    return hit.map((c) => c.task);
+  }
+
+  return { recognize: recognize, fitsOwn: fitsOwn };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatPaymentClaim };
