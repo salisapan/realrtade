@@ -15,10 +15,11 @@ const FlowConnectEcosystem = (() => {
 
   // Work-account-only or card-time incremental scopes (not in one-consent).
   const MICROSOFT_OPTIONAL_SCOPES = {
-    planner: ['Group.Read.All'],
     teamsChat: ['Chat.Read'],
     contacts: ['Contacts.Read']
   };
+
+  const TEAMS_OPTIONAL_HOST_ORIGINS = ['https://teams.microsoft.com/*'];
 
   const MS_CONSUMER_TENANT_ID = '9188040d-6c67-4c5b-b112-36a304b66dad';
 
@@ -111,8 +112,6 @@ const FlowConnectEcosystem = (() => {
   function microsoftConsentScopes() {
     return microsoftScopes();
   }
-
-  const PLANNER_GROUP_SCOPE = 'Group.Read.All';
 
   function decodeJwtPayload(idToken) {
     const parts = String(idToken || '').split('.');
@@ -223,29 +222,50 @@ const FlowConnectEcosystem = (() => {
   function optionalScopesForAccount(account) {
     const out = Object.assign({}, MICROSOFT_OPTIONAL_SCOPES);
     if (!isWorkMicrosoftAccount(account)) {
-      delete out.planner;
       delete out.teamsChat;
     }
     return out;
   }
 
-  function hasPlannerGroupScope(grantedScopes) {
-    return hasScopes(grantedScopes, [PLANNER_GROUP_SCOPE]);
+  function optionalScopeBucketForLabsSwitch(switchId) {
+    if (switchId === 'TEAMS_MEETING') return 'teamsChat';
+    return null;
   }
 
-  // C1 consent helper for M8 Planner (card wiring is another agent). Never requests on personal accounts.
+  function optionalScopeBucketForOutlookService(serviceId) {
+    if (serviceId === 'contacts') return 'contacts';
+    if (serviceId === 'teams') return 'teamsChat';
+    return null;
+  }
+
+  function incrementalScopesForBucket(bucket, account) {
+    const opt = optionalScopesForAccount(account);
+    const row = opt[bucket];
+    return row ? row.slice() : [];
+  }
+
+  function mergeMicrosoftScopes(base, extra) {
+    const out = [];
+    (base || []).concat(extra || []).forEach((s) => {
+      const x = String(s || '').trim();
+      if (!x || out.indexOf(x) >= 0) return;
+      out.push(x);
+    });
+    return dropSend(out);
+  }
+
+  // M8 Planner needs a CTO-approved scope; Group.Read.All is not in this build.
   function plannerAccess(account, grantedScopes) {
     if (isPersonalMicrosoftAccount(account)) return 'personal';
-    if (hasPlannerGroupScope(grantedScopes)) return 'granted';
-    return 'needs-consent';
+    return 'unavailable';
   }
 
   function plannerShowsPlannerCard(access) {
-    return access === 'granted' || access === 'needs-consent';
+    return false;
   }
 
   function plannerShouldRequestGroupConsent(access) {
-    return access === 'needs-consent';
+    return false;
   }
 
   const PLANNER_ADMIN_CONSENT_RE = /AADSTS65001|AADSTS90094|admin_consent|admin consent required/i;
@@ -260,16 +280,13 @@ const FlowConnectEcosystem = (() => {
 
   // Host uses this after consent: personal → To Do silently; admin/denied → To Do with explanation (display-copy).
   function plannerExecutionRoute(access, consentOutcome) {
-    const accessState = access || 'needs-consent';
+    const accessState = access || 'unavailable';
     const outcome = consentOutcome || null;
-    if (accessState === 'personal') {
+    if (accessState === 'personal' || accessState === 'unavailable') {
       return { destination: 'todo', requestGroupConsent: false, showPlannerCard: false, explainTodoFallback: false };
     }
     if (accessState === 'granted' || outcome === 'granted') {
       return { destination: 'planner', requestGroupConsent: false, showPlannerCard: true, explainTodoFallback: false };
-    }
-    if (accessState === 'needs-consent' && !outcome) {
-      return { destination: 'planner', requestGroupConsent: true, showPlannerCard: true, explainTodoFallback: false };
     }
     if (outcome === 'admin-required' || outcome === 'denied') {
       return { destination: 'todo', requestGroupConsent: false, showPlannerCard: false, explainTodoFallback: true };
@@ -414,6 +431,11 @@ const FlowConnectEcosystem = (() => {
     MICROSOFT_SCOPES: microsoftScopes(),
     microsoftScopes: microsoftScopes,
     microsoftOptionalScopes: MICROSOFT_OPTIONAL_SCOPES,
+    TEAMS_OPTIONAL_HOST_ORIGINS: TEAMS_OPTIONAL_HOST_ORIGINS.slice(),
+    optionalScopeBucketForLabsSwitch: optionalScopeBucketForLabsSwitch,
+    optionalScopeBucketForOutlookService: optionalScopeBucketForOutlookService,
+    incrementalScopesForBucket: incrementalScopesForBucket,
+    mergeMicrosoftScopes: mergeMicrosoftScopes,
     META_ORIGINS: META_ORIGINS.slice(),
     PKCE_REFRESH_INTERFACE: PKCE_REFRESH_INTERFACE,
     catalog: catalog,

@@ -57,7 +57,7 @@ import '../core/profile-hook.js'; // classic: sets globalThis.FlowProfileHook (C
 import '../core/graph-mail.js'; // classic: sets globalThis.FlowGraphMail (Outlook Graph sync)
 import '../core/outlook-sync.js'; // classic: sets globalThis.FlowOutlookSync (ecosystem Graph sync when OWA closed)
 import '../src/outlook.js'; // classic: sets globalThis.FlowOutlook
-import { connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras } from './connect-ecosystem-sw.js';
+import { connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras, requestMicrosoftOptionalScopes } from './connect-ecosystem-sw.js';
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
 import '../core/day-words.js'; // classic: sets globalThis.FlowDayWords (extract.js makes the day forms people write explicit with it)
 import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)
@@ -7048,6 +7048,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:google-reconnect') {
     if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
     return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => ({ ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
+  }
+
+  if (msg.type === 'flow:microsoft-optional-scopes') {
+    if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
+    const bucket = msg.bucket || msg.optionalBucket;
+    return reply(sendResponse, requestMicrosoftOptionalScopes(bucket, { launchInteractive: outlookLaunchInteractive }));
   }
 
   if (msg.type === 'flow:connect') {

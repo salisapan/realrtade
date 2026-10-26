@@ -205,4 +205,45 @@ export async function disconnectEcosystemConnector(connectorId, deps) {
   return { ok: false };
 }
 
-export { ecosystemStatusExtras, metaGranted };
+async function requestMicrosoftOptionalScopes(bucket, deps) {
+  const E = eco();
+  const A = globalThis.FlowOutlookAuth;
+  const cfg = globalThis.FlowOutlookConfig;
+  if (!E || !A || !cfg || !cfg.CLIENT_ID) return { ok: false, reason: 'not-configured' };
+  const key = String(bucket || '').trim();
+  if (!key) return { ok: false, reason: 'missing-bucket' };
+  const bag = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
+  const auth = bag[OUTLOOK_AUTH_KEY];
+  if (!auth || !auth.token) return { ok: false, reason: 'not-connected' };
+  const account = auth.account || {};
+  const extra = (typeof E.incrementalScopesForBucket === 'function')
+    ? E.incrementalScopesForBucket(key, account)
+    : [];
+  if (!extra.length) return { ok: false, reason: 'not-available' };
+  const granted = E.scopeNames(auth.token.grantedScopes || auth.requestedScopes || []);
+  const missing = extra.filter((s) => granted.indexOf(s) < 0);
+  if (!missing.length) return { ok: true, alreadyGranted: true };
+  if (key === 'teamsChat' && chrome.permissions && E.TEAMS_OPTIONAL_HOST_ORIGINS) {
+    const hostOk = await new Promise((resolve) => {
+      try {
+        chrome.permissions.request({ origins: E.TEAMS_OPTIONAL_HOST_ORIGINS.slice() }, (g) => resolve(Boolean(g)));
+      } catch (e) { resolve(false); }
+    });
+    if (!hostOk) return { ok: false, reason: 'host-denied' };
+  }
+  const base = auth.requestedScopes || E.microsoftConsentScopes();
+  const merged = (typeof E.mergeMicrosoftScopes === 'function')
+    ? E.mergeMicrosoftScopes(base, missing)
+    : base.concat(missing);
+  const r = await A.signIn(outlookAuthDeps(deps && deps.launchInteractive), cfg, chrome.identity.getRedirectURL(), { scopes: merged });
+  if (!r || !r.ok || !r.token) return { ok: false, reason: (r && r.error) || 'cancelled' };
+  await chrome.storage.local.set({
+    [OUTLOOK_AUTH_KEY]: Object.assign({}, auth, {
+      token: r.token,
+      requestedScopes: merged
+    })
+  });
+  return { ok: true, scopes: missing };
+}
+
+export { ecosystemStatusExtras, metaGranted, requestMicrosoftOptionalScopes };
