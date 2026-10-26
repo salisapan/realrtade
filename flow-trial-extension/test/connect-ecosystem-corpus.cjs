@@ -1042,6 +1042,59 @@ await ok('personal microsoft one-consent succeeds without OnlineMeetings.ReadWri
   assert.strictEqual(E.hasScopes(granted, E.microsoftRequiredScopes()), true);
 });
 
+await ok('K1: ecosystem microsoft sign-in sends only base consent scopes', async () => {
+  const world = loadMicrosoftEcosystemConnect();
+  await world.connect();
+  const auth = world.stored.outlookAuth;
+  assert.ok(auth && Array.isArray(auth.requestedScopes));
+  assert.deepStrictEqual(sortScopes(auth.requestedScopes), sortScopes(MS_EXPECTED));
+});
+
+await ok('K2: popup requests optional scopes via flow:microsoft-optional-scopes not outlook-consent', () => {
+  const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+  const addBlock = popup.slice(popup.indexOf('data-glance-add-scope'), popup.indexOf('data-glance-add-scope') + 2200);
+  assert.ok(/flow:microsoft-optional-scopes/.test(addBlock));
+  assert.ok(/optionalScopeBucketForOutlookService/.test(addBlock));
+  const labs = popup.slice(popup.indexOf('async function labsOptionalScopeAfterFlip'), popup.indexOf('async function renderLabs'));
+  assert.ok(/flow:microsoft-optional-scopes/.test(labs));
+  assert.ok(!/renderLabs[\s\S]{0,800}flow:microsoft-optional-scopes/.test(popup));
+});
+
+await ok('K3: outlook-consent-scope refuses Contacts.Read and Chat.Read', async () => {
+  const { backgroundScript } = require('./load-background.cjs');
+  const stored = { outlookAuth: { token: { accessToken: 't' }, requestedScopes: MS_EXPECTED } };
+  const chrome = {
+    storage: { local: { async get() { return stored; }, async set() {} } },
+    identity: { getRedirectURL: () => 'https://ext.chromiumapp.org/' }
+  };
+  const sandbox = { console, chrome, crypto: require('crypto').webcrypto, fetch: async () => ({ ok: false }) };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(backgroundScript(), sandbox, { filename: 'background.js', timeout: 120000 });
+  const fn = vm.runInContext('outlookConsentScope', sandbox);
+  const contacts = await fn({ scope: 'Contacts.Read' });
+  const chat = await fn({ scope: 'Chat.Read' });
+  assert.strictEqual(contacts.reason, 'scope-refused');
+  assert.strictEqual(chat.reason, 'scope-refused');
+});
+
+await ok('ecosystem reconnect keeps already-granted Contacts.Read', async () => {
+  const withContacts = MS_EXPECTED.concat(['Contacts.Read']);
+  const { w, inst } = outlookConnectWorld({
+    store: {
+      outlookAuth: {
+        ecosystem: true,
+        requestedScopes: withContacts,
+        token: { accessToken: 'old', grantedScopes: withContacts },
+        account: { address: 'me@contoso.com', microsoftAccountKind: 'work' }
+      }
+    }
+  });
+  await inst.connect({ scopes: MS_EXPECTED.concat(['Mail.Read']) });
+  assert.ok(w.signInScopes.indexOf('Contacts.Read') >= 0);
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(withContacts));
+});
+
 console.log('\n' + n + ' passed, ' + failures + ' failed');
 runF488BiteRows();
 if (failures) process.exit(1);

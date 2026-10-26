@@ -5168,6 +5168,7 @@ async function outlookConsentScope(msg) {
     return { ok: false, reason: 'not-configured' };
   }
   const scope = String((msg && msg.scope) || '');
+  if (scope === 'Contacts.Read' || scope === 'Chat.Read') return { ok: false, reason: 'scope-refused' };
   const todoScope = scope === 'Tasks.ReadWrite';
   const calendarScope = scope === 'Calendars.ReadWrite';
   if (!todoScope && !calendarScope) return { ok: false, reason: 'scope-refused' };
