@@ -3841,6 +3841,9 @@ async function openDrivePicker(payload, sender) {
   const requestId = payload && payload.requestId;
   const tabId = sender && sender.tab && sender.tab.id;
   if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
+  if (!(typeof FlowBuild !== 'undefined' && FlowBuild.PICKER_BUNDLED)) {
+    return { ok: false, unavailable: true };
+  }
 
   const win = await chrome.windows.create({
     url: chrome.runtime.getURL('picker/picker.html') + '?requestId=' + encodeURIComponent(requestId),
