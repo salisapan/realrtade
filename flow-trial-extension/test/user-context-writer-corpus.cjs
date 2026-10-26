@@ -189,6 +189,28 @@ function loadWorker(stored) {
   await w.seed({ email: 'other@co.com', name: 'Other' });
   check('S2: seed merges into existing account bucket only', w.bag.glanceUserContextV0.byAccount['other@co.com'] && w.bag.glanceUserContextV0.byAccount['other@co.com'].identity.aliases.indexOf('Other') >= 0, w.bag.glanceUserContextV0.byAccount);
 
+  console.log('\n--- verifier mutants B5 / B6 (worker learning) ---\n');
+
+  w = loadWorker({ glanceSwitches: { USER_CONTEXT_WRITER: true }, glanceUserContextV0: { byAccount: {} } });
+  const undoRes = await w.send({
+    type: 'flow:user-context-event',
+    accountKey: 'learn@co.com',
+    event: { type: 'undo', partyKey: 'vendor@co.com', intentFamily: 'full-document', at: '2026-10-26T12:00:00.000Z' }
+  });
+  const undoProf = w.bag.glanceUserContextV0.byAccount['learn@co.com'];
+  const undoRow = undoProf && undoProf.decisionHistory && undoProf.decisionHistory.find((r) => r.intentFamily === 'full-document');
+  check('B5: applyUserContextEvent records undo on the profile (mutant undo:0 fails)', undoRes && undoRes.ok === true && undoRow && undoRow.undo === 1, undoRow);
+
+  w = loadWorker({ glanceSwitches: { USER_CONTEXT_WRITER: true }, glanceUserContextV0: { byAccount: {} } });
+  const editRes = await w.send({
+    type: 'flow:user-context-event',
+    accountKey: 'edit@co.com',
+    event: { type: 'edited', partyKey: 'client@co.com', intentFamily: 'quote', at: '2026-10-26T12:00:00.000Z' }
+  });
+  const editProf = w.bag.glanceUserContextV0.byAccount['edit@co.com'];
+  const editRow = editProf && editProf.decisionHistory && editProf.decisionHistory.find((r) => r.intentFamily === 'quote');
+  check('B6: applyUserContextEvent records edited on the profile (mutant edited:0 fails)', editRes && editRes.ok === true && editRow && editRow.edited === 1, editRow);
+
   console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
   process.exit(failures ? 1 : 0);
 })();
