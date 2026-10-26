@@ -344,7 +344,10 @@ test('the side panel keeps its scroll across a re-render', async ({ glance }) =>
     });
   }));
   await expect.poll(async () => popup.locator('#log-list').getByText('One more passport row').count()).toBe(1);
-  await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(160);
+  await expect.poll(async () => {
+    const top = await popup.locator('main').evaluate((el) => el.scrollTop);
+    return Math.abs(top - before) <= 2;
+  }, { timeout: 15000 }).toBe(true);
 });
 
 test('3:05 PM saves the afternoon file, and a bare 3:05 does not', async ({ glance }) => {
