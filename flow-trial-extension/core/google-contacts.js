@@ -286,7 +286,8 @@ const FlowGoogleContacts = (() => {
     write: write,
     undo: undo,
     titleFor: titleFor,
-    contactLogHash: contactLogHash
+    contactLogHash: contactLogHash,
+    notFoundLine: notFoundLine
   };
 })();
 
