@@ -141,3 +141,13 @@ test('a Hebrew promise and a Hebrew "I sent it" by the person close their own ta
   await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   expect(tasks()[0].status).toBe('completed');
 });
+
+test('a short "Sent!" by the person closes their one open task, and "Sent!" with two open tasks offers nothing', async ({ glance }) => {
+  await ownTask(glance);
+  let page = await glance.openWhatsApp(whatsappHtml('Sent!', { own: true, id: 'SH1' }));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await expect(page.locator(CARD)).toContainText('Mark done');
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(tasks()[0].status).toBe('completed');
+});

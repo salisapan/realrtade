@@ -7,9 +7,9 @@
 // no network.
 const FlowChatPickupNotice = (() => {
   const NOUN_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:order|parcel|package|delivery|item|items|prescription|glasses|laundry|documents?|passport|id|car|repair)\b/i;
-  const NOUN_HE = /(?:ההזמנה|החבילה|המשלוח|הפריט|המרשם|הכביסה|המסמכים|הדרכון|הרכב|התיקון|הטלפון|המשקפיים)\s+(?:שלך|שלכם|שלכן)|(?:הזמנתך|חבילתך)/;
-  const PICKUP_EN = /\b(?:ready\s+(?:for|to)\s+(?:pick\s?-?up|collect(?:ion)?|be\s+collected|be\s+picked\s+up)|(?:is|are)\s+(?:waiting|available|ready)\s+(?:for\s+(?:pick\s?-?up|collection)|at\s+(?:the|our)\b)|(?:pick|collect)\s+(?:it|them)?\s*up|collect(?:ion)?\s+(?:it|them)?|for\s+(?:pick\s?-?up|collection))\b/i;
-  const PICKUP_HE = /(?:מוכנ(?:ה|ים)\s+לאיסוף|לאיסוף|ממתינ(?:ה|ים)\s+(?:לך|לכם|בדואר|בסניף|בנקודת)|לאסוף|ניתן\s+לאסוף|אפשר\s+לאסוף)/;
+  const NOUN_HE = /(?:ההזמנה|החבילה|המשלוח|הפריט|המרשם|התרופה|התרופות|הכביסה|המסמכים|הדרכון|הרכב|התיקון|הטלפון|המשקפיים)\s+(?:שלך|שלכם|שלכן)|(?:הזמנתך|חבילתך)/;
+  const PICKUP_EN = /\b(?:ready\s+(?:for|to)\s+(?:pick\s?-?up|collect(?:ion)?|be\s+collected|be\s+picked\s+up)|(?:is|are)\s+(?:waiting|available|ready)\s+(?:for\s+(?:pick\s?-?up|collection)|at\s+(?:the|our)\b)|we(?:'ll|\s+will)?\s+(?:hold|keep)\s+(?:it|them)|(?:pick|collect)\s+(?:it|them)?\s*up|collect(?:ion)?\s+(?:it|them)?|for\s+(?:pick\s?-?up|collection))\b/i;
+  const PICKUP_HE = /(?:נשמור\s+(?:אותה|אותו|אותם|אותן)|מוכנ(?:ה|ים)\s+לאיסוף|לאיסוף|ממתינ(?:ה|ים)\s+(?:לך|לכם|בדואר|בסניף|בנקודת)|לאסוף|ניתן\s+לאסוף|אפשר\s+לאסוף)/;
   const MARK = /(?:\b(?:until|by|before|till|through|no\s+later\s+than)\b|(?:^|[\s,])(?:עד|לפני)(?=\s))/i;
   // A look back, a cancellation, a question, an offer, or a delivery that arrives by itself.
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night)|(?:was|were|has\s+been|have\s+been|been)\s+(?:picked\s+up|collected|delivered)|already\s+(?:picked|collected)|cancel(?:l?ed)?|returned|unfortunately|sorry|would\s+you\s+like|choose|select|click|tap|will\s+(?:arrive|be\s+delivered|reach)|out\s+for\s+delivery|arriv(?:es|ing)|expected)\b/i;
@@ -62,8 +62,17 @@ const FlowChatPickupNotice = (() => {
   }
 
   // { kind: 'pickup', dateIso, lang } or { kind: 'none', reason }.
+  // "Pick it up within 3 days" / «יש לאסוף תוך 3 ימים»: a count of calendar days from today is the last day (business days are not counted here).
+  function withinDays(text, now) {
+    const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);
+    const day = (n) => { const d = new Date(at.getFullYear(), at.getMonth(), at.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+    return String(text == null ? '' : text)
+      .replace(/\b(?:within|in\s+the\s+next|during\s+the\s+next)\s+(\d{1,2})\s+days?\b/gi, (m, n) => (Number(n) >= 1 && Number(n) <= 30 ? 'by ' + day(Number(n)) : m))
+      .replace(/(?:תוך|בתוך|במהלך)\s+(\d{1,2})\s+ימים/g, (m, n) => (Number(n) >= 1 && Number(n) <= 30 ? 'עד ' + day(Number(n)) : m));
+  }
+
   function recognize(text, now) {
-    const raw = extendedTo(String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim());
+    const raw = extendedTo(String(dayWords(withinDays(text, now), now) || '').replace(/\s+/g, ' ').trim());
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 240) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };
