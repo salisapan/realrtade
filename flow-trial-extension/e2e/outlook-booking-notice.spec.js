@@ -420,3 +420,18 @@ test('BOOKING_NOTICE on: a mail that says the technician will come between two h
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await events(glance)).length).toBe(0);
 });
+
+for (const [label, body, want] of [['English', 'Hi Sali, your appointment is Tuesday at 14:00. See you then.', '14:00'], ['Hebrew', 'שלום סלי, התור שלך ביום שלישי בשעה 14:00. נתראה!', '14:00']]) {
+  test('BOOKING_NOTICE on: an appointment told as "is <day> at <clock>" (' + label + ') is one hold, no guest, and Undo deletes it', async ({ glance }) => {
+    const page = await open(glance, { BOOKING_NOTICE: true }, body, true);
+    await expect(page.locator(PANE + ' .chip-hold')).toBeVisible({ timeout: 20000 });
+    await page.locator(PANE + ' .chip-hold').click();
+    await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+    const list = await events(glance);
+    expect(list).toHaveLength(1);
+    expect(JSON.stringify(list[0].start)).toContain(want);
+    expect(list[0].attendees || []).toEqual([]);
+    await page.locator(PANE + ' button.flow-chip-undo').click();
+    await expect.poll(async () => (await events(glance)).length).toBe(0);
+  });
+}

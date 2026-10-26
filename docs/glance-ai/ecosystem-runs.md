@@ -918,3 +918,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/chat-travel-notice-corpus.cjs` +6 lines (all fail on the old code) and 5 quiet ones; one real-browser WhatsApp case (Hebrew flight); booking and WhatsApp specs pass (53); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; an unmarked hour under 8 with minutes ("at 6:30", "at 7:45") stays quiet by design (ambiguous with the evening); a parent-teacher meeting, a webinar and a date written 5/11 are still quiet.
+
+### Run 112 (2026-10-26)
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** "Your appointment is Tuesday at 14:00" (no "on", no "confirmed") and a Hebrew dotted date («התור שלך ב-5.11 בשעה 10:20») gave no card; they are now the Appointment hold. The Hebrew «התור שלך ביום שלישי בשעה 14:00» already worked (the probe showed it), so only the English and the dotted-date forms are new.
+- **Probe findings that are not gaps:** a webinar is excluded on purpose (marketing); a school or group announcement never reaches the card (groups are not offered); "5/11" and "12/11" stay quiet because day-first and month-first cannot be told apart.
+- **Code:** `core/chat-appointment-notice.js` only (frames; "on sale" and discount as quiet words).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` +5 lines and 4 quiet ones (6 fail on the old code); 2 real-browser Outlook cases; booking and WhatsApp specs pass (55); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; an ambiguous slash date is still quiet; no Messenger or Instagram spec for these forms.
