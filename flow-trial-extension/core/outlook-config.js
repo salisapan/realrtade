@@ -29,8 +29,8 @@ const FlowOutlookConfig = {
   // Calendars.ReadWrite only when that box is checked. The Entra app must list
   // that delegated permission or consent for the box fails.
   // SharePoint asks Sites.ReadWrite.All only when that box is checked (see the row below).
-  // OneDrive asks Files.ReadWrite only when that box is checked (it starts
-  // ticked). One file write into the Glance folder, then a read-back. A mail does not search OneDrive. Files.Read
+  // OneDrive asks Files.ReadWrite only when that box is checked. One file
+  // write into the Glance folder, then a read-back. A mail does not search OneDrive. Files.Read
   // cannot write. Files.ReadWrite.All is not this scope.
   CONNECT_SERVICES: [
     { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', scopes: ['Mail.Read', 'Mail.ReadWrite'], required: true },
@@ -41,7 +41,7 @@ const FlowOutlookConfig = {
     // defaultOn pre-ticks the box on a new connection. It does not change
     // defaultConnectIds() or the scopes of an existing sign-in: the person can
     // untick it, and an account that never ticked it is asked only when they do.
-    { id: 'onedrive', label: 'OneDrive', detail: 'Save one file into OneDrive > Glance, read it back, and Undo deletes it. A mail does not search OneDrive.', scopes: ['Files.ReadWrite'], required: false, defaultOn: true },
+    { id: 'onedrive', label: 'OneDrive', detail: 'Save one file into OneDrive > Glance, read it back, and Undo deletes it. A mail does not search OneDrive.', scopes: ['Files.ReadWrite'], required: false },
     // SharePoint asks Sites.ReadWrite.All only when its box is checked (never ticked for you). One empty Word or Excel file into the
     // Glance folder of the one site a mail names, read back by id; Undo deletes it unless it was edited. Owner approval 2026-10-24
     // (row 79a). The Entra app must list the delegated permission and an admin may need to consent; the switch SHAREPOINT_NEW_FILE
