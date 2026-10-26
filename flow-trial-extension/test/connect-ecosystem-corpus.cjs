@@ -564,6 +564,7 @@ await ok('profileHook onConnect/onDisconnect are callable no-ops', () => {
 
 function outlookConnectWorld(over) {
   globalThis.FlowConnectEcosystem = E;
+  globalThis.FlowOutlookConfig = C;
   const CFG = Object.assign({}, C, { CLIENT_ID: '11111111-2222-3333-4444-555555555555' });
   const ME = 'me@contoso.com';
   const w = Object.assign({ store: {}, signInScopes: [], signInCalls: 0 }, over || {});
@@ -661,6 +662,7 @@ function loadBackgroundMessageHarness(over) {
     crypto: require('crypto').webcrypto,
     fetch: async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }),
     FlowConnectEcosystem: E,
+    FlowOutlookConfig: C,
     FlowProfileHook: PH,
     FlowExtract: {},
     FlowIntent: {},
@@ -1157,6 +1159,48 @@ await ok('K3: background onMessage flow:outlook-consent-scope refuses Contacts.R
   assert.strictEqual(chat.reason, 'scope-refused');
 });
 
+await ok('K3c: onMessage flow:microsoft-optional-scopes contacts bucket calls signIn with Contacts.Read', async () => {
+  const { dispatch, sandbox, stored } = loadBackgroundMessageHarness({
+    stored: {
+      outlookAuth: {
+        ecosystem: true,
+        token: { accessToken: 'tok', grantedScopes: MS_EXPECTED },
+        requestedScopes: MS_EXPECTED,
+        account: { address: 'me@contoso.com', microsoftAccountKind: 'work' }
+      }
+    }
+  });
+  vm.runInContext(`
+    globalThis.__k3SignInScopes = [];
+    FlowOutlookAuth.signIn = async function (_d, _c, _r, opts) {
+      globalThis.__k3SignInScopes.push((opts && opts.scopes) ? opts.scopes.slice() : []);
+      return { ok: true, token: { accessToken: 'new', grantedScopes: (opts && opts.scopes) || [] } };
+    };
+  `, sandbox);
+  const out = await dispatch({ type: 'flow:microsoft-optional-scopes', bucket: 'contacts' });
+  const signInScopes = vm.runInContext('globalThis.__k3SignInScopes', sandbox);
+  assert.strictEqual(out && out.ok, true, out);
+  assert.ok(Array.isArray(signInScopes) && signInScopes.length >= 1, signInScopes);
+  assert.ok(signInScopes[0].indexOf('Contacts.Read') >= 0, signInScopes[0]);
+  assert.deepStrictEqual(sortScopes(signInScopes[0]), sortScopes(MS_EXPECTED.concat(['Contacts.Read'])));
+});
+
+await ok('K3s: flow:microsoft-optional-scopes rejects foreign sender', async () => {
+  const { dispatch } = loadBackgroundMessageHarness({
+    stored: {
+      outlookAuth: {
+        ecosystem: true,
+        token: { accessToken: 'tok', grantedScopes: MS_EXPECTED },
+        requestedScopes: MS_EXPECTED,
+        account: { address: 'me@contoso.com', microsoftAccountKind: 'work' }
+      }
+    }
+  });
+  const out = await dispatch({ type: 'flow:microsoft-optional-scopes', bucket: 'contacts' }, { id: 'not-the-extension' });
+  assert.strictEqual(out && out.ok, false);
+  assert.strictEqual(out && out.reason, 'not-allowed');
+});
+
 await ok('K3b: Contacts.Read via outlook-consent-scope stays refused (mutant guard)', async () => {
   const { backgroundScript } = require('./load-background.cjs');
   const stored = { outlookAuth: { token: { accessToken: 't' }, requestedScopes: MS_EXPECTED } };
@@ -1273,15 +1317,22 @@ await ok('K2b: Labs TEAMS_MEETING flip via renderLabs click calls flow:microsoft
   assert.ok(sent.some((m) => m.type === 'flow:microsoft-optional-scopes' && m.bucket === 'teamsChat'), sent);
 });
 
-await ok('K4: expired reconnect uses scopesFor from checked boxes (calendar not dropped)', () => {
-  const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
-  assert.ok(/\(\(link === 'missing' \|\| link === 'expired' \|\| link === 'missing-scope'\)/.test(popup));
-  assert.ok(!/else if \(link === 'expired' \|\| link === 'missing-scope'\)/.test(popup));
-  const i = popup.indexOf('const grantedReconnect');
-  assert.ok(i > 0);
-  const chunk = popup.slice(i, i + 4200);
-  assert.ok(/scopesFor\(ids\)/.test(chunk));
-  assert.ok(/grantedReconnect/.test(chunk));
+await ok('R4/R5: ecosystem reconnect keeps ticked Calendar (Calendars.ReadWrite)', async () => {
+  const withCal = MS_EXPECTED.concat(['Calendars.ReadWrite']);
+  const { w, inst } = outlookConnectWorld({
+    store: {
+      outlookAuth: {
+        ecosystem: true,
+        requestedScopes: withCal,
+        token: { accessToken: 'old', grantedScopes: withCal },
+        account: { address: 'me@contoso.com', microsoftAccountKind: 'work' }
+      }
+    }
+  });
+  const scopes = C.scopesFor(['mail', 'calendar']);
+  await inst.connect({ scopes });
+  assert.ok(w.signInScopes.indexOf('Calendars.ReadWrite') >= 0, w.signInScopes);
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(scopes));
 });
 
 await ok('popup.html loads connect-ecosystem.js and Contacts add-scope uses optional bucket', async () => {

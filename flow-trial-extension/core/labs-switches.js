@@ -24,7 +24,7 @@ const FlowLabsSwitches = (() => {
     { id: 'CHAT_CHASE_DRAFT', who: 'תזכורת בצ\'אט למי שמאחר', note: 'טיוטת תזכורת בתיבת הצ\'אט כשמשימת "מחכים ל..." עברה את היום שלה (לא נשלחת)' },
     { id: 'PLANNER_TASK', who: 'משימה בתוכנית עבודה של Microsoft', note: 'משימה בתוכנית ששמה בא במייל, בלי הקצאה לאף אחד' },
     { id: 'CONNECT_ECOSYSTEM', who: 'חיבור לפי מערכת', note: 'מסך חיבור אחד לכל מערכת (Google, Microsoft, Meta) — לא נבדק בבדיקה חיה' },
-    { id: 'FULL_DOCUMENT_CLOSE', who: 'מסמך מלא בסגנון שלך', note: 'הצעת מחיר או מסמך מלא ב-Docs לפי סגנון הכתיבה שלך — לא נבדק בבדיקה חיה' },
+    { id: 'FULL_DOCUMENT_CLOSE', who: 'מסמך מלא בסגנון שלך', note: 'הצעת מחיר או מסמך מלא במסמך Google לפי סגנון הכתיבה שלך — לא נבדק בבדיקה חיה' },
     { id: 'USER_CONTEXT_WRITER', who: 'עדכון פרופיל מקומי', note: 'רושם בפרופיל המקומי איך טיפלת בדומה — לא נבדק בבדיקה חיה' }
   ];
   const IDS = LIST.map((r) => r.id);
