@@ -144,6 +144,13 @@
   "planned": 42,
   "watched": 32,
   "cloud": 227,
-  "wrongModel": []
+  "wrongModel": [],
+  "wrongStep": [
+   "v2syn-1061:draft≠task",
+   "v2syn-1100:task≠calendar",
+   "ctrl-he-4:task≠draft"
+  ],
+  "suggestSave": 0,
+  "suggestSaveGold": 0
  }
 }

@@ -6,6 +6,7 @@
 //            consent), and the strict gate and veto on every model answer.
 //   Plan     core/model-plan.js: a model card becomes the product's own process, drawn by the steps list, with doneWhen.
 //   Carry    core/model-plan.js toWatch(): an ask or a promise the model found enters the follow loop until it really closes.
+//   Floor    core/ai-floor.js: the strict gate and veto on every model answer, used when the host injects none.
 // The engine's own card (tier 0) is returned as the engine built it; this file never replans or changes it.
 // Nothing here closes, writes or sends: the host shows the card, and every step runs on the person's click.
 //
@@ -19,6 +20,18 @@ const FlowAiEngine = (() => {
   }
   const router = () => sibling(typeof FlowUnderstandingRouter !== 'undefined' ? FlowUnderstandingRouter : null, './understanding-router.js', 'FlowUnderstandingRouter');
   const planner = () => sibling(typeof FlowModelPlan !== 'undefined' ? FlowModelPlan : null, './model-plan.js', 'FlowModelPlan');
+  const floor = () => sibling(typeof FlowAiFloor !== 'undefined' ? FlowAiFloor : null, './ai-floor.js', 'FlowAiFloor');
+
+  // A host that injects no gate or veto gets the production floor (core/ai-floor.js) bound to this mail. A host gate or veto wins.
+  // With no floor available either, Router v2 counts the missing gate as silence.
+  function withFloor(deps, mail) {
+    if (typeof deps.gate === 'function' && typeof deps.veto === 'function') return deps;
+    const F = floor();
+    if (!F) return deps;
+    const f = F.floorFor({ text: mail.text, body: mail.body, subject: mail.subject, surface: mail.surface, direction: mail.direction,
+      attachmentCount: mail.attachmentCount || 0, today: mail.today });
+    return Object.assign({}, deps, { gate: typeof deps.gate === 'function' ? deps.gate : f.gate, veto: typeof deps.veto === 'function' ? deps.veto : f.veto });
+  }
 
   // read(mail, deps, flags) -> { used:false } | { used:true, tier, reason, card:null|{ source, step, proposal?, plan?, rows? }, watch, trace, calls }
   // mail: { text, subject, today, direction, attachmentCount, surface, lang, cloudConsent, tier0:{quiet,step,possible},
@@ -27,8 +40,9 @@ const FlowAiEngine = (() => {
     const R = router();
     if (!R || !R.enabled(flags)) return { used: false };
     mail = mail || {};
+    deps = withFloor(deps || {}, mail);
     const r = await R.route({ text: mail.text, today: mail.today, attachmentCount: mail.attachmentCount || 0, direction: mail.direction,
-      cloudConsent: mail.cloudConsent === true, tier0: mail.tier0 || {} }, deps || {}, flags);
+      cloudConsent: mail.cloudConsent === true, tier0: mail.tier0 || {} }, deps, flags);
     const base = { used: true, tier: r.tier, reason: r.reason || null, trace: r.trace, calls: r.calls, watch: null };
     if (!r.step || r.step === 'SILENT') return Object.assign(base, { card: null });
     if (r.tier === 0) return Object.assign(base, { card: { source: 'engine', step: r.step } });
