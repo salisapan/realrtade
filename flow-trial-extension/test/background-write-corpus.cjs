@@ -95,7 +95,7 @@ function load(opts) {
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com', scopes: ['https://www.googleapis.com/auth/tasks'] } }),
+        getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com', scopes: OAUTH_SCOPES_EXACT.slice() } }),
         onMessage: { addListener() {} },
         onInstalled: { addListener() {} },
         onStartup: { addListener() {} },
@@ -161,6 +161,10 @@ async function attempt(promise) {
 
 function apiCalls(calls) {
   return (calls || []).filter((c) => typeof c === 'string' && !c.startsWith('EVICT '));
+}
+
+function driveListCall(calls) {
+  return (calls || []).find((c) => typeof c === 'string' && c.includes('/drive/v3/files'));
 }
 
 function draftPostBody(env) {
@@ -755,7 +759,7 @@ async function run() {
     const blankOut = await attempt(blank.fn('searchDriveFiles')('', emptyDetail));
     check('an empty query does not call Drive', blankOut === null && emptyDetail.reason === 'drive-search-failed' && emptyDetail.error === 'empty-query' && blank.calls.length === 0, { blankOut, emptyDetail, calls: blank.calls });
 
-    const hiddenMailbox = load({ stored: CONNECTED });
+    const hiddenMailbox = load({ loadGoogleConfig: true, stored: CONNECTED });
     const hiddenDetail = {};
     const hiddenSearch = await attempt(hiddenMailbox.fn('searchDriveFiles')("name contains 'invoice'", hiddenDetail));
     check('without drive.readonly mailbox search stays hidden and never calls Drive', hiddenSearch === null && hiddenDetail.reason === 'drive-search-unavailable' && hiddenMailbox.calls.length === 0, { hiddenSearch, hiddenDetail, calls: hiddenMailbox.calls });
@@ -884,7 +888,8 @@ async function run() {
   console.log('\n--- background.js: Gmail draft undo deletes that draft, and a missing one is already undone ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/users\/me\/drafts\/draft_1$/, { reply: res(204, {}) }],
         [/\/users\/me\/drafts\/gone$/, { reply: res(404, {}) }]
@@ -896,7 +901,8 @@ async function run() {
       && env.calls.some((c) => c.startsWith('DELETE ') && c.includes('/users/me/drafts/draft_1')),
       env.calls);
     const withFile = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/users\/me\/drafts\/draft_tpl$/, { reply: res(204, {}) }],
         [/\/drive\/v3\/files\/copy_1$/, { reply: res(204, {}) }]
@@ -1131,7 +1137,7 @@ async function run() {
     check('the receipt names Calendar, the title, and the time that was written',
       out.written === 'Calendar · I will send you the signed contract by Friday, September 18 at 3pm. · Sep 18 15:00',
       out.written);
-    check('one request', env.calls.length === 1, env.calls);
+    check('one request', apiCalls(env.calls).length === 1, env.calls);
   }
 
   console.log('\n--- background.js: an invalid date or time is not written, and does not look like success ---\n');
@@ -1291,7 +1297,7 @@ async function run() {
     check('a single event at that minute is deleted', out.ok === true && out.ref && out.ref.eventId === 'ev_sync' && out.ref.restore && out.ref.restore.start, out);
     check('the receipt says the event is off that clock', out.written === 'Calendar · Friday sync · off Sep 18 15:00', out.written);
     check('delete lists then deletes, and does not insert',
-      env.calls[0].indexOf('GET /calendars/primary/events?') === 0 &&
+      apiCalls(env.calls)[0].indexOf('GET /calendars/primary/events?') === 0 &&
         env.calls.some((c) => c === 'DELETE /calendars/primary/events/ev_sync') &&
         !env.calls.some((c) => c === 'POST /calendars/primary/events'),
       env.calls);
@@ -1339,9 +1345,10 @@ async function run() {
     });
     const undone = await attempt(undoEnv.fn('googleCalendarUndo')(out.ref));
     check('undo of a move patches the previous start back',
-      undone.ok === true && undoEnv.calls[0] === 'PATCH /calendars/primary/events/ev_move' &&
-        undoEnv.bodies[0] && undoEnv.bodies[0].start.dateTime === previousStart.dateTime,
-      { calls: undoEnv.calls, body: undoEnv.bodies[0] });
+      undone.ok === true && apiCalls(undoEnv.calls)[0] === 'PATCH /calendars/primary/events/ev_move' &&
+        undoEnv.bodies[undoEnv.calls.findIndex((c) => c === 'PATCH /calendars/primary/events/ev_move')] &&
+        undoEnv.bodies[undoEnv.calls.findIndex((c) => c === 'PATCH /calendars/primary/events/ev_move')].start.dateTime === previousStart.dateTime,
+      { calls: undoEnv.calls, body: undoEnv.bodies[undoEnv.calls.findIndex((c) => c === 'PATCH /calendars/primary/events/ev_move')] });
   }
   {
     const one = (id, minute) => ({
@@ -1356,7 +1363,7 @@ async function run() {
     const empty = await attempt(none.fn('googleCalendarWrite')({
       params: { calendarOp: 'delete', dateIso: '2026-09-18', hour: 15, minute: 0 }
     }));
-    check('zero events at that minute is not a write', empty.ok === false && empty.reason === 'not-found' && !empty.written && none.calls.length === 1, { out: empty, calls: none.calls });
+    check('zero events at that minute is not a write', empty.ok === false && empty.reason === 'not-found' && !empty.written && apiCalls(none.calls).length === 1, { out: empty, calls: none.calls });
     const two = load({
       stored: CONNECTED,
       routes: [[/\/calendars\/primary\/events\?/, { reply: res(200, { items: [one('a', '00'), one('b', '00')] }) }]]
@@ -1364,7 +1371,7 @@ async function run() {
     const both = await attempt(two.fn('googleCalendarWrite')({
       params: { calendarOp: 'delete', dateIso: '2026-09-18', hour: 15, minute: 0 }
     }));
-    check('two events at that minute are not deleted', both.ok === false && both.reason === 'not-found' && !both.written && two.calls.length === 1, { out: both, calls: two.calls });
+    check('two events at that minute are not deleted', both.ok === false && both.reason === 'not-found' && !both.written && apiCalls(two.calls).length === 1, { out: both, calls: two.calls });
     const other = load({
       stored: CONNECTED,
       routes: [[/\/calendars\/primary\/events\?/, { reply: res(200, { items: [one('later', '30')] }) }]]
@@ -1373,7 +1380,7 @@ async function run() {
       params: { calendarOp: 'delete', dateIso: '2026-09-18', hour: 15, minute: 0 }
     }));
     check('an event that starts on another minute is not deleted',
-      overlap.ok === false && overlap.reason === 'not-found' && other.calls.length === 1, { out: overlap, calls: other.calls });
+      overlap.ok === false && overlap.reason === 'not-found' && apiCalls(other.calls).length === 1, { out: overlap, calls: other.calls });
     const missing = load({
       stored: CONNECTED,
       routes: [[/\/calendars\/primary\/events/, { reply: res(200, { id: 'should_not' }) }]]
@@ -1440,7 +1447,8 @@ async function run() {
   console.log('\n--- background.js: fact lookup stays silent when Drive has too many files ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?/, { reply: res(200, {
         files: [
           { id: 'a', name: 'Budget', mimeType: 'application/vnd.google-apps.spreadsheet' },
@@ -1453,14 +1461,15 @@ async function run() {
     const out = await attempt(env.fn('factSources')({ factLabel: 'Q3 total', sourceKind: 'sheet', sourceName: 'budget' }));
     check('four files is truncated silence', out.ok === true && out.truncated === true && out.sources.length === 0, out);
     check('it does not export those files', !env.calls.some((c) => /\/export/.test(c)), env.calls);
-    const q = env.calls[0] || '';
+    const q = driveListCall(env.calls) || '';
     check('the query is a spreadsheet name search through searchDriveFiles',
       q.indexOf('spreadsheet') !== -1 && q.indexOf('budget') !== -1 && q.indexOf('fullText') === -1 && q.indexOf('pageSize=100') !== -1 && q.indexOf('corpora=user') !== -1, q);
   }
 
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [
         [/\/drive\/v3\/files\?/, { reply: res(200, { files: [
           { id: 'sheet1', name: 'Acme Budget', mimeType: 'application/vnd.google-apps.spreadsheet' }
@@ -1476,7 +1485,8 @@ async function run() {
       disconnected.ok === false && disconnected.reason === 'not-connected' && offline.calls.length === 0,
       disconnected);
     const quoted = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?/, { reply: res(200, { files: [] }) }]]
     });
     await attempt(quoted.fn('factSources')({
@@ -1484,7 +1494,7 @@ async function run() {
       sourceKind: 'sheet',
       sourceName: "a'b"
     }));
-    const quotedUrl = decodeURIComponent(quoted.calls[0] || '');
+    const quotedUrl = decodeURIComponent(driveListCall(quoted.calls) || '');
     check('a quote in the file name stays inside the Drive query literal',
       quotedUrl.indexOf("a\\'b") !== -1 && quotedUrl.indexOf("name contains 'secret") === -1, quotedUrl);
   }

@@ -84,6 +84,19 @@ export function scopeVersion(scopes) {
   return cleaned.join('\n');
 }
 
+function grantedCoversRequired(grantedVersion, requiredScopes) {
+  const required = scopeVersion(requiredScopes).split('\n').filter(Boolean);
+  if (!required.length) return false;
+  const granted = scopeVersion(
+    typeof grantedVersion === 'string' ? grantedVersion.split('\n') : grantedVersion
+  ).split('\n').filter(Boolean);
+  if (!granted.length) return false;
+  for (let i = 0; i < required.length; i++) {
+    if (granted.indexOf(required[i]) < 0) return false;
+  }
+  return true;
+}
+
 // 'use' keeps the silent path. 'upgrade' drops the cached token and asks
 // once. A cancel on this version stays quiet until the next Connect.
 export function googleScopeAction(stored, requiredScopes, mode) {
@@ -92,9 +105,11 @@ export function googleScopeAction(stored, requiredScopes, mode) {
   const version = rec && typeof rec.version === 'string' ? rec.version : '';
   const status = rec && rec.status;
   const same = Boolean(required) && version === required;
+  const covers = Boolean(required) && version && grantedCoversRequired(version, requiredScopes);
+  const current = same || covers;
   const interactive = mode === 'interactive' || mode === true;
-  if (same && status === 'granted') return 'use';
-  if (!interactive && same && status === 'asked') return 'use';
+  if (current && status === 'granted') return 'use';
+  if (!interactive && current && status === 'asked') return 'use';
   return 'upgrade';
 }
 
