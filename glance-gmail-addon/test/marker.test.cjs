@@ -8,7 +8,13 @@ const vm = require('vm');
 const addon = path.join(__dirname, '..');
 const repo = path.join(addon, '..');
 const intent = require('../src/intent.js');
-const markerSrc = fs.readFileSync(path.join(addon, 'src', 'marker.js'), 'utf8');
+const { spawnSync } = require('child_process');
+const driftCheck = spawnSync(process.execPath, [path.join(addon, 'scripts', 'check-marker-bundle.cjs')], { encoding: 'utf8' });
+if (driftCheck.status !== 0) {
+  console.error((driftCheck.stdout || '') + (driftCheck.stderr || ''));
+  process.exit(1);
+}
+const markerSrc = fs.readFileSync(path.join(addon, 'Marker.js'), 'utf8').replace(/^\/\/ Generated[^\n]*\n/, '');
 
 let failures = 0;
 let passes = 0;
@@ -360,6 +366,83 @@ Mu._test.rememberMarkMeta('m-star-only', { userHadStar: applyRes.userHadStar });
 Mu.onProofClose('m-star-only', GmailApp);
 Mu.onUndoRestore('m-star-only', GmailApp);
 check('undo restores glance-only star', starOnlyStarred === true);
+
+let undoUserStarCalled = false;
+const userStarUndoThread = {
+  getLabels() { return []; },
+  getMessages() {
+    return [{
+      isStarred() { return true; },
+      star() { undoUserStarCalled = true; },
+      unstar() {}
+    }];
+  }
+};
+GmailApp.getMessageById = function (id) {
+  return { getId() { return id; }, getThread() { return userStarUndoThread; } };
+};
+const propsUndoUser = mockProps(false);
+const Mud = loadMarker(propsUndoUser);
+Mud._test.rememberMarkMeta('m-user-undo', { userHadStar: true });
+Mud.onProofClose('m-user-undo', GmailApp);
+Mud.onUndoRestore('m-user-undo', GmailApp);
+check('undo without re-starring when user already had star', undoUserStarCalled === false);
+
+let notThisUnstar = false;
+const plainThread = {
+  getLabels() { return []; },
+  getMessages() {
+    return [{
+      isStarred() { return true; },
+      unstar() { notThisUnstar = true; },
+      star() {}
+    }];
+  }
+};
+GmailApp.getMessageById = function (id) {
+  return { getId() { return id; }, getThread() { return plainThread; } };
+};
+const Mplain = loadMarker(mockProps(false));
+Mplain.onNotThis('m-never-marked', GmailApp);
+check('not-this does not unmark a thread Glance never marked', notThisUnstar === false && Mplain.isDismissed('m-never-marked'));
+
+let closeUnstar = false;
+const closeThread = {
+  getLabels() { return []; },
+  getMessages() {
+    return [{
+      isStarred() { return true; },
+      unstar() { closeUnstar = true; },
+      star() {}
+    }];
+  }
+};
+GmailApp.getMessageById = function (id) {
+  return { getId() { return id; }, getThread() { return closeThread; } };
+};
+const Mclose = loadMarker(mockProps(false));
+Mclose.onProofClose('m-no-meta', GmailApp);
+check('close with no Glance mark record does not unstar', closeUnstar === false);
+
+const Md = loadMarker(mockProps(false));
+Md.dismiss('m-dismissed-sweep');
+const dismissedMsg = {
+  getId() { return 'm-dismissed-sweep'; },
+  getThread() {
+    return { getMessages() { return [dismissedMsg]; } };
+  },
+  _body: 'Can you please sign the pilot deck and send it back by Friday? We need it for the board.',
+  star() {}, unstar() {}
+};
+GmailApp.search = function () { return [{ getMessages() { return [dismissedMsg]; } }]; };
+const dismissedSweep = Md.sweep({
+  startedMs: Date.now(),
+  gmailApp: GmailApp,
+  readerCtx,
+  buildOpened: openedFromMsg,
+  isClosable() { return true; }
+});
+check('sweep skips dismissed messages', dismissedSweep.marked === 0 && Md.isDismissed('m-dismissed-sweep'));
 
 const corpus = JSON.parse(fs.readFileSync(path.join(__dirname, 'marker-corpus-20.json'), 'utf8'));
 for (const tz of ['UTC', 'Asia/Jerusalem']) {

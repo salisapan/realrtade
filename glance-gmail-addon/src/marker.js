@@ -294,7 +294,15 @@ var GlanceMarker = (function () {
     var thread = msg.getThread();
     if (snap.hadMark) {
       var label = ensureLabel_(Gmail);
-      applyMark_(thread, label, true);
+      if (label) {
+        try { label.addToThread(thread); } catch (err) { /* label may be missing */ }
+      }
+      if (snap.glanceStarred && !snap.userHadStar) {
+        var latestHadMark = latestMessage_(thread);
+        if (latestHadMark) {
+          try { latestHadMark.star(); } catch (err2) { /* ignore */ }
+        }
+      }
       return;
     }
     if (snap.glanceStarred) {
