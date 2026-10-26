@@ -1644,7 +1644,8 @@ function glanceUiCopy(kind) {
       const found = await driveFindOne(intent.googleWait.fileTerm);
       const match = found && typeof found === 'object' ? found.match : found;
       const mailboxBlocked = !!(found && found.driveSearchUnavailable);
-      const unresolved = mailboxBlocked || match === 'unknown' || match === 'many' || match == null;
+      if (mailboxBlocked && (match === 'one' || match === 'many')) return { type: null };
+      const unresolved = mailboxBlocked || match === 'unknown' || match == null;
       if (unresolved) {
         // Without drive.readonly the mailbox cannot be searched, and an
         // unknown/many match is the same for planning. A named file on the

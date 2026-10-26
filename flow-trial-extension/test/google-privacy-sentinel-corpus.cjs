@@ -567,10 +567,13 @@ function activityLogRefBehaviour(ref) {
       !outbound.filter((o) => o.kind === 'google-api' || o.kind === 'fetch').some((o) => JSON.stringify(o.body || {}).includes(SENT_CONTACT_EMAIL)),
       outbound.length);
     const writtenRows = activityLogRows.filter((r) => r && r.kind === 'written');
-    check('J:P1: activity log written rows omit contact email', !writtenRows.some((r) => JSON.stringify(r).includes(SENT_CONTACT_EMAIL)), writtenRows);
+    check('J:P1: activity log rows omit contact email', !activityLogRows.some((r) => JSON.stringify(r).includes(SENT_CONTACT_EMAIL)), activityLogRows);
     check('P3c: activity log written ref strips ref.to from compose response',
       writtenRows.length > 0 && writtenRows.every((r) => !r.ref || !r.ref.to),
       writtenRows[0]);
+    check('R-subj: written ref carries no to/subject/body keys',
+      writtenRows.length > 0 && writtenRows.every((r) => !r.ref || !['to', 'subject', 'body'].some((k) => k in r.ref)),
+      writtenRows.map((r) => r.ref));
     check('R-subj/R-before: activity log omits seeded subject and prefilled To',
       !activityLogRows.some((r) => JSON.stringify(r).includes(SENT_TASK_TITLE) || JSON.stringify(r).includes(SENT_CONTACT_EMAIL)),
       activityLogRows);
@@ -613,6 +616,8 @@ function activityLogRefBehaviour(ref) {
     if (undoBtn) undoBtn.click();
     await sleep(600);
     check('R-merge: Undo restores prefilled To', toEl && readComposeValue(toEl) === vendorTo, toEl && readComposeValue(toEl));
+    const bodyEl = w.document.querySelector('[aria-label="Message Body"]');
+    check('R-merge: Undo cleared the filled body', bodyEl && bodyEl.textContent === '', bodyEl && bodyEl.textContent);
     check('R-merge: Undo restores prefilled Subject', subEl && readComposeValue(subEl) === vendorSub, subEl && readComposeValue(subEl));
     w.close();
   }
@@ -797,6 +802,10 @@ function activityLogRefBehaviour(ref) {
     check('D1: drive unavailable — needs-you for the invoice, no prepare card',
       Boolean(wD1.document.querySelector('[data-glance-chain="needs-you"]')) && !wD1.document.querySelector('[data-glance-chain="prepare"]'),
       wD1.document.body.innerHTML.slice(0, 200));
+    check('D1: drive unavailable — only needs-you, no Reply & Track chip',
+      Boolean(wD1.document.querySelector('[data-glance-chain="needs-you"]'))
+      && !wD1.document.querySelector('.flow-chip-host:not([data-glance-chain="needs-you"])'),
+      wD1.document.body.innerHTML.slice(0, 300));
     wD1.close();
 
     const holdAsk = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
@@ -805,11 +814,18 @@ function activityLogRefBehaviour(ref) {
     const pageSent3 = [];
     let findOneCalls = 0;
     const { w: wD3 } = bootGmailPage(holdAsk, storeD3, pageSent3, bg.send, outbound, {
-      driveFindOne: () => { findOneCalls++; return { match: 'none', driveSearchUnavailable: true }; }
+      driveFindOne: () => {
+        findOneCalls++;
+        return {
+          match: 'one',
+          file: { id: 'f1', name: 'glance-pricing-q4.pdf', url: 'https://drive.google.com/file/d/f1/view' },
+          driveSearchUnavailable: true
+        };
+      }
     });
     await wD3.__glanceGmailPage.rescan();
     await sleep(800);
-    check('D3: drive-find-one unavailable still offers the calendar hold chip', Boolean(wD3.document.querySelector('.flow-chip-host')), findOneCalls);
+    check('D3: drive-find-one unavailable keeps the page quiet (no chip)', !wD3.document.querySelector('.flow-chip-host'), findOneCalls);
     check('D3: googleWait path called drive-find-one', findOneCalls >= 1, findOneCalls);
     wD3.close();
 
@@ -833,6 +849,16 @@ function activityLogRefBehaviour(ref) {
     await wD2.__glanceGmailPage.rescan();
     await sleep(1200);
     check('D2: follow resolution probe does not duplicate Drive search', followDriveSearches <= 1, followDriveSearches);
+    {
+      let okSearches = 0;
+      const { w: wOk } = bootGmailThread(thread, JSON.parse(JSON.stringify(baseStored)), [], bg.send, outbound, {
+        searchDrive: () => { okSearches++; return { ok: true, files: [] }; }
+      });
+      await wOk.__glanceGmailPage.rescan();
+      await sleep(1200);
+      check('D2b: granted Drive — follow resolution searches Drive exactly once', okSearches === 1, okSearches);
+      wOk.close();
+    }
     check('D2: unavailable Drive search leaves follow resolution quiet', !wD2.document.getElementById('flow-follow-host'), followDriveSearches);
     wD2.close();
   }
