@@ -463,7 +463,7 @@ function jerusalemToUtcIso(y, m, d, hour) {
 const HEBREW_HOLD = 'פגישה ב-' + THURSDAY.getDate() + '/' + (THURSDAY.getMonth() + 1) + ' בשעה 14:00';
 const HEBREW_HOLD_UTC = jerusalemToUtcIso(THURSDAY.getFullYear(), THURSDAY.getMonth() + 1, THURSDAY.getDate(), 14);
 
-test('Hebrew weekday date and hour posts one Jerusalem hold at 14:00 Jerusalem time', async ({ glance }) => {
+test('Hebrew numeric date and hour posts one Jerusalem hold at 14:00 Jerusalem time', async ({ glance }) => {
   const page = await open(glance, {
     seed: { glanceTimeZone: 'Asia/Jerusalem' },
     mail: {
