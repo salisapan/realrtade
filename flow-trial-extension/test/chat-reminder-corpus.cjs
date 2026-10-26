@@ -12,7 +12,14 @@ const YES = [
   ['אל תשכח להביא את הטופס החתום ביום שני', '2026-10-26', /הטופס/],
   ['תזכור לשלוח את החשבונית מחר', '2026-10-24', /החשבונית/],
   ['שלא תשכח לשלם את המקדמה ביום חמישי', '2026-10-29', /המקדמה/],
-  ['אל תשכחי להתקשר לספק היום', '2026-10-23', /לספק/]
+  ['אל תשכחי להתקשר לספק היום', '2026-10-23', /לספק/],
+  // a plain imperative "bring" with the thing and a day (run 106)
+  ['Please bring your passport tomorrow', '2026-10-24', /passport/],
+  ['Bring the signed contract on Monday', '2026-10-26', /signed contract/],
+  ['Please bring a printed copy on Wednesday', '2026-10-28', /printed copy/],
+  ['תביא איתך את הרישיון מחר', '2026-10-24', /הרישיון/],
+  ['נא להביא את הטפסים ביום רביעי', '2026-10-28', /הטפסים/],
+  ['תביאי את הציוד ביום ראשון', '2026-10-25', /הציוד/]
 ];
 for (const [text, day, what] of YES) {
   const r = R.recognize(text, NOW);
@@ -32,6 +39,11 @@ const NO = [
   ['אל תשכח להביא את הטופס ביום שני?', 'question'],
   ['Remember to call on 2025-01-02', 'past'],
   ['Remember the good times on Monday', 'no cue'],
+  ['Please bring your passport', 'no day'],
+  ['Can you bring your passport tomorrow?', 'question'],
+  ['I will bring the contract on Monday', 'own promise'],
+  ['Bring cash, parking is not free, see you tomorrow', 'no thing for the cue'],
+  ['תביא קפה', 'no day'],
   ['', 'empty'],
   ['x'.repeat(300), 'long']
 ];

@@ -6,6 +6,10 @@
 const FlowChatReminder = (() => {
   const CUE_EN = /\b(?:(?:please\s+)?(?:don'?t|do\s+not|dont)\s+forget\s+to|(?:please\s+)?remember\s+to|make\s+sure\s+you(?:\s+remember\s+to)?|(?:just\s+)?a\s+reminder\s+to|reminder\s*[:\-]\s*(?:to\s+)?)\s+/i;
   const CUE_HE = /(?:^|[\s,.])(?:אל\s+(?:תשכח(?:י|ו)?)|שלא\s+תשכח(?:י|ו)?|תזכור|תזכרי|תזכרו|זכור|זכרי|אל\s+תשכחו)\s+/;
+  // A plain "bring" in the imperative with the thing and a day ("Please bring your ID tomorrow", «תביא איתך את הטופס החתום מחר», «נא להביא את
+  // התעודה ביום חמישי») is the same task. The cue is zero-width: the thing starts at the verb.
+  const CUE_BRING_EN = /\b(?:please\s+)?(?=bring\s+(?:your|the|a|an|along|with)\b)/i;
+  const CUE_BRING_HE = /(?:^|[\s,.])(?:נא\s+)?(?=(?:תביא|תביאי|תביאו|להביא)\s)/;
   // Not a reminder to act: a look back, a refusal, a hedge, a thing already done, a thing for someone else.
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|forgot|already|never\s*mind|forget\s+it|i'?ll|i\s+will|maybe|might|if\s+you\s+want|cancel(?:l?ed)?)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|שכחתי|כבר\s|עזוב|תעזוב|לא\s+משנה|אני\s+אעשה|אולי|בוטל|לבטל)/;
@@ -62,7 +66,7 @@ const FlowChatReminder = (() => {
     if (raw.length > 240) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-a-reminder' };
-    const m = raw.match(CUE_EN) || raw.match(CUE_HE);
+    const m = raw.match(CUE_EN) || raw.match(CUE_HE) || raw.match(CUE_BRING_EN) || raw.match(CUE_BRING_HE);
     if (!m) return { kind: 'none', reason: 'no-cue' };
     // A bare "Reminder:" in front of a request ("Reminder: please send it by Monday") is a deadline ask, and in front of a look back
     // ("Reminder: the form was due Monday") is nothing to do: neither is a reminder to act.

@@ -873,3 +873,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`; one other agent's commit (AI engine, #206) touched no file I changed.
 - **Tests:** new `test/hebrew-share-ask-corpus.cjs` (6 asks written after the change, 4 quiet lines; 4 of 6 asks fail on the old code; one held-out line failed on my first patterns and led to the wider short-ask nouns); every `test/*corpus.cjs` green. Phone-card `CoreBundle.js` rebuilt. No real-browser spec this run.
 - **Open:** live Gate; «זכור להגיש את הדוח השבועי…» (a reminder to the reader) still quiet; the run-101 «We need to talk … back at the office» false positive.
+
+### Run 106 (2026-10-26)
+- **Capability shipped (behind `TASK_ASK` / `CHAT_TASK_CARD`, off):** "Please bring your passport tomorrow" and «תביא איתך את הרישיון מחר» (a plain imperative "bring" with the thing and a day, no "don't forget") gave no card; it is now the To Do task "bring your passport" due that day, in mail and in chat.
+- **Proof added for run 104:** the "Pay invoice 2231" task (no amount) is now proved in a real browser, English and Hebrew, with write, read-back, Undo and the duplicate guard for a second mail about the same invoice.
+- **Code:** `core/chat-reminder.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`; two other agents' AI-engine commits (#206, #240) touched none of my files.
+- **Tests:** `test/chat-reminder-corpus.cjs` +6 lines and 5 quiet ones (6 fail on the old code); 5 new cases in `e2e/outlook-booking-notice.spec.js` (all 28 + 3 pass), `chat-whatsapp-card` and `outlook-teams-and-series` specs green (33); every `test/*corpus.cjs` green.
+- **Open:** live Gate; Messenger and Instagram have no spec for the "bring" task (same lane as WhatsApp); «Hi Sali, make sure the invoice is signed before Friday» still quiet.
