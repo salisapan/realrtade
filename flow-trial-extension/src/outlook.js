@@ -516,6 +516,10 @@ const FlowOutlook = (() => {
         let searched = null;
         try { searched = await deps.send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.searchTerms || gate.ask.query) }); }
         catch (e) { searched = { ok: false, reason: 'drive-search-failed', status: 0, error: String(e && e.message || e) }; }
+        if (searched && searched.reason === 'drive-search-unavailable') {
+          silence.push({ conversationId: d.conversationId, reason: 'file-chain-not-run' });
+          continue;
+        }
         const failed = searchSilenceOf(searched);
         if (failed) { silence.push({ conversationId: d.conversationId, reason: failed }); continue; }
         const chain = FlowCloseChains.resolve({
@@ -523,7 +527,7 @@ const FlowOutlook = (() => {
           origin: 'outlook',
           now,
           evidence: FlowCloseChains.fileEvidence({
-            driveOk: true,
+            driveOk: Boolean(searched && searched.ok),
             driveFiles: (searched && searched.files) || [],
             threadFiles: msg.hasAttachments ? null : []
           })

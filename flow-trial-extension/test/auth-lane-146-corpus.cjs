@@ -50,6 +50,11 @@ async function laneFetch(url, init) {
   const auth = headers.Authorization || '';
   fetches.push({ url: String(url), method: method, auth: auth });
   const expect = storedBearer();
+  if (/\/oauth2\/v3\/userinfo/.test(String(url))) {
+    const email = expect && auth === expect ? 'me@example.com' : '';
+    const body = { email: email, sub: email ? 'sub-me' : '' };
+    return Object.assign(jsonResponse(200, body), { json: async () => body });
+  }
   if (/\/gmail\/v1\/users\/me\/profile/.test(String(url))) {
     return Object.assign(jsonResponse(200, { emailAddress: expect && auth === expect ? 'me@example.com' : 'other@example.com' }), { json: async () => ({ emailAddress: expect && auth === expect ? 'me@example.com' : 'other@example.com' }) });
   }

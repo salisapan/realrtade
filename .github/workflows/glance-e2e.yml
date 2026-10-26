@@ -12,8 +12,8 @@ jobs:
   e2e:
     name: e2e (${{ matrix.tz }})
     runs-on: ubuntu-latest
-    # The suite runs about 15 minutes on a hosted runner, so 15 cancelled it mid-run.
-    timeout-minutes: 25
+    # Full Playwright + jsdom on hosted runners needs headroom; 25m cancelled mid-suite.
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:

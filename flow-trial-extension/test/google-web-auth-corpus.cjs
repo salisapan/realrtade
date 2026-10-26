@@ -14,13 +14,13 @@ const WEB_CLIENT = '93977330357-gstvm1m1h1iet49uhgq212jfjqu11s8n.apps.googleuser
 const CHROME_CLIENT = '93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com';
 const EXTENSION_ID = 'dnjhplgmnkabbjogfpbhofjedlkehkai';
 const SCOPES = [
-  'https://www.googleapis.com/auth/tasks',
   'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/gmail.compose',
-  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/contacts.readonly',
   'https://www.googleapis.com/auth/drive.file',
   'openid',
-  'https://www.googleapis.com/auth/userinfo.profile'
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email'
 ];
 const SIGNIN_OFF = 'The user turned off browser signin';
 const USER_CANCEL = 'The user did not approve access.';

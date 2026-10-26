@@ -1479,7 +1479,8 @@ function glanceUiCopy(kind) {
       chrome.runtime.sendMessage({ type: 'flow:drive-find-one', term: term }, (res) => {
         resolve({
           match: res && res.match ? res.match : 'unknown',
-          file: res && res.file ? res.file : null
+          file: res && res.file ? res.file : null,
+          driveSearchUnavailable: !!(res && res.driveSearchUnavailable)
         });
       });
     });
@@ -1641,6 +1642,7 @@ function glanceUiCopy(kind) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
       if (!usingGoogle) await ensureGoogleAutoConnect();
       const found = await driveFindOne(intent.googleWait.fileTerm);
+      if (found && found.driveSearchUnavailable) return { type: null };
       const match = found && typeof found === 'object' ? found.match : found;
       intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match || 'unknown' }));
       if (intent && found && found.file) intent.laneFile = found.file;
@@ -2089,7 +2091,10 @@ function glanceUiCopy(kind) {
     // The 20-character floor stays for everything else — this does not
     // lower the scorer, it only lets a fully-formed fact ask through.
     const factProbe = (text.length >= 12 && typeof FlowFactReply !== 'undefined') ? FlowFactReply.detect(text) : null;
-    if (text.length < 20 && !factProbe && !attachmentsEarly.length) {
+    const contactProbe = (typeof FlowGoogleContacts !== 'undefined' && typeof FlowGoogleContacts.recognize === 'function')
+      ? FlowGoogleContacts.recognize(text)
+      : { kind: 'ignore' };
+    if (text.length < 20 && !factProbe && !attachmentsEarly.length && contactProbe.kind !== 'clear') {
       logScanSkip(messageId, 'short-text');
       return; // still rendering, or genuinely nothing new was written
     }
@@ -2242,6 +2247,7 @@ function glanceUiCopy(kind) {
     // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
     // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
     if (inboundMail && usingGoogle && await showFullDocumentChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
+    if (inboundMail && usingGoogle && await showGoogleContactsChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showRecurringChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showNewFileChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
@@ -2397,10 +2403,16 @@ function glanceUiCopy(kind) {
       ? FlowIntent.attachToInvitePlan(text) : null;
     // A file onto an existing invite is the file-track card (task + short
     // draft) even when the file was not found. Never the needs-you banner.
-    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
+    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && !intent.googleClose && typeof FlowFileAttach !== 'undefined') {
       const searched = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
       });
+      if (searched && searched.reason === 'drive-search-unavailable') {
+        logScanSkip(messageId, 'file');
+        recordSilence(messageId, 'file');
+        void flushSuggest(false);
+        return;
+      } else {
       // One resolver for every file ask the resolution planner does not own.
       // A template is not a file that was found. Mailbox-wide attachment
       // search is not connected (compose-only Gmail). Null Drive means the
@@ -2427,12 +2439,18 @@ function glanceUiCopy(kind) {
           })
         });
         if (chain && chain.move === 'needs-you') {
-          injectNeedsYou(message, {
-            messageId, intent, sender, subject, attachment, attachments,
-            threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
-          });
-          watchCopiedOnly(message, messageId, text, ownEmail, audience);
-          return;
+          if (!(await gmailComposeApiAllowedFromStorage())) {
+            logScanSkip(messageId, 'compose-closed');
+            recordSilence(messageId, 'file');
+            chainSettled = true;
+          } else {
+            injectNeedsYou(message, {
+              messageId, intent, sender, subject, attachment, attachments,
+              threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
+            });
+            watchCopiedOnly(message, messageId, text, ownEmail, audience);
+            return;
+          }
         }
         if (chain && (chain.move === 'watch' || chain.reason === 'conflict' || chain.reason === 'unclear')) {
           logScanSkip(messageId, 'file-chain');
@@ -2463,6 +2481,7 @@ function glanceUiCopy(kind) {
           return;
         }
         attachFile = decision.file;
+      }
       }
     }
 
@@ -3270,6 +3289,93 @@ function glanceUiCopy(kind) {
   // A Meet link added to an event the person already organizes ("Can you add a Meet link to the Thursday sync?").
   // The worker decides (flow:google-event-link-plan, only with the switch EVENT_CALL_LINK on) and reads the
   // calendar; the page shows the canonical Do It card with a one-step list, or nothing.
+  // Google Contacts (G8): answer with an address or forward to a named person. The worker
+  // searches People API when GOOGLE_CONTACTS is on; the page fills compose only, never sends.
+  async function showGoogleContactsChip(message, c) {
+    let plan = null;
+    try {
+      plan = await sendRuntime(Object.assign({
+        type: 'flow:google-contacts-plan',
+        text: c.text,
+        choiceIndex: typeof c.choiceIndex === 'number' ? c.choiceIndex : undefined
+      }, laneAccountContext()));
+    } catch (e) { plan = null; }
+    if (!plan || plan.action === 'off' || plan.action === 'silence') return false;
+    if (plan.action === 'not-found') {
+      if (!message.querySelector('.flow-chip-contact-miss')) {
+        const miss = el('p', 'flow-chip-contact-miss', plan.line || '');
+        miss.setAttribute('role', 'status');
+        message.insertBefore(miss, message.firstChild);
+      }
+      return true;
+    }
+    if (plan.action === 'choose' && Array.isArray(plan.candidates) && plan.candidates.length > 1) {
+      if (message.querySelector('.flow-chip-contact-choose')) return true;
+      const host = el('div', 'flow-chip-contact-choose');
+      host.setAttribute('role', 'group');
+      host.appendChild(el('p', 'flow-chip-contact-choose-q', plan.line || ''));
+      const row = el('div', 'flow-chip-contact-choose-row');
+      plan.candidates.slice(0, 6).forEach((rowCand, idx) => {
+        const btn = el('button', 'flow-chip-contact-pick', (rowCand.displayName || rowCand.address || '').trim());
+        btn.type = 'button';
+        btn.addEventListener('click', () => {
+          host.replaceWith(el('span', 'flow-chip-contact-pick-wait', '…'));
+          void showGoogleContactsChip(message, Object.assign({}, c, { choiceIndex: idx }));
+        });
+        row.appendChild(btn);
+      });
+      host.appendChild(row);
+      message.insertBefore(host, message.firstChild);
+      return true;
+    }
+    if (plan.action !== 'offer' || !plan.email || !plan.mode) return false;
+    const stepKind = plan.mode === 'forward' ? 'googleContactForward' : 'googleContactAnswer';
+    const process = {
+      id: 'google-contact',
+      name: plan.title || plan.line,
+      closingLine: plan.line || plan.title,
+      closedLine: plan.lang === 'he' ? 'מוכן בטיוטה. אתה שולח.' : 'Ready in compose. You send it.',
+      steps: [{
+        id: 'compose',
+        kind: stepKind,
+        label: 'Compose',
+        hint: plan.lang === 'he' ? 'מילוי טיוטה בגימייל — לא נשלח' : 'Fill Gmail compose — nothing is sent',
+        dependsOn: null,
+        params: {
+          mode: plan.mode,
+          email: plan.email,
+          displayName: plan.displayName || plan.name,
+          name: plan.name,
+          lang: plan.lang
+        }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.title || plan.line, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      const logSteps = process.steps.map((step) => {
+        if (!step || !step.params) return step;
+        const hash = typeof FlowGoogleContacts !== 'undefined' && typeof FlowGoogleContacts.contactLogHash === 'function'
+          ? FlowGoogleContacts.contactLogHash(step.params.email)
+          : '';
+        return Object.assign({}, step, {
+          params: { mode: step.params.mode, lang: step.params.lang, contactHash: hash }
+        });
+      });
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.title || plan.line, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: logSteps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
   async function showEventLinkChip(message, c) {
     let plan = null;
     try {
@@ -3808,6 +3914,27 @@ function glanceUiCopy(kind) {
       return Object.assign(base, { params: params, ownEmail: ownEmailFromThread() || lastOwnEmail || '' });
     }
 
+    if (action.kind === 'googleContactAnswer' || action.kind === 'googleContactForward') {
+      const p = action.params || {};
+      if (!p.email || !p.mode) return null;
+      const G = typeof FlowGoogleContacts !== 'undefined' ? FlowGoogleContacts : null;
+      const composeIn = G && typeof G.composeInputFromOffer === 'function'
+        ? G.composeInputFromOffer({ mode: p.mode, email: p.email, name: p.name, lang: p.lang }, {
+          subject: ctx.subject,
+          senderEmail: ctx.sender && ctx.sender.email,
+          quote: ctx.bodyText
+        })
+        : null;
+      if (!composeIn) return null;
+      return Object.assign(base, {
+        connectorId: 'gmailCompose',
+        contactCompose: composeIn,
+        showCopy: p.mode === 'answer',
+        copyText: p.mode === 'answer' ? p.email : '',
+        lang: p.lang
+      });
+    }
+
     if (action.kind === 'gmailDraft') {
       // selectedAttachment/driveFileId are only ever set by the attach
       // chooser (buildAttachChooser, above) — if the user never opened it,
@@ -3957,6 +4084,8 @@ function glanceUiCopy(kind) {
     driveNewFile: 'googleNewFile',
     calendarCallLink: 'googleEventCallLink',
     calendarRecurring: 'googleRecurringReminder',
+    googleContactAnswer: 'gmailCompose',
+    googleContactForward: 'gmailCompose',
     gmailDraft: 'gmailCompose'
   };
 
@@ -4083,6 +4212,40 @@ function glanceUiCopy(kind) {
     return { tabAccount: ownEmailFromThread() || lastOwnEmail || '', lang: glanceUiHebrew() ? 'he' : 'en' };
   }
 
+  async function gmailComposeApiAllowedFromStorage() {
+    const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
+    if (!C || typeof C.gmailDraftApiAllowed !== 'function') return false;
+    try {
+      const bag = await chrome.storage.local.get('googleGrantedScopes');
+      const rec = bag && bag.googleGrantedScopes;
+      const raw = rec && rec.version;
+      const scopes = raw == null ? null : String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
+      return C.gmailDraftApiAllowed(scopes);
+    } catch (e) { return false; }
+  }
+
+  function activityLogRef(ref) {
+    if (!ref || typeof ref !== 'object') return ref;
+    const out = Object.assign({}, ref);
+    delete out.to;
+    delete out.target;
+    delete out.body;
+    delete out.subject;
+    if (out.before && typeof out.before === 'object') {
+      const before = Object.assign({}, out.before);
+      delete before.to;
+      delete before.body;
+      delete before.subject;
+      out.before = before;
+    }
+    if (out.proof && typeof out.proof === 'object') {
+      const proof = Object.assign({}, out.proof);
+      delete proof.target;
+      out.proof = proof;
+    }
+    return out;
+  }
+
   function sendExecuteAction(payload) {
     const lane = laneConnectorId(payload && payload.connectorId);
     if (!lane) return sendRuntime({ type: 'flow:execute-action', payload: payload });
@@ -4102,8 +4265,7 @@ function glanceUiCopy(kind) {
     return !!FlowGoogleComposePage.findBody(document);
   }
 
-  // No compose window is open. The reply draft is saved in the thread
-  // through the Gmail drafts API and read back by its id. Glance never sends.
+  // No compose window open: write through the lane (gmail.compose is enforced in core/google-drafts.js).
   async function saveReplyDraft(payload, input) {
     const planned = typeof FlowGoogleCompose !== 'undefined' && typeof FlowGoogleCompose.plan === 'function'
       ? FlowGoogleCompose.plan(input)
@@ -4117,10 +4279,50 @@ function glanceUiCopy(kind) {
       connectorId: 'googleReplyDraft',
       input: { to: planned.to, subject: planned.subject, body: planned.body, threadId: threadId }
     }, laneAccountContext()));
-
   }
 
   async function sendGmailCompose(payload) {
+    if (payload && payload.contactCompose) {
+      const composeIn = Object.assign({ useDraft: false }, payload.contactCompose);
+      if (!composeBodyOpen()) {
+        return {
+          ok: false,
+          reason: 'compose-closed',
+          preview: true,
+          closes: false,
+          sent: false,
+          error: glanceUiCopy('composeClosed') || (glanceUiHebrew() ? 'פתח קודם תשובה. Glance לא לוחץ על שליחה.' : 'Open Reply first. Glance does not press Send.')
+        };
+      }
+      const swPromise = sendRuntime({ type: 'flow:gmail-compose', connectorId: 'gmailCompose', input: composeIn, payload: composeIn });
+      let page = null;
+      if (typeof FlowGoogleComposePage !== 'undefined' && typeof FlowGoogleComposePage.fill === 'function') {
+        try { page = FlowGoogleComposePage.fill(composeIn); } catch (e) {
+          page = { ok: false, reason: 'unavailable', preview: true, closes: false, sent: false, error: 'The compose window is still empty.' };
+        }
+      } else {
+        page = { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false, error: 'Open Reply first. Glance does not press Send.' };
+      }
+      const sw = await swPromise;
+      if (page && page.ok) {
+        if (!composeReadBack(page)) {
+          return { ok: false, reason: 'verify_failed', preview: true, closes: false, sent: false, error: 'The compose window is still empty.' };
+        }
+        if (sw && typeof sw === 'object') {
+          if (sw.proof && !page.proof) page.proof = sw.proof;
+        }
+        const he = payload.lang === 'he' || glanceUiHebrew();
+        page.written = composeIn.to && composeIn.body === payload.copyText
+          ? (he ? 'הכתובת בטיוטה. אתה שולח.' : 'Address in the draft. You send it.')
+          : (he ? 'ההעברה מוכנה. אתה שולח.' : 'Forward ready in compose. You send it.');
+        if (payload.showCopy && payload.copyText) {
+          page.showCopy = true;
+          page.copyText = payload.copyText;
+        }
+        return page;
+      }
+      return page || { ok: false, reason: 'unavailable', preview: true, closes: false, sent: false, error: 'The compose window is still empty.' };
+    }
     const email = (payload && payload.senderEmail) || '';
     const input = {
       to: email,
@@ -5047,7 +5249,7 @@ function glanceUiCopy(kind) {
     }
   }
 
-  function showPreviewReceipt(host, chip, result) {
+  function showPreviewReceipt(host, chip, result, ctx) {
     const response = result.response || {};
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('role', 'status');
@@ -5057,6 +5259,20 @@ function glanceUiCopy(kind) {
       return;
     }
     done.appendChild(el('span', 'flow-chip-written', response.written || 'Compose filled. You send it.'));
+    if (response.showCopy && response.copyText) {
+      const copyLabel = (typeof FlowDisplay !== 'undefined' && FlowDisplay.chrome)
+        ? (FlowDisplay.chrome(glanceUiLang()).googleContactCopy || 'Copy')
+        : 'Copy';
+      const copyBtn = el('button', 'flow-chip-copy', copyLabel);
+      copyBtn.type = 'button';
+      copyBtn.addEventListener('click', () => {
+        const text = String(response.copyText || '');
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(text).catch(() => {});
+        }
+      });
+      done.appendChild(copyBtn);
+    }
     const undo = el('button', 'flow-chip-undo', 'Undo');
     undo.type = 'button';
     undo.addEventListener('click', () => {
@@ -5073,6 +5289,20 @@ function glanceUiCopy(kind) {
     });
     done.appendChild(undo);
     placeReceipt(host, chip, done);
+    if (ctx && composeReadBack(response)) {
+      FlowStorage.appendLog({
+        kind: 'written',
+        label: activityLabel(ctx),
+        messageId: ctx.messageId,
+        legacyMessageId: ctx.legacyMessageId || null,
+        threadId: ctx.threadId || null,
+        where: response.where,
+        url: response.url,
+        ref: activityLogRef(response.ref),
+        connectorId: result.action && (laneConnectorId(result.action.kind) || result.action.kind),
+        app: SOURCE_APP
+      }).catch((e) => console.error('[Glance] failed to record a compose preview in the activity log', e));
+    }
   }
 
   // A write Google accepted and has not shown back yet. It is in Google, so
@@ -5221,12 +5451,12 @@ function glanceUiCopy(kind) {
       }
       const preview = results.find((r) => r.response && composeReadBack(r.response));
       if (preview) {
-        showPreviewReceipt(host, chip, preview);
+        showPreviewReceipt(host, chip, preview, ctx);
         return;
       }
       const composeTry = results.find((r) => r.action && !(r.response && r.response.skipped) && (r.action.kind === 'gmailDraft' || laneConnectorId(r.action.kind) === 'gmailCompose'));
       if (composeTry) {
-        showPreviewReceipt(host, chip, composeTry);
+        showPreviewReceipt(host, chip, composeTry, ctx);
         return;
       }
       const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
@@ -5471,7 +5701,7 @@ function glanceUiCopy(kind) {
         threadId: ctx.threadId || null,
         where: r.response.where,
         url: r.response.url,
-        ref: r.response.ref,
+        ref: activityLogRef(r.response.ref),
         connectorId: r.action.kind,
         holdAt: (typeof FlowHeldHold !== 'undefined') ? FlowHeldHold.keyOf(ctx.intent) || undefined : undefined,
         holdSender: (ctx.sender && ctx.sender.email) || undefined,
@@ -6227,7 +6457,14 @@ function glanceUiCopy(kind) {
       document.body.appendChild(mount);
       injectChip(mount, ctx);
       return mount.querySelector('.flow-chip-host');
-    }
+    },
+    planContactsChip: async (c) => {
+      const message = document.querySelector('[role="listitem"]');
+      if (!message) return null;
+      const shown = await showGoogleContactsChip(message, c);
+      return shown ? message.querySelector('.flow-chip-host') : null;
+    },
+    rescan: () => scanReadingPane()
   };
 
   // An offer below the fold pops up in view on its own (src/chip-peek.js). It points at the card and writes nothing.

@@ -596,6 +596,11 @@ const FlowDisplay = (() => {
       plannerGroupConsentWhy: 'Planner needs read access to your work groups so Glance can list your plans. This is separate from your main Microsoft sign-in and is only asked when you use Planner.',
       plannerTodoFallbackAdmin: 'Your organization has to approve Planner access. Glance added this to Microsoft To Do instead.',
       plannerTodoFallbackDenied: 'Planner access wasn’t granted. Glance added this to Microsoft To Do instead.',
+      googleContactAnswerTitle: "Answer with {name}'s address",
+      googleContactForwardTitle: 'Forward to {name}',
+      googleContactNotFound: 'No contact matched that name in Google Contacts.',
+      googleContactChoose: 'Which {name} did you mean?',
+      googleContactCopy: 'Copy',
       skippedEarlier: 'Skipped — an earlier step in this process didn’t complete.',
       todoUiCache: 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.',
       notAllGone: 'Not all of it is gone. Undo again to remove what’s left.',
@@ -754,6 +759,11 @@ const FlowDisplay = (() => {
       plannerGroupConsentWhy: 'Planner צריך הרשאת קריאה לקבוצות העבודה שלך כדי ש-Glance יוכל להציג את התוכניות. זה נפרד מהחיבור הראשי ל-Microsoft ונשאל רק כשמשתמשים ב-Planner.',
       plannerTodoFallbackAdmin: 'הארגון שלך צריך לאשר גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.',
       plannerTodoFallbackDenied: 'לא ניתנה גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.',
+      googleContactAnswerTitle: 'לענות עם הכתובת של {name}',
+      googleContactForwardTitle: 'להעביר ל{name}',
+      googleContactNotFound: 'לא נמצא איש קשר בשם הזה באנשי הקשר.',
+      googleContactChoose: 'איזו {name} התכוונת?',
+      googleContactCopy: 'העתק',
       skippedEarlier: 'דולג — שלב קודם בתהליך לא הושלם.',
       todoUiCache: 'ב-Microsoft To Do המשימה יכולה להישאר על המסך כשתי דקות. אחרי רענון היא נעלמת.',
       notAllGone: 'לא הכול הוסר. בטל שוב כדי להסיר את מה שנשאר.',
@@ -896,6 +906,21 @@ const FlowDisplay = (() => {
 
   function chrome(lang) {
     return CHROME[uiLangFrom({ setting: lang })] || CHROME.en;
+  }
+
+  function fillName(template, name) {
+    return String(template || '').replace(/\{name\}/g, String(name || '').trim());
+  }
+
+  function googleContactTitle(mode, name, lang) {
+    const L = chrome(lang);
+    const key = mode === 'forward' ? 'googleContactForwardTitle' : 'googleContactAnswerTitle';
+    return fillName(L[key] || CHROME.en[key], name);
+  }
+
+  function googleContactChoose(name, lang) {
+    const L = chrome(lang);
+    return fillName(L.googleContactChoose || CHROME.en.googleContactChoose, name);
   }
 
   // The primary button follows the plan and the UI language. A To Do
@@ -1212,6 +1237,8 @@ const FlowDisplay = (() => {
     ageLine: ageLine,
     namesPendingLine: namesPendingLine,
     chrome: chrome,
+    googleContactTitle: googleContactTitle,
+    googleContactChoose: googleContactChoose,
     actionLabel: actionLabel,
     fillChrome: fillChrome,
     showChrome: showChrome

@@ -49,6 +49,18 @@ const FlowFollow = (() => {
     });
   }
 
+  async function gmailComposeApiAllowedFromStorage() {
+    const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
+    if (!C || typeof C.gmailDraftApiAllowed !== 'function') return false;
+    try {
+      const bag = await chrome.storage.local.get('googleGrantedScopes');
+      const rec = bag && bag.googleGrantedScopes;
+      const raw = rec && rec.version;
+      const scopes = raw == null ? null : String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
+      return C.gmailDraftApiAllowed(scopes);
+    } catch (e) { return false; }
+  }
+
   function track(event) {
     send({ type: 'flow:track', event, params: {} });
   }
@@ -273,7 +285,7 @@ const FlowFollow = (() => {
     const name = whoOf(sender);
     const what = patch.yoursReason === 'blocked' ? 'could not open or find what you sent' : 'asked you something';
     let next = Object.assign({}, watch, patch);
-    const canDraft = Boolean(next.counterpart && next.counterpart.email);
+    const canDraft = Boolean(next.counterpart && next.counterpart.email) && (await gmailComposeApiAllowedFromStorage());
     // Is a file part of the way out, and is there exactly one right file? Otherwise: none.
     const choice = canDraft ? await resolveFile(ctx, next) : null;
     if (choice && choice.source === 'drive') {
@@ -999,7 +1011,12 @@ const FlowFollow = (() => {
     const person = { email: sender.email, personKey: env.personKey || null };
     const payment = FlowResolution.paymentStatus({ facts: env.facts, person, watches, paymentsSeen: await FlowStorage.getPaymentsSeen(), state: env.state, now: Date.now() });
     const issuer = await FlowStorage.getIssuer(need.object);
-    return { evidence: { threadFiles, driveFiles: found && found.ok ? found.files : null }, payment, issuer };
+    return {
+      evidence: { threadFiles, driveFiles: found && found.ok ? found.files : null },
+      payment,
+      issuer,
+      driveSearch: found
+    };
   }
 
   function planFor(env, world) {
@@ -1149,10 +1166,12 @@ const FlowFollow = (() => {
     }
     const key = threadId + '|' + lastId;
     if (examinedResolution.has(key)) return true;
-    examinedResolution.add(key);
     const env = { need, facts, state, watch, sender, threadId, lastId, subject: ctx.subject, threadUrl: ctx.threadUrl(lastId), text, what: String(text).replace(/\s+/g, ' ').trim().slice(0, 160), personKey: (watch && watch.personKey) || null };
     const world = await resolutionWorld(ctx, sender, env);
+    if (world.driveSearch && world.driveSearch.reason === 'drive-search-unavailable') return false;
+    examinedResolution.add(key);
     const plan = planFor(env, world);
+    if (plan && (plan.move === 'choose-file' || plan.why === 'several-fit')) return true;
     if (watch) {
       // Say it again only when the move changed, and keep the stored line true. A held loop stays quiet.
       if (state.move === plan.move) return true;

@@ -96,6 +96,7 @@ import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClos
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
+import '../core/google-contacts.js';
 import './google-lane-host.js';
 import './gmail-reinject.js';
 import '../core/user-context-writer.js';
@@ -1542,9 +1543,18 @@ function launchGoogleWebAuthFlow(details) {
   });
 }
 
-function googleManifestScopes() {
+async function googleManifestScopes() {
   const oauth2 = chrome.runtime.getManifest().oauth2;
-  return googleOAuthScopesFrom(oauth2 && oauth2.scopes);
+  const base = googleOAuthScopesFrom(oauth2 && oauth2.scopes);
+  const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+  const flags = bag.glanceSwitches || {};
+  const G = globalThis.FlowGoogleContacts;
+  if (G && typeof G.oauthScopesForSwitch === 'function') {
+    G.oauthScopesForSwitch(flags).forEach((scope) => {
+      if (scope && base.indexOf(scope) < 0) base.push(scope);
+    });
+  }
+  return base;
 }
 
 async function readGoogleWebAuth() {
@@ -1589,10 +1599,11 @@ async function runGoogleWebAuth(interactive) {
   if (!redirectUri) throw new Error('Glance could not determine this extension’s redirect address.');
   const state = randomOAuthState();
   const hint = await googleLoginHint();
+  const scopes = await googleManifestScopes();
   const url = googleImplicitAuthUrl({
     clientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri,
-    scopes: googleManifestScopes(),
+    scopes,
     state,
     prompt: interactive ? 'select_account' : 'none',
     loginHint: hint
@@ -1719,9 +1730,10 @@ async function readGoogleGrantedScopes() {
 }
 
 async function writeGoogleGrantedScopes(status, source) {
+  const scopes = await googleManifestScopes();
   await chrome.storage.local.set({
     [GOOGLE_GRANTED_SCOPES_KEY]: {
-      version: scopeVersion(googleManifestScopes()),
+      version: scopeVersion(scopes),
       status: status,
       source: source || null,
       at: Date.now()
@@ -1795,7 +1807,8 @@ async function recordGoogleConsent(token, source) {
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
   const granted = await readGoogleGrantedScopes();
-  if (googleScopeAction(granted, googleManifestScopes(), wantUi ? 'interactive' : 'silent') === 'upgrade') {
+  const requiredScopes = await googleManifestScopes();
+  if (googleScopeAction(granted, requiredScopes, wantUi ? 'interactive' : 'silent') === 'upgrade') {
     return upgradeGoogleScopesOnce();
   }
   try {
@@ -2804,6 +2817,7 @@ async function followTaskReopen(ref, dueIso) {
 
 async function findThreadIdTo(recipientEmail, subject) {
   if (!recipientEmail) return null;
+  if (!(await gmailComposeApiAllowedNow())) return null;
   try {
     const q = 'to:' + recipientEmail + (subject ? ' subject:"' + String(subject).replace(/^re:\s*/i, '').replace(/"/g, '') + '"' : '');
     const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
@@ -2820,6 +2834,9 @@ async function followDraftCreate(p) {
   const to = String((p && p.to) || '').trim();
   const text = String((p && p.body) || '').trim();
   if (!to || !text) return { ok: false, reason: 'invalid', error: 'No one to write to.' };
+  if (!(await gmailComposeApiAllowedNow())) {
+    return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false };
+  }
   const base = String(p.subject || '').trim();
   const subject = base ? (/^re:/i.test(base) ? base : 'Re: ' + base) : 'Following up';
   // A file prepared for this draft (docs/file-backed-closure-plan.md): either the one
@@ -3270,6 +3287,7 @@ function buildMimeMessage(opts) {
 // whole action because a search query came back empty.
 async function findThreadId(senderEmail, subject) {
   if (!senderEmail) return null;
+  if (!(await gmailComposeApiAllowedNow())) return null;
   try {
     const q = 'from:' + senderEmail + (subject ? ' subject:"' + subject.replace(/"/g, '') + '"' : '');
     const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
@@ -3377,12 +3395,50 @@ async function googleTokenScopes() {
 // failed page returns null rather than a short list — ranking a partial
 // page is how a second, unseen file becomes "the only match".
 // detail, when passed, receives status/reason/error of the failure.
+// Mailbox-wide Drive search needs drive.readonly, which is not in the OAuth
+// grant. Without it, stay quiet — never call files.list and surface a 403.
+async function googleGrantedScopeList() {
+  try {
+    const bag = await chrome.storage.local.get('googleGrantedScopes');
+    const rec = bag.googleGrantedScopes;
+    if (!rec) return null;
+    const v = rec.version;
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'string' && v) return v.split('\n').filter(Boolean);
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function gmailComposeApiAllowedNow() {
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  return !!(C && C.gmailDraftApiAllowed(scopes));
+}
+
+async function mailboxDriveSearchAllowedNow() {
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  return !!(C && C.mailboxDriveSearchAllowed(scopes));
+}
+
 // One 403 for a missing Drive scope drops the cached Chrome token and asks
 // once more, silently. A grant that already includes drive.readonly can be
 // reused. This retry does not open a consent window. A second 403 stops.
 async function searchDriveFiles(q, detail) {
   if (!q) {
     if (detail) { detail.status = 0; detail.reason = 'drive-search-failed'; detail.error = 'empty-query'; }
+    return null;
+  }
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  if (C && !C.mailboxDriveSearchAllowed(scopes)) {
+    if (detail) {
+      detail.status = 0;
+      detail.reason = 'drive-search-unavailable';
+      detail.error = 'mailbox-search-not-granted';
+    }
     return null;
   }
   const files = [];
@@ -3502,6 +3558,7 @@ function driveQuote(value) {
 
 async function factSources(ask) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  if (!(await mailboxDriveSearchAllowedNow())) return { ok: true, sources: [], truncated: false };
   const factLabel = driveQuote(ask && ask.factLabel);
   const sourceName = driveQuote(ask && ask.sourceName);
   const kind = ask && (ask.sourceKind === 'sheet' || ask.sourceKind === 'doc') ? ask.sourceKind : null;
@@ -3542,6 +3599,18 @@ async function factSources(ask) {
 
 async function gmailDraftWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  if (C && !C.gmailDraftApiAllowed(scopes)) {
+    return {
+      ok: false,
+      reason: 'compose-closed',
+      preview: true,
+      closes: false,
+      sent: false,
+      error: 'Open Reply first. Glance does not press Send.'
+    };
+  }
   if (!p.senderEmail) return { ok: false, reason: 'error', error: 'No sender address to reply to.' };
 
   const params = p.params || {};
@@ -3720,7 +3789,11 @@ async function driveFindOneByName(term) {
     if (needle.length < 2) return { match: 'unknown' };
     const escaped = needle.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const q = "trashed = false and name contains '" + escaped + "'";
-    const files = await searchDriveFiles(q);
+    const detail = {};
+    const files = await searchDriveFiles(q, detail);
+    if (!files && detail.reason === 'drive-search-unavailable') {
+      return { match: 'none', driveSearchUnavailable: true };
+    }
     if (!files) return { match: 'unknown' };
     const hits = driveNameHits(files, needle);
     if (hits.length !== 1) return { match: hits.length === 0 ? 'none' : 'many' };
@@ -3847,6 +3920,7 @@ async function deleteDriveFile(fileId) {
 
 async function gmailDraftUndo(ref) {
   if (!ref || !ref.draftId) return { ok: false };
+  if (!(await gmailComposeApiAllowedNow())) return { ok: false, reason: 'compose-closed' };
   const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts/' + encodeURIComponent(ref.draftId), {
     method: 'DELETE'
   });
@@ -7013,7 +7087,8 @@ async function connectorStatus() {
     try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
   }
   const grantedRec = reconnectBag[GOOGLE_GRANTED_SCOPES_KEY] || null;
-  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(googleManifestScopes()));
+  const manifestScopes = await googleManifestScopes();
+  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(manifestScopes));
   const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
     configured: googleTasksConfigured(),
     detail: GLANCE_TASK_LIST_TITLE + ' list',
@@ -7325,6 +7400,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:outside-drive') {
     return reply(sendResponse, (async () => {
       if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+      if (!(await mailboxDriveSearchAllowedNow())) return { ok: true, files: [] };
       const since = Number(msg.sinceMs);
       const terms = (Array.isArray(msg.terms) ? msg.terms : []).map((t) => String(t).replace(/['\\]/g, '')).filter((t) => t.length >= 2).slice(0, 8);
       if (!(since > 0) || !terms.length) return { ok: false, reason: 'bad-request' };
