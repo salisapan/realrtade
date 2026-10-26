@@ -4,8 +4,8 @@
 // do, one named day that is today or later. It returns the day and the thing only. It never writes; the caller offers a
 // task the person approves. Portable: no chrome.*, no DOM, no network.
 const FlowChatReminder = (() => {
-  const CUE_EN = /\b(?:(?:please\s+)?(?:don'?t|do\s+not|dont)\s+forget\s+to|(?:please\s+)?remember\s+to|make\s+sure\s+you(?:\s+remember\s+to)?|(?:just\s+)?a\s+reminder\s+to|reminder\s*[:\-]\s*(?:to\s+)?)\s+/i;
-  const CUE_HE = /(?:^|[\s,.])(?:אל\s+(?:תשכח(?:י|ו)?)|שלא\s+תשכח(?:י|ו)?|תזכור|תזכרי|תזכרו|זכור|זכרי|אל\s+תשכחו)\s+/;
+  const CUE_EN = /\b(?:(?:please\s+)?(?:don'?t|do\s+not|dont)\s+forget\s+to|(?:please\s+)?remember\s+to|make\s+sure\s+you(?:\s+remember\s+to)?|(?:just\s+)?a\s+(?:friendly\s+|gentle\s+|quick\s+)?reminder\s+to|(?:friendly|gentle|quick|polite)\s+reminder\s+to|reminder\s*[:\-]\s*(?:to\s+)?)\s+/i;
+  const CUE_HE = /(?:^|[\s,.])(?:תזכורת(?:\s+(?:ידידותית|קטנה))?\s*[:\-](?=\s+ל[א-ת])|אל\s+(?:תשכח(?:י|ו)?)|שלא\s+תשכח(?:י|ו)?|תזכור|תזכרי|תזכרו|זכור|זכרי|אל\s+תשכחו)\s+/;
   // A plain "bring" in the imperative with the thing and a day ("Please bring your ID tomorrow", «תביא איתך את הטופס החתום מחר», «נא להביא את
   // התעודה ביום חמישי») is the same task. The cue is zero-width: the thing starts at the verb.
   const CUE_BRING_EN = /\b(?:please\s+)?(?=bring\s+(?:your|the|a|an|along|with)\b)/i;

@@ -449,3 +449,17 @@ for (const [label, body, want] of [['English', 'Hi Sali, please call the bank on
     await expect.poll(async () => (await todo(glance)).length).toBe(0);
   });
 }
+
+for (const [label, body, want] of [['English', 'Hi Sali, a friendly reminder to submit your expense report by Thursday. Thanks!', /expense report/i], ['Hebrew', 'שלום סלי, תזכורת: להגיש את הדוח השבועי עד יום חמישי. תודה!', /הדוח השבועי/]]) {
+  test('TASK_ASK on: a friendly reminder ("' + label + '") is one To Do task due that day, read back, and Undo deletes it', async ({ glance }) => {
+    const page = await open(glance, { TASK_ASK: true }, body, false);
+    await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+    await page.locator(PANE + ' button.flow-chip').click();
+    await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+    const list = await todo(glance);
+    expect(list).toHaveLength(1);
+    expect(JSON.stringify(list[0])).toMatch(want);
+    await page.locator(PANE + ' button.flow-chip-undo').click();
+    await expect.poll(async () => (await todo(glance)).length).toBe(0);
+  });
+}

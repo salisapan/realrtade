@@ -26,7 +26,14 @@ const YES = [
   ['Email the landlord on Wednesday', '2026-10-28', /Email the landlord/],
   ['תתקשר לבנק ביום שני', '2026-10-26', /לבנק/],
   ['תתקשר ליוסי מחר', '2026-10-24', /ליוסי/],
-  ['נא לתקשר ללקוח ביום חמישי', '2026-10-29', /ללקוח/]
+  ['נא לתקשר ללקוח ביום חמישי', '2026-10-29', /ללקוח/],
+  // a friendly/gentle reminder, and a Hebrew «תזכורת: ל...» (run 117)
+  ['Friendly reminder to submit your expense report by Thursday', '2026-10-29', /expense report/],
+  ['A gentle reminder to pay the deposit on Monday', '2026-10-26', /deposit/],
+  ['Quick reminder to send the signed form on Wednesday', '2026-10-28', /signed form/],
+  ['תזכורת: להגיש את הדוח השבועי עד יום חמישי', '2026-10-29', /הדוח השבועי/],
+  ['תזכורת ידידותית: להחזיר את הטופס עד יום שלישי', '2026-10-27', /הטופס/],
+  ['תזכורת קטנה: לשלם את המקדמה ביום ראשון', '2026-10-25', /המקדמה/]
 ];
 for (const [text, day, what] of YES) {
   const r = R.recognize(text, NOW);
@@ -57,6 +64,9 @@ const NO = [
   ['I will call the bank tomorrow', 'own promise'],
   ['Call the bank', 'no day'],
   ['Can you call the bank on Monday?', 'question'],
+  ['Friendly reminder that the office is closed on Friday', 'a notice, not a thing to do'],
+  ['תזכורת: הפגישה מחר בשעה 10', 'a notice'],
+  ['תזכורת: להגיש את הדוח', 'no day'],
   ['', 'empty'],
   ['x'.repeat(300), 'long']
 ];

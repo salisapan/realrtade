@@ -957,3 +957,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** new `test/confirm-ask-corpus.cjs` (6 asks, 5 quiet lines; the 6 asks fail on the old code); every `test/*corpus.cjs` green; phone-card bundle rebuilt. No real-browser spec this run (recognition only, no new write).
 - **Open:** live Gate; "Let me know if Thursday works for you" and «תודיע לי אם זה מתאים לך» (scheduling replies) stay quiet on purpose; «תוכל לאשר שהתשלום התקבל?» stays a hedge.
+
+### Run 117 (2026-10-26)
+- **Capability shipped (behind `TASK_ASK` / `CHAT_TASK_CARD`, off):** "Friendly reminder to submit your expense report by Thursday" and «תזכורת: להגיש את הדוח השבועי עד יום חמישי» (the commonest reminder wording at work) gave no card; they are now the To Do reminder task.
+- **Probe findings, not built:** an expiry notice ("Your parking permit expires on 15/11", «הרישיון שלך פג תוקף ב-15/11») has no action verb and belongs to the system-notice reader (`SYSTEM_NOTICE`), not the reminder reader.
+- **Code:** `core/chat-reminder.js` only (two cues).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-reminder-corpus.cjs` +6 lines (all fail on the old code) and 3 quiet ones; 2 real-browser Outlook cases; every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; no Messenger or Instagram spec for the reminder tasks; expiry notices without an action verb stay quiet.
