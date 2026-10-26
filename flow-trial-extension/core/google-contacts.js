@@ -5,7 +5,6 @@ const FlowGoogleContacts = (() => {
   const SWITCH_DEFAULT = false;
   const CONNECTOR = 'googleContacts';
   const READ_SCOPE = 'https://www.googleapis.com/auth/contacts.readonly';
-  const OTHER_READ_SCOPE = 'https://www.googleapis.com/auth/contacts.other.readonly';
   const PEOPLE = 'https://people.googleapis.com/v1';
 
   function enabled(flags) {
@@ -276,7 +275,6 @@ const FlowGoogleContacts = (() => {
     SWITCH_DEFAULT: SWITCH_DEFAULT,
     CONNECTOR: CONNECTOR,
     READ_SCOPE: READ_SCOPE,
-    OTHER_READ_SCOPE: OTHER_READ_SCOPE,
     enabled: enabled,
     oauthScopesForSwitch: oauthScopesForSwitch,
     hasReadScope: hasReadScope,

@@ -62,6 +62,11 @@ function forbiddenInPayload(json) {
   console.log('\n--- recognition and plan ---\n');
   check('switch default off', G.SWITCH_DEFAULT === false && G.SWITCH === 'GOOGLE_CONTACTS');
   check('answer ask in English', G.recognize("What's Dana's email?").mode === 'answer');
+  check('Hebrew not-found line is Hebrew-only', (() => {
+    const he = G.notFoundLine('he');
+    const en = G.notFoundLine('en');
+    return /[\u0590-\u05FF]/.test(he) && he.indexOf('No contact matched') < 0 && /No contact matched/.test(en);
+  })());
   check('forward ask in English', G.recognize('send this to Dana').mode === 'forward');
   check('off switch: plan stays off', (await G.plan({ text: "What's Dana's email?", flags: {} }, { grantedScopes: SCOPES, http })).action === 'off');
   check('missing scope: silence', (await G.plan({ text: "What's Dana's email?", flags: ON }, { grantedScopes: ['tasks'], http })).reason === 'missing-scope');

@@ -19,7 +19,6 @@ const FlowGoogleConfig = (() => {
   const SCOPE_CALENDAR = 'https://www.googleapis.com/auth/calendar.events';
   const SCOPE_TASKS = 'https://www.googleapis.com/auth/tasks';
   const SCOPE_CONTACTS_READONLY = 'https://www.googleapis.com/auth/contacts.readonly';
-  const SCOPE_CONTACTS_OTHER_READONLY = 'https://www.googleapis.com/auth/contacts.other.readonly';
   const SCOPE_USERINFO_EMAIL = 'https://www.googleapis.com/auth/userinfo.email';
   const SCOPE_USERINFO_PROFILE = 'https://www.googleapis.com/auth/userinfo.profile';
   const SCOPE_GMAIL_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose';
@@ -157,7 +156,6 @@ const FlowGoogleConfig = (() => {
     SCOPE_CALENDAR: SCOPE_CALENDAR,
     SCOPE_TASKS: SCOPE_TASKS,
     SCOPE_CONTACTS_READONLY: SCOPE_CONTACTS_READONLY,
-    SCOPE_CONTACTS_OTHER_READONLY: SCOPE_CONTACTS_OTHER_READONLY,
     SCOPE_GMAIL_COMPOSE: SCOPE_GMAIL_COMPOSE,
     SCOPE_DRIVE_READONLY: SCOPE_DRIVE_READONLY,
     OAUTH_SCOPE_SET_EXACT: OAUTH_SCOPE_SET_EXACT,
