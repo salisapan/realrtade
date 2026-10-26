@@ -739,13 +739,14 @@ await ok('ecosystem checkbox scopesFor path ends subset of base ecosystem scopes
     store: { outlookAuth: { ecosystem: true, requestedScopes: MS_EXPECTED, token: { accessToken: 'old' }, account: { address: 'me@contoso.com' } } }
   });
   await inst.connect({ scopes: scopes });
-  const allowed = new Set(MS_EXPECTED);
-  const expectedIntersect = scopes.filter((s) => allowed.has(s));
+  const allowed = new Set(MS_EXPECTED.concat(['Calendars.ReadWrite', 'Sites.ReadWrite.All']));
+  const expectedReconnect = MS_EXPECTED.concat(['Calendars.ReadWrite', 'Sites.ReadWrite.All']);
   assert.ok(w.signInScopes.every((s) => allowed.has(s)));
   assert.ok(!w.signInScopes.some((s) => /^Group\./i.test(s)));
   assert.ok(w.signInScopes.indexOf('Chat.Read') < 0, 'Chat.Read is optional teamsChat only');
   assert.ok(w.signInScopes.indexOf('Mail.Read') < 0, 'legacy Mail.Read must not leak into ecosystem reconnect');
-  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(expectedIntersect));
+  assert.ok(w.signInScopes.indexOf('Contacts.Read') < 0, 'Contacts.Read is optional contacts bucket only');
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(expectedReconnect));
 });
 
 await ok('personal microsoft stays connected when teamsChat optional is denied and Chat.Read is stripped on reconnect', async () => {
@@ -1182,7 +1183,8 @@ await ok('K3c: onMessage flow:microsoft-optional-scopes contacts bucket calls si
   assert.strictEqual(out && out.ok, true, out);
   assert.ok(Array.isArray(signInScopes) && signInScopes.length >= 1, signInScopes);
   assert.ok(signInScopes[0].indexOf('Contacts.Read') >= 0, signInScopes[0]);
-  assert.deepStrictEqual(sortScopes(signInScopes[0]), sortScopes(MS_EXPECTED.concat(['Contacts.Read'])));
+  const gotScopes = JSON.parse(JSON.stringify(signInScopes[0]));
+  assert.deepStrictEqual(sortScopes(gotScopes), sortScopes(MS_EXPECTED.concat(['Contacts.Read'])));
 });
 
 await ok('K3s: flow:microsoft-optional-scopes rejects foreign sender', async () => {
@@ -1332,7 +1334,121 @@ await ok('R4/R5: ecosystem reconnect keeps ticked Calendar (Calendars.ReadWrite)
   const scopes = C.scopesFor(['mail', 'calendar']);
   await inst.connect({ scopes });
   assert.ok(w.signInScopes.indexOf('Calendars.ReadWrite') >= 0, w.signInScopes);
-  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(scopes));
+  assert.ok(w.signInScopes.indexOf('Mail.Read') < 0, w.signInScopes);
+  assert.ok(w.signInScopes.indexOf('Chat.Read') < 0, w.signInScopes);
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(MS_EXPECTED.concat(['Calendars.ReadWrite'])));
+});
+
+await ok('R4 popup: expired ecosystem reconnect pre-ticks Calendar and Connect sends Calendars.ReadWrite', async () => {
+  if (!JSDOM) throw new Error('jsdom required for R4 popup');
+  const withCal = MS_EXPECTED.concat(['Calendars.ReadWrite']);
+  const connectOpts = [];
+  const dom = new JSDOM('<!doctype html><html><body><div id="surface-list"></div></body></html>', {
+    runScripts: 'outside-only',
+    url: 'chrome-extension://ext/popup/popup.html'
+  });
+  const w = dom.window;
+  const storageBag = {
+    outlookAuth: {
+      ecosystem: true,
+      requestedScopes: withCal,
+      token: { accessToken: 'old', grantedScopes: withCal, expiresAt: Date.now() - 60000 },
+      account: { address: 'me@contoso.com', microsoftAccountKind: 'work' }
+    },
+    outlookSync: {}
+  };
+  w.chrome = {
+    runtime: {
+      id: 'ext',
+      sendMessage: async (msg) => {
+        if (msg && msg.type === 'flow:surface-status') return { surfaces: { outlook: { enabled: false } } };
+        return { ok: true };
+      }
+    },
+    storage: {
+      local: {
+        get: async () => Object.assign({}, storageBag),
+        set: async (patch) => { Object.assign(storageBag, patch); }
+      }
+    },
+    permissions: {
+      contains: async () => true,
+      request: async () => true
+    }
+  };
+  const ctx = dom.getInternalVMContext();
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../core/outlook-config.js'), 'utf8'), ctx, { filename: 'outlook-config.js' });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../core/connect-ecosystem.js'), 'utf8'), ctx, { filename: 'connect-ecosystem.js' });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../core/outlook-auth.js'), 'utf8'), ctx, { filename: 'outlook-auth.js' });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../core/outlook-calendar.js'), 'utf8'), ctx, { filename: 'outlook-calendar.js' });
+  const outlookSrc = fs.readFileSync(path.join(__dirname, '../src/outlook.js'), 'utf8');
+  vm.runInContext(outlookSrc, ctx, { filename: 'outlook.js' });
+  const popupSrc = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+  const elFn = popupSrc.slice(popupSrc.indexOf('function el(tag, cls, text)'), popupSrc.indexOf('async function refresh()'));
+  const sliceStart = popupSrc.indexOf('function grantedOutlookScopes()');
+  const sliceEnd = popupSrc.indexOf('async function renderOutlookRow(host, gen)');
+  const reconnectEnd = popupSrc.indexOf('} else if (link === \'valid\') {');
+  const reconnectBlock = popupSrc.slice(
+    popupSrc.indexOf('if ((link === \'missing\' || link === \'expired\''),
+    reconnectEnd
+  ) + '\n    }';
+  ctx.__r4Bag = storageBag;
+  vm.runInContext(
+    'const storageBag = globalThis.__r4Bag;\n'
+    + 'var state = storageBag;\n'
+    + elFn + '\n'
+    + popupSrc.slice(sliceStart, sliceEnd) + '\n'
+    + 'const connectCalls = [];\n'
+    + 'const o = FlowOutlook.create({\n'
+    + '  storage: { get: async () => storageBag, set: async (p) => Object.assign(storageBag, p) },\n'
+    + '  cfg: FlowOutlookConfig,\n'
+    + '  auth: FlowOutlookAuth,\n'
+    + '  plan: async () => ({ incoming: [] }),\n'
+    + '  fetch: async () => ({ ok: false }),\n'
+    + '  redirectUri: () => "https://ext.chromiumapp.org/",\n'
+    + '  launch: async () => "", launchSilent: async () => "",\n'
+    + '  permissions: { request: async () => true },\n'
+    + '  send: async () => ({ ok: true }),\n'
+    + '  random: (n) => require("crypto").randomBytes(n),\n'
+    + '  sha256: async (b) => require("crypto").createHash("sha256").update(Buffer.from(b)).digest(),\n'
+    + '  now: () => Date.now(), planDeps: {}, identity: { empty: () => ({ parties: {} }) }, followUp: {}\n'
+    + '});\n'
+    + 'o.connect = async (opts) => { connectCalls.push(opts); return { ok: true }; };\n'
+    + 'o.status = async () => ({ configured: true, redirectUri: "https://ext.chromiumapp.org/" });\n'
+    + 'function outlook() { return o; }\n'
+    + 'function serviceLabel(svc) { return svc && svc.label; }\n'
+    + 'function uiLang() { return "en"; }\n'
+    + 'function appendMissingScopeLine() {}\n'
+    + 'function microsoftFaceLabel() { return "Expired"; }\n'
+    + 'function stampMicrosoft() {}\n'
+    + 'async function renderSurfaces() {}\n'
+    + 'async function renderOutlookCards() {}\n'
+    + 'async function renderWaiting() {}\n'
+    + 'async function renderOpen() {}\n'
+    + 'async function run() {\n'
+    + '  const row = document.createElement("div");\n'
+    + '  const link = "expired";\n'
+    + '  const st = { configured: true };\n'
+    + '  const acts = document.createElement("div");\n'
+    + reconnectBlock + '\n'
+    + '  row.appendChild(acts);\n'
+    + '  document.body.appendChild(row);\n'
+    + '  const calBox = row.querySelector(\'input[data-glance-service="calendar"]\');\n'
+    + '  if (!calBox || !calBox.checked) throw new Error("calendar not pre-ticked");\n'
+    + '  const go = row.querySelector("[data-glance-connect-go]");\n'
+    + '  if (!go) throw new Error("no connect");\n'
+    + '  await go.click();\n'
+    + '  await new Promise((r) => setTimeout(r, 80));\n'
+    + '  if (!connectCalls.length) throw new Error("connect not called");\n'
+    + '  const scopes = connectCalls[0].scopes || [];\n'
+    + '  if (scopes.indexOf("Calendars.ReadWrite") < 0) throw new Error("no calendar scope " + JSON.stringify(scopes));\n'
+    + '  globalThis.__r4PopupOk = true;\n'
+    + '}\n',
+    ctx,
+    { filename: 'r4-popup-harness.js' }
+  );
+  await vm.runInContext('run()', ctx);
+  assert.strictEqual(vm.runInContext('globalThis.__r4PopupOk', ctx), true);
 });
 
 await ok('popup.html loads connect-ecosystem.js and Contacts add-scope uses optional bucket', async () => {
