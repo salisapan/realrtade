@@ -54,6 +54,20 @@ for (const [label, text, want, end] of [['English', 'The plumber will come betwe
   });
 }
 
+test('WhatsApp, CHAT_TASK_CARD on: a Hebrew table booking («השולחן שלכם נשמר ליום שבת בשעה 20:00») is one hold, no guest, read back, and Undo deletes it', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, whatsappHtml('השולחן שלכם נשמר ליום שבת בשעה 20:00'));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await events(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0].start)).toContain('20:00');
+  expect(list[0].attendees || []).toEqual([]);
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+  await page.locator(CARD + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});
+
 test('WhatsApp, CHAT_TASK_CARD on: an appointment that names its length is one hold of that length, no guest, and Undo deletes it', async ({ glance }) => {
   const page = await open(glance, { CHAT_TASK_CARD: true }, whatsappHtml('Your appointment is confirmed for tomorrow from 14:00 to 15:30'));
   await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
