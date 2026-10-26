@@ -3936,7 +3936,7 @@ async function gmailDraftUndo(ref) {
 // content-gmail.js can't open chrome.windows itself (that API isn't exposed
 // to content scripts), and the picker has to live in its own extension page
 // rather than be loaded into the Gmail tab — Gmail's own CSP would be the
-// one deciding whether https://apis.google.com's gapi loader is even
+// one deciding whether Google's hosted gapi loader is even
 // allowed to run there, and there is no reason to depend on that. So the
 // content script asks this worker to open the window, and this worker
 // remembers which Gmail tab asked, keyed by the requestId the content
@@ -3948,6 +3948,9 @@ async function openDrivePicker(payload, sender) {
   const requestId = payload && payload.requestId;
   const tabId = sender && sender.tab && sender.tab.id;
   if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
+  if (!(typeof FlowBuild !== 'undefined' && FlowBuild.PICKER_BUNDLED)) {
+    return { ok: false, unavailable: true };
+  }
 
   const win = await chrome.windows.create({
     url: chrome.runtime.getURL('picker/picker.html') + '?requestId=' + encodeURIComponent(requestId),

@@ -2794,26 +2794,28 @@ function glanceUiCopy(kind) {
       row.appendChild(chip);
     });
 
-    const driveChip = el('button', 'flow-chip-attach-chip flow-chip-attach-drive', attachments.length ? 'Choose from Drive instead' : 'Attach from Drive');
-    driveChip.type = 'button';
-    driveChip.setAttribute('aria-pressed', 'false');
-    chips.push(driveChip);
-    driveChip.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const prevLabel = driveChip.textContent;
-      driveChip.textContent = 'Opening Drive…';
-      driveChip.disabled = true;
-      const picked = await openDrivePicker();
-      driveChip.disabled = false;
-      if (!picked) { driveChip.textContent = prevLabel; return; }
-      action.params.selectedAttachment = null;
-      action.params.driveFileId = picked.id;
-      action.params.driveFileName = picked.name;
-      action.params.driveMimeType = picked.mimeType;
-      driveChip.textContent = 'Drive: ' + picked.name;
-      selectChip(driveChip);
-    });
-    row.appendChild(driveChip);
+    if (typeof FlowBuild !== 'undefined' && FlowBuild.PICKER_BUNDLED) {
+      const driveChip = el('button', 'flow-chip-attach-chip flow-chip-attach-drive', attachments.length ? 'Choose from Drive instead' : 'Attach from Drive');
+      driveChip.type = 'button';
+      driveChip.setAttribute('aria-pressed', 'false');
+      chips.push(driveChip);
+      driveChip.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const prevLabel = driveChip.textContent;
+        driveChip.textContent = 'Opening Drive…';
+        driveChip.disabled = true;
+        const picked = await openDrivePicker();
+        driveChip.disabled = false;
+        if (!picked) { driveChip.textContent = prevLabel; return; }
+        action.params.selectedAttachment = null;
+        action.params.driveFileId = picked.id;
+        action.params.driveFileName = picked.name;
+        action.params.driveMimeType = picked.mimeType;
+        driveChip.textContent = 'Drive: ' + picked.name;
+        selectChip(driveChip);
+      });
+      row.appendChild(driveChip);
+    }
 
     return row;
   }
