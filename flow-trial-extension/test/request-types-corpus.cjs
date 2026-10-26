@@ -51,11 +51,22 @@ const yes = [
   ['Please pay the balance by the end of the month.', 'pay', 'money'],
   ['Could you wire the deposit this week?', 'pay', 'money'],
   ['תוכל לשלוח לי את החוזה החתום עד יום חמישי?', 'send', 'contract'],
+  ['בבקשה תשלח טופס חתום', 'send', 'document'],
+  ['שלחי לי בבקשה את החוזה החתום.', 'send', 'contract'],
+  ['נשמח אם תוכלו לצרף את החוזה החתום למייל השבוע?', 'send', 'contract'],
+  ['היי, אבי, תוכל לחתום על החוזה החתום ולהחזיר ביום שני?', 'sign', 'contract'],
+  ['לחתום על החוזה החתום ולהחזיר', 'sign', 'contract'],
+  ['תחתום ותחזיר?', 'sign', null],
+  ['נא לחתום ולהחזיר, וגם צילום ת"ז', 'sign', null],
+  ['נבקש לחתום על ההסכם ולהחזיר אלינו סרוק', 'sign', 'contract'],
+  ['תשלח את החוזה החתום עד יום חמישי', 'send', 'contract'],
   ['נא לחתום על ההסכם לפני הפגישה.', 'sign', 'contract'],
   ['אפשר לאשר את התקציב עד יום ראשון?', 'approve', 'report'],
   ['בבקשה לתאם איתי פגישה בשבוע הבא.', 'schedule', 'meeting'],
   ['אשמח אם תבדוק את המצגת ותחזור אליי.', 'review', 'deck'],
   ['צריך שתמלא את הטופס עד מחר.', 'complete', 'document'],
+  ['להכין את החוזה החתום', 'complete', 'contract'],
+  ['רק תזכורת שתכין את החוזה החתום למחר', 'complete', 'contract'],
   ['תוכל לעדכן אותי לגבי הגרסה החדשה?', 'reply', 'deliverable'],
   ['נא לשלם את היתרה עד סוף החודש.', 'pay', 'money'],
   ['אנחנו ממתינים לתשובה שלך בנוגע להצעת המחיר.', 'reply', 'quote'],
@@ -92,6 +103,21 @@ const no = [
 ];
 for (const text of no) check('silent: ' + text.slice(0, 56), T.detectRequest(text) === null, T.detectRequest(text));
 
+console.log('\n--- Hebrew frame must-not-fire (detectRequest only) ---\n');
+const noHeFrame = [
+  'לא צריך לשלוח את החוזה.',
+  'אין צורך לשלוח את הקבלה.',
+  'מצטער, אני לא אוכל לחתום על זה',
+  'אוכל לשלוח את רשימת האורחים עד הערב.',
+  'מקווה לשלוח לך משהו מועיל בקרוב.',
+  'תבקש מחשבונאות לשלוח לי את החשבונית',
+  'כל השותפים חייבים לחתום על ההסכם',
+  'לשלוח באוויר או בים?',
+  'יש לשלוח עד סוף היום',
+  'היית אמור לשלוח את הקבצים אתמול.'
+];
+for (const text of noHeFrame) check('no frame: ' + text.slice(0, 56), T.detectRequest(text) === null, T.detectRequest(text));
+
 console.log('\n--- the same sentences through classifyOutgoing keep the silence ---\n');
 for (const text of no) {
   const long = text + ' Anyway, that is all from my side for now.';
@@ -120,6 +146,8 @@ const mine = [
   ["I'm going to finalize the draft this week for you.", 'complete'],
   ['Let me look into it and confirm the date next week.', 'confirm'],
   ['אשלח לך את החוזה עד יום חמישי.', 'send'],
+  ['אשלח לך את החוזה החתום מחר.', 'send'],
+  ['החוזה חתום ונשלח.', 'send'],
   ['אחזור אליך מחר עם תשובה.', 'reply'],
   ['נעדכן אותך ברגע שנדע, אבדוק את זה השבוע.', 'reply'],
   ['We agreed to renew the passport application by Friday.', 'complete'],
@@ -127,7 +155,7 @@ const mine = [
 ];
 for (const [text, action] of mine) {
   const c = T.detectCommitmentSentence(text);
-  check('promise: ' + text.slice(0, 54), c && c.type.startsWith('owe:') && (action === 'reply' || c.action === action || true) && c.action, c);
+  check('promise: ' + text.slice(0, 54), c && c.type.startsWith('owe:') && (action === 'reply' || c.action === action) && c.action, c);
 }
 const notMine = [
   'Let me know if you have any questions about it.',

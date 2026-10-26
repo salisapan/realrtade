@@ -52,7 +52,7 @@ const FlowRequestTypes = (() => {
       he: ['להשלים', 'תשלים', 'תשלימו', 'למלא', 'תמלא', 'תמלאו', 'לסיים', 'תסיים', 'להכין', 'תכין', 'תכינו', 'לכתוב', 'תכתוב', 'לתקן', 'תתקן'] },
     { id: 'send', days: 2, noun: 'a file',
       en: ['send', 'sending', 'sent', 'share', 'forward', 'provide', 'attach', 'upload', 'return', 'submit', 'resend', 'e-?mail me', 'give me', 'get me'],
-      he: ['לקבל', 'שלחת', 'שלחתם', 'לשלוח', 'תשלח', 'תשלחו', 'שלח', 'להעביר', 'תעביר', 'תעבירו', 'להעלות', 'תעלה', 'להגיש', 'תגיש', 'להחזיר', 'תחזיר', 'לספק', 'תספק', 'תן לי', 'תני לי', 'תשמור את (?:ה)?(?:קובץ|מסמך|מצורף)', 'לשמור את (?:ה)?(?:קובץ|מסמך|מצורף)'] },
+      he: ['לקבל', 'שלחת', 'שלחתם', 'לשלוח', 'תשלח', 'תשלחו', 'שלח', 'שלחי', 'שלחו', 'אשלח', 'נשלח', 'לצרף', 'צרף', 'תצרף', 'תצרפו', 'להעביר', 'תעביר', 'תעבירו', 'להעלות', 'תעלה', 'להגיש', 'תגיש', 'להחזיר', 'תחזיר', 'לספק', 'תספק', 'תן לי', 'תני לי', 'תשמור את (?:ה)?(?:קובץ|מסמך|מצורף)', 'לשמור את (?:ה)?(?:קובץ|מסמך|מצורף)'] },
     { id: 'reply', days: 2, noun: 'a reply',
       en: ['get my (?:email|message|text)', 'reply', 'respond', 'get back', 'revert', 'answer', 'response', 'update me', 'an update', 'let me know', 'follow up', 'be in touch', 'hear (?:back )?from you', 'hear your'],
       he: ['קיבלת', 'להשיב', 'תשיב', 'תשיבו', 'לענות', 'תענה', 'תענו', 'תחזור', 'תחזרו', 'תחזרי', 'לחזור אליי', 'לעדכן', 'תעדכן', 'תעדכנו', 'תודיע', 'תודיעו', 'תשובה', 'עדכון', 'סיוע', 'עזרתך', 'עזרה', 'בירור', 'לברר', 'הבהרה', 'להבהיר', 'לדעת', 'סטטוס', 'להודיע'] }
@@ -80,7 +80,8 @@ const FlowRequestTypes = (() => {
   // statement, not an ask.
   const FRAME_EN = /\b(?:could|can|would|will) you\b|\b(?:can|could|shall) we\b|\bplease\b|\bkindly\b|\b(?:i|we)(?:'d| would) (?:like|appreciate|love)\b|\b(?:i|we) (?:need|require|want|expect)\b|\bneed you to\b|\b(?:waiting|awaiting) (?:for|on)\b|\bany chance\b|\bwhen (?:can|could|will) you\b|\bdo you have\b|\bby when\b|\bwould you mind\b|\bit would help (?:if|to)\b|\bstill need\b|\bhave you (?:had a chance|been able)\b|\b(?:can|could|would|will) (?:u|ya)\b|\b(?:pls|plz|pleez)\b|\b(?:did|have|had) (?:you|u) (?:\w+ )?(?:sent|send|paid|pay|signed|sign|confirmed|confirm|got|get|received|receive|transferred|transfer|checked|check|seen|see)\b|\b(?:u|you) able to\b|\bwhat time (?:works|is good|suits)\b|\blet me know if (?:you|u)\b|\bneed (?:the )?[\w ]{1,30} by\b/i;
   // "ניתן לפנות" is "one may contact", an availability line, not a request frame.
-  const FRAME_HE = /(?:תוכל|תוכלי|תוכלו|אפשר|ניתן(?!\s+לפנות)|נא |בבקשה|אשמח|צריך ש|צריכים|אני צריך|אנחנו צריכים|ממתין|ממתינה|ממתינים|מחכה|מחכים|מתי תוכל|יש לך|היית יכול|האם תוכל|עדיין צריך|אודה|נודה|אבקש|נבקש|אני מבקש|אנו מבקשים|אנחנו מבקשים|מבקשת|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|ברצוננו (?:לדעת|לברר|לקבל|לוודא|לבקש)|הייתי מבקש|הייתי מודה|אצטרך|נצטרך|נשמח|^(?:(?:אחי|אחותי|חבר|חבר'ה|יקירי|היי|הי|שלום|נו|אז|ו)[,\s]+)*ת(?:שלח|שלחי|עביר|עבירי|חתום|חתמי|אשר|אשרי|בדוק|בדקי|עדכן|עדכני|חזור|חזרי|תן|תני|ביא|בואי|גיד|גידי|שמור|שמרי|שמרו|אשר)(?=[\s,.!?]|$)|(?:שלחת|שלחתם|העברת|חתמת|אישרת|שילמת|בדקת|קיבלת|ראית)(?:\s+כבר)?(?=[\s,.!?]|$)|מתי (?:ת(?:עביר|שלח|חתום|אשר|חזור|עדכן|שלם|בוא|גיע)|נוח|מתאים|אפשר|זה יהיה)|אפשר (?:ל|ש)\S+)/;
+  const FRAME_HE = /(?:תוכל|תוכלי|תוכלו|אפשר|ניתן(?!\s+לפנות)|נא |בבקשה|אשמח|צריך ש|צריכים|אני צריך|אנחנו צריכים|ממתין|ממתינה|ממתינים|מחכה|מחכים|מתי תוכל|יש לך|היית יכול|האם תוכל|עדיין צריך|אודה|נודה|אבקש|נבקש|אני מבקש|אנו מבקשים|אנחנו מבקשים|מבקשת|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|ברצוננו (?:לדעת|לברר|לקבל|לוודא|לבקש)|הייתי מבקש|הייתי מודה|אצטרך|נצטרך|נשמח|(?:^|[^\u0590-\u05FF])להכין|(?:^|[^\u0590-\u05FF])שתכין|^(?:(?:אחי|אחותי|חבר|חבר'ה|יקירי|היי|הי|שלום|נו|אז|ו)[,\s]+)*ת(?:שלח|שלחי|עביר|עבירי|חתום|חתמי|אשר|אשרי|בדוק|בדקי|עדכן|עדכני|חזור|חזרי|תן|תני|ביא|בואי|גיד|גידי|שמור|שמרי|שמרו|אשר)(?=[\s,.!?]|$)|(?:שלחת|שלחתם|העברת|חתמת|אישרת|שילמת|בדקת|קיבלת|ראית)(?:\s+כבר)?(?=[\s,.!?]|$)|מתי (?:ת(?:עביר|שלח|חתום|אשר|חזור|עדכן|שלם|בוא|גיע)|נוח|מתאים|אפשר|זה יהיה)|אפשר (?:ל|ש)\S+)/;
+  const FRAME_NOT_HE = /(?:^|\s)לא\s+(?:צריך|אפשר|אוכל|רוצה|חייב)\s+ל|אין צורך ל|(?:^|\s)חייבים לחתום/;
 
   // English entries are regex fragments joined into one word-bounded pattern.
   // Hebrew has no \b, so each Hebrew entry is its own pattern.
@@ -100,12 +101,44 @@ const FlowRequestTypes = (() => {
     }
     return null;
   }
-  const findAction = (s) => find(ACTIONS, String(s || ''));
+  function heSignedAdjectiveForm(sentence) {
+    const s = String(sentence || '');
+    if (/(?:^|[^\u0590-\u05FF])(?:החתום|חתומה)(?=[\s,.!?]|$)/.test(s)) return true;
+    if (/[\u0590-\u05FF]{2,}\s+החתום/.test(s)) return true;
+    if (/[\u0590-\u05FF]{2,}\s+חתום(?![א-ת])/.test(s)) return true;
+    if (/חוזה החתום|החוזה החתום|עותק חתום|מסמך חתום|טופס חתום/.test(s)) return true;
+    return false;
+  }
+  function heExplicitSignImperative(sentence) {
+    return /(?:^|[^\u0590-\u05FF])(?:לחתום|תחתום|תחתמו|תחתמי|חתום והחזר|חתום ותחזיר|חתום ולהחזיר|חתמי והחזיר)(?=[\s,.!?]|$)/.test(String(sentence || ''));
+  }
+  function findAction(sentence) {
+    const s = String(sentence || '');
+    if (!hasHebrew(s)) return find(ACTIONS, s);
+    const send = ACTIONS.find((a) => a.id === 'send');
+    const sign = ACTIONS.find((a) => a.id === 'sign');
+    const complete = ACTIONS.find((a) => a.id === 'complete');
+    const sendHit = Boolean(send && send.heRe.some((r) => r.test(s)));
+    const signHit = Boolean(sign && sign.heRe.some((r) => r.test(s)));
+    const completeHit = Boolean(complete && complete.heRe.some((r) => r.test(s)));
+    if (heExplicitSignImperative(s)) return sign || find(ACTIONS, s);
+    if (sendHit && signHit && heSignedAdjectiveForm(s)) return send;
+    if (completeHit && signHit && heSignedAdjectiveForm(s)) return complete;
+    if (signHit && heSignedAdjectiveForm(s) && !heExplicitSignImperative(s)) {
+      if (sendHit) return send;
+      if (completeHit) return complete;
+      return null;
+    }
+    return find(ACTIONS, s);
+  }
   const findObject = (s) => find(OBJECTS, String(s || ''));
 
   function framed(sentence) {
     const s = String(sentence || '');
-    return FRAME_EN.test(s) || (hasHebrew(s) && FRAME_HE.test(s));
+    if (FRAME_EN.test(s)) return true;
+    if (!hasHebrew(s)) return false;
+    if (FRAME_NOT_HE.test(s)) return false;
+    return FRAME_HE.test(s) || heExplicitSignImperative(s);
   }
 
   // One sentence -> { type, action, object, label, days } or null.
