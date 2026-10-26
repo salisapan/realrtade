@@ -51,20 +51,40 @@ function loadEngine() {
   const readerEmail = 'owner@ai.local.flow@gmail.com';
   const readerDisplay = 'Owner User';
   const readerNames = ['Owner User', 'Owner'];
-  const readerTo = readerDisplay + ' <' + readerEmail + '>';
-  return function engine(text, readerOverride) {
-    const reader = readerOverride || { userName: readerDisplay, ownNames: readerNames };
-    const judged = judgeShared({
-      text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: [readerEmail], ownAddresses: [readerEmail], userName: reader.userName, ownNames: reader.ownNames, now: NOW, surface: 'gmail', attachmentCount: 0, inbound: true
-    }, {});
-    if (!judged || !judged.show) {
-      return { intent: judged ? judged.intent : null, plan: null, reason: judged ? judged.reason : null };
+  return {
+    engine: function engine(text, readerOverride) {
+      const reader = readerOverride || { userName: readerDisplay, ownNames: readerNames };
+      const judged = judgeShared({
+        text, subject: '', sender: { email: 'dana@meridian.com', name: null }, to: [readerEmail], ownAddresses: [readerEmail], userName: reader.userName, ownNames: reader.ownNames, now: NOW, surface: 'gmail', attachmentCount: 0, inbound: true
+      }, {});
+      if (!judged || !judged.show) {
+        return { intent: judged ? judged.intent : null, plan: null, reason: judged ? judged.reason : null };
+      }
+      return { intent: judged.intent, plan: judged.process };
+    },
+    judgeIncoming: function judgeIncoming(extra) {
+      const base = {
+        text: '',
+        subject: '',
+        sender: { email: 'dana@meridian.com', name: 'Dana' },
+        to: [readerEmail],
+        ownAddresses: [readerEmail],
+        userName: readerDisplay,
+        ownNames: readerNames,
+        readerEmail: readerEmail,
+        now: NOW,
+        surface: 'gmail',
+        attachmentCount: 0,
+        inbound: true
+      };
+      return judgeShared(Object.assign(base, extra || {}), {});
     }
-    return { intent: judged.intent, plan: judged.process };
   };
 }
 
-const engine = loadEngine();
+const judgeBundle = loadEngine();
+const engine = judgeBundle.engine;
+const judgeIncoming = judgeBundle.judgeIncoming;
 
 const READER_EMAIL = 'owner@ai.local.flow@gmail.com';
 const READER_DISPLAY = 'Owner User';
@@ -124,6 +144,28 @@ console.log('\n--- intent ---');
 {
   const hi = judge('Hi Dana, please remember to call the client.');
   check('a greeting to someone else stays quiet for the reader', hi.speak === false, hi);
+}
+{
+  const ccDanaThirdParty = judge('Dana, could you review the proposal by Friday?', {
+    userName: 'Sali Sapan',
+    ownNames: ['Sali', 'Sali Sapan'],
+    readerEmail: READER_EMAIL,
+    toRecipients: [{ name: 'Sali Sapan', email: READER_EMAIL, localPart: 'owner' }],
+    ccRecipients: [{ name: 'Dana Levi', email: 'dana@initech.com', localPart: 'dana' }]
+  });
+  check('Dana vocative with Dana on Cc stays quiet for the reader (addon intent)', ccDanaThirdParty.speak === false, ccDanaThirdParty);
+}
+{
+  const heDanaMeeting = judgeIncoming({
+    text: 'דנה, נוכל להיפגש ביום חמישי בשעה 15:00?',
+    userName: 'Sali Sapan',
+    ownNames: ['Sali', 'Sali Sapan'],
+    readerEmail: READER_EMAIL,
+    toRecipients: [{ name: 'Sali Sapan', email: READER_EMAIL, localPart: 'owner' }],
+    ccRecipients: [{ name: 'Dana Levi', email: 'dana@initech.com', localPart: 'dana' }],
+    namesWaitDone: true
+  });
+  check('Hebrew Dana on Cc stays quiet for sole To reader (FlowNameMatch product path)', heDanaMeeting && heDanaMeeting.show === false, heDanaMeeting);
 }
 {
   const buriedNda = judge('Hi Dana, great meeting today. Please remember to send me the signed NDA by Friday.', { reader: { userName: 'Dana', ownNames: ['Dana', 'Dana Levi'] } });
