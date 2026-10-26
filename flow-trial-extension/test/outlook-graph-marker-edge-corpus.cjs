@@ -15,8 +15,12 @@ function check(name, cond, detail) {
 (async function main() {
   let slowAborted = false;
   try {
-    await M.graphFetchWithTimeout(30, function () {
-      return new Promise(function () { /* never resolves */ });
+    await M.graphFetchWithTimeout(30, function (signal) {
+      return new Promise(function (resolve, reject) {
+        if (signal && typeof signal.addEventListener === 'function') {
+          signal.addEventListener('abort', function () { reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); });
+        }
+      });
     });
   } catch (e) {
     slowAborted = /abort/i.test(String(e && e.name || e));
