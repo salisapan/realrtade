@@ -69,33 +69,35 @@ def strip_js_html_comments(text: str) -> str:
 def entry_loads_remote_google_script(name: str, data: bytes) -> bool:
     if not name.endswith((".js", ".html")):
         return False
-    cleaned = strip_js_html_comments(data.decode("utf-8", errors="replace"))
-    lowered = cleaned.lower()
-    if "apis.google.com" in lowered:
+    if b"apis.google.com" in data.lower():
         return True
+    cleaned = strip_js_html_comments(data.decode("utf-8", errors="replace"))
     return APIS_GOOGLE_LOAD_RE.search(cleaned.encode("utf-8")) is not None
 
 
 def check_apis_google_script_guard() -> None:
-    """Self-test: real gapi loads fail; comments (including background.js) pass."""
+    """Self-test: real gapi loads and obfuscation bypasses fail; packaged background.js is clean."""
     if not entry_loads_remote_google_script("load.js", b"importScripts('https://apis.google.com/js/api.js');"):
         die("apis.google guard: must detect importScripts load")
     if not entry_loads_remote_google_script(
         "load.html", b'<script src="https://apis.google.com/js/api.js"></script>'
     ):
         die("apis.google guard: must detect HTML script src load")
-    if entry_loads_remote_google_script(
-        "comment.js", b"// whether https://apis.google.com's gapi loader is even\n"
+    if not entry_loads_remote_google_script(
+        "bypass-fake-block.js",
+        b"const a='/*'; s.src='https://apis.google.com/js/api.js'; const b='*/';",
     ):
-        die("apis.google guard: must not match line comments")
-    if entry_loads_remote_google_script(
-        "comment-import.js", b"// import x from 'https://apis.google.com/js/api.js'\n"
+        die("apis.google guard: must detect apis.google.com inside a fake block-comment string")
+    if not entry_loads_remote_google_script(
+        "bypass-fake-html.html",
+        b"const a='<!--'; s.src='https://apis.google.com/js/api.js'; const b='-->';",
     ):
-        die("apis.google guard V3: must not match line-commented import from apis.google.com")
-    if entry_loads_remote_google_script(
-        "block-comment-import.js", b"/* import x from 'https://apis.google.com/js/api.js' */\n"
+        die("apis.google guard: must detect apis.google.com inside a fake HTML-comment string")
+    if not entry_loads_remote_google_script(
+        "bypass-template-trim.js",
+        b"const t = `\n//apis.google.com/js/api.js\n`.trim(); s.src = t;",
     ):
-        die("apis.google guard V3: must not match block-commented import from apis.google.com")
+        die("apis.google guard: must detect apis.google.com in template-literal trim bypass")
     if not entry_loads_remote_google_script(
         "dynamic.js", b"import('https://apis.google.com/js/api.js');"
     ):
