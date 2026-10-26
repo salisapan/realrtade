@@ -684,15 +684,32 @@ function isCasaRestrictedScope(url) {
   return false;
 }
 
-const CASA_GOOGLE_OAUTH_ALLOWLIST = [
-  'calendar.events',
-  'tasks',
-  'contacts.readonly',
-  'drive.file',
+// CTO allowlist: no new sensitive scope without a ruling. Each entry is explicit.
+const GLANCE_APPSSCRIPT_OAUTH_ALLOWLIST = [
+  scopeUrl('calendar.events'),
+  scopeUrl('tasks'),
+  scopeUrl('contacts.readonly'),
+  scopeUrl('drive.file'),
   'openid',
-  'userinfo.profile',
-  'userinfo.email'
-].map((id) => (id === 'openid' ? 'openid' : scopeUrl(id))).sort();
+  scopeUrl('userinfo.profile'),
+  scopeUrl('userinfo.email'),
+  scopeUrl('script.external_request'),
+  scopeUrl('script.scriptapp'),
+  scopeUrl('script.locale'),
+  scopeUrl('gmail.addons.current.message.readonly'),
+  scopeUrl('gmail.addons.execute')
+].sort();
+
+function auditManifestOAuthScopes(oauthScopes) {
+  const scopes = oauthScopes.slice().sort();
+  const restricted = scopes.filter(isCasaRestrictedScope);
+  if (restricted.length) return { ok: false, restricted, unknown: [], missing: [] };
+  const unknown = scopes.filter((url) => GLANCE_APPSSCRIPT_OAUTH_ALLOWLIST.indexOf(url) === -1);
+  if (unknown.length) return { ok: false, restricted: [], unknown, missing: [] };
+  const missing = GLANCE_APPSSCRIPT_OAUTH_ALLOWLIST.filter((url) => scopes.indexOf(url) === -1);
+  if (missing.length) return { ok: false, restricted: [], unknown: [], missing };
+  return { ok: true, restricted: [], unknown: [], missing: [] };
+}
 
 console.log('\n--- host boundaries ---');
 {
@@ -700,22 +717,16 @@ console.log('\n--- host boundaries ---');
   const host = fs.readFileSync(path.join(addon, 'Code.js'), 'utf8') +
     fs.readFileSync(path.join(addon, 'Marker.js'), 'utf8');
   const scopes = manifest.oauthScopes.slice().sort();
-  const expected = scopesRequiredByManifest(manifest, host);
-  CASA_GOOGLE_OAUTH_ALLOWLIST.forEach((url) => {
-    if (expected.indexOf(url) === -1) expected.push(url);
-  });
-  expected.sort();
-  const restricted = scopes.filter(isCasaRestrictedScope);
-  check('manifest declares no CASA-restricted Google scopes', restricted.length === 0, { restricted: restricted });
-  const googleAllow = CASA_GOOGLE_OAUTH_ALLOWLIST.slice().sort();
-  const googleDeclared = scopes.filter((url) => googleAllow.indexOf(url) >= 0).sort();
-  check(
-    'Google OAuth scopes are only calendar.events, tasks, contacts.readonly, drive.file, openid, profile, and email',
-    JSON.stringify(googleDeclared) === JSON.stringify(googleAllow),
-    { googleDeclared: googleDeclared, googleAllow: googleAllow }
-  );
-  check('every manifest flag has its scope, and there are no extras', JSON.stringify(scopes) === JSON.stringify(expected), { scopes: scopes, expected: expected });
-  check('useLocaleFromApp requires script.locale', expected.indexOf(scopeUrl('script.locale')) !== -1 && scopes.indexOf(scopeUrl('script.locale')) !== -1);
+  const audit = auditManifestOAuthScopes(manifest.oauthScopes);
+  check('manifest declares no CASA-restricted scopes', audit.restricted.length === 0, { restricted: audit.restricted });
+  check('manifest declares no scope outside the explicit allowlist', audit.unknown.length === 0, { unknown: audit.unknown });
+  check('manifest declares every allowlisted scope the add-on uses today', audit.missing.length === 0, { missing: audit.missing });
+  check('manifest oauthScopes match the allowlist exactly', audit.ok === true, audit);
+  const mutantRestricted = auditManifestOAuthScopes(manifest.oauthScopes.concat([scopeUrl('gmail.modify')]));
+  check('mutant gmail.modify is rejected', mutantRestricted.ok === false && mutantRestricted.restricted.indexOf(scopeUrl('gmail.modify')) >= 0, mutantRestricted);
+  const mutantUnknown = auditManifestOAuthScopes(manifest.oauthScopes.concat(['https://www.googleapis.com/auth/unknown-scope-cto-test']));
+  check('mutant unknown scope is rejected', mutantUnknown.ok === false && mutantUnknown.unknown.length === 1, mutantUnknown);
+  check('useLocaleFromApp requires script.locale', manifest.addOns.common.useLocaleFromApp === true && scopes.indexOf(scopeUrl('script.locale')) !== -1);
   check('message open reads the body, not metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
   check('there is no compose scope', !manifest.addOns.gmail.composeTrigger && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) === -1);
 
