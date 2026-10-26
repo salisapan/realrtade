@@ -71,6 +71,7 @@ async function run() {
   check('GOOGLE uppercase normalizes to google and blocks', summarizeAttachmentSilenced('GOOGLE', KEYS));
   check('dropbox on allowlist is not silenced', summarizeAttachmentAllowed('dropbox', KEYS));
   check('paid tier allows google', summarizeAttachmentAllowed('google', Object.assign({}, KEYS, { GEMINI_PAID_TIER: 'true' })));
+  check('G7: GEMINI_PAID_TIER must be exactly true string', !geminiPaidTierEnabled({ GEMINI_PAID_TIER: 'True' }) && !geminiPaidTierEnabled({ GEMINI_PAID_TIER: '1' }) && geminiPaidTierEnabled({ GEMINI_PAID_TIER: 'true' }));
 
   console.log('\n--- mutation: lowercase normalization must stay ---\n');
   const gateSrc = fs.readFileSync(path.join(__dirname, 'gemini-paid-gate.js'), 'utf8');
