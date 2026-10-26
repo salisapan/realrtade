@@ -129,6 +129,13 @@ const GMAIL_COMPOSE_SCOPES = {
   at: 1
 };
 
+const OAUTH_NO_COMPOSE = {
+  version: GMAIL_COMPOSE_SCOPES.version.replace(/\nhttps:\/\/www\.googleapis\.com\/auth\/gmail\.compose$/, ''),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
+
 async function backgroundTests() {
   const auth = { googleTasksAuth: { taskListId: 'LIST1' }, googleGrantedScopes: GMAIL_COMPOSE_SCOPES };
   const TASKS = /tasks\.googleapis\.com/;
@@ -193,6 +200,10 @@ async function backgroundTests() {
   check('reopening makes the Task open again on the new day', r.ok && reopened.body.status === 'needsAction' && reopened.body.completed === null && reopened.body.due === '2026-10-13T00:00:00.000Z', { r, reopened });
   r = await w.fn('followTaskReopen')({ taskListId: 'LIST1', taskId: 'T1' }, null);
   check('reopening without a day still reopens', r.ok && w.calls[1].body.status === 'needsAction' && !('due' in w.calls[1].body), w.calls[1]);
+
+  w = load({ stored: Object.assign({}, auth, { googleGrantedScopes: OAUTH_NO_COMPOSE }), routes: [[/gmail\.googleapis\.com/, { reply: ok({}) }]] });
+  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Vendor', body: 'Hi' });
+  check('without gmail.compose: follow draft stays compose-closed, no Gmail HTTP', r.ok === false && r.reason === 'compose-closed' && !w.calls.some((c) => /gmail\.googleapis\.com/.test(c.url)), { r, calls: w.calls });
 
   // nudge draft
   const watch = F.buildWatch({ threadId: 't', messageId: 'm', subject: 'Vendor booking', counterpart: { email: 'dana@acme.com', name: 'Dana Cole' }, ask: F.classifyOutgoing('Please confirm the final figure by Monday so I can book the vendor.', { now: new Date(2026, 9, 1, 12).getTime(), extract: FlowExtract }), now: 1 });

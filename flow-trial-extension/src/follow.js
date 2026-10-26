@@ -49,6 +49,18 @@ const FlowFollow = (() => {
     });
   }
 
+  async function gmailComposeApiAllowedFromStorage() {
+    const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
+    if (!C || typeof C.gmailDraftApiAllowed !== 'function') return false;
+    try {
+      const bag = await chrome.storage.local.get('googleGrantedScopes');
+      const rec = bag && bag.googleGrantedScopes;
+      const raw = rec && rec.version;
+      const scopes = raw == null ? null : String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
+      return C.gmailDraftApiAllowed(scopes);
+    } catch (e) { return false; }
+  }
+
   function track(event) {
     send({ type: 'flow:track', event, params: {} });
   }
@@ -273,7 +285,7 @@ const FlowFollow = (() => {
     const name = whoOf(sender);
     const what = patch.yoursReason === 'blocked' ? 'could not open or find what you sent' : 'asked you something';
     let next = Object.assign({}, watch, patch);
-    const canDraft = Boolean(next.counterpart && next.counterpart.email);
+    const canDraft = Boolean(next.counterpart && next.counterpart.email) && (await gmailComposeApiAllowedFromStorage());
     // Is a file part of the way out, and is there exactly one right file? Otherwise: none.
     const choice = canDraft ? await resolveFile(ctx, next) : null;
     if (choice && choice.source === 'drive') {

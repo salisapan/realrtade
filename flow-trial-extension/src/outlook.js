@@ -341,9 +341,11 @@ const FlowOutlook = (() => {
           ? E.scopeNames((prev && prev.token && prev.token.grantedScopes) || (prev && prev.requestedScopes) || [])
           : [];
         const keptOptional = prevNames.filter((s) => optional.indexOf(s) >= 0);
+        const fromUi = (chosen || []).filter((s) => allow.indexOf(s) >= 0);
+        const base = fromUi.length ? fromUi : allow;
         scopeSources = (E && typeof E.mergeMicrosoftScopes === 'function')
-          ? E.mergeMicrosoftScopes(allow, keptOptional)
-          : allow.concat(keptOptional);
+          ? E.mergeMicrosoftScopes(base, keptOptional)
+          : base.concat(keptOptional);
       } else {
         scopeSources = (chosen || []).concat(cfg.SCOPES || []);
       }
@@ -510,6 +512,10 @@ const FlowOutlook = (() => {
         let searched = null;
         try { searched = await deps.send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.searchTerms || gate.ask.query) }); }
         catch (e) { searched = { ok: false, reason: 'drive-search-failed', status: 0, error: String(e && e.message || e) }; }
+        if (searched && searched.reason === 'drive-search-unavailable') {
+          silence.push({ conversationId: d.conversationId, reason: 'file-chain-not-run' });
+          continue;
+        }
         const failed = searchSilenceOf(searched);
         if (failed) { silence.push({ conversationId: d.conversationId, reason: failed }); continue; }
         const chain = FlowCloseChains.resolve({
@@ -517,7 +523,7 @@ const FlowOutlook = (() => {
           origin: 'outlook',
           now,
           evidence: FlowCloseChains.fileEvidence({
-            driveOk: true,
+            driveOk: Boolean(searched && searched.ok),
             driveFiles: (searched && searched.files) || [],
             threadFiles: msg.hasAttachments ? null : []
           })

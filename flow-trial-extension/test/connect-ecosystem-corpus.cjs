@@ -436,6 +436,8 @@ await ok('stepsFor meta is exactly one host permission step with 15 origins', ()
 await ok('catalog lists Planner, OneNote, Word, Excel, PowerPoint', () => {
   const ids = E.catalog().map((row) => row.id);
   assert.deepStrictEqual(ids, ['ms-planner', 'ms-onenote', 'ms-word', 'ms-excel', 'ms-powerpoint']);
+  const planner = E.catalog().find((row) => row.id === 'ms-planner');
+  assert.ok(planner && /To Do/.test(planner.detail) && /explanation/i.test(planner.detail), planner && planner.detail);
 });
 
 await ok('connectScreenTools matches design connect-3 tool lines', () => {
@@ -613,6 +615,85 @@ function outlookConnectWorld(over) {
 
 function sortScopes(list) {
   return list.slice().sort();
+}
+
+function loadBackgroundMessageHarness(over) {
+  const messageListeners = [];
+  const stored = Object.assign({
+    outlookAuth: { token: { accessToken: 't' }, requestedScopes: MS_EXPECTED }
+  }, (over && over.stored) || {});
+  const chrome = {
+    storage: {
+      local: {
+        async get(k) {
+          if (typeof k === 'string') return { [k]: stored[k] };
+          if (Array.isArray(k)) {
+            const bag = {};
+            k.forEach((key) => { bag[key] = stored[key]; });
+            return bag;
+          }
+          return Object.assign({}, stored);
+        },
+        async set(patch) { Object.assign(stored, patch); }
+      }
+    },
+    identity: { getRedirectURL: () => 'https://ext.chromiumapp.org/' },
+    runtime: {
+      id: 'ext',
+      onInstalled: { addListener() {} },
+      onStartup: { addListener() {} },
+      onMessage: { addListener(fn) { messageListeners.push(fn); } },
+      getManifest: () => ({ version: '0.9.56' }),
+      sendMessage: async () => ({})
+    },
+    alarms: { create: () => {}, onAlarm: { addListener() {} }, get: (n, cb) => cb(null) },
+    contextMenus: { removeAll(cb) { if (cb) cb(); }, create() {}, onClicked: { addListener() {} } },
+    windows: { create: () => {}, onRemoved: { addListener() {} } },
+    tabs: { sendMessage: () => {}, query: async () => [] },
+    permissions: { request: async () => true, contains: async () => false, remove: async () => true },
+    notifications: { create: () => {}, onClicked: { addListener() {} }, onClosed: { addListener() {} } },
+    scripting: { registerContentScripts: async () => {}, unregisterContentScripts: async () => {} },
+    action: { setBadgeText: () => {}, setBadgeBackgroundColor: () => {} }
+  };
+  const sandbox = {
+    console,
+    chrome,
+    crypto: require('crypto').webcrypto,
+    fetch: async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }),
+    FlowConnectEcosystem: E,
+    FlowProfileHook: PH,
+    FlowExtract: {},
+    FlowIntent: {},
+    FlowFactReply: {},
+    FlowActions: {},
+    FlowIdentity: { empty: () => ({ parties: {} }) },
+    FlowFollowUp: {}
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../lane-chat/meta-consent.js'), 'utf8'), sandbox);
+  const { backgroundScript } = require('./load-background.cjs');
+  vm.runInContext(backgroundScript(), sandbox, { filename: 'background.js', timeout: 180000 });
+  function dispatch(msg, sender) {
+    const snd = sender || { id: chrome.runtime.id };
+    return new Promise((resolve) => {
+      let settled = false;
+      const reply = (r) => {
+        if (!settled) { settled = true; resolve(r); }
+      };
+      for (const fn of messageListeners) {
+        try {
+          fn(msg, snd, reply);
+        } catch (e) {
+          if (!settled) { settled = true; resolve({ ok: false, error: String(e) }); }
+        }
+      }
+      setTimeout(() => {
+        if (!settled) { settled = true; resolve(undefined); }
+      }, 250);
+    });
+  }
+  return { dispatch, messageListeners, sandbox, stored };
 }
 
 await ok('ecosystem FlowOutlook.connect intersects scopes on reconnect #1', async () => {
@@ -957,6 +1038,7 @@ await ok('outlookEcosystemSync without FlowOutlook is not-configured (wiring dep
 function loadMicrosoftEcosystemConnect(over) {
   const stored = {};
   const syncCalls = [];
+  const signInLog = [];
   const w = Object.assign({ profile: {
     mail: 'me@contoso.com',
     userPrincipalName: 'me@contoso.com',
@@ -996,7 +1078,10 @@ function loadMicrosoftEcosystemConnect(over) {
     },
     FlowConnectEcosystem: E,
     FlowOutlookAuth: {
-      signIn: async () => ({ ok: true, token: w.token })
+      signIn: async (_deps, _cfg, _redirect, opts) => {
+        signInLog.push((opts && opts.scopes) ? opts.scopes.slice() : []);
+        return { ok: true, token: w.token };
+      }
     },
     FlowOutlookConfig: { CLIENT_ID: '11111111-2222-3333-4444-555555555555' },
     FlowProfileHook: PH
@@ -1008,6 +1093,7 @@ function loadMicrosoftEcosystemConnect(over) {
   return {
     stored,
     syncCalls,
+    signInLog,
     async connect() {
       stored.outlookPending = { offers: [{ key: 'old' }], asks: [] };
       stored.outlookSync = { offered: { x: 1 }, lastAt: 99, diagnostics: ['stale'] };
@@ -1048,6 +1134,8 @@ await ok('K1: ecosystem microsoft sign-in sends only base consent scopes', async
   const auth = world.stored.outlookAuth;
   assert.ok(auth && Array.isArray(auth.requestedScopes));
   assert.deepStrictEqual(sortScopes(auth.requestedScopes), sortScopes(MS_EXPECTED));
+  assert.ok(world.signInLog.length >= 1);
+  assert.deepStrictEqual(sortScopes(world.signInLog[world.signInLog.length - 1]), sortScopes(MS_EXPECTED));
 });
 
 await ok('K2: popup requests optional scopes via flow:microsoft-optional-scopes not outlook-consent', () => {
@@ -1060,12 +1148,32 @@ await ok('K2: popup requests optional scopes via flow:microsoft-optional-scopes 
   assert.ok(!/renderLabs[\s\S]{0,800}flow:microsoft-optional-scopes/.test(popup));
 });
 
-await ok('K3: outlook-consent-scope refuses Contacts.Read and Chat.Read', async () => {
+await ok('K3: background onMessage flow:outlook-consent-scope refuses Contacts.Read and Chat.Read', async () => {
+  const { dispatch, messageListeners } = loadBackgroundMessageHarness();
+  assert.ok(messageListeners.length >= 1, 'background must register onMessage');
+  const contacts = await dispatch({ type: 'flow:outlook-consent-scope', scope: 'Contacts.Read' });
+  const chat = await dispatch({ type: 'flow:outlook-consent-scope', scope: 'Chat.Read' });
+  assert.strictEqual(contacts.reason, 'scope-refused');
+  assert.strictEqual(chat.reason, 'scope-refused');
+});
+
+await ok('K3b: Contacts.Read via outlook-consent-scope stays refused (mutant guard)', async () => {
   const { backgroundScript } = require('./load-background.cjs');
   const stored = { outlookAuth: { token: { accessToken: 't' }, requestedScopes: MS_EXPECTED } };
   const chrome = {
     storage: { local: { async get() { return stored; }, async set() {} } },
-    identity: { getRedirectURL: () => 'https://ext.chromiumapp.org/' }
+    identity: { getRedirectURL: () => 'https://ext.chromiumapp.org/' },
+    runtime: {
+      id: 'ext',
+      onInstalled: { addListener() {} },
+      onStartup: { addListener() {} },
+      onMessage: { addListener() {} },
+      getManifest: () => ({ version: '0.9.56' })
+    },
+    alarms: { create: () => {}, onAlarm: { addListener() {} } },
+    contextMenus: { removeAll(cb) { if (cb) cb(); }, create() {}, onClicked: { addListener() {} } },
+    windows: { create: () => {}, onRemoved: { addListener() {} } },
+    tabs: { sendMessage: () => {} }
   };
   const sandbox = { console, chrome, crypto: require('crypto').webcrypto, fetch: async () => ({ ok: false }) };
   sandbox.globalThis = sandbox;
@@ -1073,9 +1181,134 @@ await ok('K3: outlook-consent-scope refuses Contacts.Read and Chat.Read', async 
   vm.runInContext(backgroundScript(), sandbox, { filename: 'background.js', timeout: 120000 });
   const fn = vm.runInContext('outlookConsentScope', sandbox);
   const contacts = await fn({ scope: 'Contacts.Read' });
-  const chat = await fn({ scope: 'Chat.Read' });
+  assert.strictEqual(contacts.ok, false);
   assert.strictEqual(contacts.reason, 'scope-refused');
-  assert.strictEqual(chat.reason, 'scope-refused');
+});
+
+await ok('K1b: requestMicrosoftOptionalScopes sign-in merges base and Contacts.Read', async () => {
+  const signInScopes = [];
+  const stored = {
+    outlookAuth: {
+      ecosystem: true,
+      requestedScopes: MS_EXPECTED,
+      token: { accessToken: 'old', grantedScopes: MS_EXPECTED },
+      account: { address: 'me@contoso.com', microsoftAccountKind: 'work' }
+    }
+  };
+  const chrome = {
+    storage: {
+      local: {
+        async get(k) {
+          if (typeof k === 'string') return { [k]: stored[k] };
+          return Object.assign({}, stored);
+        },
+        async set(patch) { Object.assign(stored, patch); }
+      }
+    },
+    identity: { getRedirectURL: () => 'https://ext.chromiumapp.org/' },
+    permissions: { request: async () => true },
+    runtime: { id: 'ext', onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} } }
+  };
+  const sandbox = {
+    console,
+    chrome,
+    crypto: require('crypto').webcrypto,
+    fetch: async () => ({ ok: false }),
+    FlowConnectEcosystem: E,
+    FlowOutlookAuth: {
+      signIn: async (_d, _c, _r, opts) => {
+        signInScopes.push((opts && opts.scopes) ? opts.scopes.slice() : []);
+        return { ok: true, token: { accessToken: 'new', grantedScopes: (opts && opts.scopes) || MS_EXPECTED } };
+      }
+    },
+    FlowOutlookConfig: C
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  const swSrc = stripModuleExports(fs.readFileSync(path.join(__dirname, '../src/connect-ecosystem-sw.js'), 'utf8'));
+  vm.runInContext(swSrc, sandbox, { filename: 'connect-ecosystem-sw.js' });
+  const fn = vm.runInContext('requestMicrosoftOptionalScopes', sandbox);
+  const out = await fn('contacts', { launchInteractive: async () => '' });
+  assert.strictEqual(out.ok, true);
+  assert.deepStrictEqual(sortScopes(signInScopes[0]), sortScopes(MS_EXPECTED.concat(['Contacts.Read'])));
+});
+
+await ok('K2b: Labs TEAMS_MEETING flip via renderLabs click calls flow:microsoft-optional-scopes', async () => {
+  if (!JSDOM) throw new Error('jsdom required for K2b');
+  const sent = [];
+  const storageBag = { glanceSwitches: {} };
+  const dom = new JSDOM('<!doctype html><html><body><div id="labs-list"></div></body></html>', {
+    runScripts: 'outside-only',
+    url: 'chrome-extension://glance/popup.html'
+  });
+  const w = dom.window;
+  w.chrome = {
+    runtime: { id: 'ext', sendMessage: async (msg) => { sent.push(msg); return { ok: true }; } },
+    storage: {
+      local: {
+        async get() { return { glanceSwitches: storageBag.glanceSwitches || {} }; },
+        async set(patch) { Object.assign(storageBag, patch); }
+      }
+    }
+  };
+  const ctx = dom.getInternalVMContext();
+  const labsSrc = fs.readFileSync(path.join(__dirname, '../core/labs-switches.js'), 'utf8')
+    .replace(/^if \(typeof module[\s\S]*$/m, 'globalThis.FlowLabsSwitches = FlowLabsSwitches;');
+  const ecoSrc = fs.readFileSync(path.join(__dirname, '../core/connect-ecosystem.js'), 'utf8')
+    .replace(/^if \(typeof module[\s\S]*$/m, 'globalThis.FlowConnectEcosystem = FlowConnectEcosystem;');
+  vm.runInContext(labsSrc, ctx, { filename: 'labs-switches.js' });
+  vm.runInContext(ecoSrc, ctx, { filename: 'connect-ecosystem.js' });
+  const popupSrc = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+  const elFn = popupSrc.slice(popupSrc.indexOf('function el(tag, cls, text)'), popupSrc.indexOf('async function refresh()'));
+  const labsBlock = popupSrc.slice(popupSrc.indexOf('async function labsOptionalScopeAfterFlip'), popupSrc.indexOf('async function renderSurfaces'));
+  vm.runInContext(elFn + '\n' + labsBlock, ctx, { filename: 'popup-labs.js' });
+  await vm.runInContext('renderLabs()', ctx);
+  await flushDom(w);
+  const teamsRow = [...w.document.querySelectorAll('#labs-list .wait-item')].find((row) => /TEAMS|Teams|טימס/.test(row.textContent || ''));
+  assert.ok(teamsRow, 'TEAMS_MEETING labs row');
+  const turnOn = teamsRow.querySelector('button');
+  assert.ok(turnOn && /הפעל/.test(turnOn.textContent || ''), turnOn && turnOn.textContent);
+  turnOn.click();
+  await new Promise((r) => w.setTimeout(r, 80));
+  assert.ok(sent.some((m) => m.type === 'flow:microsoft-optional-scopes' && m.bucket === 'teamsChat'), sent);
+});
+
+await ok('K4: expired reconnect uses scopesFor from checked boxes (calendar not dropped)', () => {
+  const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+  assert.ok(/\(\(link === 'missing' \|\| link === 'expired' \|\| link === 'missing-scope'\)/.test(popup));
+  assert.ok(!/else if \(link === 'expired' \|\| link === 'missing-scope'\)/.test(popup));
+  const i = popup.indexOf('const grantedReconnect');
+  assert.ok(i > 0);
+  const chunk = popup.slice(i, i + 4200);
+  assert.ok(/scopesFor\(ids\)/.test(chunk));
+  assert.ok(/grantedReconnect/.test(chunk));
+});
+
+await ok('popup.html loads connect-ecosystem.js and Contacts add-scope uses optional bucket', async () => {
+  const html = fs.readFileSync(path.join(__dirname, '../popup/popup.html'), 'utf8');
+  const scripts = [];
+  html.replace(/<script src="([^"]+)"><\/script>/g, (_, src) => { scripts.push(src); });
+  assert.ok(scripts.some((s) => /connect-ecosystem\.js$/.test(s)), scripts);
+  assert.ok(scripts.indexOf('../core/connect-ecosystem.js') < scripts.indexOf('popup.js'), scripts);
+  const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+  assert.ok(/flow:microsoft-optional-scopes/.test(popup) && /optionalScopeBucketForOutlookService/.test(popup));
+  if (!JSDOM) throw new Error('jsdom required');
+  const sent = [];
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', { runScripts: 'outside-only' });
+  const w = dom.window;
+  w.chrome = { runtime: { sendMessage: (msg) => { sent.push(msg); return Promise.resolve({ ok: true }); } } };
+  const ctx = dom.getInternalVMContext();
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../core/connect-ecosystem.js'), 'utf8'), ctx, { filename: 'connect-ecosystem.js' });
+  await vm.runInContext(
+    '(async () => {\n'
+    + 'const bucket = FlowConnectEcosystem.optionalScopeBucketForOutlookService("contacts");\n'
+    + 'if (!bucket) throw new Error("no bucket");\n'
+    + 'await chrome.runtime.sendMessage({ type: "flow:microsoft-optional-scopes", bucket });\n'
+    + '})();\n',
+    ctx
+  );
+  await new Promise((r) => w.setTimeout(r, 40));
+  assert.ok(sent.some((m) => m.type === 'flow:microsoft-optional-scopes' && m.bucket === 'contacts'), sent);
 });
 
 await ok('ecosystem reconnect keeps already-granted Contacts.Read', async () => {

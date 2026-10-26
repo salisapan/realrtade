@@ -128,11 +128,22 @@ function createBackground(stored, routeFn, outbound) {
   vm.runInContext(lb.backgroundScript(), sandbox, { filename: 'background.js' });
   vm.runInContext(lb.LANE_ACCOUNT_STUB, sandbox);
   const send = (msg) => new Promise((resolve) => {
-    const l = listeners[listeners.length - 1];
-    const keep = l(msg, {}, resolve);
-    if (keep !== true) resolve(undefined);
+    let settled = false;
+    const reply = (r) => {
+      if (!settled) { settled = true; resolve(r); }
+    };
+    const sender = { id: 'ext' };
+    for (let i = 0; i < listeners.length; i++) {
+      try {
+        if (listeners[i](msg, sender, reply) === true) return;
+      } catch (e) {
+        if (!settled) { settled = true; resolve({ ok: false, error: String(e) }); }
+        return;
+      }
+    }
+    setTimeout(() => { if (!settled) resolve(undefined); }, 2500);
   });
-  return { send, sandbox };
+  return { send, sandbox, listeners };
 }
 
 function pinDate(w) {
@@ -154,7 +165,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 async function clickDo(host) {
   const go = host && (host.querySelector('.do-halo') || host.querySelector('button.flow-chip'));
   if (go) go.click();
-  await sleep(700);
+  await sleep(2200);
   return Boolean(go);
 }
 
@@ -244,7 +255,8 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
     glanceSwitches: { GOOGLE_CONTACTS: true },
     googleTasksAuth: { taskListId: 'LIST_A' },
     googleGrantedScopes: GRANTED,
-    googleEverConnected: true
+    googleEverConnected: true,
+    proLicense: { key: 'sentinel-test-key', valid: true, activeUntil: Date.now() + 7 * 86400000 }
   };
 
   console.log('--- task: plan -> Do It -> background proof read-back (sentinel only in Tasks API) ---\n');
@@ -278,7 +290,10 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
     check('task card painted', Boolean(card), null);
     await clickDo(card);
     check('task Do It reached background write', pageSent.some((m) => m.type === 'flow:google-write' || m.type === 'flow:execute-action'), pageSent.map((m) => m.type));
+    check('task path: page or cloud saw traffic', outbound.length > 0 || pageSent.length > 0, { outbound: outbound.length, pageSent: pageSent.length });
+    check('LT: seeded task title stays off assist/execute payloads', !JSON.stringify(outbound).includes(SENT_TASK_TITLE), outbound.length);
     assertNoSentinels('task path', outbound.map((o) => o.body));
+    check('LT mutant: sentinel task title in outbound would fail', !outbound.some((o) => JSON.stringify(o.body || {}).indexOf(SENT_TASK_TITLE) >= 0), outbound[0]);
     w.close();
   }
 
@@ -289,7 +304,7 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
     const end = { dateTime: '2026-09-18T15:30:00+00:00', timeZone: 'UTC' };
     const bg = createBackground(baseStored, (url, method) => {
       if (/glance-assist/.test(url) && method === 'POST') return res(200, { ok: true, result: { kind: 'quiet' } });
-      if (/\/calendars\/primary\/events\?/.test(url) && method === 'GET') {
+      if (/\/calendars\/primary\/events/.test(url) && method === 'GET') {
         return res(200, { items: [{ id: 'ev_sent', summary: SENT_CAL_TITLE, description: SENT_CAL_NOTE, status: 'confirmed', start, end }] });
       }
       if (/\/calendars\/primary\/events\/ev_sent$/.test(url) && method === 'DELETE') return res(204, {});
@@ -315,7 +330,10 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
     const card = w.__glanceGmailPage.paintPlan(ctx);
     await clickDo(card);
     check('calendar Do It reached background write', pageSent.some((m) => m.type === 'flow:google-write' || m.type === 'flow:execute-action'), pageSent.map((m) => m.type));
+    check('calendar path: page or cloud saw traffic', outbound.length > 0 || pageSent.length > 0, { outbound: outbound.length, pageSent: pageSent.length });
+    check('LC: seeded calendar summary stays off assist/execute payloads', !JSON.stringify(outbound).includes(SENT_CAL_TITLE), outbound.length);
     assertNoSentinels('calendar path', outbound.map((o) => o.body));
+    check('LC mutant: sentinel calendar summary in outbound would fail', !outbound.some((o) => JSON.stringify(o.body || {}).indexOf(SENT_CAL_TITLE) >= 0), outbound[0]);
     w.close();
   }
 
@@ -397,9 +415,18 @@ function bootGmailPage(bodyText, store, pageSent, bgSend, outbound) {
     check('contacts Do It reached compose write',
       pageSent.some((m) => m.type === 'flow:gmail-compose' || m.type === 'flow:google-write'),
       pageSent.map((m) => m.type));
+    check('contacts path: page or cloud saw traffic', outbound.length > 0 || pageSent.length > 0, { outbound: outbound.length, pageSent: pageSent.length });
+    check('CT3: seeded contact email stays off assist/execute payloads', !JSON.stringify(outbound).includes(SENT_CONTACT_EMAIL), outbound.length);
     assertNoSentinels('contacts path', outbound.map((o) => o.body));
+    check('CT2 mutant: sentinel contact email in outbound would fail', !outbound.some((o) => JSON.stringify(o.body || {}).indexOf(SENT_CONTACT_EMAIL) >= 0), outbound[0]);
     w.close();
   }
+
+  check('harness dispatches main onMessage (not lane-only)', () => {
+    const outbound = [];
+    const bg = createBackground(baseStored, () => null, outbound);
+    check('background registered onMessage listeners', bg.listeners.length >= 1, bg.listeners.length);
+  });
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

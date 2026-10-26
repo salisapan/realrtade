@@ -2435,12 +2435,18 @@ function glanceUiCopy(kind) {
           })
         });
         if (chain && chain.move === 'needs-you') {
-          injectNeedsYou(message, {
-            messageId, intent, sender, subject, attachment, attachments,
-            threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
-          });
-          watchCopiedOnly(message, messageId, text, ownEmail, audience);
-          return;
+          if (!(await gmailComposeApiAllowedFromStorage())) {
+            logScanSkip(messageId, 'compose-closed');
+            recordSilence(messageId, 'file');
+            chainSettled = true;
+          } else {
+            injectNeedsYou(message, {
+              messageId, intent, sender, subject, attachment, attachments,
+              threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
+            });
+            watchCopiedOnly(message, messageId, text, ownEmail, audience);
+            return;
+          }
         }
         if (chain && (chain.move === 'watch' || chain.reason === 'conflict' || chain.reason === 'unclear')) {
           logScanSkip(messageId, 'file-chain');
@@ -4200,6 +4206,31 @@ function glanceUiCopy(kind) {
     return { tabAccount: ownEmailFromThread() || lastOwnEmail || '', lang: glanceUiHebrew() ? 'he' : 'en' };
   }
 
+  async function gmailComposeApiAllowedFromStorage() {
+    const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
+    if (!C || typeof C.gmailDraftApiAllowed !== 'function') return false;
+    try {
+      const bag = await chrome.storage.local.get('googleGrantedScopes');
+      const rec = bag && bag.googleGrantedScopes;
+      const raw = rec && rec.version;
+      const scopes = raw == null ? null : String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
+      return C.gmailDraftApiAllowed(scopes);
+    } catch (e) { return false; }
+  }
+
+  function activityLogRef(ref) {
+    if (!ref || typeof ref !== 'object') return ref;
+    const out = Object.assign({}, ref);
+    delete out.to;
+    delete out.target;
+    if (out.proof && typeof out.proof === 'object') {
+      const proof = Object.assign({}, out.proof);
+      delete proof.target;
+      out.proof = proof;
+    }
+    return out;
+  }
+
   function sendExecuteAction(payload) {
     const lane = laneConnectorId(payload && payload.connectorId);
     if (!lane) return sendRuntime({ type: 'flow:execute-action', payload: payload });
@@ -5635,7 +5666,7 @@ function glanceUiCopy(kind) {
         threadId: ctx.threadId || null,
         where: r.response.where,
         url: r.response.url,
-        ref: r.response.ref,
+        ref: activityLogRef(r.response.ref),
         connectorId: r.action.kind,
         holdAt: (typeof FlowHeldHold !== 'undefined') ? FlowHeldHold.keyOf(ctx.intent) || undefined : undefined,
         holdSender: (ctx.sender && ctx.sender.email) || undefined,
