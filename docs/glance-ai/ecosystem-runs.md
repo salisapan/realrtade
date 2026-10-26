@@ -778,3 +778,69 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`; the existing Mark done card (title "Done? ...").
 - **Tests:** `e2e/chat-document-close.spec.js` gained 3 real-browser specs (the own loop with Undo, Hebrew, and the two guards), the 5 specs of run 92 stay green, every `test/*corpus.cjs` green.
 - **Open:** live Gate; words only, an attached file bubble is not read; Messenger and Instagram have no spec for the two document closes; no close from mail.
+
+## Run 94 (builder B, 2026-10-25): the "sent" claim reads real short replies
+
+- **Capability shipped (same switches as runs 92 and 93: `CHAT_TASK_CARD` for the other side's claim, `CHAT_PROMISE_CARD` for the person's own):** run 92 and 93 recognised "I just sent you the signed contract" but not what people actually type: "Sent!", "Done, sent", "Just emailed it", "Sent you an email", "sent the quote", «שלחתי», «בוצע, שלחתי», «שלחתי במייל». They now count. The measure was a probe of invented lines, not the corpus I had tuned on, and it found three real defects, all fixed: (1) a short reply with no verb frame was not a claim; (2) a recipient ("I forwarded it to Dana") or a channel (email, מייל) was taken for the thing that was sent, so it could have matched a task by a name; (3) the Hebrew prefix strip cut מייל to ייל. A claim that names nothing still fits only when it is the one open task of its kind, so "Sent!" with two open tasks offers nothing.
+- **Code:** `core/chat-sent-claim.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-sent-claim-corpus.cjs` gained 9 sent lines, 2 quiet lines and 2 token checks; `e2e/chat-document-close.spec.js` gained the "Sent!" loop (9 specs, all green); every `test/*corpus.cjs` green.
+- **Open:** live Gate; words only; Messenger and Instagram have no spec for the document closes; no close from mail. This run changes recall only, so the user-visible gain is real but small.
+
+## Run 95 (builder B, 2026-10-26): a booking that repeats
+
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off, and the owner's `RECURRING_HOLD`, off):** "Your piano lesson is every Monday at 17:00", "Hi, your weekly yoga class is every Tuesday at 18:30", «השיעור שלך כל יום שני ב-17:00». Before, such a mail or chat message had no card at all (the appointment reader wanted "confirmed", "booked", "see you" or one named day, not "is every Monday"). Now the existing Hold It card is offered for the next lesson (said on a Monday morning, today at 17:00; said on Monday evening, next Monday), and with `RECURRING_HOLD` on the series path that already existed for meetings writes the weekly series (Google `RRULE:FREQ=WEEKLY;BYDAY=MO`, Outlook weekly pattern), reads the rule back by id, removes the event again if the rule did not land, and Undo deletes the series. With `RECURRING_HOLD` off it is the one next event. Shop opening hours, a team that "meets every Monday" (no booking noun), a repeat with no clock, a past or questioned repeat stay quiet.
+- **Why it matters:** weekly lessons, classes and treatments are the most common standing bookings of the first user's life; one card now covers the whole series instead of a card per week or none.
+- **Code:** `core/chat-appointment-notice.js` only (frame, `repeats`, the first date); the judge, the Gmail card, the Outlook card and the chat card carry the message words to the writers already.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` (6 repeating lines with their first date, 5 quiet lines, a one-off is not marked), 6 real-browser specs (Outlook mail on and off, Gmail on and off, WhatsApp on Outlook), every `test/*corpus.cjs` green.
+- **Open:** live Gate (both switches are the owner's); an end date for a course is not read; monthly and daily repeats of a booking are not offered here.
+
+## Run 96 (builder B, 2026-10-26): a plain reminder is a booking
+
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** the appointment reader wanted a confirming word ("confirmed", "booked", "see you") and so ignored the commonest real message, the reminder: "Your appointment is tomorrow at 14:00", "Your dentist appointment is in 3 days at 14:00", "Your table is tonight at 8pm", «התור שלך מחר ב-14:00». Found by probing invented lines I had not tuned on (12 lines: 7 should have been bookings and 5 were silent for the wrong reason). Now the existing Hold It card is offered for them in chat, Outlook and Gmail.
+- **Precision work in the same change:** the first version also accepted "The deadline for your appointment form is in 3 days at 14:00" (the booking noun is the form's). The reader now stays quiet when the word after the booking noun is form, request, history, link, page, policy, details, fee or number, and on deadline, due and expires. Questions, past and cancelled messages, "unless you cancel", and a flight, a meeting, an order or an invoice (no booking noun) stay quiet, as before.
+- **Code:** `core/chat-appointment-notice.js` only (frame and a few quiet words).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` gained 9 plain-reminder lines with their date and clock and 9 quiet lines, two real-browser Outlook specs (the reminder is one hold with Undo; the form deadline shows nothing), every `test/*corpus.cjs` green (including the booking, silence and parity corpora), and the 68 booking and hold specs green.
+- **Open:** live Gate; a day number with no month ("the 5th") and a bare hour ("tomorrow morning at 9") are not read.
+
+## Run 97 (builder B, 2026-10-26): the polite Hebrew payment ask
+
+- **Capability shipped (behind `CHAT_TASK_CARD`, off):** the payment-ask reader knew the Hebrew imperative («תעביר», «תשלם») but not the forms Israelis actually write: «נא להעביר את התשלום על 1200 ש"ח עד מחר», «אפשר להעביר את ה-400 שקל עד מחר?», «תוכל לשלם 300 ש"ח עד יום חמישי», «היי דנה, נא לשלם 250 שקל עד יום ראשון». They now give the task "לשלם 1200 NIS · Dana" due that day. Found by probing 10 invented payment lines (3 Hebrew polite forms were silent). «נא לא להעביר» (a polite refusal), «הוא צריך להעביר» (somebody else), «אני צריך להעביר» (the writer pays), a message with no amount and a non-money «תוכל לשלוח לי תמונה» stay quiet.
+- **A second defect found by the real-browser spec and fixed:** for the same Hebrew words the shared judge had already shown a generic card, so the task was "Reply requested by Oct 27, ₪1,200" and the payment reader never ran. In chat a payment with an amount and a day is now read by its own reader first: the card is the payment task, not the vague reply.
+- **Code:** `core/chat-payment-ask.js` (verbs, ask frame, refusal), one precedence rule in `src/chat-task-card.js`.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-payment-ask-corpus.cjs` gained 4 polite Hebrew asks and 5 quiet lines, a real-browser WhatsApp spec for the polite Hebrew ask (task "לשלם 1200 NIS", Undo deletes it, nothing sent), the other chat specs (30) and every `test/*corpus.cjs` green.
+- **Open:** live Gate; «אשמח אם תוכל להעביר …» (an "if"-polite form) stays quiet as a hedge; a bill told without "your" ("The payment of 350 NIS is due tomorrow") is not read.
+
+## Run 98 (builder B, 2026-10-26): polite and "waiting for your ..." asks become Waiting-on tasks
+
+- **Capability shipped (behind `CHAT_PROMISE_CARD`, off):** when the person asks the other side for a thing by a day, Glance writes "Waiting on Dana: <thing>" (runs 70s) and, now, chases it (run 90) and closes it (runs 92 to 94). The reader behind it knew «תחתום על החוזה עד יום שישי» and "I need the report by Friday" but not the polite forms: «נא לשלוח את הטפסים החתומים עד יום רביעי», «אנא להחזיר את החוזה עד מחר», "Please let me have the signed copy by Friday", "Get me the invoice by Thursday", nor a wait phrased as a request: "I am waiting for your signed copy by Friday", «אנחנו מחכים לאישור שלכם עד מחר». They now give the task. A wait counts only when it is for the other person's thing (your, שלך, שלכם, ממך); "I'm waiting for the delivery by Friday", «אני מחכה לשליח עד מחר», «נא לא לשלוח», "Please let me know by Friday" and "waiting for the bus until 5" stay quiet.
+- **Found by:** the same probe habit as runs 96 and 97 (invented lines, not the corpus): 3 of 8 Hebrew and English asks were silent.
+- **Code:** `core/chat-deadline-ask.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-deadline-ask-corpus.cjs` gained 6 asks and 5 quiet lines, one real-browser WhatsApp spec for the polite Hebrew ask (task "מחכים ל-Dana: הטפסים החתומים", nothing sent), the 31 other chat specs and every `test/*corpus.cjs` green.
+- **Open:** live Gate; a polite English question ("Could you send me the photos by Thursday?") is still quiet by an earlier rule (a question is not an ask of record); the thing is kept as written ("קבצים שלך").
+
+## Run 99 (builder B, 2026-10-26): a pickup told in days
+
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** the pickup reader wanted a named last day. Real locker and post-office messages say how many days are left: "Your package arrived at the locker, pick it up within 3 days", «החבילה שלך הגיעה ללוקר, יש לאסוף תוך 3 ימים»; a pharmacy says "we hold it until Thursday" / «נשמור אותה עד יום חמישי». They now give the existing task "Pick up the order" due on the last day (a count of calendar days from today, 1 to 30), in chat, Outlook and Gmail, through the same reader. Found by probing 8 invented pickup lines (4 silent). Business days are not counted (no task rather than a wrong day), a delivery that arrives "within 3 days" is not a pickup, a question and a count over 30 stay quiet.
+- **Code:** `core/chat-pickup-notice.js` only (the count of days, the hold phrase, the prescription noun).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-pickup-notice-corpus.cjs` gained 5 pickups and 4 quiet lines, one real-browser Outlook spec (the task is due in three days with the date read back, Undo deletes it), the booking and chat specs and every `test/*corpus.cjs` green.
+- **Open:** live Gate; business-day counts are not offered.
+
+### Run 100 (2026-10-26)
+- **Capability shipped:** a polite Hebrew ask opened with «האם» («האם תוכל לשלוח לי את הקובץ?», «האם אפשר לקבל את הלוגו?») used to score below the card threshold and stayed quiet; it now offers the same reply card as the form without «האם». "Would it be possible to get …?" too.
+- **Code:** `core/intent.js` (rewrite of the two polite openings, skipped for a note to oneself), `core/judgment.js` (short-ask reader).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/polite-he-ask-corpus.cjs`; `regress-144` caught my first version (self-sent «האם תוכל לתאם…» tasks), fixed; every `test/*corpus.cjs` green. No real-browser spec this run.
+- **Open:** live Gate; no new write path, so no ProofOfClose or off switch is involved (a recognition fix on the existing card).
+
+### Run 101 (2026-10-26)
+- **Capability shipped:** six polite English forms of an ask with a deadline were quiet and now offer the same reply card as "could you ..." ("I'd be grateful if you could", "Do you think you could", "If you could send ... that would be perfect", "We need X back by Friday", "We need X from you", "It would be helpful to have X before Thursday").
+- **Code:** `core/judgment.js` only (the handoff reader).
+- **Grok sync:** nothing new in `card-requests-*.md`; no Gmail-side half missing for the recent B features (series, Meet link and booking cancel are on both).
+- **Tests:** new `test/polite-en-ask-corpus.cjs` (10 asks, 6 look-alikes; 9 of 10 asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run. One pre-existing false positive found, not caused by this change: "We need to talk about the budget back at the office" shows a card; recorded, not fixed.
+- **Open:** live Gate; the "talk ... back at the office" false positive; "I'd love to get X by Friday" and «אכפת לך לשלוח…» stay quiet.

@@ -26,13 +26,24 @@ const YES = [
   ['שלחתי לך את החוזה החתום', ['חוזה', 'חתום']],
   ['הנה החשבונית', ['חשבונית']],
   ['החוזה החתום מצורף', ['חוזה', 'חתום']],
-  ['העליתי את הקבצים', []]
+  ['העליתי את הקבצים', []],
+  ['Sent!', []],
+  ['Done, sent', []],
+  ['Just emailed it', []],
+  ['Sent you an email', []],
+  ['sent the quote', ['quote']],
+  ['I sent the contract to Dana', ['contract']],
+  ['שלחתי', []],
+  ['בוצע, שלחתי', []],
+  ['שלחתי לך מייל', []]
 ];
 for (const [text, words] of YES) {
   const r = C.recognize(text);
   const same = r.kind === 'sent' && words.every((w) => r.words.indexOf(w) >= 0);
   check('sent: ' + text, same, r);
 }
+check('a recipient is not a word that names the thing', C.recognize('I forwarded it to Dana').words.length === 0 && C.recognize('I sent the contract to Dana').words.indexOf('dana') < 0);
+check('a Hebrew word that only starts with a prefix letter keeps it: מייל stays out as a channel, חוזה loses ה', C.tokens('החוזה').join() === 'חוזה' && C.tokens('מייל').length === 0);
 check('English and Hebrew are told apart', C.recognize('I sent it').lang === 'en' && C.recognize('שלחתי לך את החוזה').lang === 'he');
 
 console.log('\n--- quiet ---\n');
@@ -51,6 +62,8 @@ const NO = [
   ['עוד לא שלחתי את החוזה', 'not yet'],
   ['שלחתי לך את התשלום', 'money'],
   ['Thanks for the contract', 'not a claim'],
+  ['Sent it yesterday', 'not a claim'],
+  ['Uploaded to the drive', 'not a claim'],
   ['The contract looks good', 'not a claim'],
   ['', 'empty'],
   ['I sent a very long message that goes on and on about nothing in particular and keeps going for far too long to be a simple claim that a document was sent, so it is not one at all', 'long']
