@@ -4,6 +4,9 @@
 //                 already uses commitment|task for these mails, so v2.3 split one intention over two classes (BATCH-004: the
 //                 chooser then read «התחייבת לשלוח… עד» as a reply). Writes train/features-v25a/.
 //   GLANCE_V25=b  the same plus v2.4's two changes (deadlines the device does not read, dated notes to self). Writes features-v25b/.
+//   GLANCE_V25=c  v2.6 (2026-10-26): b, plus an undated ask that only says asap / as soon as possible / בהקדם / מיד is labelled SILENT,
+//                 as the device does today (BATCH-005: v2.5b learned 'today' as a deadline and spread it to 'asap'). If the owner
+//                 decides undated asks should act, this is the one line to flip. Writes features-v26/.
 // Labels are template intent, NOT owner-verified.
 'use strict';
 // v2.4 labels: v2.3 (gap-labels-v23.cjs, unchanged) plus two changes found by batch-004 (glance-ai/labeling/BATCH-004.md):
@@ -27,7 +30,7 @@
 // Writes train/features-v24/{train,val,test}.jsonl (+ meta.json) from train/features-v2 and dataset/out-v2/all.jsonl.
 // usage: GLANCE_V25=a|b GLANCE_NOW=2026-10-07T12:00:00+03:00 node train/gap-labels-v25.cjs
 const fs = require('fs'), path = require('path');
-const HERE = __dirname, SRC = path.join(HERE, 'features-v2'), V = process.env.GLANCE_V25 === 'b' ? 'b' : 'a', DST = path.join(HERE, 'features-v25' + V);
+const HERE = __dirname, SRC = path.join(HERE, 'features-v2'), V = ({ b: 'b', c: 'c' })[process.env.GLANCE_V25] || 'a', DST = path.join(HERE, V === 'c' ? 'features-v26' : 'features-v25' + V);
 const ALL = path.join(HERE, '..', 'dataset', 'out-v2', 'all.jsonl');
 const { FlowExtract: E } = require(path.join(HERE, '..', '..', '..', 'flow-trial-extension', 'core', 'extract.js'));
 const NOW = new Date(process.env.GLANCE_NOW || '2026-10-07T12:00:00+03:00');
@@ -37,6 +40,7 @@ const LABEL = {
   commitment_reader: 'commitment|task', meeting: 'event|calendar'
 };
 const DEADLINE = /\b(?:today|tonight|(?:by|before|until)\s+(?:the\s+)?end\s+of\s+(?:the\s+)?week)\b|היום|סוף\s+השבוע/i;
+const ASAP = /\b(?:asap|as soon as possible)\b|בהקדם|(?:^|\s)מיד(?:\s|[.,!?]|$)/i;
 const GROUP = /\b(?:hi|hello|hey|dear)\s+(?:all|everyone|team|guys|folks)\b|(?:היי|שלום)\s+(?:לכולם|לכולן|צוות|חברים)/i;
 
 const src = {}; for (const r of read(ALL)) src[r.id] = r;
@@ -52,7 +56,7 @@ for (const split of ['train', 'val', 'test']) {
     const body = r ? (r.cleanBody || r.body || '') : '';
     let why = null;
     if (!r) why = 'no-source';
-    else if (V === 'b' && r.direction === 'self' && f.scenario === 'own_commitment_self') {
+    else if (V !== 'a' && r.direction === 'self' && f.scenario === 'own_commitment_self') {
       const d = E.parseDate(body, NOW);
       if (!((d && d.iso) || DEADLINE.test(body))) why = 'self-undated';
       else if (E.parseTime && E.parseTime(body)) why = 'self-with-time';
@@ -64,9 +68,10 @@ for (const split of ['train', 'val', 'test']) {
     else if (!(f.voc === 'own' || f.voc === 'none') || GROUP.test(body)) why = 'group-or-other';
     else {
       const d = E.parseDate(body, NOW);
-      if ((!d || !d.iso) && !(V === 'b' && DEADLINE.test(body))) why = 'undated';
+      if ((!d || !d.iso) && !(V !== 'a' && DEADLINE.test(body))) why = 'undated';
       else if (f.scenario === 'meeting' && !(E.parseTime && E.parseTime(body))) why = 'meeting-without-time';
     }
+    if (why === 'undated' && V === 'c' && ASAP.test(body)) { inc(split + ':asap-silent'); out.push(Object.assign({}, f, { y: 'SILENT', ybin: 0, unsure: false, gap: true })); continue; }
     if (why) { inc(split + ':stays-unsure:' + why.split(':')[0]); out.push(f); continue; }
     inc(split + ':gap-labelled:' + f.scenario);
     out.push(Object.assign({}, f, { y: LABEL[f.scenario], ybin: 1, unsure: false, gap: true }));
