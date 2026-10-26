@@ -911,3 +911,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`; one other agent's commit (#254-line, "Breadth Y3") touched none of my files.
 - **Tests:** `test/chat-appointment-notice-corpus.cjs` +7 lines and 4 quiet ones (7 fail on the old code), `test/chat-pickup-notice-corpus.cjs` +3 (3 fail on the old code); a real-browser WhatsApp case for the Hebrew table; booking and WhatsApp specs pass (52); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; flights ("Your flight departs Thursday at 6:30"), a parent-teacher meeting, a webinar and a date written 5/11 are still quiet; no Hebrew pickup spec in a real browser.
+
+### Run 111 (2026-10-26)
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** a flight or train told as "is on Thursday at 06:30" / «הטיסה שלך ביום חמישי בשעה 06:30» (no verb such as "departs") gave no card; it is now the Trip hold.
+- **Code:** `core/chat-travel-notice.js` only (the confirming frame).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-travel-notice-corpus.cjs` +6 lines (all fail on the old code) and 5 quiet ones; one real-browser WhatsApp case (Hebrew flight); booking and WhatsApp specs pass (53); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; an unmarked hour under 8 with minutes ("at 6:30", "at 7:45") stays quiet by design (ambiguous with the evening); a parent-teacher meeting, a webinar and a date written 5/11 are still quiet.

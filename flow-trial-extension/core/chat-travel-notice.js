@@ -6,8 +6,8 @@
 const FlowChatTravelNotice = (() => {
   const NOUN_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:flight|train|bus|ferry|trip|ride|cab|taxi|shuttle|transfer|cruise|coach)\b|\b(?:boarding|check-?in)\s+(?:for|to)\s+your\b/i;
   const NOUN_HE = /(?:הטיסה|הרכבת|האוטובוס|המעבורת|הנסיעה|ההסעה|המונית|ההעברה|הנסיעה)\s+(?:שלך|שלכם|שלכן)|(?:טיסתך|נסיעתך)|(?:העלייה\s+למטוס|הצ'ק[- ]?אין)\s+(?:שלך|שלכם)/;
-  const FRAME_EN = /\b(?:depart(?:s|ing|ure)?|leav(?:es|ing)|boarding|pick-?up|picks?\s+you|confirmed|booked|scheduled|set\s+for|takes\s+off)\b/i;
-  const FRAME_HE = /(?:ממריא(?:ה)?|יוצא(?:ת)?|עולים|איסוף|אושר(?:ה)?|נקבע(?:ה)?|הוזמנ(?:ה)?|מתחיל(?:ה)?|העלייה)/;
+  const FRAME_EN = /\b(?:depart(?:s|ing|ure)?|leav(?:es|ing)|boarding|pick-?up|picks?\s+you|confirmed|booked|scheduled|set\s+for|takes\s+off|(?:is|are)\s+(?:on|at|for))\b/i;
+  const FRAME_HE = /(?:ממריא(?:ה)?|יוצא(?:ת)?|עולים|איסוף|אושר(?:ה)?|נקבע(?:ה)?|הוזמנ(?:ה)?|מתחיל(?:ה)?|העלייה|(?:שלך|שלכם|שלכן)\s+(?:ביום|בשעה|מחר|היום|הערב|ב-?\d))/;
   // Looking back, cancelling, moving, asking, or a thing that is not an appointment of the person's.
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|was\s+(?:great|nice)|cancel(?:l?ed|l?ation)?|postpone[d]?|resched\w*|delay(?:ed|s)?|changed|unfortunately|unable|can'?t|cannot|sorry|instead|maybe|might|if\s+you|would\s+you\s+like|deals?|offers?|sale|discount|promo\w*|from\s+only|book\s+now|book\s+(?:your|a)\b|click|tap|choose|select|departed|landed|arrived)\b/i;
   const NO_HE = /(?:אתמול|שבוע שעבר|בוטל|בוטלה|ביטול|לבטל|נדחה|נדחתה|לדחות|עיכוב|עוכב|שונה|השתנה|לצערנו|מצטערים|מצטער|אולי|במקום|מבצע|הנחה|מבצעים|הזמינו\s+עכשיו|לחץ|בחר|בחרי|המריאה|נחתה)/;
