@@ -252,3 +252,4 @@ One line per decision: `date · decision · who · where it is written in docs/`
 2026-10-26: polite Hebrew asks opened with «האם» (תוכל / אפשר לקבל) and "Would it be possible to get..." now offer the reply card (package unchanged, run 100). Gate: not run live.
 2026-10-26: six polite English asks with a deadline (grateful if you could, do you think you could, if you could send, we need X back, X from you, helpful to have X) now offer the reply card (package unchanged, run 101). Gate: not run live.
 2026-10-26: Hebrew second-person 'can you' asks (את יכולה / אתה יכול / אתם יכולים / היית יכולה + a work verb) and 'Are you able to' now offer the reply card (package unchanged, run 102). Gate: not run live.
+2026-10-26: asks for a reply, decision or signature ('get back to me', 'let me know your decision', 'kindly revert', 'need your signature', אשמח שתחזור אליי, אני זקוק לחתימה שלך) now offer the reply card (package unchanged, run 103). Gate: not run live.

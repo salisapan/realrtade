@@ -851,3 +851,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** new `test/can-you-he-corpus.cjs` (9 asks, 5 look-alikes; asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run.
 - **Open:** live Gate; two borderline lines now show (a «…לדנה במקום אליי» redirect and a «…כבר קיבלתי אותו» contradiction), the same as the «תוכל» forms did before; the «We need to talk … back at the office» false positive from run 101 is still open.
+
+### Run 103 (2026-10-26)
+- **Capability shipped:** the everyday asks for an answer, a decision or a signature ("get back to me", "let me know your decision", "kindly revert", "need your signature", «אשמח שתחזור אליי», «אני זקוק לחתימה שלך») were quiet; they now offer the reply card.
+- **Code:** `core/judgment.js` only (English and Hebrew handoff readers).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/reply-ask-corpus.cjs` (10 asks written after the patterns, 6 quiet look-alikes; 9 of 10 asks fail on the old code); every `test/*corpus.cjs` green. No real-browser spec this run. A probe of 12 invented negatives showed no new false positive.
+- **Open:** live Gate; «צריך לסגור את זה עד יום רביעי, אפשר שתאשר?» still quiet; the "We need to talk … back at the office" false positive (run 101) is still open.
