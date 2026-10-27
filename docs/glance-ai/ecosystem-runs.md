@@ -974,3 +974,11 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/work-ask-corpus.cjs` +2 asks and 2 quiet lines; the new Meta cases; every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; the date-only meeting decision; «אפשר לשלוח לך את החוזה עד מחר?» is routed to the file chain, not changed.
+
+### Run 119 (2026-10-27)
+- **Capability shipped (behind `SYSTEM_NOTICE`, off):** a notice from an Israeli service with a deadline and a preventing action (the electric company, the state, a telecom, an invoicing service) used to be dropped: the sender was not on the known list and Hebrew dates like "ב-5.11" were not read. It now gives the existing Log It card with the date.
+- **Trust decision to note (owner):** the known-sender list is a trust list. I added eleven Israeli domains (listed in `ecosystem-coverage.md`); matching is exact-domain-or-subdomain, so a lookalike never passes, and the result is only a task the person approves. If the owner wants a narrower or wider list, it is one array in `core/system-notice.js`.
+- **Code:** `core/system-notice.js` only (domains, the provider names, the numeric Hebrew date).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/system-notice-corpus.cjs` +4 Israeli positives and 5 quiet cases; 2 real-browser Outlook cases (the task with date and sender, Undo; a lookalike sender shows nothing); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; English day/month dates stay quiet (ambiguous); no WhatsApp or Gmail spec for the Israeli notices.

@@ -463,3 +463,34 @@ for (const [label, body, want] of [['English', 'Hi Sali, a friendly reminder to 
     await expect.poll(async () => (await todo(glance)).length).toBe(0);
   });
 }
+
+test('SYSTEM_NOTICE off: an electric-company notice shows no card; on: one To Do task with the date, read back, Undo deletes it, nothing is paid', async ({ glance }) => {
+  const body = 'שלום סלי, החשבון שלך יחויב ב-5.11. יש לעדכן פרטי תשלום.';
+  await glance.seedOutlook({}, {});
+  n += 1;
+  let page = await glance.openOutlook({ id: 'AQMk-iec-off-' + n, subject: 'עדכון חשבון', senderEmail: 'noreply@iec.co.il', senderName: 'חברת החשמל', body: body });
+  await page.waitForTimeout(3000);
+  await expect(page.locator(PANE + ' .flow-chip-host')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(0);
+  await glance.seedOutlook({ glanceSwitches: { SYSTEM_NOTICE: true } }, {});
+  n += 1;
+  page = await glance.openOutlook({ id: 'AQMk-iec-on-' + n, subject: 'עדכון חשבון', senderEmail: 'noreply@iec.co.il', senderName: 'חברת החשמל', body: body });
+  await expect(page.locator(PANE + ' button.flow-chip')).toBeVisible({ timeout: 20000 });
+  await page.locator(PANE + ' button.flow-chip').click();
+  await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const list = await todo(glance);
+  expect(list).toHaveLength(1);
+  expect(JSON.stringify(list[0])).toContain('2026-11-05');
+  expect(JSON.stringify(list[0])).toContain('noreply@iec.co.il');
+  await page.locator(PANE + ' button.flow-chip-undo').click();
+  await expect.poll(async () => (await todo(glance)).length).toBe(0);
+});
+
+test('SYSTEM_NOTICE on: the same words from a lookalike domain show no card', async ({ glance }) => {
+  await glance.seedOutlook({ glanceSwitches: { SYSTEM_NOTICE: true } }, {});
+  n += 1;
+  const page = await glance.openOutlook({ id: 'AQMk-iec-fake-' + n, subject: 'עדכון חשבון', senderEmail: 'noreply@iec-billing.co.il', senderName: 'חברת החשמל', body: 'שלום סלי, החשבון שלך יחויב ב-5.11. יש לעדכן פרטי תשלום.' });
+  await page.waitForTimeout(3500);
+  await expect(page.locator(PANE + ' .flow-chip-host')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(0);
+});
