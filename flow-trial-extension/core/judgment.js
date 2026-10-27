@@ -272,6 +272,10 @@ const FlowJudgment = (() => {
   // status line or a thank-you that merely mentions an update stays quiet. Kept out of HANDOFF so the quoted sentence is unchanged.
   const STATUS_INTRO_ASK = /\b(?:(?:can|could|would|will) you (?:please )?(?:introduce|connect|put) me|(?:please )?(?:introduce|connect) me (?:to|with)|put me in touch with|what(?:'s| is) the (?:current )?status of|(?:please )?(?:keep|update) me (?:posted|updated|in the loop|on|about)|(?:please )?(?:give|send|get) me (?:a |an )?(?:quick |brief |short |written )?(?:status |progress )?(?:update|report)\b|i need (?:a |an )?(?:quick |brief )?(?:status |progress )?update\b|(?:please )?(?:countersign|co-sign)\b|let me know (?:the status|once|when)\b[^.?!\n]{0,60}\b(?:by|before|today|tonight|tomorrow|this week|ready|done|sent|paid))/i;
   const STATUS_INTRO_ASK_HE = /(?:^|\s)(?:תעדכן|תעדכני|תעדכנו|עדכן|עדכני)\s+אותי|(?:^|\s)מה\s+(?:ה)?סטטוס\s+של|(?:אשמח|נשמח)\s+(?:ל(?:קבל\s+)?)?עדכון|(?:^|\s)(?:תעדכן|תעדכני|תעדכנו)\s+(?:אותי\s+)?(?:את\s+)?(?:ה)?סטטוס|(?:^|\s)(?:תפגיש|תפגישי|תכיר|תכירי|תחבר|תחברי)\s+(?:אותי|לי)|(?:ש|ל)(?:תפגיש|תפגישי)\s+אותי|(?:ל)?הכיר\s+לי\s+את|להפגיש\s+אותי/;
+  // Asks for an account action: access, a password reset, a transfer, a copy of the reply. The lead ("please", "can you") is
+  // required, so "access has been granted" and "your password was reset" stay quiet. Kept out of HANDOFF like the two above.
+  const ACCOUNT_ASK = /\b(?:please|kindly|can you|could you|would you(?: please)?)\s+(?:(?:grant|give)\s+(?:me|us|[a-z]+)\s+(?:\S+\s+){0,2}?access\b|reset\s+(?:my|our|the)\s+(?:password|login|2fa)\b|transfer\s+(?:the|our|my)\s+(?:domain|account|licen[sc]e)\b|(?:copy|cc|bcc)\s+me\b)/i;
+  const ACCOUNT_ASK_HE = /(?:^|\s)(?:תעלה|תעלי|תעלו|תעביר|תעבירי|תעבירו|תאפס|תאפסי|תאפסו|תשים|תשימי|תשימו)\s+(?:לי\s+)?(?:בבקשה\s+)?(?:(?:את\s+)?(?:ה)?(?:טופס|מסמך|קובץ|דומיין|סיסמה|חשבון|רישיון)|אותי\s+בעותק)|(?:^|\s)(?:תן|תני|תנו)\s+לי\s+גישה/;
   // A short direct question that asks the reader for a named thing ("יש קישור לזום ?", "Do you have the invoice?"). Chat and
   // mail both carry these; the length floor used to drop them on every surface. The whole message has to be the question, so a
   // longer text, a bare "really?" and a greeting stay on the normal path.
@@ -655,7 +659,7 @@ const FlowJudgment = (() => {
     // A clock in the text ("Tuesday at 3", "בשעה 16:00") belongs to the event and hold gates, which already decide it.
     const clockNamed = /\b(?:at|@)\s*\d{1,2}(?::\d{2})?\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b|בשעה\s*\d|(?:^|\s)ב-?\d{1,2}(?::\d{2})?(?:\s|$|[.,?!])/i.test(text);
     const slotAsk = !clockNamed && slotAskText(text);
-    const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE, STATUS_INTRO_ASK, STATUS_INTRO_ASK_HE], directedAsk);
+    const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE, STATUS_INTRO_ASK, STATUS_INTRO_ASK_HE, ACCOUNT_ASK, ACCOUNT_ASK_HE], directedAsk);
     const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk;
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
