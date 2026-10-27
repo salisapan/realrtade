@@ -982,3 +982,10 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`.
 - **Tests:** `test/system-notice-corpus.cjs` +4 Israeli positives and 5 quiet cases; 2 real-browser Outlook cases (the task with date and sender, Undo; a lookalike sender shows nothing); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
 - **Open:** live Gate; English day/month dates stay quiet (ambiguous); no WhatsApp or Gmail spec for the Israeli notices.
+
+### Run 120 (2026-10-27)
+- **Capability shipped (behind `GOOGLE_FORMS` + `WORKSPACE_FILE`, off):** "Create a feedback form called X" / «תפתח טופס הרשמה בשם X» could be recognised but the write always answered not-connected; the manifest now carries `forms.body` and the Forms host, so Do It creates the empty form, reads it back by id and Undo trashes it unless it was edited. The form has its own Labs switch; a doc or sheet is unaffected.
+- **Note for the owner:** the scope list changed, so connected people are asked to reconnect Google once; Google's verification of the scope and the privacy and store wording are your steps (open-tasks row 85, wording proposed there).
+- **Code:** `manifest.json`, `core/workspace-file.js`, `core/google-config.js`, `core/labs-switches.js`, `core/consent-catalog.js`, `src/google-lane-host.js`, `src/google-web-auth.js`.
+- **Tests:** `test/google-form-corpus.cjs` +6 checks (switch off, doc unaffected, manifest, allowlist); scope lists updated in the web-auth, write and e2e launch fixtures. The real-browser spec was updated but could not start in this container (`chrome is not defined` in the extension worker, same on the untouched base).
+- **Open:** live Gate; Google scope verification; next backlog item (3) the five red add-on tests (row 83 says they are a product decision), then (4) Messenger and Instagram parity.

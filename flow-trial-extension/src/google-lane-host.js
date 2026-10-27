@@ -698,7 +698,7 @@ async function prepareWrite(connectorId, input, cred) {
   if (connectorId === 'googleNewFile') {
     const W = globalThis.FlowWorkspaceFile;
     return {
-      flags: W ? { [W.SWITCH]: await laneSwitchOn(W.SWITCH) } : {},
+      flags: W ? { [W.SWITCH]: await laneSwitchOn(W.SWITCH), [W.FORMS_SWITCH]: await laneSwitchOn(W.FORMS_SWITCH) } : {},
       fileKind: params.fileKind || i.fileKind || '',
       name: params.name || i.name || '',
       now: new Date().toISOString()
@@ -945,7 +945,8 @@ function onLaneMessage(msg, sender, sendResponse) {
     Promise.resolve((async () => {
       if (!W || typeof W.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
       if (!(await laneSwitchOn(W.SWITCH))) return { action: 'off', reason: 'switch-off' };
-      return W.plan({ flags: { [W.SWITCH]: true }, text: String(msg.text || '').slice(0, 4000) });
+      const forms = await laneSwitchOn(W.FORMS_SWITCH);
+      return W.plan({ flags: { [W.SWITCH]: true, [W.FORMS_SWITCH]: forms }, text: String(msg.text || '').slice(0, 4000) });
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }

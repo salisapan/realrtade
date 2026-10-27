@@ -6,7 +6,7 @@
 // lbihckfmoffgjjlnneoeaehbhoonfenh.
 //
 // Allowed scopes, and nothing else: openid, email, profile, drive.file,
-// calendar.events, tasks. Docs and Sheets are used only
+// calendar.events, tasks, forms.body (a new form, behind GOOGLE_FORMS). Docs and Sheets are used only
 // on a file Glance created or the person picked. A gmail.* scope is refused
 // here. Gmail is read and filled on the Gmail page. Glance never presses Send.
 const FlowGoogleConfig = (() => {
@@ -18,13 +18,15 @@ const FlowGoogleConfig = (() => {
   const SCOPE_DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
   const SCOPE_CALENDAR = 'https://www.googleapis.com/auth/calendar.events';
   const SCOPE_TASKS = 'https://www.googleapis.com/auth/tasks';
+  const SCOPE_FORMS = 'https://www.googleapis.com/auth/forms.body';
   const SCOPES = [
     SCOPE_OPENID,
     SCOPE_EMAIL,
     SCOPE_PROFILE,
     SCOPE_DRIVE_FILE,
     SCOPE_CALENDAR,
-    SCOPE_TASKS
+    SCOPE_TASKS,
+    SCOPE_FORMS
   ];
 
   function scopeList(scopes) {
