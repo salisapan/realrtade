@@ -99,7 +99,7 @@ function calendar(opts) {
   check('the card kind, payload and lane connector exist', /kind: 'calendarRecurring'/.test(gm) && /action\.kind === 'calendarRecurring'/.test(gm) && /calendarRecurring: 'googleRecurringReminder'/.test(gm));
   check('a meeting stays the Hold It card', /c\.intent\.type === 'event'\) return false/.test(gm));
   const manifest = JSON.parse(read('manifest.json'));
-  check('the manifest has no new scope or host for this', !JSON.stringify(manifest).includes('forms.googleapis.com'));
+  check('the manifest has no new scope or host for this (forms.body is the owner-approved Forms one)', manifest.oauth2.scopes.length === 8 && manifest.host_permissions.filter((h) => /googleapis/.test(h)).length === 7);
 
   console.log(failures ? failures + ' failure(s)' : 'all passed');
   process.exit(failures ? 1 : 0);
