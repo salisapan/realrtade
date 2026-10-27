@@ -87,8 +87,9 @@
       sender: { name: party.name, phone: party.phone },
       key: key
     };
-    FlowChatLane.draftInto(composerBox(main), input).then((r) => {
-      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input);
+    const box = composerBox(main);
+    FlowChatLane.draftInto(box, input).then((r) => {
+      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input, box);
       if (!r || r.reason !== 'no-box') drafted.add(key);
     }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
   }

@@ -556,6 +556,18 @@ function startGoogleLaneServer() {
         send(res, task && task.__list === taskOne[1] ? 200 : 404, task && task.__list === taskOne[1] ? publicTask(task) : GOOGLE_404('Not Found'));
         return;
       }
+      if (taskOne && method === 'PATCH') {
+        const task = state.tasks[taskOne[2]];
+        if (!task || task.__list !== taskOne[1]) { send(res, 404, GOOGLE_404('Not Found')); return; }
+        const body = readJson(raw) || {};
+        if (body.status === 'completed') { task.status = 'completed'; task.completed = '2026-10-25T09:00:00.000Z'; }
+        else if (body.status === 'needsAction') { task.status = 'needsAction'; delete task.completed; }
+        if (typeof body.title === 'string') task.title = body.title;
+        if (typeof body.notes === 'string') task.notes = body.notes;
+        state.patches = (state.patches || []).concat([{ id: task.id, body: body }]);
+        send(res, 200, publicTask(task));
+        return;
+      }
       if (taskOne && method === 'DELETE') {
         if (!state.tasks[taskOne[2]]) { send(res, 404, GOOGLE_404('Not Found')); return; }
         delete state.tasks[taskOne[2]];

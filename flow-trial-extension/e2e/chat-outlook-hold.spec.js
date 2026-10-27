@@ -101,3 +101,62 @@ test('the same reminder repeated in the same chat while its task stands is not o
   await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
   expect(await todo(glance)).toHaveLength(1);
 });
+
+test('a payment asked in a chat is one To Do task, and "Reminder: …" repeating it is not offered a second one', async ({ glance }) => {
+  let page = await open(glance, { CHAT_TASK_CARD: true }, 'Please transfer 500 NIS to my account by Sunday');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const first = await todo(glance);
+  expect(first).toHaveLength(1);
+  expect(JSON.stringify(first[0])).toMatch(/Pay 500 NIS/);
+  expect(JSON.stringify(first[0])).not.toContain('my account');
+  page = await glance.openMessenger(HTML('Reminder: please transfer 500 NIS to my account by Sunday'));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(1);
+});
+
+test('a deadline asked in a chat is one To Do task, and "Reminder: …" repeating it is not offered a second one', async ({ glance }) => {
+  let page = await open(glance, { CHAT_TASK_CARD: true }, 'Please send the signed form by Monday');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await todo(glance)).toHaveLength(1);
+  page = await glance.openMessenger(HTML('Reminder: please send the signed form by Monday'));
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
+  expect(await todo(glance)).toHaveLength(1);
+});
+
+test('a booking the business cancelled offers to remove the hold Glance made from this chat; Do It removes that event and it is gone', async ({ glance }) => {
+  let page = await open(glance, { CHAT_TASK_CARD: true }, 'Your appointment is confirmed for tomorrow at 14:00');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await events(glance)).toHaveLength(1);
+  page = await glance.openMessenger(HTML('Your appointment tomorrow at 14:00 was cancelled'));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});
+
+test('a cancellation with no hold from this chat offers nothing', async ({ glance }) => {
+  const page = await open(glance, { CHAT_TASK_CARD: true }, 'Your appointment tomorrow at 14:00 was cancelled');
+  await page.waitForTimeout(3000);
+  await expect(page.locator(CARD + ' button.flow-chip')).toHaveCount(0);
+});
+
+test('a cancelled flight offers to remove the Trip hold Glance made from this chat; Do It removes that event', async ({ glance }) => {
+  let page = await open(glance, { CHAT_TASK_CARD: true }, 'Your flight LY001 departs tomorrow at 06:30');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(await events(glance)).toHaveLength(1);
+  page = await glance.openMessenger(HTML('Your flight LY001 departing tomorrow at 06:30 was cancelled'));
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  await expect.poll(async () => (await events(glance)).length).toBe(0);
+});

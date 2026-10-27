@@ -1552,6 +1552,60 @@ function glanceUiCopy(kind) {
     } catch (e) { return false; }
   }
 
+  // The business cancelled a booking, a trip or an invitation that Glance put on this calendar from its own earlier mail: Do It takes that
+  // same event off again through the hold's own undo (Google Calendar read back that it is gone; an event the person changed is left
+  // alone and says so). Quiet when no hold of this sender at that day and clock is on the calendar. Never sends anything.
+  async function cancelledHoldIntent(text, senderEmail) {
+    if (typeof FlowHeldHold === 'undefined' || !senderEmail) return null;
+    let gone = null;
+    for (const reader of [typeof FlowChatAppointmentNotice !== 'undefined' ? FlowChatAppointmentNotice : null, typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null]) {
+      if (!reader || typeof reader.cancelled !== 'function') continue;
+      try { const g = reader.cancelled(text, new Date()); if (g && g.kind === 'cancelled') { gone = g; break; } } catch (e) { /* the next reader */ }
+    }
+    if (!gone) return null;
+    let held = null;
+    try {
+      const bag = await FlowStorage.get();
+      held = FlowHeldHold.find((bag && bag.log) || [], senderEmail, FlowHeldHold.holdAt(gone), []);
+    } catch (e) { return null; }
+    if (!held || !held.ref || (held.connectorId !== 'calendar' && held.connectorId !== 'googleHold')) return null;
+    const he = gone.lang === 'he';
+    const title = String(held.label || '').replace(/^Calendar\s*·\s*/i, '').slice(0, 80);
+    return {
+      type: 'event', label: (he ? 'בוטל: ' : 'Cancelled: ') + title, confidence: 0.9, personalClose: 'booking-cancelled', signals: { score: 90, threshold: 50 },
+      entities: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute },
+      removeHeld: { ref: held.ref, messageId: held.messageId || null, he: he },
+      plannedProcess: { id: 'booking-cancelled', name: he ? 'הסר מהיומן' : 'Remove It', closingLine: he ? 'מסיר מהיומן.' : 'Removing it from your calendar.', closedLine: he ? 'הוסר מהיומן.' : 'Removed from your calendar.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: (he ? 'להסיר מהיומן: ' : 'Remove from calendar: ') + title, params: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute, title: title }, dependsOn: null }] }
+    };
+  }
+
+  // Do It on a cancellation: remove the hold through the lane's undo. A changed event stays and the card says so.
+  async function removeHeldHold(host, chip, ctx) {
+    const held = ctx.intent.removeHeld;
+    setChipState(chip, 'flow-chip-pending', held.he ? 'מסיר…' : 'Removing…');
+    const ref = laneUndoSnapshot('googleHold', held.ref) || held.ref;
+    const u = await sendLaneUndo('googleHold', ref);
+    if (!(u && u.ok)) {
+      const edited = u && laneEditedReason(u.reason);
+      setChipState(chip, 'flow-chip-error', edited ? (held.he ? 'שינית את האירוע, השארתי אותו' : 'You changed this event, so I left it') : (held.he ? 'לא הצלחתי להסיר, נסה שוב' : "Couldn't remove it, try again"));
+      return;
+    }
+    // The hold's own row is undone (so a later mail of that booking can be offered again); this cancellation mail is closed, read back.
+    try { await FlowStorage.appendLog({ kind: 'undone', label: 'Calendar event removed.', messageId: held.messageId, app: SOURCE_APP, connectorId: 'calendar' }); } catch (e) { /* the receipt still shows */ }
+    try { await FlowStorage.appendLog({ kind: 'written', label: 'Calendar event removed.', messageId: ctx.messageId, legacyMessageId: ctx.legacyMessageId || null, threadId: ctx.threadId || null, app: SOURCE_APP, connectorId: 'calendar', fetchedBack: true, receiptStatus: 'Handled.' }); } catch (e) { /* the receipt still shows */ }
+    host.classList.add('flow-chip-settled');
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
+    const icon = el('span', 'flow-chip-done-icon', '✓');
+    icon.setAttribute('aria-hidden', 'true');
+    done.appendChild(icon);
+    done.appendChild(el('span', 'flow-chip-handled', glanceShow('Handled.')));
+    done.appendChild(el('span', 'flow-chip-written', glanceShow(u.written || (held.he ? 'הוסר מהיומן.' : 'Removed from your calendar.'))));
+    host.replaceChildren(done);
+  }
+
   async function classifyForChip(text, base) {
     const prepared = (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function')
       ? FlowIncomingJudge.prepareForJudge(text)
@@ -1574,6 +1628,10 @@ function glanceUiCopy(kind) {
       try { bag = await chrome.storage.local.get({ glanceSwitches: {} }); } catch (e) { bag = null; }
       const sw = (bag && bag.glanceSwitches) || {};
       const judgeIn = { text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null };
+      if (sw.BOOKING_NOTICE === true) {
+        const gone = await cancelledHoldIntent(prepared, ctx.senderEmail);
+        if (gone) return gone;
+      }
       const hit = (sw.PAYMENT_ASK === true ? FlowIncomingJudge.paymentAsk(judgeIn, prepared) : null) || (sw.BOOKING_NOTICE === true ? FlowIncomingJudge.bookingNotice(judgeIn, prepared) : null) || (sw.TASK_ASK === true ? FlowIncomingJudge.taskAsk(judgeIn, prepared) : null);
       if (hit && await holdAlreadyMade(ctx.senderEmail, hit.intent, [ctx.messageId])) return { type: null };
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
@@ -5330,6 +5388,7 @@ function glanceUiCopy(kind) {
       checkBrief();
       return;
     }
+    if (ctx.intent && ctx.intent.removeHeld) return removeHeldHold(host, chip, ctx);
 
     // Every pill removed is a deliberate "do nothing" — the same outcome as
     // dismissing the chip, not a disabled button with no explanation. It also

@@ -6,12 +6,12 @@
 // task, "Pay 500 NIS", that the person approves. Portable: no chrome.*, no DOM, no network.
 const FlowChatPaymentAsk = (() => {
   const VERB_EN = /\b(?:transfer|pay|send|wire|settle|bit|paybox)\b/i;
-  const VERB_HE = /(?:תעביר|תעבירי|תעבירו|תשלם|תשלמי|תשלמו|תשלח|תשלחי|תשלחו|תבצע\s+העברה|תסגור|תסגרי)/;
+  const VERB_HE = /(?:(?:נא|אפשר|תוכל(?:י|ו)?|מבקש(?:ת)?|צריך|צריכה|חייב(?:ת)?)\s+(?:בבקשה\s+)?(?:להעביר|לשלם|לשלוח|לבצע\s+העברה|לסגור)|תעביר|תעבירי|תעבירו|תשלם|תשלמי|תשלמו|תשלח|תשלחי|תשלחו|תבצע\s+העברה|תסגור|תסגרי)/;
   const ASK_EN = /^(?:(?:hey|hi|hello)[\s,]+\S+[\s,]+)?(?:please\s+|pls\s+|kindly\s+)?(?:can|could|would|will)?\s*(?:you\s+)?(?:please\s+)?(?:transfer|pay|send|wire|settle|bit|paybox)\b|^(?:please\s+)(?:transfer|pay|send|wire|settle)\b|\byou\s+(?:owe|need\s+to\s+pay|still\s+owe)\b|\b(?:need|want)\s+you\s+to\s+(?:transfer|pay|send)\b/i;
-  const ASK_HE = /^(?:(?:שלום|היי|הי|הלו)(?:\s+[^\s,]+)?\s*,?\s+)?(?:בבקשה\s+)?(?:אפשר\s+ש)?(?:תעביר|תעבירי|תעבירו|תשלם|תשלמי|תשלמו|תשלח|תשלחי|תשלחו|תבצע|תסגור|תסגרי)|אתה\s+חייב|את\s+חייבת|אתם\s+חייבים|אני\s+צריך\s+שתעביר|צריך\s+שתשלם/;
+  const ASK_HE = /^(?:(?:שלום|היי|הי|הלו)(?:\s+[^\s,]+)?\s*,?\s+)?(?:נא|אפשר|תוכל(?:י|ו)?|מבקש(?:ת)?|אשמח\s+אם\s+תוכל(?:י|ו)?)\s+(?:בבקשה\s+)?(?:להעביר|לשלם|לשלוח|לבצע\s+העברה|לסגור)|^(?:(?:שלום|היי|הי|הלו)(?:\s+[^\s,]+)?\s*,?\s+)?(?:בבקשה\s+)?(?:אפשר\s+ש)?(?:תעביר|תעבירי|תעבירו|תשלם|תשלמי|תשלמו|תשלח|תשלחי|תשלחו|תבצע|תסגור|תסגרי)|אתה\s+חייב|את\s+חייבת|אתם\s+חייבים|אני\s+צריך\s+שתעביר|צריך\s+שתשלם/;
   const AMOUNT = /(?:(?:[$€£₪])\s?(\d[\d,]*(?:\.\d{1,2})?))|(?:(\d[\d,]*(?:\.\d{1,2})?)\s?(?:nis|ils|usd|eur|gbp|dollars?|euros?|shekels?|bucks|₪|\$|€|£|שקל(?:ים)?|שקלים|ש"ח|ש״ח|שח|דולר(?:ים)?|אירו|יורו))/i;
   const NO_EN = /\b(?:receipt|refunded|thank(?:s|\s+you)\s+for\s+(?:your\s+)?payment|has\s+been\s+paid|was\s+paid|autopay|auto-?pay|will\s+be\s+charged|direct\s+debit|don'?t|do\s+not|no\s+need|never\s*mind|already|paid|sent|yesterday|last\s+(?:week|night)|maybe|might|if\s+you\s+(?:want|can|like)|cancel(?:l?ed)?|refund|i'?ll|i\s+will|i\s+can|i\s+sent|i\s+paid|(?:he|she|they)\s+(?:will|should|can))\b/i;
-  const NO_HE = /(?:קבלה|שולם|שולמה|תודה\s+על\s+התשלום|הוראת\s+קבע|יחויב|תחויב|אל\s+תעביר|אל\s+תשלם|אין\s+צורך|לא\s+צריך|כבר\s|שילמתי|העברתי|אתמול|שבוע שעבר|אולי|אם\s+(?:בא|תוכל|אפשר)|לבטל|בוטל|החזר|אני\s+(?:אעביר|אשלם|אשלח))/;
+  const NO_HE = /(?:נא\s+לא|קבלה|שולם|שולמה|תודה\s+על\s+התשלום|הוראת\s+קבע|יחויב|תחויב|אל\s+תעביר|אל\s+תשלם|אין\s+צורך|לא\s+צריך|כבר\s|שילמתי|העברתי|אתמול|שבוע שעבר|אולי|אם\s+(?:בא|תוכל|אפשר)|לבטל|בוטל|החזר|אני\s+(?:אעביר|אשלם|אשלח))/;
   const MAX_AHEAD_DAYS = 60;
   const DAYS_EN = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -117,8 +117,12 @@ const FlowChatPaymentAsk = (() => {
   const BILL_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:invoice|bill|statement|subscription|rent|instal+ment|balance|tax|premium|fee|fine|ticket)\b[^.?!]{0,80}\b(?:is|are)?\s*(?:due|payable|overdue|outstanding)\b|\bpayment\s+(?:is\s+)?due\b|\bamount\s+due\b/i;
   const BILL_HE = /(?:החשבונית|החשבון|החיוב|המנוי|התשלום|שכר\s+הדירה|הארנונה|החוב|הקנס|הפרמיה|הדוח)\s+(?:שלך|שלכם|שלכן)[^.?!]{0,80}(?:לתשלום|פירעון|בפיגור|ממתין|ממתינה)|מועד\s+(?:הפירעון|התשלום)|לתשלום\s+עד/;
 
+  // A nudge in front of the same ask ("Reminder: please transfer…", «תזכורת: תעביר…») is the same ask, not another sentence.
+  const NUDGE_EN = /^(?:(?:a\s+)?(?:gentle|friendly|quick|polite)\s+)?(?:reminder|nudge|ping|follow(?:ing)?[\s-]*up)\s*[:,\-–—]\s*/i;
+  const NUDGE_HE = /^(?:תזכורת(?:\s+(?:ידידותית|קטנה))?|שוב)\s*[:,\-–—]\s*/;
+
   function recognize(text, now) {
-    const raw = amountWords(String(dayWords(text, now) || '')).replace(/\s+/g, ' ').trim();
+    const raw = amountWords(String(dayWords(text, now) || '')).replace(/\s+/g, ' ').trim().replace(NUDGE_EN, '').replace(NUDGE_HE, '');
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 200) return { kind: 'none', reason: 'long' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-an-ask' };
@@ -143,7 +147,35 @@ const FlowChatPaymentAsk = (() => {
     return { kind: 'ask', billed: billed, dateIso: d.iso, amount: amount, currency: currency, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
-  return { recognize: recognize };
+  // An invoice or bill that names its number and its day but no amount ("Reminder: your invoice 2231 is due on 30/10", «חשבונית מספר
+  // 2231 לתשלום עד 30/10»). The task is "Pay invoice 2231" on that day; the amount is not invented. The same refusals as above (a receipt,
+  // a charge that happens by itself, a thing already paid), and only the person's own bill in English ("your ...") or a stated due day in
+  // Hebrew. A bill that has an amount is the ask above. { kind: 'ask', ref, billed: true, amount: '', currency: '', dateIso, lang } or { kind: 'none' }.
+  const REF_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:invoice|bill|statement|instal+ment)\s*(?:#|no\.?|number)?\s*([A-Za-z]{0,4}-?\d{2,10})\b[^.?!]{0,60}\b(?:is|are)?\s*(?:due|payable|overdue|outstanding)\b|\b(?:invoice|bill)\s*(?:#|no\.?|number)?\s*([A-Za-z]{0,4}-?\d{2,10})\s+(?:is|are)\s+(?:due|payable|overdue|outstanding)\b/i;
+  const REF_HE = /(?:חשבונית|החשבונית)\s+(?:מס(?:פר|\x27)?\.?\s*)?(\d{2,10})\b[^.?!]{0,40}(?:לתשלום\s+עד|מועד\s+(?:הפירעון|התשלום)|פירעון)/;
+  function recognizeBill(text, now) {
+    const raw = amountWords(String(dayWords(text, now) || '')).replace(/\s+/g, ' ').trim().replace(NUDGE_EN, '').replace(NUDGE_HE, '');
+    if (!raw) return { kind: 'none', reason: 'empty' };
+    if (raw.length > 200) return { kind: 'none', reason: 'long' };
+    if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-an-ask' };
+    if ((raw.match(new RegExp(AMOUNT.source, 'gi')) || []).length) return { kind: 'none', reason: 'has-amount' };
+    const m = raw.match(REF_EN) || raw.match(REF_HE);
+    if (!m) return { kind: 'none', reason: 'no-bill' };
+    const ref = String(m[1] || m[2] || '').trim();
+    if (!ref) return { kind: 'none', reason: 'no-ref' };
+    const X = extractApi();
+    if (!X || typeof X.parseDate !== 'function') return { kind: 'none', reason: 'not-configured' };
+    const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);
+    const rest = raw.replace(ref, ' ');
+    const d = X.parseDate(rest, at) || weekdayDate(rest, at);
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(d.iso || ''))) return { kind: 'none', reason: 'no-day' };
+    const today = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+    const ahead = Math.round((new Date(d.iso + 'T00:00:00') - today) / 86400000);
+    if (!(ahead >= 0 && ahead <= MAX_AHEAD_DAYS)) return { kind: 'none', reason: 'day-out-of-range' };
+    return { kind: 'ask', billed: true, ref: ref, dateIso: d.iso, amount: '', currency: '', lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+  }
+
+  return { recognize: recognize, recognizeBill: recognizeBill };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatPaymentAsk };

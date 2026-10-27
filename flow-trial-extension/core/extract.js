@@ -230,6 +230,8 @@ const FlowExtract = (() => {
       let monthIdx = null;
       if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
       else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
+      // A Hebrew sentence writes day first (01/11 is 1 November): that is the convention in Israel. English stays ambiguous.
+      else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && /[\u0590-\u05FF]/.test(src)) { day = a; monthIdx = b - 1; }
       else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
       let year = m[3] ? +m[3] : null;
       if (year != null && year < 100) year += 2000;
@@ -264,6 +266,8 @@ const FlowExtract = (() => {
     let month = null;
     if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; month = b; }
     else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; month = a; }
+    // Hebrew mail writes day first (5/11 is 5 November). Same rule as slashDate().
+    else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && /[\u0590-\u05FF]/.test(src)) { day = a; month = b; }
     else return null;
     return { day: day, month: month, yearRaw: m[3] || null, token: m[1] + (slash ? '/' : '.') + m[2] + (m[3] ? (slash ? '/' : '.') + m[3] : '') };
   }

@@ -14,7 +14,7 @@ function check(name, cond, detail) {
 }
 
 const ROOT = path.join(__dirname, '..');
-const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'day-words.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-travel-notice.js', 'chat-invitation-notice.js', 'chat-self-note.js'];
+const CORE = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'file-attach.js', 'intent.js', 'actions.js', 'resolution.js', 'incoming-judge.js', 'commitment-title.js', 'day-words.js', 'meeting-confirm.js', 'teams-meeting.js', 'chat-reminder.js', 'chat-deadline-ask.js', 'chat-callback-ask.js', 'chat-payment-ask.js', 'chat-appointment-notice.js', 'chat-pickup-notice.js', 'chat-travel-notice.js', 'chat-delivery-window.js', 'chat-payment-claim.js', 'chat-invitation-notice.js', 'chat-self-note.js'];
 const NOW = new Date('2026-10-20T10:00:00+03:00').getTime();
 
 function world(opts) {
@@ -51,6 +51,7 @@ function world(opts) {
           calls.push(msg);
           let r = { ok: false };
           if (msg.type === 'flow:chat-task-target') r = o.target;
+          else if ((msg.type === 'flow:execute-action' || msg.type === 'flow:google-write') && typeof o.exec === 'function') r = o.exec(msg);
           else if (msg.type === 'flow:execute-action' || msg.type === 'flow:google-write') r = o.exec || { ok: true, ref: { taskId: 'T1', externalId: 'T1' }, written: 'Task added.', url: 'https://tasks.example/T1', proof: { system: 'googleTasks', externalId: 'T1', fetchedBack: true } };
           else if (msg.type === 'flow:undo-action' || msg.type === 'flow:google-undo') r = o.undo || { ok: true, written: 'Task removed.' };
           Promise.resolve().then(() => cb(r));
@@ -458,13 +459,230 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
     check('the first payment ask makes one task', w.logRows.length === 1 && !!w.logRows[0].heldKey, w.logRows[0]);
     const shownBefore = w.injected.length;
-    const again = await w.Card.offer(input('Hi again, please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-2' }));
+    const again = await w.Card.offer(input('Reminder: please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-2' }));
     check('the same payment in the same chat is not offered again', !again.shown && again.reason === 'already-on-task-list' && w.injected.length === shownBefore, again);
     const other = await w.Card.offer(input('Please transfer 900 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-3' }));
     check('another amount is a different task and is offered', other.shown, other);
     await w.receipts.find((x) => x.receipt).receipt.onUndo();
-    const afterUndo = await w.Card.offer(input('Hi again, please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-4' }));
+    const afterUndo = await w.Card.offer(input('Reminder: please transfer 500 NIS to my account by Sunday', { channel: 'whatsapp', key: 'm-4' }));
     check('after the task was undone the same payment is offered again', afterUndo.shown, afterUndo);
+  }
+
+  // 5u. A deadline asked and then nudged ("Reminder: please send it by Monday") is one task, not two; a look back is nothing.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleTask' } });
+    await w.Card.offer(input('Please send the signed form by Monday', { channel: 'whatsapp', key: 'd-1' }));
+    check('the deadline ask is offered', w.injected.length === 1);
+    await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    const again = await w.Card.offer(input('Reminder: please send the signed form by Monday', { channel: 'whatsapp', key: 'd-2' }));
+    check('the nudged deadline ask is the same task and is not offered again', !again.shown && again.reason === 'already-on-task-list', again);
+    const q = world({ target: { ok: true, connectorId: 'googleTask' } });
+    check('a Reminder look back offers nothing', !(await q.Card.offer(input('Reminder: the form was due Monday', { channel: 'whatsapp' }))).shown);
+  }
+
+  // 5v. A booking that was moved is the same booking at a new day and clock: the new time is offered as its own hold.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    await w.Card.offer(input('Your appointment is confirmed for Sunday at 10:00', { channel: 'whatsapp', key: 'mv-1' }));
+    await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    const moved = await w.Card.offer(input('Your appointment has been moved to Monday at 11:00', { channel: 'whatsapp', key: 'mv-2' }));
+    const st = moved.shown && w.injected[w.injected.length - 1].ctx.process.steps[0].params;
+    check('the moved appointment is offered at the new day and clock', !!st && st.dateIso === '2026-10-26' && st.hour === 11 && st.minute === 0, st || moved);
+    const he = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('Hebrew moved appointment is offered', (await he.Card.offer(input('התור שלך הועבר ליום שני בשעה 11:00', { channel: 'whatsapp' }))).shown);
+    const c = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('a cancelled appointment offers nothing', !(await c.Card.offer(input('Your appointment on Sunday at 10:00 was cancelled', { channel: 'whatsapp' }))).shown);
+  }
+
+  // 5w. A trip told as delayed with its new time is offered at the new time; a delay with no new time offers nothing.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const r = await w.Card.offer(input('Your flight LY001 has been delayed, it now departs Sunday at 07:15', { channel: 'whatsapp' }));
+    const st = r.shown && w.injected[0].ctx.process.steps[0].params;
+    check('the delayed flight is offered at its new time', !!st && st.hour === 7 && st.minute === 15, st || r);
+    const q = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('a delay with no new time offers nothing', !(await q.Card.offer(input('Your flight LY001 has been delayed', { channel: 'whatsapp' }))).shown);
+  }
+
+  // 5x. A pickup whose last day was moved is offered as a task due the new day; a delivery moved is nothing to pick up.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleTask' } });
+    const r = await w.Card.offer(input('Your order pickup has been extended to Thursday', { channel: 'whatsapp' }));
+    const st = r.shown && w.injected[0].ctx.process.steps[0].params;
+    check('the extended pickup is offered with the new last day', !!st && /^\d{4}-\d{2}-\d{2}$/.test(st.dateIso) && /pick up/i.test(st.title), st || r);
+    const q = world({ target: { ok: true, connectorId: 'googleTask' } });
+    check('a moved delivery offers nothing', !(await q.Card.offer(input('Your order delivery was moved to Thursday', { channel: 'whatsapp' }))).shown);
+  }
+
+  // 5y. A cancellation of a booking this chat already put on the calendar offers to remove that event; with no hold there is nothing to do.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    await w.Card.offer(input('Your appointment is confirmed for Monday at 11:00', { channel: 'whatsapp', key: 'c-1' }));
+    await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    check('the confirmation makes one hold', w.logRows.length === 1);
+    const r = await w.Card.offer(input('Your appointment on Monday at 11:00 was cancelled', { channel: 'whatsapp', key: 'c-2' }));
+    const last = w.injected[w.injected.length - 1];
+    check('the cancellation offers to remove the hold', r.shown && r.reason === 'remove-offered' && !!last.ctx.chatTask.remove, r);
+    check('the removal card shows no message words', last.ctx.bodyText === '' && !/cancelled$/i.test(JSON.stringify(last.ctx.process)), last.ctx.process);
+    const callsBefore = w.calls.length;
+    await last.handlers.onDoIt(last.host, {}, last.ctx);
+    const undo = w.calls.slice(callsBefore).find((c) => c.type === 'flow:google-undo');
+    check('Do It runs the hold undo with the held ref', !!undo && undo.connectorId === 'googleHold' && !!undo.ref, undo);
+    check('the removal is logged as undone', w.logRows[w.logRows.length - 1].kind === 'undone' && w.logRows[w.logRows.length - 1].chatKey === w.logRows[0].chatKey, w.logRows[w.logRows.length - 1]);
+    const again = await w.Card.offer(input('Your appointment on Monday at 11:00 was cancelled', { channel: 'whatsapp', key: 'c-3' }));
+    check('once removed, a second cancellation offers nothing', !again.shown && again.reason === 'no-hold-to-remove', again);
+
+    const none = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const n = await none.Card.offer(input('Your appointment on Monday at 11:00 was cancelled', { channel: 'whatsapp', key: 'c-4' }));
+    check('a cancellation with no hold offers nothing', !n.shown && n.reason === 'no-hold-to-remove', n);
+
+    const ed = world({ target: { ok: true, connectorId: 'googleHold' }, undo: { ok: false, reason: 'user-edited' } });
+    await ed.Card.offer(input('Your appointment is confirmed for Monday at 11:00', { channel: 'whatsapp', key: 'e-1' }));
+    await ed.injected[0].handlers.onDoIt(ed.injected[0].host, {}, ed.injected[0].ctx);
+    await ed.Card.offer(input('Your appointment on Monday at 11:00 was cancelled', { channel: 'whatsapp', key: 'e-2' }));
+    const lastEd = ed.injected[ed.injected.length - 1];
+    await lastEd.handlers.onDoIt(lastEd.host, {}, lastEd.ctx);
+    check('an event the person edited is left alone and says so', ed.receipts.some((x) => x.state === 'flow-chip-error' && /changed this event/.test(x.text)) && ed.logRows.every((r) => r.kind !== 'undone'), ed.receipts);
+
+    const he = world({ target: { ok: true, connectorId: 'googleHold' } });
+    await he.Card.offer(input('התור שלך נקבע ליום שני בשעה 11:00', { channel: 'whatsapp', key: 'h-1' }));
+    await he.injected[0].handlers.onDoIt(he.injected[0].host, {}, he.injected[0].ctx);
+    const hr = await he.Card.offer(input('התור שלך ביום שני ב-11:00 בוטל', { channel: 'whatsapp', key: 'h-2' }));
+    check('Hebrew cancellation offers the removal', hr.shown && hr.reason === 'remove-offered', hr);
+  }
+
+  // 5z. An invitation that was moved is offered at the new day and clock; a cancelled one offers nothing.
+  {
+    const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+    const r = await w.Card.offer(input('The launch party you were invited to has been moved to Monday at 20:00', { channel: 'whatsapp' }));
+    const st = r.shown && w.injected[0].ctx.process.steps[0].params;
+    check('the moved invitation is offered at its new time', !!st && st.hour === 20 && st.minute === 0, st || r);
+    const q = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('a cancelled invitation offers nothing', !(await q.Card.offer(input('The party you were invited to was cancelled', { channel: 'whatsapp' }))).shown);
+  }
+
+  // 5aa. A cancelled trip and a cancelled invitation take the hold made from this chat off the calendar too.
+  {
+    for (const [made, gone, label] of [
+      ['Your flight LY001 departs Monday at 06:30', 'Your flight LY001 departing Monday at 06:30 was cancelled', 'trip'],
+      ['You are invited to our launch party on Monday at 19:00', 'The launch party on Monday at 19:00 has been cancelled', 'invitation'],
+      ['הטיסה שלך ממריאה ביום שני ב-06:30', 'הטיסה שלך ביום שני ב-06:30 בוטלה', 'Hebrew trip']
+    ]) {
+      const w = world({ target: { ok: true, connectorId: 'googleHold' } });
+      await w.Card.offer(input(made, { channel: 'whatsapp', key: label + '-1' }));
+      await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+      const r = await w.Card.offer(input(gone, { channel: 'whatsapp', key: label + '-2' }));
+      const last = w.injected[w.injected.length - 1];
+      check('the cancelled ' + label + ' offers the removal', r.shown && r.reason === 'remove-offered' && !!last.ctx.chatTask.remove, r);
+      await last.handlers.onDoIt(last.host, {}, last.ctx);
+      check('the ' + label + ' hold was undone', w.logRows[w.logRows.length - 1].kind === 'undone', w.logRows[w.logRows.length - 1]);
+    }
+    const none = world({ target: { ok: true, connectorId: 'googleHold' } });
+    check('a cancelled flight with no hold offers nothing', !(await none.Card.offer(input('Your flight LY001 departing Monday at 06:30 was cancelled', { channel: 'whatsapp' }))).shown);
+  }
+
+  // 5ab. A delivery window told to the person is a hold at the start of the window titled "Delivery 14:00–18:00 · name"; nobody is invited.
+  {
+    for (const [text, titleRe, hour] of [['Your package will be delivered tomorrow between 14:00 and 18:00', /^Delivery 14:00–18:00 · Dana$/, 14], ['השליח יגיע מחר בין 10:00 ל-12:00', /^משלוח 10:00–12:00 · Dana$/, 10], ['Your order will arrive tomorrow at 15:30', /^Delivery · Dana$/, 15]]) {
+      const g = world({ target: { ok: true, connectorId: 'googleHold' } });
+      const r = await g.Card.offer(input(text, { channel: 'whatsapp' }));
+      check('delivery offers one calendar step: ' + text, r.shown && g.injected[0].ctx.process.steps.length === 1 && g.injected[0].ctx.process.steps[0].kind === 'calendar', r);
+      if (!g.injected[0]) continue;
+      await g.injected[0].handlers.onDoIt(g.injected[0].host, {}, g.injected[0].ctx);
+      const ge = g.calls.find((c) => c.type === 'flow:google-write');
+      check('the hold is the delivery at the start of the window, no guest, no message words: ' + text, !!ge && titleRe.test(ge.input.title) && ge.input.hour === hour && !('attendees' in ge.input) && (ge.input.title + ' ' + ge.input.quote).indexOf('package') < 0, ge && ge.input);
+    }
+    for (const quiet of ['Your package was delivered yesterday at 14:00', 'The courier will arrive tomorrow between 4 and 6', 'Your order is ready for pickup tomorrow between 14:00 and 18:00']) {
+      const q = world({ target: { ok: true, connectorId: 'googleHold' } });
+      check('no delivery card for: ' + quiet, !(await q.Card.offer(input(quiet, { channel: 'whatsapp' }))).shown || q.injected[0].ctx.process.steps[0].params.title !== 'Delivery');
+    }
+  }
+
+  // 5ae. The other side says they paid while this chat has a "Waiting on ...: Payment" task: the card offers to mark that task done.
+  {
+    const proof = { system: 'google/tasks', externalId: 'T1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' };
+    const execOf = (calls) => (msg) => {
+      calls.push(msg);
+      if (msg.connectorId === 'googleTaskClose') return { ok: true, written: 'Google Task done · Waiting on Dana: Payment 500 NIS', where: 'Google Tasks', ref: { taskListId: 'L1', taskId: 'T1', externalId: 'T1', contentHash: 'h2', closedByGlance: true }, proof: { system: 'google/tasks-close', externalId: 'T1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' } };
+      return { ok: true, written: 'Task', where: 'Google Tasks', ref: { taskListId: 'L1', taskId: 'T1', externalId: 'T1', contentHash: 'h1' }, proof: proof };
+    };
+    const mine = (text, extra) => input(text, Object.assign({ fromMe: true, own: true, sender: { name: 'Dana' } }, extra || {}));
+    const make = async (w) => {
+      await w.Card.offer(mine('Please transfer 500 NIS to my account by Sunday', { key: 'pw-1' }));
+      await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+    };
+    {
+      const sent = [];
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: execOf(sent) });
+      await make(w);
+      check('the waiting payment task is written first', w.logRows.length === 1 && /payment 500 nis$/.test(w.logRows[0].heldKey), w.logRows);
+      const r = await w.Card.offer(input('I transferred 500 NIS', { key: 'pw-2' }));
+      const last = w.injected[w.injected.length - 1];
+      check('the claim offers to mark the task done', r.shown && r.reason === 'close-offered' && !!last.ctx.chatTask.close && last.ctx.bodyText === '', r);
+      await last.handlers.onDoIt(last.host, {}, last.ctx);
+      const closeCall = sent.find((m) => m.connectorId === 'googleTaskClose');
+      check('Do It closes the held task by its ids and content hash, nothing else', !!closeCall && closeCall.input.taskId === 'T1' && closeCall.input.taskListId === 'L1' && closeCall.input.contentHash === 'h1' && Object.keys(closeCall.input).length === 3, closeCall);
+      const closeRow = w.logRows[w.logRows.length - 1];
+      check('the close is logged as written with the task it closes', closeRow.kind === 'written' && closeRow.connectorId === 'googleTaskClose' && closeRow.closes === w.logRows[0].chatKey && closeRow.fetchedBack === true, closeRow);
+      const again = await w.Card.offer(input('העברתי לך 500 ש"ח', { key: 'pw-3' }));
+      check('once closed, a second claim offers nothing', !again.shown, again);
+      await w.receipts.filter((x) => x.receipt).pop().receipt.onUndo();
+      check('Undo of the close goes through the lane undo of googleTaskClose', w.calls.some((c) => c.type === 'flow:google-undo' && c.connectorId === 'googleTaskClose'), w.calls.map((c) => c.type + ':' + c.connectorId));
+      const after = await w.Card.offer(input('I transferred 500 NIS', { key: 'pw-4' }));
+      check('after Undo the task is open again and the claim is offered again', after.shown && after.reason === 'close-offered', after);
+    }
+    for (const [text, why] of [['I transferred 900 NIS', 'another amount'], ['I will pay tomorrow', 'a promise'], ['Did you get the 500 NIS?', 'a question'], ['I paid for the pizza', 'something else']]) {
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: execOf([]) });
+      await make(w);
+      const before = w.injected.length;
+      const r = await w.Card.offer(input(text, { key: 'q-1' }));
+      check('no close card for ' + why + ': ' + text, !(r.shown && r.reason === 'close-offered') && w.injected.length === before + (r.shown ? 1 : 0), r);
+    }
+    {
+      // A person on Microsoft only: the waiting task is a To Do task and the close goes through the worker, with the snapshot Glance took.
+      const sent = [];
+      const snap = { title: 'Waiting on Dana: Payment 500 NIS', status: 'notStarted' };
+      const exec = (msg) => {
+        sent.push(msg);
+        if (msg.payload && msg.payload.connectorId === 'outlookTaskClose') return { ok: true, fetchedBack: true, written: 'To Do task done · Waiting on Dana: Payment 500 NIS', where: 'Microsoft To Do', ref: { taskListId: 'ML1', taskId: 'MT1', externalId: 'MT1', closed: { title: snap.title, status: 'completed' }, closedByGlance: true }, proof: { system: 'microsoft/todo', externalId: 'MT1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' } };
+        return { ok: true, fetchedBack: true, written: 'To Do task', where: 'Microsoft To Do', ref: { taskListId: 'ML1', taskId: 'MT1', externalId: 'MT1', created: snap }, proof: { system: 'microsoft/todo', externalId: 'MT1', fetchedBack: true, verifiedAt: '2026-10-25T10:00:00.000Z' } };
+      };
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'outlookTask' }, exec: exec });
+      await make(w);
+      const r = await w.Card.offer(input('I transferred 500 NIS', { key: 'o-2' }));
+      const last = w.injected[w.injected.length - 1];
+      check('a claim offers the close for a To Do task too', r.shown && r.reason === 'close-offered' && last.ctx.chatTask.connectorId === 'outlookTaskClose', r);
+      await last.handlers.onDoIt(last.host, {}, last.ctx);
+      const call = sent.find((m) => m.payload && m.payload.connectorId === 'outlookTaskClose');
+      check('Do It closes the To Do task by its ids and the snapshot Glance took, nothing else', !!call && call.type === 'flow:execute-action' && call.payload.params.taskId === 'MT1' && call.payload.params.taskListId === 'ML1' && call.payload.params.created.status === 'notStarted' && Object.keys(call.payload.params).length === 3, call);
+      const row = w.logRows[w.logRows.length - 1];
+      check('the To Do close is logged as written with the task it closes', row.kind === 'written' && row.connectorId === 'outlookTaskClose' && row.closes === w.logRows[0].chatKey, row);
+      await w.receipts.filter((x) => x.receipt).pop().receipt.onUndo();
+      check('Undo of the To Do close goes through the worker undo of outlookTaskClose', w.calls.some((c) => c.type === 'flow:undo-action' && c.connectorId === 'outlookTaskClose'), w.calls.map((c) => c.type + ':' + c.connectorId));
+    }
+    {
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: execOf([]) });
+      const r = await w.Card.offer(input('I transferred 500 NIS', { key: 'n-1' }));
+      check('a claim with no waiting task offers nothing', !r.shown || r.reason !== 'close-offered', r);
+    }
+    {
+      const sent = [];
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: (msg) => { sent.push(msg); return msg.connectorId === 'googleTaskClose' ? { ok: false, reason: 'user-edited' } : execOf([])(msg); } });
+      await make(w);
+      await w.Card.offer(input('שילמתי', { key: 'e-1' }));
+      const last = w.injected[w.injected.length - 1];
+      check('an amount-less claim with exactly one waiting task offers the close', !!last.ctx.chatTask.close);
+      await last.handlers.onDoIt(last.host, {}, last.ctx);
+      check('a task the person changed is left alone and says so', w.receipts.some((x) => x.state === 'flow-chip-error' && /changed this task|שינית את המשימה/.test(x.text)) && w.logRows.every((r) => r.connectorId !== 'googleTaskClose'), w.receipts.map((x) => (x.state || 'receipt') + ':' + (x.text || '')));
+    }
+    {
+      const w = world({ switchOn: true, switchOwn: true, target: { ok: true, connectorId: 'googleTask' }, exec: execOf([]) });
+      await make(w);
+      await w.Card.offer(mine('Please send me the signed contract by Thursday', { key: 'pw-9' }));
+      await w.injected[w.injected.length - 1].handlers.onDoIt(w.injected[w.injected.length - 1].host, {}, w.injected[w.injected.length - 1].ctx);
+      const r = await w.Card.offer(input('שילמתי', { key: 'm-1' }));
+      check('two waiting asks but one payment: an amount-less claim still closes only the payment', r.reason !== 'close-offered' || w.injected[w.injected.length - 1].ctx.chatTask.close.chatKey === w.logRows[0].chatKey, r);
+    }
   }
 
   // 5d. Hebrew meeting asks in a chat (the first user writes Hebrew): "can we meet" forms offer a hold; looking back stays quiet.
@@ -507,6 +725,42 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     check('CHAT_PROMISE_CARD does not turn on the inbound card', !(await inboundOff.Card.offer(input(ASKS[0][0]))).shown);
   }
 
+  // 5ad. What the person asked the other side for in their own message is a loop to chase: "Waiting on Dana: ..." due that day.
+  {
+    const mine = (text, extra) => input(text, Object.assign({ fromMe: true, own: true, sender: { name: 'Dana' } }, extra || {}));
+    for (const [text, titleRe] of [
+      ['Please transfer 500 NIS to my account by Sunday', /^Waiting on Dana: Payment 500 NIS$/],
+      ['תעביר לי 500 שקל עד יום ראשון', /^מחכים ל-Dana: תשלום 500 NIS$/],
+      ['Please send me the signed contract by Thursday', /^Waiting on Dana: /],
+      ['I need the report by Wednesday', /^Waiting on Dana: /],
+      ['תחתום על החוזה עד יום שישי', /^מחכים ל-Dana: /]
+    ]) {
+      const w = world({ switchOn: false, switchOwn: true });
+      const r = await w.Card.offer(mine(text));
+      check('own ask offers one follow-up task: ' + text, r.shown && w.injected[0].ctx.process.steps.length === 1, r);
+      if (!w.injected[0]) continue;
+      const st = w.injected[0].ctx.process.steps[0].params;
+      check('the follow-up task is titled Waiting on the person, due that day: ' + text, titleRe.test(st.title) && /^\d{4}-\d{2}-\d{2}$/.test(st.dateIso), st);
+      await w.injected[0].handlers.onDoIt(w.injected[0].host, {}, w.injected[0].ctx);
+      const exec = w.calls.find((c) => c.type === 'flow:google-write');
+      check('the follow-up is written through the lane with no message words: ' + text, !!exec && titleRe.test(exec.input.title) && JSON.stringify(exec.input).indexOf('my account') < 0, exec && exec.input);
+      check('the follow-up is logged as written (Handled only after the read-back): ' + text, w.logRows.length === 1 && w.logRows[0].kind === 'written', w.logRows);
+    }
+    const off = world({ switchOn: true, switchOwn: false });
+    check('CHAT_PROMISE_CARD off: an own ask shows nothing', !(await off.Card.offer(mine('Please transfer 500 NIS to my account by Sunday'))).shown && off.calls.length === 0);
+    for (const quiet of ['Could you send me the contract by Thursday?', 'Please send me the contract', 'Thanks for the report, got it', 'I paid you 500 NIS on Sunday', 'תעביר לי את זה מתישהו']) {
+      const q = world({ switchOn: false, switchOwn: true });
+      check('own message stays quiet: ' + quiet, !(await q.Card.offer(mine(quiet))).shown && q.injected.length === 0);
+    }
+    const g = world({ switchOwn: true });
+    check('an own ask in a group stays out', !(await g.Card.offer(mine('Please transfer 500 NIS to my account by Sunday', { group: true }))).shown);
+    const again = world({ switchOn: false, switchOwn: true });
+    await again.Card.offer(mine('Please transfer 500 NIS to my account by Sunday', { key: 'a-1' }));
+    await again.injected[0].handlers.onDoIt(again.injected[0].host, {}, again.injected[0].ctx);
+    const rep = await again.Card.offer(mine('Reminder: please transfer 500 NIS to my account by Sunday', { key: 'a-2' }));
+    check('the same ask repeated is not a second follow-up task', !rep.shown && rep.reason === 'already-on-task-list', rep);
+  }
+
   // 5f. An agreed meeting is a hold too, titled "Meeting · Dana", never with the whole message.
   for (const [text, he] of [['מעולה, נתראה ביום חמישי ב-15:00', true], ['Sounds good, see you Thursday at 3pm', false], ['סגור, מחר ב-10:00 אצלך', true]]) {
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
@@ -521,7 +775,7 @@ const QUIET = ['lol ok', 'Thanks, got it!', 'FYI the payment went out', 'hi', 'U
     const w = world({ target: { ok: true, connectorId: 'googleHold' } });
     check('no hold for: ' + text, !(await w.Card.offer(input(text, { channel: 'whatsapp' }))).shown && w.injected.length === 0);
   }
-  check('chat lanes load core/meeting-confirm.js before the card', /'core\/day-words\.js', 'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-travel-notice\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
+  check('chat lanes load core/meeting-confirm.js before the card', /'core\/day-words\.js', 'core\/meeting-confirm\.js', 'core\/teams-meeting\.js', 'core\/chat-reminder\.js', 'core\/chat-deadline-ask\.js', 'core\/chat-callback-ask\.js', 'core\/chat-payment-ask\.js', 'core\/chat-appointment-notice\.js', 'core\/chat-pickup-notice\.js', 'core\/chat-travel-notice\.js', 'core\/chat-delivery-window\.js', 'core\/chat-payment-claim\.js', 'core\/chat-sent-claim\.js', 'core\/chat-chase\.js', 'core\/chat-invitation-notice\.js', 'core\/chat-self-note\.js', 'src\/chip-host\.js', 'src\/chat-task-card\.js'/.test(fs.readFileSync(path.join(ROOT, 'src', 'background.js'), 'utf8')));
 
   // 6. sync: another newest message, or the person's own, retires the card.
   {

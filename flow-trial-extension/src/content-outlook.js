@@ -827,7 +827,57 @@
         if (FlowHeldHold.find((bag && bag.log) || [], pane.senderEmail, FlowHeldHold.keyOf(r.intent), [pane.itemId, pane.pathId, pane.conversationId])) return { none: true, reason: 'already-on-calendar' };
       } catch (e) { /* the log is unreadable: offer as before */ }
     }
+    if (!(r && r.show) && bookingNoticeSwitch === true && pane.senderEmail) {
+      const gone = await cancelledHold(pane, own);
+      if (gone) return gone;
+    }
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
+  }
+
+  // The business cancelled a booking, a trip or an invitation that Glance put on this calendar from its own earlier mail: Do It takes
+  // that same event off again, through the same undo the hold's receipt has (read back that it is gone; an event the person changed is
+  // left alone and says so). Quiet when no hold of this sender at that day and clock is on the calendar. Never sends anything.
+  async function cancelledHold(pane, ownText) {
+    if (typeof FlowHeldHold === 'undefined') return null;
+    const text = String(ownText || '') || String(pane.subject || '');
+    let gone = null;
+    for (const reader of [typeof FlowChatAppointmentNotice !== 'undefined' ? FlowChatAppointmentNotice : null, typeof FlowChatTravelNotice !== 'undefined' ? FlowChatTravelNotice : null, typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null]) {
+      if (!reader || typeof reader.cancelled !== 'function') continue;
+      try { const g = reader.cancelled(text, new Date()); if (g && g.kind === 'cancelled') { gone = g; break; } } catch (e) { /* the next reader */ }
+    }
+    if (!gone) return null;
+    let held = null;
+    try {
+      const bag = await FlowStorage.get();
+      held = FlowHeldHold.find((bag && bag.log) || [], pane.senderEmail, FlowHeldHold.holdAt(gone), []);
+    } catch (e) { return null; }
+    if (!held || held.connectorId !== 'outlookCalendar' || !held.ref) return null;
+    const he = gone.lang === 'he';
+    const title = String(held.label || '').replace(/^Calendar\s*·\s*/i, '').slice(0, 80);
+    return {
+      intent: { type: 'event', label: (he ? 'בוטל: ' : 'Cancelled: ') + title, confidence: 0.9, personalClose: 'booking-cancelled', signals: { score: 90, threshold: 50 }, entities: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute } },
+      process: { id: 'booking-cancelled', name: he ? 'הסר מהיומן' : 'Remove It', closingLine: he ? 'מסיר מהיומן.' : 'Removing it from your calendar.', closedLine: he ? 'הוסר מהיומן.' : 'Removed from your calendar.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: (he ? 'להסיר מהיומן: ' : 'Remove from calendar: ') + title, params: { dateIso: gone.dateIso, hour: gone.hour, minute: gone.minute, title: title }, dependsOn: null }] },
+      removeHeld: { connectorId: held.connectorId, ref: held.ref, messageId: held.messageId || null, he: he }
+    };
+  }
+
+  // Do It on a cancellation: remove the hold through the worker's undo. A changed event stays and the card says so.
+  async function removeHeldHold(host, chip, ctx) {
+    const held = ctx.removeHeld;
+    const token = captureMailToken();
+    paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', held.he ? 'מסיר…' : 'Removing…'); });
+    const u = await send({ type: 'flow:undo-action', connectorId: held.connectorId, ref: held.ref, created: held.ref && held.ref.created });
+    if (!(u && u.ok)) {
+      const edited = u && u.reason === 'user-edited';
+      const text = edited ? (held.he ? 'שינית את האירוע, השארתי אותו' : 'You changed this event, so I left it') : (held.he ? 'לא הצלחתי להסיר, נסה שוב' : "Couldn't remove it, try again");
+      paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-error', text); });
+      return;
+    }
+    try { await FlowStorage.markOutlookCalendarUndone(held.messageId, held.ref); } catch (e) { /* the receipt still shows */ }
+    paintIfCurrent(token, function () {
+      if (typeof FlowChipHost.showDraftReceipt === 'function') FlowChipHost.showDraftReceipt(host, { status: 'Handled.', written: u.written || (held.he ? 'הוסר מהיומן.' : 'Removed from your calendar.') });
+    });
   }
 
   function userNameOf(st) {
@@ -1201,6 +1251,7 @@
       key: entry.key,
       hydrateHow: (pane && pane.hydrateHow) || null,
       priorConversationId: (pane && pane.priorConversationId) || null,
+      removeHeld: (decided && decided.removeHeld) || null,
       __epoch: paneEpoch(pane)
     };
   }
@@ -1246,6 +1297,7 @@
   async function onDoIt(host, chip, ctx, liveSteps) {
     const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
+    if (ctx && ctx.removeHeld) return removeHeldHold(host, chip, ctx);
     const earlySteps = (ctx && ctx.process && ctx.process.steps) || [];
     const earlyTask = earlySteps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     const earlyDraft = earlySteps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
@@ -3106,6 +3158,8 @@
     const bags = [];
     const steps = (ctx && ctx.process && ctx.process.steps) || [];
     steps.forEach((step) => { if (step && step.params) bags.push(step.params); });
+    // A length the plan names (a delivery window) rides along; anything else is the default half hour.
+    const named = steps.map((step) => step && step.params && step.params.durationMinutes).find((n) => n);
     if (ctx && ctx.intent) bags.push(ctx.intent.entities, ctx.intent.facts, ctx.intent);
     for (let i = 0; i < bags.length; i++) {
       const found = clockFrom(bags[i]);
@@ -3113,6 +3167,7 @@
       const title = found.what || (ctx.intent && ctx.intent.label) || ctx.subject || 'Meeting';
       return {
         meeting: true,
+        durationMinutes: named || undefined,
         dateIso: found.dateIso,
         hour: found.hour,
         minute: found.minute,
@@ -3440,6 +3495,7 @@
       requireTime: p.requireTime === true
     };
     if (p.calendarOp) params.calendarOp = p.calendarOp;
+    if (p.durationMinutes) params.durationMinutes = p.durationMinutes;
     if (p.fileTerm || p.fileName || p.fileUrl) {
       if (p.fileTerm) params.fileTerm = p.fileTerm;
       if (p.fileName) params.fileName = p.fileName;
@@ -4110,7 +4166,14 @@
       if (!cfg.scopeOk(st)) return false;
       const text = ((pane && pane.subject) ? pane.subject + '. ' : '') + holdTextOf(pane);
       if (!String(text).trim()) return false;
-      const plan = await send({ type: cfg.planMessage, text: text });
+      let plan = await send({ type: cfg.planMessage, text: text });
+      // The ask reads as explicit; the worker needs the Graph message id to list the attachments (a chain that sets needsGraphId).
+      if (plan && plan.action === 'need-message-id' && cfg.needsGraphId) {
+        const graphId = await ensureOutlookMessageId({ pathId: pane.pathId || pane.conversationId, conversationId: pane.conversationId, itemId: pane.itemId, outlookIncomingId: pane.itemId, sender: { email: pane.senderEmail } });
+        if (!graphId) return false;
+        plan = await send({ type: cfg.planMessage, text: text, graphMessageId: graphId });
+        if (plan && plan.action === 'offer') plan = Object.assign({}, plan, { graphMessageId: graphId });
+      }
       if (!plan || plan.action !== 'offer' || !cfg.planOk(plan)) return false;
       return showCard(pane, plan, messageId);
     }
@@ -4140,6 +4203,58 @@
     })
   });
 
+  // An empty Word or Excel file on the ONE SharePoint site a mail names (switch SHAREPOINT_NEW_FILE, off): the worker reads the site by
+  // name and is silent unless exactly one site has it. Needs the SharePoint box (Sites.ReadWrite.All) on the Connect screen.
+  const sharepointFileChain = makeCloseChain({
+    chain: 'sharepoint-file',
+    connectorId: 'sharepointNewFile',
+    planMessage: 'flow:sharepoint-file-plan',
+    refKey: 'itemId',
+    stepKind: 'drive',
+    name: 'New file',
+    undone: 'File removed from SharePoint.',
+    undoFailed: 'Could not remove the file.',
+    writtenDefault: 'New file in SharePoint.',
+    linkLabel: openFileLabel,
+    scopeOk: (st) => scopeOf(st, 'sites.readwrite.all'),
+    planOk: (plan) => Boolean(plan.fileName && plan.siteId),
+    cardLabel: (plan) => plan.fileName,
+    paramsOf: (plan) => ({ fileKind: plan.fileKind, fileName: plan.fileName, name: plan.name, siteId: plan.siteId, siteName: plan.siteName }),
+    reasons: () => ({
+      'name-taken': pageUiLang() === 'he' ? 'כבר יש קובץ בשם הזה בתיקיית Glance באתר' : 'A file with that name is already in the site\'s Glance folder',
+      'site-not-found': pageUiLang() === 'he' ? 'האתר לא נמצא' : 'The SharePoint site was not found',
+      'sharepoint-not-granted': pageUiLang() === 'he' ? 'צריך הרשאה ל-SharePoint' : 'SharePoint needs to be allowed first',
+      'not-connected': pageUiLang() === 'he' ? 'צריך להתחבר מחדש' : 'Reconnect Outlook'
+    })
+  });
+
+  // The mail's own attachment saved on the ONE SharePoint site the mail names (switch SHAREPOINT_SAVE_FILE, off). Needs the SharePoint box.
+  const sharepointSaveChain = makeCloseChain({
+    chain: 'sharepoint-save',
+    connectorId: 'sharepointSaveFile',
+    planMessage: 'flow:sharepoint-save-plan',
+    needsGraphId: true,
+    refKey: 'itemId',
+    stepKind: 'drive',
+    name: 'Save the file',
+    undone: 'File removed from SharePoint.',
+    undoFailed: 'Could not remove the file.',
+    writtenDefault: 'Saved in SharePoint.',
+    linkLabel: openFileLabel,
+    scopeOk: (st) => scopeOf(st, 'sites.readwrite.all'),
+    planOk: (plan) => Boolean(plan.fileName && plan.siteId && plan.attachmentId && plan.graphMessageId),
+    cardLabel: (plan) => plan.fileName,
+    paramsOf: (plan) => ({ fileName: plan.fileName, siteId: plan.siteId, siteName: plan.siteName, attachmentId: plan.attachmentId, graphMessageId: plan.graphMessageId }),
+    reasons: () => ({
+      'name-taken': pageUiLang() === 'he' ? 'כבר יש קובץ בשם הזה בתיקיית Glance באתר' : 'A file with that name is already in the site\'s Glance folder',
+      'site-not-found': pageUiLang() === 'he' ? 'האתר לא נמצא' : 'The SharePoint site was not found',
+      'sharepoint-not-granted': pageUiLang() === 'he' ? 'צריך הרשאה ל-SharePoint' : 'SharePoint needs to be allowed first',
+      'attachment-differs': pageUiLang() === 'he' ? 'הקובץ המצורף השתנה' : 'The attachment is not the one on the card',
+      'no-bytes': pageUiLang() === 'he' ? 'לא הצלחתי לקרוא את הקובץ המצורף' : 'Could not read the attachment',
+      'not-connected': pageUiLang() === 'he' ? 'צריך להתחבר מחדש' : 'Reconnect Outlook'
+    })
+  });
+
   const eventLinkChain = makeCloseChain({
     chain: 'event-link',
     connectorId: 'outlookEventCallLink',
@@ -4165,6 +4280,8 @@
 
   async function settleCloseChains(pane, st) {
     if (await newFileChain.settle(pane, st)) return newFileChain.chain;
+    if (await sharepointFileChain.settle(pane, st)) return sharepointFileChain.chain;
+    if (await sharepointSaveChain.settle(pane, st)) return sharepointSaveChain.chain;
     if (await eventLinkChain.settle(pane, st)) return eventLinkChain.chain;
     return '';
   }

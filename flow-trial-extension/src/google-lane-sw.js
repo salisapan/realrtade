@@ -5,6 +5,7 @@ import './background.js';
 import '../core/google-config.js';
 import '../core/google-calendar.js';
 import '../core/google-tasks.js';
+import '../core/google-task-close.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
 import '../core/google-sheets.js';

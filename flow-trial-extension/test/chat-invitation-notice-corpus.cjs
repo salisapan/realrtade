@@ -5,6 +5,9 @@ const NOW = new Date(2026, 9, 23, 10, 0, 0); // Friday
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
+  ['The launch party you were invited to has been moved to Monday at 20:00', '2026-10-26', 20, 0],
+  ['Your invitation to the party was rescheduled from Sunday at 19:00 to Monday at 20:00', '2026-10-26', 20, 0],
+  ['האירוע שהוזמנת אליו הועבר ליום שני בשעה 20:00', '2026-10-26', 20, 0],
   ["You're invited to my birthday on Saturday at 8pm", '2026-10-24', 20, 0],
   ['Join us for the opening on Thursday at 19:00', '2026-10-29', 19, 0],
   ["We'd love to invite you to our housewarming Sunday at 6:30pm", '2026-10-25', 18, 30],
@@ -16,6 +19,11 @@ const YES = [
 ];
 for (const [text, day, h, m] of YES) { const r = A.recognize(text, NOW); check('invitation: ' + text, r.kind === 'invitation' && r.dateIso === day && r.hour === h && r.minute === m, r); }
 const NO = [
+  ['Unfortunately the party you were invited to has been moved to Monday at 20:00 instead', 'sorry / instead'],
+  ['לצערנו האירוע שהוזמנת אליו הועבר ליום שני בשעה 20:00', 'sorry'],
+  ['The meeting was moved to Monday at 20:00', 'no invitation'],
+  ['The party you were invited to was cancelled', 'cancelled'],
+  ['The party you were invited to has been moved to Monday', 'no clock'],
   ["You're invited to my birthday on Saturday", 'no clock'],
   ["You're invited to my birthday at 8pm", 'no day'],
   ["Are you coming to my birthday on Saturday at 8pm? You're invited", 'question'],
@@ -35,5 +43,32 @@ const NO = [
 ];
 for (const [text, why] of NO) check('not an invitation (' + why + '): ' + text.slice(0, 50), A.recognize(text, NOW).kind === 'none', A.recognize(text, NOW));
 check('no throw on junk', (() => { try { A.recognize(null, null); A.recognize(undefined, 'x'); return true; } catch (e) { return false; } })());
+
+// The cancellation reader: the day and clock of what was cancelled, for removing the hold Glance made for it.
+const GONE = [
+  ['The launch party on Sunday at 19:00 has been cancelled', '2026-10-25', 19, 0],
+  ['The wedding on Thursday at 20:30 was cancelled', '2026-10-29', 20, 30],
+  ['האירוע ביום ראשון בשעה 19:00 בוטל', '2026-10-25', 19, 0],
+];
+for (const [text, day, h, m] of GONE) { const r = A.cancelled(text, NOW); check('cancelled: ' + text, r.kind === "cancelled" && r.dateIso === day && r.hour === h && r.minute === m, r); }
+const NOT_GONE = [
+  ['The launch party on Sunday at 19:00 has been moved to Monday at 20:00', 'a move'],
+  ['The party on Sunday was cancelled', 'no clock'],
+  ['Was the party on Sunday at 19:00 cancelled?', 'a question'],
+  ['Our offer on Sunday at 19:00 was cancelled', 'not an event noun'],
+  ['To cancel the party on Sunday at 19:00 reply 1', 'an offer to cancel'],
+];
+for (const [text, why] of NOT_GONE) check('not a cancellation (' + why + '): ' + text.slice(0, 50), A.cancelled(text, NOW).kind === 'none', A.cancelled(text, NOW));
+
+// The told length of an invitation (durationMinutes) and the start of a written range.
+const LEN = [
+  ["You're invited to my birthday on Saturday from 20:00 to 23:00", 20, 180],
+  ["You're invited to the party on Saturday between 8 and 11pm", 20, 180],
+  ['מוזמנים ליום ההולדת ביום שישי 20:00-23:00', 20, 180],
+  ["You're invited to the opening on Thursday at 19:00 for 2 hours", 19, 120]
+];
+for (const [text, h, n] of LEN) { const r = A.recognize(text, NOW); check('length ' + n + ': ' + text.slice(0, 60), r.kind === 'invitation' && r.hour === h && r.durationMinutes === n, r); }
+for (const text of ["You're invited to my birthday on Saturday at 8pm until late", "You're invited to the opening on Thursday at 19:00"]) { const r = A.recognize(text, NOW); check('no told length: ' + text.slice(0, 60), r.kind === 'invitation' && r.durationMinutes === undefined, r); }
+
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-invitation-notice checks passed');
 process.exit(failures ? 1 : 0);

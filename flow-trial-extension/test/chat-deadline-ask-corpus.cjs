@@ -5,6 +5,15 @@ const NOW = new Date(2026, 9, 23, 10, 0, 0); // Friday
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
+  ['נא לשלוח את הטפסים החתומים עד יום רביעי', '2026-10-28', 'הטפסים החתומים'],
+  ['אנא להחזיר את החוזה עד מחר', '2026-10-24', 'החוזה'],
+  ['Please let me have the signed copy by Friday', '2026-10-30', 'Signed copy'],
+  ['Get me the invoice by Thursday', '2026-10-29', 'Invoice'],
+  ['I am waiting for your signed copy by Friday', '2026-10-30', 'Signed copy'],
+  ['אנחנו מחכים לאישור שלכם עד מחר', '2026-10-24', 'אישור שלכם'],
+  ['Reminder: please send the signed form by Monday', '2026-10-26', /signed form/],
+  ['Gentle reminder, we need the invoice before Thursday', '2026-10-29', /invoice/],
+  ['תזכורת: תשלח לי את החוזה עד יום חמישי', '2026-10-29', /החוזה/],
   ['Need the report by Wednesday', '2026-10-28', /report/],
   ['I need the signed contract by tomorrow', '2026-10-24', /contract/],
   ['We need the invoice before Thursday', '2026-10-29', /invoice/],
@@ -20,6 +29,11 @@ for (const [text, day, what] of YES) {
   check('ask: ' + text, r.kind === 'ask' && r.dateIso === day && new RegExp(what.source, 'i').test(r.what) && !/(?:by|before|עד|לפני)\s/.test(r.what), r);
 }
 const NO = [
+  ['נא לא לשלוח עד יום רביעי', 'a polite refusal'],
+  ['Please let me know by Friday', 'let me know is not a thing'],
+  ["I'm waiting for the delivery by Friday", 'a wait for somebody else'],
+  ['אני מחכה לשליח עד מחר', 'a wait for somebody else'],
+  ['We are waiting for the bus until 5', 'not a day'],
   ['Need the report', 'no day'],
   ['Need the report by Wednesday?', 'question'],
   ['Could you send the report by Wednesday', 'no cue verb first'],

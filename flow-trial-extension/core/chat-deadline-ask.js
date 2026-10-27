@@ -9,6 +9,12 @@ const FlowChatDeadlineAsk = (() => {
   const VERB_EN = /^(?:please\s+)?(?:send|sign|submit|pay|review|approve|finish|complete|prepare|update|upload|book|confirm|return|fill|share|deliver|post|file|renew)\s+/i;
   const NEED_HE = /^(?:(?:אני|אנחנו)\s+)?(?:צריך|צריכה|צריכים|צריכות|רוצה|רוצים)\s+(?:לקבל\s+)?(?:את\s+|ש)?/;
   const VERB_HE = /^(?:בבקשה\s+)?(?:תשלח|תשלחי|תשלחו|תעביר|תעבירי|תעבירו|תחתום|תחתמי|תחתמו|תאשר|תאשרי|תאשרו|תכין|תכיני|תכינו|תסדר|תסדרי|תעדכן|תעדכני|תשלם|תשלמי|תחזיר|תחזירי|תמלא|תמלאי|תגיש|תגישי|תסיים|תסיימי|תעלה|תעלי|תזמין|תזמיני|תחדש|תחדשי)\s+/;
+  // Polite and waiting forms: «נא לשלוח את הטפסים עד יום רביעי», "Please let me have the signed copy by Friday", "I'm waiting for your signed copy by
+  // Friday" (a wait is an ask only when it is for the other person's thing: your / שלך / ממך).
+  const POLITE_HE = /^(?:(?:שלום|היי|הי)(?:\s+[^\s,]+)?\s*,?\s+)?(?:נא|אנא)\s+(?:ל(?:שלוח|העביר|אשר|חתום|החזיר|מלא|הגיש|עדכן|הכין|סדר|שלם)|לשלוח)\s+(?:לי\s+)?(?:את\s+)?/;
+  const POLITE_EN = /^(?:please\s+)?(?:let\s+me\s+have|get\s+me|give\s+me)\s+(?:the\s+|your\s+|a\s+)?/i;
+  const WAIT_EN = /^(?:i'?m|we'?re|i\s+am|we\s+are)\s+waiting\s+for\s+(?=your\b)(?:your\s+)/i;
+  const WAIT_HE = /^(?:אני|אנחנו)\s+(?:מחכה|מחכים|מחכות)\s+(?:ל|לקבל\s+)(?:את\s+)?(?=[^]*(?:שלך|שלכם|שלכן|ממך|ממכם))/;
   const MARK = /(?:\b(?:by|before|until|no\s+later\s+than)\b|(?:^|[\s,])(?:עד|לפני)(?=\s))/i;
   // Not an ask of the person: a look back, a hedge, a refusal, a thing already done, a thing for someone else, a question.
   const NO_EN = /\b(?:yesterday|last\s+(?:week|night)|already|never\s*mind|maybe|might|if\s+you\s+want|cancel(?:l?ed)?|i'?ll|i\s+will|(?:he|she|they)\s+need)\b/i;
@@ -58,13 +64,17 @@ const FlowChatDeadlineAsk = (() => {
   }
 
   // { kind: 'ask', dateIso, what } or { kind: 'none', reason }.
+  // A nudge in front of the same ask ("Reminder: please send it by Monday", «תזכורת: תשלח …») is the same ask, not another sentence.
+  const NUDGE_EN = /^(?:(?:a\s+)?(?:gentle|friendly|quick|polite)\s+)?(?:reminder|nudge|ping|follow(?:ing)?[\s-]*up)\s*[:,\-–—]\s*/i;
+  const NUDGE_HE = /^(?:תזכורת(?:\s+(?:ידידותית|קטנה))?|שוב)\s*[:,\-–—]\s*/;
+
   function recognize(text, now) {
-    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim();
+    const raw = String(dayWords(text, now) || '').replace(/\s+/g, ' ').trim().replace(NUDGE_EN, '').replace(NUDGE_HE, '');
     if (!raw) return { kind: 'none', reason: 'empty' };
     if (raw.length > 200) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-an-ask' };
-    const cue = raw.match(NEED_EN) || raw.match(VERB_EN) || raw.match(NEED_HE) || raw.match(VERB_HE);
+    const cue = raw.match(NEED_EN) || raw.match(VERB_EN) || raw.match(POLITE_EN) || raw.match(WAIT_EN) || raw.match(NEED_HE) || raw.match(VERB_HE) || raw.match(POLITE_HE) || raw.match(WAIT_HE);
     if (!cue) return { kind: 'none', reason: 'no-cue' };
     const rest = raw.slice(cue[0].length);
     if (!MARK.test(rest)) return { kind: 'none', reason: 'no-deadline-marker' };

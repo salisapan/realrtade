@@ -6,10 +6,17 @@ const NOW = new Date(2026, 9, 23, 10, 0, 0); // Friday
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
+  ['נא להעביר את התשלום על 1200 ש"ח עד מחר', '2026-10-24', '1200', 'NIS'],
+  ['אפשר להעביר את ה-400 שקל עד מחר?', '2026-10-24', '400', 'NIS'],
+  ['תוכל לשלם 300 ש"ח עד יום חמישי', '2026-10-29', '300', 'NIS'],
+  ['היי דנה, נא לשלם 250 שקל עד יום ראשון', '2026-10-25', '250', 'NIS'],
   ['Please transfer 500 NIS to my account by Sunday', '2026-10-25', '500', 'NIS'],
   ['Can you pay the 1,200 ₪ invoice before Thursday?', '2026-10-29', '1200', 'NIS'],
   ['Could you send $250 tomorrow?', '2026-10-24', '250', 'USD'],
   ['Please wire 80 EUR by Monday', '2026-10-26', '80', 'EUR'],
+  ['Reminder: please transfer 500 NIS to my account by Sunday', '2026-10-25', '500', 'NIS'],
+  ['Gentle reminder, please wire 80 EUR by Monday', '2026-10-26', '80', 'EUR'],
+  ['תזכורת: תעביר לי 500 שקל עד יום ראשון', '2026-10-25', '500', 'NIS'],
   ['תעביר לי 500 שקל עד יום ראשון', '2026-10-25', '500', 'NIS'],
   ['תשלם 300 ש"ח עד מחר', '2026-10-24', '300', 'NIS'],
   ['אפשר שתעביר 1,500 ₪ ביום חמישי?', '2026-10-29', '1500', 'NIS'],
@@ -29,6 +36,14 @@ const YES = [
 ];
 for (const [text, day, amount, cur] of YES) { const r = A.recognize(text, NOW); check('payment ask: ' + text, r.kind === 'ask' && r.dateIso === day && r.amount === amount && r.currency === cur, r); }
 const NO = [
+  ['נא לא להעביר 500 שקל עד מחר', 'a polite refusal'],
+  ['הוא צריך להעביר 500 שקל עד מחר', 'somebody else'],
+  ['אני צריך להעביר 500 שקל עד מחר', 'the writer pays'],
+  ['אפשר להעביר?', 'no amount'],
+  ['תוכל לשלוח לי תמונה עד מחר', 'not money'],
+  'Reminder: the group is paying 500 NIS on Sunday',
+  'A reminder that rent was paid on Sunday, 500 NIS',
+  'Reminder: payment of 500 NIS went out on Sunday',
   ['Please transfer the money by Sunday', 'no amount'],
   ['Please transfer 500 NIS', 'no day'],
   ['Please transfer 500 NIS or 600 NIS by Sunday', 'two amounts'],
@@ -60,6 +75,25 @@ const NO = [
   ['x'.repeat(300), 'long']
 ];
 for (const [text, why] of NO) check('not a payment ask (' + why + '): ' + text.slice(0, 50), A.recognize(text, NOW).kind === 'none', A.recognize(text, NOW));
+// An invoice that names its number and day but no amount (recognizeBill, run 104; chat card run 107): the task is "Pay invoice N".
+const BILLS = [
+  ['Reminder: your invoice 2231 is due on Thursday', '2026-10-29', '2231', 'en'],
+  ['Your invoice #INV-4412 is payable by Friday', '2026-10-30', 'INV-4412', 'en'],
+  ['חשבונית מספר 2231 לתשלום עד יום חמישי', '2026-10-29', '2231', 'he'],
+  ['תזכורת: חשבונית 7754 לתשלום עד מחר', '2026-10-24', '7754', 'he']
+];
+for (const [text, day, ref, lang] of BILLS) {
+  const r = A.recognizeBill(text, NOW);
+  check('bill without an amount: ' + text, r.kind === 'ask' && r.dateIso === day && r.ref === ref && r.lang === lang && r.amount === '', r);
+}
+for (const [text, why] of [
+  ['Your invoice 2231 has been paid, thank you', 'paid'],
+  ['Your invoice 2231 is overdue', 'no day'],
+  ['Your invoice 2231 of 500 NIS is due on Thursday', 'has an amount: the amount ask'],
+  ['Your invoice 2231 will be charged automatically, due on Thursday', 'automatic charge'],
+  ['Invoice 2231 was due on Monday and I paid it yesterday', 'look back'],
+  ['', 'empty']
+]) check('not a bill without an amount (' + why + '): ' + text.slice(0, 50), A.recognizeBill(text, NOW).kind === 'none', A.recognizeBill(text, NOW));
 check('no throw on junk', (() => { try { A.recognize(null, null); A.recognize(undefined, 'x'); return true; } catch (e) { return false; } })());
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-payment-ask checks passed');
 process.exit(failures ? 1 : 0);

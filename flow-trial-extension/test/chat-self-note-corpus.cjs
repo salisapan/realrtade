@@ -16,6 +16,9 @@ const YES = [
 ];
 for (const [text, day, what] of YES) { const r = A.recognize(text, NOW); check('note: ' + text, r.kind === 'note' && r.dateIso === day && what.test(r.what) && !/(?:tomorrow|Thursday|Monday|מחר|ביום)/i.test(r.what), r); }
 const NO = [
+  ['Reminder: please transfer 500 NIS to my account by Sunday', 'addressed to someone'],
+  ['Reminder: you owe me 200 NIS by Sunday', 'addressed to someone'],
+  ['תזכורת: תעביר לי 500 שקל עד יום ראשון', 'addressed to someone'],
   ['Remind me to pay the bill', 'no day'],
   ['Can you remind me tomorrow to pay the bill?', 'question'],
   ['Remind me tomorrow', 'no thing'],

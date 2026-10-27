@@ -11,7 +11,7 @@ const SHOTS = '/opt/cursor/artifacts/screenshots';
 const MONTHS = /\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/;
 const BRANDS = new Set([
   'glance', 'google', 'gmail', 'drive', 'meta', 'outlook', 'pro', 'microsoft',
-  'onedrive', 'whatsapp', 'glnc', 'teams', 'slack', 'telegram', 'web', 'notion',
+  'onedrive', 'sharepoint', 'whatsapp', 'glnc', 'teams', 'slack', 'telegram', 'web', 'notion',
   'ollama', 'lm', 'studio'
 ]);
 const BRAND_PHRASES = ['glance pro', 'telegram web', 'google', 'meta', 'slack'];
