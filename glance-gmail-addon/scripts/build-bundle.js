@@ -22,6 +22,7 @@ const files = [
   'close-families.js',
   'fact-reply.js',
   'file-attach.js',
+  'draft-reply.js',
   'intent.js',
   'actions.js',
   'resolution.js',
@@ -35,7 +36,8 @@ const files = [
   'execute.js',
   'cards.js',
   'prefetch.js',
-  'remote.js'
+  'remote.js',
+  'draft-compose.js'
 ].map((name) => path.join(src, name)));
 
 const header = [
@@ -57,6 +59,7 @@ const footer = [
   '  cards: GlanceCards,',
   '  prefetch: GlancePrefetch,',
   '  remote: GlanceRemote,',
+  '  draftCompose: GlanceDraftCompose,',
   '  classify: function (text, ctx) { return FlowIntent.classify(text, ctx || {}); },',
   '  plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },',
   '  judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }',
