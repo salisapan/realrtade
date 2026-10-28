@@ -1,0 +1,191 @@
+{
+ "generatedAt": "2026-10-08",
+ "heldoutSha256": "8dcc096806b0f59c9062be9f07caacf3ffe1c6b5102598c34e92ff5c2170322c",
+ "pairs": 60,
+ "labeledBy": "synthetic-heldout",
+ "ownerVerified": 0,
+ "circularity": "contrast-v0 was the set the hand rule was written against. The learned scorer trains on contrast-v0 plus a separate generator and is scored on contrast-heldout-v0, which is not a training input. The held-out gold and the generator labels were both written from the same owner spec in this lab, so a high held-out score is not an owner-verified result.",
+ "hand": {
+  "system": "hand rule, current featurize/judge",
+  "pairAccuracy": "65.0% (39/60)",
+  "wrongDoIt": "16.7% (10/60)",
+  "missedClose": "18.3% (11/60)",
+  "missedCloseOnRelevant": "18.3% (11/60)",
+  "wrongAction": "5.0% (3/60)",
+  "sameAnswerPairs": 18
+ },
+ "learned": {
+  "system": "L2 logistic regression on profile x email features",
+  "pairAccuracy": "58.3% (35/60)",
+  "wrongDoIt": "11.7% (7/60)",
+  "missedClose": "25.0% (15/60)",
+  "missedCloseOnRelevant": "25.0% (15/60)",
+  "wrongAction": "6.7% (4/60)",
+  "sameAnswerPairs": 22
+ },
+ "model": {
+  "l2": 0.01,
+  "valRelevanceAccuracy": 0.975,
+  "valN": 40,
+  "trainN": 168,
+  "ranked": [
+   {
+    "name": "history_approved",
+    "weight": 0.88,
+    "abs": 0.8799837611737513
+   },
+   {
+    "name": "saves_always",
+    "weight": 0.8201,
+    "abs": 0.8200879409040681
+   },
+   {
+    "name": "group_rate",
+    "weight": -0.6444,
+    "abs": 0.6444256817015228
+   },
+   {
+    "name": "pref_offer",
+    "weight": 0.5723,
+    "abs": 0.5723263421280294
+   },
+   {
+    "name": "history_against",
+    "weight": -0.5664,
+    "abs": 0.5664018776395314
+   },
+   {
+    "name": "save_span",
+    "weight": -0.5632,
+    "abs": 0.5631848008960743
+   },
+   {
+    "name": "role_topic_body",
+    "weight": 0.5026,
+    "abs": 0.5025608526161893
+   },
+   {
+    "name": "role_mismatch_amount",
+    "weight": 0.4666,
+    "abs": 0.466587643084227
+   },
+   {
+    "name": "history_stale",
+    "weight": -0.4607,
+    "abs": 0.46072531748358825
+   },
+   {
+    "name": "other_vendor_only",
+    "weight": -0.4194,
+    "abs": 0.4194270355184195
+   },
+   {
+    "name": "covers_named_other",
+    "weight": 0.3606,
+    "abs": 0.3606483429073167
+   },
+   {
+    "name": "saves_never",
+    "weight": -0.3303,
+    "abs": 0.33027548754711444
+   },
+   {
+    "name": "amount_span",
+    "weight": -0.3277,
+    "abs": 0.3277325396385082
+   },
+   {
+    "name": "from_manager",
+    "weight": 0.3198,
+    "abs": 0.3197612449409265
+   },
+   {
+    "name": "sender_seen",
+    "weight": -0.2594,
+    "abs": 0.25944014802664916
+   },
+   {
+    "name": "role_topic_file",
+    "weight": 0.252,
+    "abs": 0.2520353883410113
+   },
+   {
+    "name": "pref_overridden",
+    "weight": -0.2333,
+    "abs": 0.2332521255552476
+   },
+   {
+    "name": "pref_silent",
+    "weight": -0.2263,
+    "abs": 0.22625945184230492
+   },
+   {
+    "name": "ask_span",
+    "weight": 0.1504,
+    "abs": 0.15035273347412564
+   },
+   {
+    "name": "fyi_shape",
+    "weight": 0.1113,
+    "abs": 0.11130359587791
+   },
+   {
+    "name": "cc_only",
+    "weight": 0.081,
+    "abs": 0.08098185448942977
+   },
+   {
+    "name": "sender_reply_rate",
+    "weight": 0.0779,
+    "abs": 0.07787103937936471
+   },
+   {
+    "name": "named_other_uncovered",
+    "weight": -0.0303,
+    "abs": 0.030305913331917164
+   },
+   {
+    "name": "approver_on_thread",
+    "weight": 0.0301,
+    "abs": 0.030096697067542387
+   },
+   {
+    "name": "vocative_own",
+    "weight": 0,
+    "abs": 0
+   }
+  ]
+ },
+ "adversarialWrongActions": {
+  "approver-fyi": {
+   "handWrong": 4,
+   "learnedWrong": 1,
+   "sides": 8
+  },
+  "group-named-other": {
+   "handWrong": 6,
+   "learnedWrong": 1,
+   "sides": 8
+  },
+  "role-in-filename": {
+   "handWrong": 1,
+   "learnedWrong": 1,
+   "sides": 8
+  },
+  "lookalike-vendor": {
+   "handWrong": 1,
+   "learnedWrong": 0,
+   "sides": 8
+  },
+  "stale-preference": {
+   "handWrong": 1,
+   "learnedWrong": 1,
+   "sides": 8
+  }
+ },
+ "emptyProfileFlips": {
+  "shippedPreds": 0,
+  "shippedN": 6982,
+  "note": "each of the 6982 predictions is checked with the hand rule and again with the learned scorer; a flip on either increments shippedPreds"
+ }
+}
