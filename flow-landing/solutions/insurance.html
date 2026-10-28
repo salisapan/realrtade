@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="AI automation for insurance carriers and agencies: claims and underwriting workflows with human review gates. Fully local deployment and the decision record are a deployment offer (roadmap), not live today.">
+<meta name="description" content="Flow for insurance agents and agencies (סוכני ביטוח): Flow prepares client intake, renewals and carrier-system updates, and the agent approves each one. Choose Flow's masked secure cloud, Flow-Edge or Flow-Onprem.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/solutions/insurance.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -12,18 +12,18 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<title>AI Workflow Automation for Insurance — Flow</title>
+<title>AI Workflow Automation for Insurance Agents — Flow</title>
 <meta property="og:type" content="website">
-<meta property="og:title" content="AI Automation for Insurance Carriers — Flow">
-<meta property="og:description" content="AI automation for insurance carriers and agencies: claims and underwriting workflows with human review gates. Fully local deployment and the decision record are a deployment offer (roadmap), not live today.">
+<meta property="og:title" content="AI Workflow Automation for Insurance Agents — Flow">
+<meta property="og:description" content="Flow for insurance agents and agencies (סוכני ביטוח): Flow prepares client intake, renewals and carrier-system updates, and the agent approves each one. Choose Flow's masked secure cloud, Flow-Edge or Flow-Onprem.">
 <meta property="og:url" content="https://theflow-ai.com/solutions/insurance.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="AI Automation for Insurance Carriers — Flow">
-<meta name="twitter:description" content="AI automation for insurance carriers and agencies: claims and underwriting workflows with human review gates. Fully local deployment and the decision record are a deployment offer (roadmap), not live today.">
+<meta name="twitter:title" content="AI Workflow Automation for Insurance Agents — Flow">
+<meta name="twitter:description" content="Flow for insurance agents and agencies (סוכני ביטוח): Flow prepares client intake, renewals and carrier-system updates, and the agent approves each one. Choose Flow's masked secure cloud, Flow-Edge or Flow-Onprem.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Insurance","item":"https://theflow-ai.com/solutions/insurance.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Insurance agents","item":"https://theflow-ai.com/solutions/insurance.html"}]}</script>
 <link rel="stylesheet" href="/assets/fonts.css">
 <style>
 
@@ -157,43 +157,51 @@ footer.site a{color:var(--muted)}
   </div>
 </header>
 <div class="mobile-nav" id="mobileNav" hidden>
-  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
+  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
   <a href="/solutions/">Solutions</a>
   <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
 </div>
 <main id="main">
   <div class="wrap">
     <span class="eyebrow">Solutions</span>
-    <h1 class="title">AI automation for insurance carriers.</h1>
+    <h1 class="title">AI automation for insurance agents.</h1>
     
     <article>
-<p class="note">Flow is in pre-release. Flow-Edge and the audit trail are part of the deployment offer (roadmap) &mdash; not capabilities marked live today. For status in writing: <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
-<p class="lead">Claims and underwriting decisions carry two obligations at once: move fast enough to serve the policyholder, and be able to justify every input afterwards. Automation that drops the second one is the failure mode.</p>
+<p class="lead">An insurance agency runs on repetition: the same client details typed into several carrier systems, renewals chased by mail, certificates and policy documents attached to the right file. Flow prepares that work for the agent (סוכן הביטוח) to approve.</p>
 
 <h2>The constraint</h2>
-<p>Insurance automation is judged by a different standard than most. A claims decision has to be defensible to a regulator and to the insured; an underwriting input has to be actuarially justified, not merely applied consistently. Rate filings, market-conduct exams, and unfair-discrimination rules all assume someone can reconstruct why a specific decision came out the way it did &mdash; and "the model produced this" is not an answer that survives that examination. Meanwhile claims files, medical records attached to them, and applicant data are exactly the material carriers cannot casually hand to a third-party service.</p>
+<p>An agency holds the material clients trust it with: ID numbers, health and financial declarations, claims correspondence, policy schedules. That material moves between the agent's mailbox, the agency's management system and carrier portals, and each hop is a place where it can be mis-keyed, mis-sent or exposed. At the same time, the agent remains responsible for what is submitted in the client's name.</p>
 
-<h2>How Flow addresses it</h2>
+<h2>What Flow prepares for an agency</h2>
 <ul>
-<li><b>Deployment that fits the data &mdash; roadmap.</b> A masked secure cloud tenant, or fully local Flow-Edge when claims files and applicant data cannot leave the building, is the deployment path designed into the engagement &mdash; not a live product toggle today.</li>
-<li><b>Immutable audit trail &mdash; roadmap.</b> For regulated deployments, an append-only record is planned: what was reviewed, what was proposed, who approved it, and what executed. Not a live product toggle today; closed in the engagement. That is the evidence a market-conduct exam or a rate filing actually asks for.</li>
-<li><b>Human gates on the calls that matter.</b> Adverse decisions and edge cases surface for an adjuster or underwriter rather than executing silently.</li>
-<li><b>Inputs you can name.</b> Deterministic execution over a defined set of inputs, so a proxy-discrimination question has a factual answer rather than an inference about model behaviour.</li>
+<li><b>Intake from documents and mail.</b> A policy schedule, a renewal notice or a client's request arrives; Flow reads it and prepares the update in the system where it belongs.</li>
+<li><b>Re-keying across systems.</b> The same details entered once, prepared for each destination the agency already uses.</li>
+<li><b>Renewals and follow-ups.</b> Flow prepares the next message or record; the agent reviews and approves it.</li>
+<li><b>Client correspondence.</b> Replies and requests for missing documents are prepared as drafts for the agent.</li>
 </ul>
+<p>Flow prepares; the agent approves. Nothing is written to a carrier system or sent to a client until a person has approved it.</p>
 
-<h2>Research on insurance deployment</h2>
+<h2>Where the work runs: your agency chooses</h2>
+<ul>
+<li><b>Flow's dedicated secure cloud.</b> All sensitive data is masked before any processing.</li>
+<li><b>Flow-Edge.</b> For computers with suitable hardware: data is stored only on the employee's own computer and never leaves it.</li>
+<li><b>Flow-Onprem.</b> A dedicated server inside the office's internal network. Data never goes to an external cloud.</li>
+</ul>
+<p>Client files, health declarations and ID documents are exactly the material an agency decides about carefully. <a href="/solutions/deployment.html">The deployment page</a> describes each setup.</p>
+
+<h2>Research relevant to insurance</h2>
 <ul class="readlist">
 <li><a href="/blog/insurance-claims-ai-automation.html">AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight</a></li>
 <li><a href="/blog/insurance-underwriting-ai-rate-filing.html">AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard</a></li>
-<li><a href="/blog/auditability-by-design-ai-systems.html">Auditability by Design: Logging, Provenance, and Human Oversight</a></li>
-<li><a href="/blog/ai-model-drift-monitoring.html">Model Drift: Why a Validated AI System Doesn't Stay Validated on Its Own</a></li>
 <li><a href="/blog/what-is-data-masking-technical-guide.html">What Is Data Masking? A Technical Guide to De-Identifying Data</a></li>
+<li><a href="/blog/auditability-by-design-ai-systems.html">Auditability by Design: Logging, Provenance, and Human Oversight</a></li>
 </ul>
 
 <div class="cta">
-  <h2>Automation an examiner can follow</h2>
-  <p>See how approval gates are designed, and where the decision record sits on the deployment roadmap.</p>
-  <a class="doit" href="/security.html" data-ga="solutions_security"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Read the Security Page</a>
+  <h2>Less re-keying, the agent still decides</h2>
+  <p>The homepage form asks for a work email and comes back with a deployment plan for your agency.</p>
+  <a class="doit" href="/#waitlist" data-ga="sol_insurance_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get a deployment plan</a>
+  <p class="cta-alt">Prefer to talk it through? <a href="/contact.html">Contact us</a> or <a href="/solutions/deployment.html">see the three deployment setups</a>.</p>
 </div>
     </article>
   </div>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="AI automation within professional responsibility limits: human review gates for privilege-sensitive work. Flow-Edge and the append-only audit trail are a deployment offer (roadmap), not live today.">
+<meta name="description" content="Flow for law firms: human approval before every write, and a deployment setup that fits privilege — Flow's masked secure cloud, Flow-Edge on the firm's own computers, or Flow-Onprem on a dedicated server in the firm's network. Replaces pasting matter content into chat tools.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/solutions/legal.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -12,18 +12,18 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<title>AI Workflow Automation for Legal — Flow</title>
+<title>AI Workflow Automation for Law Firms — Flow</title>
 <meta property="og:type" content="website">
-<meta property="og:title" content="AI Workflow Automation for Legal — Flow">
-<meta property="og:description" content="AI automation within professional responsibility limits: human review gates for privilege-sensitive work. Flow-Edge and the append-only audit trail are a deployment offer (roadmap), not live today.">
+<meta property="og:title" content="AI Workflow Automation for Law Firms — Flow">
+<meta property="og:description" content="Flow for law firms: human approval before every write, and a deployment setup that fits privilege — Flow's masked secure cloud, Flow-Edge on the firm's own computers, or Flow-Onprem on a dedicated server in the firm's network. Replaces pasting matter content into chat tools.">
 <meta property="og:url" content="https://theflow-ai.com/solutions/legal.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="AI Workflow Automation for Legal — Flow">
-<meta name="twitter:description" content="AI automation within professional responsibility limits: human review gates for privilege-sensitive work. Flow-Edge and the append-only audit trail are a deployment offer (roadmap), not live today.">
+<meta name="twitter:title" content="AI Workflow Automation for Law Firms — Flow">
+<meta name="twitter:description" content="Flow for law firms: human approval before every write, and a deployment setup that fits privilege — Flow's masked secure cloud, Flow-Edge on the firm's own computers, or Flow-Onprem on a dedicated server in the firm's network. Replaces pasting matter content into chat tools.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Legal","item":"https://theflow-ai.com/solutions/legal.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Law firms","item":"https://theflow-ai.com/solutions/legal.html"}]}</script>
 <link rel="stylesheet" href="/assets/fonts.css">
 <style>
 
@@ -157,29 +157,43 @@ footer.site a{color:var(--muted)}
   </div>
 </header>
 <div class="mobile-nav" id="mobileNav" hidden>
-  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
+  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
   <a href="/solutions/">Solutions</a>
   <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
 </div>
 <main id="main">
   <div class="wrap">
     <span class="eyebrow">Solutions</span>
-    <h1 class="title">AI automation for legal teams.</h1>
+    <h1 class="title">AI automation for law firms.</h1>
     
     <article>
-<p class="note">Flow is in pre-release. Flow-Edge and the audit trail are part of the deployment offer (roadmap) &mdash; not capabilities marked live today. For status in writing: <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
-<p class="lead">Privileged material has a different risk profile than "sensitive data." Putting that material in someone else's cloud is the failure mode a firm has to be able to refuse.</p>
+<p class="lead">Privileged material has a different risk profile than "sensitive data." Putting that material in someone else's cloud, or pasting it into a chat window, is the failure mode a firm has to be able to refuse.</p>
 
 <h2>The constraint</h2>
 <p>Firms and in-house teams face a specific version of the problem: the duty of confidentiality and the duty of technology competence point in opposite directions when the only available tooling requires uploading client material to a third party. Add the defensibility standard in e-discovery, and "the model produced this" is not a process you can put in front of a court.</p>
 
+<h2>ChatGPT and Copilot are not a matter workflow</h2>
+<p>ChatGPT and Microsoft Copilot help people draft and research in a separate window. A lawyer pastes confidential text into a chat to get a draft; the chain of custody of that text is unclear, and a later write back into the document system, the file, or the mail goes out with no approval on the write itself. The chat was useful. It was not a controlled close.</p>
+<p>Whether Copilot is safer than a consumer ChatGPT account depends on the tenant controls and on the firm's own policy. Neither is a blank check to paste matter content. The alternative is to watch the work in the systems the firm already uses, show the proposed write, and execute only after a lawyer approves it, in the deployment setup the firm's policy calls for.</p>
+
 <h2>How Flow addresses it</h2>
 <ul>
-<li><b>Fully local deployment (Flow-Edge) &mdash; roadmap.</b> When policy requires that client material stay inside the firm's own network, this is the deployment path designed into the engagement &mdash; not a live cloud toggle today.</li>
-<li><b>Immutable audit trail &mdash; roadmap.</b> For regulated deployments, an append-only log is planned: what was reviewed, what was proposed, who approved it, and what was executed. Not a live product toggle today; closed in the engagement. That is the record you need when the process itself is challenged.</li>
-<li><b>Human approval gates.</b> Judgment calls surface for a lawyer rather than executing silently.</li>
+<li><b>Human approval gates.</b> Flow prepares the update and a lawyer approves it. Judgment calls surface for a lawyer rather than executing silently.</li>
 <li><b>Deterministic execution.</b> Workflow steps run under a strict runtime rather than free-form model output.</li>
+<li><b>A record you can defend.</b> What was reviewed, what was proposed, who approved it and what was executed. The scope of the audit log is set with your security team in the engagement, so the process can be reconstructed when it is challenged.</li>
+<li><b>Does not replace your document system.</b> Flow works across the systems the firm already uses, after a person approves the write. It does not become the system of record.</li>
 </ul>
+
+<h2>Where the work runs: your firm chooses</h2>
+<ul>
+<li><b>Flow's dedicated secure cloud.</b> All sensitive data is masked before any processing.</li>
+<li><b>Flow-Edge.</b> For computers with suitable hardware: data is stored only on the employee's own computer and never leaves it.</li>
+<li><b>Flow-Onprem.</b> A dedicated server inside the office's internal network. Data never goes to an external cloud.</li>
+</ul>
+<p>The policy decides which of the three fits a given matter. <a href="/solutions/deployment.html">The deployment page</a> describes each setup.</p>
+
+<h2>A design partnership, not a download</h2>
+<p>Flow's legal and real-estate work in Israel is a design partnership with the practice lead who feels the friction, not a CIO-first rollout and not a self-serve install. A document lands, the file, the statement, or the next mail is prepared, and nothing is written until a person approves it. <a href="/blog/human-in-the-loop-ai-agents.html">What that approval has to show</a>.</p>
 
 <h2>Research on legal deployment</h2>
 <ul class="readlist">
@@ -192,8 +206,9 @@ footer.site a{color:var(--muted)}
 
 <div class="cta">
   <h2>Automation that survives a defensibility challenge</h2>
-  <p>See how approval gates are designed, and where the audit trail sits on the deployment roadmap.</p>
-  <a class="doit" href="/security.html" data-ga="solutions_security"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Read the Security Page</a>
+  <p>The homepage form asks for a work email and comes back with a deployment plan.</p>
+  <a class="doit" href="/#waitlist" data-ga="sol_legal_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get a deployment plan</a>
+  <p class="cta-alt">Prefer to talk it through? <a href="/contact.html">Contact us</a> or <a href="/solutions/deployment.html">see the three deployment setups</a>.</p>
 </div>
     </article>
   </div>

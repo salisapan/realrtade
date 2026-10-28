@@ -3,28 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="One Do It when a real close is clear. Writes into personal destinations already connected for that close. Stays quiet when unsure. Not inbox AI.">
+<meta name="description" content="Three Flow setups: a dedicated secure cloud that masks all sensitive data before processing, Flow-Edge on the employee's own computer, and Flow-Onprem on a dedicated server in the office network.">
 <meta name="theme-color" content="#07090F">
-<link rel="canonical" href="https://theflow-ai.com/solutions/close-from-gmail-without-a-prompt.html">
+<link rel="canonical" href="https://theflow-ai.com/solutions/deployment.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<title>Close From Gmail Without a Prompt | Glance</title>
+<title>Deployment: Where Flow Runs — Flow</title>
 <meta property="og:type" content="website">
-<meta property="og:title" content="Close From Gmail Without a Prompt | Glance">
-<meta property="og:description" content="One Do It when a real close is clear. Writes into personal destinations already connected for that close. Stays quiet when unsure. Not inbox AI.">
-<meta property="og:url" content="https://theflow-ai.com/solutions/close-from-gmail-without-a-prompt.html">
+<meta property="og:title" content="Deployment: Where Flow Runs — Flow">
+<meta property="og:description" content="Three Flow setups: a dedicated secure cloud that masks all sensitive data before processing, Flow-Edge on the employee's own computer, and Flow-Onprem on a dedicated server in the office network.">
+<meta property="og:url" content="https://theflow-ai.com/solutions/deployment.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Close From Gmail Without a Prompt | Glance">
-<meta name="twitter:description" content="One Do It when a real close is clear. Writes into personal destinations already connected for that close. Stays quiet when unsure. Not inbox AI.">
+<meta name="twitter:title" content="Deployment: Where Flow Runs — Flow">
+<meta name="twitter:description" content="Three Flow setups: a dedicated secure cloud that masks all sensitive data before processing, Flow-Edge on the employee's own computer, and Flow-Onprem on a dedicated server in the office network.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/", "logo": "https://theflow-ai.com/logo.png"}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://theflow-ai.com/"}, {"@type": "ListItem", "position": 2, "name": "Solutions", "item": "https://theflow-ai.com/solutions/"}, {"@type": "ListItem", "position": 3, "name": "Close from Gmail", "item": "https://theflow-ai.com/solutions/close-from-gmail-without-a-prompt.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does the Chrome extension upload all my mail to your cloud?", "acceptedAnswer": {"@type": "Answer", "text": "No. The decision to show Do It runs on your device, on the message you have open, and that scoring does not send the email text to Flow. A write leaves the browser only when you click Do It, and it goes to the personal destination already connected for that close. Anonymous usage events contain no message text. The privacy policy lists them."}}, {"@type": "Question", "name": "Will it send email by itself?", "acceptedAnswer": {"@type": "Answer", "text": "No. Auto-send is not the close. If the close is a reply, Do It prepares a Gmail draft. You send it, or you do not."}}, {"@type": "Question", "name": "Is Glance a free trial of Flow?", "acceptedAnswer": {"@type": "Answer", "text": "No. Glance is a separate personal product. It does not include Flow's deployment options, and it is not for regulated matter data."}}, {"@type": "Question", "name": "Is this an inbox-zero tool or a task manager?", "acceptedAnswer": {"@type": "Answer", "text": "No. Both are out of scope. Glance does not try to empty the inbox, and it does not run a task list for you. It offers one Do It when a personal close is clear, and it stays quiet otherwise."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Deployment","item":"https://theflow-ai.com/solutions/deployment.html"}]}</script>
 <link rel="stylesheet" href="/assets/fonts.css">
 <style>
 
@@ -42,6 +41,9 @@
   --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
 }
 *{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
 html,body{overflow-x:clip}
 @supports not (overflow-x:clip){html,body{overflow-x:hidden}}
 html{scroll-behavior:smooth}
@@ -71,6 +73,11 @@ article li{margin-bottom:8px}
 article a{color:var(--accent-2)}
 footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
 footer.site a{color:var(--muted)}
+
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat — which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
 .skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1741C4; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
 .lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
@@ -82,12 +89,15 @@ footer.site a{color:var(--muted)}
 .cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
 .cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
 .cta p{margin:0 0 18px; color:var(--muted)}
+.btn{display:inline-block; background:var(--cat); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:13px 30px; border-radius:999px}
+.btn:hover{filter:brightness(1.1)}
 .readlist{list-style:none; padding:0; margin:0}
 .readlist li{margin-bottom:12px}
 .readlist a{font-family:var(--sans); font-weight:600}
 .pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
 .pagenav a{color:var(--muted); margin-inline-end:16px}
 .note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
 .menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
 .menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
 .menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
@@ -96,10 +106,8 @@ footer.site a{color:var(--muted)}
 .mobile-nav[hidden]{display:none}
 .mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
 .mobile-nav a:hover{color:var(--accent-2,var(--cat))}
-
 </style>
 <link rel="stylesheet" href="/assets/flow-premium.css">
-<link rel="stylesheet" href="/assets/solutions-aeo.css">
 <script>
 (function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
 </script>
@@ -139,6 +147,7 @@ footer.site a{color:var(--muted)}
       <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
         <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
       </button>
+      
       <button class="lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
       <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
@@ -148,79 +157,59 @@ footer.site a{color:var(--muted)}
   </div>
 </header>
 <div class="mobile-nav" id="mobileNav" hidden>
-  <a href="/">Home</a><a href="/#how">Product</a><a href="/solutions/">Solutions</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a>
-  <div class="mobile-nav-legal"><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
+  <a href="/solutions/">Solutions</a>
+  <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
 </div>
 <main id="main">
   <div class="wrap">
-    <nav class="crumb" aria-label="Breadcrumb">
-      <a href="/">Home</a>
-      <span aria-hidden="true">/</span>
-      <a href="/solutions/">Solutions</a>
-      <span aria-hidden="true">/</span>
-      <span aria-current="page">Close from Gmail</span>
-    </nav>
-    <p class="product-chip">Glance</p>
     <span class="eyebrow">Solutions</span>
-    <h1 class="title">Close what you meant from Gmail: one Do It, no prompt, no auto-send</h1>
+    <h1 class="title">Where Flow runs: three setups.</h1>
+    
     <article>
+<p class="lead">Regulated teams ask two questions: where the data goes, and who can compel access to it. Flow answers with three setups, and the office chooses the one its policy calls for. In all three, Flow prepares the work and a person approves it before anything is written.</p>
 
-      <p class="lead">Glance watches the thread you have open. When a real personal close is clear, it shows one Do It. You click, and it writes into the personal destinations already connected for that close (Google or Notion, where those are live). It does not ask for a prompt. It does not send mail by itself. When it is not sure, it stays quiet.</p>
+<h2>The three setups</h2>
+<h3>1. Flow's dedicated secure cloud</h3>
+<p>Flow runs in its own dedicated secure cloud, and masks all sensitive data before any processing. Names, identifiers and other sensitive fields are replaced before a model sees the material. This is the lightest setup to start with.</p>
+<h3>2. Flow-Edge</h3>
+<p>For computers with suitable hardware. Processing happens on the employee's own computer: data is stored only there and never leaves it.</p>
+<h3>3. Flow-Onprem</h3>
+<p>A dedicated server inside the office's internal network. Data never goes to an external cloud.</p>
 
-      <h2>Not an inbox product</h2>
-      <p>Glance is not an email helper, not inbox AI, not an inbox-zero tool, and not a smarter inbox. It is also not a task manager. The point is trust that a clear intent actually closes. Most threads produce nothing on screen. Silence is the product working.</p>
+<h2>Residency is not sovereignty</h2>
+<p>Residency is where the bytes sit. Sovereignty is who can demand them. A region pin answers the first question. It does not, by itself, answer a compel, a subpoena, or a vendor that can read the payload. Name which question the policy is actually asking before you pick a setup.</p>
 
-      <h2>What the write actually is</h2>
-      <p>A Do It writes only into destinations already connected for that close. It does not fan out to every system. The sign-in a new install shows is Google. Notion is a live write path in the product when that database is the destination connected for the close.</p>
-      <p>On the live Google path, the write matches the close:</p>
-      <ul>
-        <li>an item in Google Tasks, when that is the close</li>
-        <li>a Calendar event, created with Calendar's events.insert, when the close is a meeting or a named time</li>
-        <li>a Gmail draft, prepared and not sent, when the close is a reply</li>
-        <li>Drive is read-only (drive.readonly), and only when that close needs a file already in Drive</li>
-      </ul>
-      <p>One close does not write to Tasks, Calendar, Gmail, Drive, and Notion all at once. HubSpot, Salesforce, Slack, and Monday.com are not live Glance connectors.</p>
+<h2>How to choose</h2>
+<ul>
+<li>Masked payloads, a contract that limits use, and a human gate before any write can be enough for some teams: that is the dedicated secure cloud.</li>
+<li>When policy says client material stays on the employee's machine: Flow-Edge, on computers with suitable hardware.</li>
+<li>When policy says it stays inside the office network, on a server the office controls: Flow-Onprem.</li>
+</ul>
+<p>The policy decides. A slogan about "private AI" does not. Bring the policy that governs the material, the systems a write would touch, and who must approve it, and the setup follows from them.</p>
 
-      <h2>A drafted reply is not the close</h2>
-      <p>An extension that only drafts a reply still leaves the intent sitting in the thread. Glance's Do It writes the close into the personal destination already connected for it. When the close is a reply, the result is a draft. You send it yourself.</p>
+<h2>What stays the same in all three</h2>
+<ul>
+<li>Flow prepares; a person approves. Flow does not auto-send or auto-write.</li>
+<li>Execution is a defined step, not a series of guessed clicks. <a href="/blog/human-in-the-loop-ai-agents.html">What approval has to show</a>.</li>
+<li>Security controls such as SSO and the audit log scope are agreed with your security team in the engagement. The <a href="/security.html">security page</a> describes the architecture.</li>
+</ul>
 
-      <h2>What stays on the machine</h2>
-      <p>The decision to show Do It is made on your device. Email text is not uploaded to Flow to make that judgment. A write happens only when you click, and it goes to the destination already connected: Google's APIs with your own sign-in, or Notion when that destination is connected. Glance also sends a small set of anonymous usage events with no message content. The <a href="/privacy.html">privacy policy</a> lists them. Uninstalling the extension removes what it stored on the device.</p>
+<h2>Common questions</h2>
+<h3>Does Flow send documents to a public model by default?</h3>
+<p>No. In the dedicated secure cloud, sensitive data is masked before any processing. With Flow-Edge it stays on the employee's computer. With Flow-Onprem it stays on a server in your network.</p>
+<h3>Can we change setups later?</h3>
+<p>Setup is chosen with the office in the engagement. Talk to us about moving between them. This page is product framing, not legal advice.</p>
 
-      <h2>Separate from Flow</h2>
-      <p>Glance is its own product. It is not Flow Lite, and it is not a step toward an organization deployment. Closing from email is the entry, not the ceiling: the same personal loop can grow beyond email. It does not become an organization runtime, and it does not contain Flow. <a href="/solutions/human-in-the-loop-ai-agents.html">Flow</a> is the other product, for regulated teams.</p>
-      <p class="note"><b>What this page will not call Glance.</b> Not an email helper. Not inbox AI. Not inbox-zero. Not a task manager. Not a trial of Flow. Do It, when a personal close is clear, and silence when it is not.</p>
+<h2>Where this applies</h2>
+<p>See the pages for <a href="/solutions/legal.html">law firms</a>, <a href="/solutions/insurance.html">insurance agents</a> and <a href="/solutions/cpas.html">accounting firms</a>.</p>
 
-      <h2 id="faq">Common questions</h2>
-      <div class="faq-list">
-        <details>
-          <summary>Does the Chrome extension upload all my mail to your cloud?</summary>
-          <p>No. The decision to show Do It runs on your device, on the message you have open, and that scoring does not send the email text to Flow. A write leaves the browser only when you click Do It, and it goes to the personal destination already connected for that close. Anonymous usage events contain no message text. The privacy policy lists them.</p>
-        </details>
-        <details>
-          <summary>Will it send email by itself?</summary>
-          <p>No. Auto-send is not the close. If the close is a reply, Do It prepares a Gmail draft. You send it, or you do not.</p>
-        </details>
-        <details>
-          <summary>Is Glance a free trial of Flow?</summary>
-          <p>No. Glance is a separate personal product. It does not include Flow's deployment options, and it is not for regulated matter data.</p>
-        </details>
-        <details>
-          <summary>Is this an inbox-zero tool or a task manager?</summary>
-          <p>No. Both are out of scope. Glance does not try to empty the inbox, and it does not run a task list for you. It offers one Do It when a personal close is clear, and it stays quiet otherwise.</p>
-        </details>
-      </div>
-      <h2>Related</h2>
-      <ul class="readlist">
-        <li><a href="/solutions/human-in-the-loop-ai-agents.html">Flow, a different product: approval before an organization write</a></li>
-        <li><a href="/solutions/on-prem-ai-regulated-work.html">Flow, a different product: regulated deployment</a></li>
-      </ul>
-      <div class="cta">
-        <h2>Install Glance</h2>
-        <p>The Glance page confirms your email and gives you the extension download. That step keeps the file from being passed around. It is not a Flow trial.</p>
-        <span class="magnetic"><a class="doit" href="/trial.html" data-ga="sol_glance_install"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get Glance</a></span>
-        <p class="cta-alt">Flow is a different product for regulated teams. <a href="/solutions/human-in-the-loop-ai-agents.html">How Flow handles approval before a write</a>.</p>
-      </div>
+<div class="cta">
+  <h2>Choose a setup with us</h2>
+  <p>The homepage form asks for a work email and comes back with a deployment plan.</p>
+  <a class="doit" href="/#waitlist" data-ga="sol_deploy_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get a deployment plan</a>
+  <p class="cta-alt">Prefer to talk it through? <a href="/contact.html">Contact us</a> or <a href="/solutions/deployment.html">see the three deployment setups</a>.</p>
+</div>
     </article>
   </div>
 </main>
@@ -232,8 +221,8 @@ footer.site a{color:var(--muted)}
     &copy; 2026 Flow. <a href="/">theflow-ai.com</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/blog/rss.xml">RSS</a>
   </div>
 </footer>
-
 <script>
+
 (function(){
   var tb = document.getElementById('themeBtn');
   tb.addEventListener('click', function(){
@@ -243,6 +232,7 @@ footer.site a{color:var(--muted)}
     try{localStorage.setItem('flow_theme', next);}catch(e){}
   });
 })();
+
 </script>
 <script>
 (function(){
@@ -257,7 +247,6 @@ footer.site a{color:var(--muted)}
 })();
 </script>
 <script src="/assets/flow-premium.js" defer></script>
-
 <script src="/assets/site-nav.js" defer></script>
 </body>
 </html>
