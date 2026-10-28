@@ -130,9 +130,9 @@ function fs_(p) { return require('fs').readFileSync(p, 'utf8'); }
   const p10 = W.plan({ flags, text: 'Can you create a feedback form for the Q4 launch?' });
   check('GOOGLE_FORMS on: the form card is offered', p10.action === 'offer' && p10.fileKind === 'form', p10);
   const man = JSON.parse(fs_(path.join(__dirname, '..', 'manifest.json')));
-  check('manifest asks forms.body and the Forms host, nothing broader', man.oauth2.scopes.includes('https://www.googleapis.com/auth/forms.body') && man.host_permissions.includes('https://forms.googleapis.com/*') && !man.oauth2.scopes.some((x) => /\/auth\/forms$/.test(x)));
+  check('manifest excludes forms.body and the Forms host (CTO revert; #241 keeps seven scopes)', !man.oauth2.scopes.includes('https://www.googleapis.com/auth/forms.body') && !man.host_permissions.includes('https://forms.googleapis.com/*') && !man.oauth2.scopes.some((x) => /\/auth\/forms$/.test(x)));
   const { FlowGoogleConfig: Cfg } = require(path.join(__dirname, '..', 'core', 'google-config.js'));
-  check('the lane allowlist accepts forms.body', Cfg.assertAllowed(['https://www.googleapis.com/auth/forms.body']).ok === true);
+  check('the lane allowlist refuses forms.body', Cfg.assertAllowed(['https://www.googleapis.com/auth/forms.body']).ok === false);
 
   // Wiring the page and the lane already carry.
   const fs = require('fs');

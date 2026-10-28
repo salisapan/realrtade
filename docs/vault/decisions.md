@@ -2,7 +2,7 @@
 tags: [decisions]
 updated: 2026-10-20
 ---
-# Decisions log (newest first)
+- 2026-10-28 · verify-ca1-r9 on PR #241: corpora assert `forms.body` absent (google-form, recurring-reminder-wiring, google-web-auth); `google-oauth-scopes-exact-corpus.cjs` pins `FlowGoogleConfig.SCOPES` ⊆ seven-scope allowlist; chat-draft fixture clock restored to 2026-10-14 (e2e patches Oct 27 in spec); restored `token-relay` + `understand.js` from merge base; D5 rows in `hebrew-weekday-explicit-date-corpus.cjs` and `intent-actions-corpus.cjs`; full corpus sweep wired in `verify_trial_install.py`. Gate: not run live.
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 

@@ -348,6 +348,16 @@ def check_cws_zip() -> None:
         die("repo manifest must keep the unpacked key and unpacked Google client")
 
 
+def run_corpus_sweep() -> None:
+    ext = REPO_ROOT / "flow-trial-extension" / "test"
+    corpora = sorted(ext.glob("*corpus.cjs"))
+    if not corpora:
+        die("no corpus files under flow-trial-extension/test")
+    for path in corpora:
+        print(f"verify_trial_install: corpus {path.name}")
+        run(["node", str(path)])
+
+
 def main() -> None:
     check_apis_google_script_guard()
     check_profiles()
@@ -356,6 +366,8 @@ def main() -> None:
     check_cws_zip()
     run(["node", "--input-type=module", "-e", NODE_PUBLIC_CLIENT_ID_CHECK])
     run(["node", str(REPO_ROOT / "scripts" / "verify_download_handler.cjs")])
+    run(["node", str(REPO_ROOT / "flow-trial-extension" / "test" / "google-oauth-scopes-exact-corpus.cjs")])
+    run_corpus_sweep()
     print("verify_trial_install: ok")
 
 

@@ -65,6 +65,16 @@ function run() {
   check('manifest excludes forms.googleapis.com host',
     !(manifest.host_permissions || []).some((h) => String(h).indexOf('forms.googleapis.com') >= 0));
 
+  const { FlowGoogleConfig: Cfg } = require(path.join(ROOT, 'core', 'google-config.js'));
+  check('FlowGoogleConfig.SCOPES lists only the seven allowlisted OAuth scopes',
+    Array.isArray(Cfg.SCOPES) && Cfg.SCOPES.length === 7 && setEqual(Cfg.SCOPES, EXACT));
+  check('assertAllowed refuses forms.body in a scope list',
+    Cfg.assertAllowed(['https://www.googleapis.com/auth/forms.body']).ok === false);
+  check('assertAllowed refuses a scope outside the lane allowlist',
+    Cfg.assertAllowed(['https://www.googleapis.com/auth/gmail.modify']).ok === false);
+  check('assertAllowed accepts the manifest scope set',
+    Cfg.assertAllowed(manifestScopes).ok === true);
+
   if (failures) {
     console.log('\n' + failures + ' failure(s)');
     process.exit(1);

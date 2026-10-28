@@ -73,6 +73,37 @@ check('Mon (+2) Thu 5/11 with no clock is 5 November', iso('ביום חמישי 
 check('Hebrew within ±48 of 01/11 with meeting word is 1 November',
   iso('פגישה 01/11 בשעה 11:00', '2026-10-25T11:00:00+02:00') === '2026-11-01');
 
+// Boundary: Hebrew letter 30 chars before the slash needs the full ±48 window (±20 mutant dies).
+{
+  const pad = '.'.repeat(24);
+  const text = 'פגישה ' + pad + '5/11 בשעה 14:00';
+  check('Hebrew meeting word 30 chars before 5/11 is 5 November (needs ±48, not ±20)',
+    iso(text, '2026-10-26T09:00:00+02:00') === '2026-11-05');
+}
+// Boundary: Hebrew 6 chars before the slash needs more than ±3 (±3 mutant dies).
+check('Hebrew ב beside 5/11 with meeting context is 5 November (needs ±48, not ±3)',
+  iso('פגישה ב-5/11 בשעה 14:00', '2026-10-26T09:00:00+02:00') === '2026-11-05');
+// Boundary: far Hebrew must not flip US 12/4 when the window is not widened to ±400.
+{
+  const farHe = ('ש '.repeat(55)) + 'Call on Friday 12/4 at 10:00';
+  check('distant Hebrew does not turn US 12/4 into day-first (±400 mutant dies)',
+    iso(farHe, '2026-12-01T12:00:00Z') === '2026-12-04');
+}
+
+// D5: "find us N minutes" is quiet in intent.js (rehearsal D5).
+{
+  const fs = require('fs');
+  const vm = require('vm');
+  const sb = { module: undefined, console };
+  vm.createContext(sb);
+  for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js']) {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'core', f), 'utf8'), sb, { filename: f });
+  }
+  const FlowIntent = vm.runInContext('FlowIntent', sb);
+  const d5 = FlowIntent.classify('Can you find us 30 minutes next week to go over the quote?', { senderEmail: 'dana@meridian.com', now: new Date('2026-10-26T09:00:00Z'), calibration: null });
+  check('find us 30 minutes stays quiet (Gate gap D5)', !d5 || d5.type === null, d5 && d5.type);
+}
+
 // English / mixed: US M/D must survive (kills always-day-first mutant).
 check('English US Fri 12/4 is 4 December', iso('Call on Friday 12/4 at 10:00', '2026-12-01T12:00:00Z') === '2026-12-04');
 check('mixed subject keeps US 12/4', iso('Re: הצעה – Call on Friday 12/4 at 10:00', '2026-12-01T12:00:00Z') === '2026-12-04');

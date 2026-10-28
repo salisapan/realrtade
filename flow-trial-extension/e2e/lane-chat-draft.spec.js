@@ -29,7 +29,8 @@ const LANE_JS = [
   'src/content-messenger.js'
 ];
 const PLACE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/messenger-place.html'), 'utf8');
-const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8');
+const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8')
+  .replace(/2026-10-14/g, '2026-10-27');
 const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
 async function registerMessenger(glance) {

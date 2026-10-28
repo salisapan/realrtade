@@ -313,7 +313,7 @@ async function run() {
   check('unpacked redirect', api.googleRedirectUriForExtension(EXTENSION_ID) === 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/');
   check('store redirect', api.googleRedirectUriForExtension('lbihckfmoffgjjlnneoeaehbhoonfenh') === 'https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/');
   check('blank extension id has no redirect', api.googleRedirectUriForExtension('  ') === '');
-  check('default scopes match the manifest list', JSON.stringify(api.googleOAuthScopesFrom(null)) === JSON.stringify(api.GOOGLE_OAUTH_SCOPES) && api.GOOGLE_OAUTH_SCOPES.length === 8);
+  check('default scopes match the manifest list (seven scopes, no forms.body)', JSON.stringify(api.googleOAuthScopesFrom(null)) === JSON.stringify(api.GOOGLE_OAUTH_SCOPES) && api.GOOGLE_OAUTH_SCOPES.length === 7 && api.GOOGLE_OAUTH_SCOPES.indexOf('https://www.googleapis.com/auth/forms.body') === -1);
   check('the one consent includes openid and userinfo.profile',
     api.GOOGLE_OAUTH_SCOPES.indexOf('openid') !== -1 &&
     api.GOOGLE_OAUTH_SCOPES.indexOf('https://www.googleapis.com/auth/userinfo.profile') !== -1);

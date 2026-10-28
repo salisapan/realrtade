@@ -3,7 +3,7 @@
 //   flow-trial-extension/core/extract.js
 //   flow-trial-extension/core/judgment.js
 // Regenerate with: scripts/build-glance-engine.sh
-// Last synced: 2026-09-28
+// Last synced: 2026-10-28
 //
 // This is the exact client-side judgment engine the Glance extension
 // runs — concatenated as-is (no edits) so the live demo on trial.html
@@ -125,6 +125,13 @@ const FlowExtract = (() => {
   // Gregorian month names as Israeli business mail actually writes them
   // ("7 בספטמבר"), in the same order as MONTHS so the index is the month.
   const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  // Short month names ("Oct 8, 2026") are the same dates as the full names
+  // above. "sept" is the four-letter form of September. Full names are
+  // matched first, so this map is only for the abbreviation.
+  const MONTH_ABBR = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7,
+    sep: 8, sept: 8, oct: 9, nov: 10, dec: 11
+  };
 
   const CURRENCY = {
     '$': 'USD', 'us$': 'USD', 'usd': 'USD',
@@ -256,9 +263,193 @@ const FlowExtract = (() => {
     return { raw, iso: iso(inWindow[0]) };
   }
 
+  function localToday(now) {
+    const d = now || new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  // An invoice number, a version, or a phone is not a day.
+  function slashRejected(text, index) {
+    const before = text.slice(Math.max(0, index - 32), index);
+    if (/(?:invoice|inv|version|ver|חשבונית|גרסה|טלפון|phone|ext)\.?\s*[#:]?\s*$/i.test(before)) return true;
+    if (/(?:^|[^A-Za-z])v\s*$/i.test(before)) return true;
+    return false;
+  }
+  // A slash is a date only beside a preposition, a weekday, or a time or meeting word.
+  // Day-first for ambiguous N/N only beside a Hebrew יום/ביום weekday name,
+  // not anywhere Hebrew appears (mixed English mail with a signature stays M/D).
+  function hebrewWeekdayNear(text, index, span) {
+    const start = Math.max(0, index - 48);
+    const end = Math.min(text.length, index + (span || 0) + 48);
+    const window = text.slice(start, end);
+    return /(?:ביום|יום)\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(window);
+  }
+  function slashDateContext(text, index, raw) {
+    const before = text.slice(Math.max(0, index - 40), index);
+    const window = text.slice(Math.max(0, index - 48), Math.min(text.length, index + String(raw || '').length + 48));
+    if (/(?:עד|ב-|ב־|לפני|ביום)\s*$/.test(before)) return true;
+    if (/\b(?:on|by|until|before|due|no later than)\s*$/i.test(before)) return true;
+    if (/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(window)) return true;
+    if (/יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)/.test(window)) return true;
+    if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(window)) return true;
+    if (/(?:בשעה|(?<![\u0590-\u05FF])בעה|\bat\s+\d|\b\d{1,2}:\d{2}\b)/i.test(window)) return true;
+    return false;
+  }
+  // 23/10 is day 23. 10/23 is month 10. 5/6 is either, so it stays words with no ISO.
+  // Day-first stays. A bare slash, a past day, or a number inside an invoice is not a date.
+  function slashDate(text, now) {
+    const src = String(text || '');
+    const re = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+    const today = localToday(now || new Date());
+    let ambiguous = null;
+    let m;
+    while ((m = re.exec(src))) {
+      if (slashRejected(src, m.index)) continue;
+      const a = +m[1];
+      const b = +m[2];
+      let day = null;
+      let monthIdx = null;
+      if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; monthIdx = b - 1; }
+      else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; monthIdx = a - 1; }
+      else if (a >= 1 && a <= 12 && b >= 1 && b <= 12) {
+        const heDayFirst = hebrewWeekdayNear(src, m.index, m[0].length) ||
+          (/[\u0590-\u05FF]/.test(src.slice(Math.max(0, m.index - 48), Math.min(src.length, m.index + m[0].length + 48))) &&
+            slashDateContext(src, m.index, m[0]));
+        if (heDayFirst) { day = a; monthIdx = b - 1; }
+        else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
+      }
+      else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
+      let year = m[3] ? +m[3] : null;
+      if (year != null && year < 100) year += 2000;
+      const built = monthDay(m[0], monthIdx, day, year, now || new Date());
+      const iso = built && built.iso;
+      if (!iso || !slashDateContext(src, m.index, m[0]) || iso < today) {
+        if (!ambiguous) ambiguous = { raw: m[0], iso: null };
+        continue;
+      }
+      return built;
+    }
+    return ambiguous;
+  }
+
+  // A clock, however it is written. בשעה, ב-14:00, at 14:00, and a bare HH:MM
+  // are the same hour. The conflict check must not depend on one spelling.
+  function hasStatedClock(src) {
+    if (/(?:בשעה|בשעות|(?<![\u0590-\u05FF])בעה)\s*\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    if (/(?:^|[^\u0590-\u05FF\d])ב-\s*\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    if (/\bat\s+\d{1,2}(?::\d{2})?\b/i.test(src)) return true;
+    if (/(?:^|[^\d])\d{1,2}:\d{2}(?!\d)/.test(src)) return true;
+    return false;
+  }
+  function numericDayMonth(src, preferDayFirst) {
+    const slash = src.match(/(?:^|[^\d])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?!\d)/);
+    const dotted = src.match(/(?:^|[^\d])(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?(?!\d)/);
+    const m = slash || dotted;
+    if (!m) return null;
+    const a = +m[1];
+    const b = +m[2];
+    let day = null;
+    let month = null;
+    if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; month = b; }
+    else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; month = a; }
+    else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && preferDayFirst) { day = a; month = b; }
+    else return null;
+    return {
+      day: day,
+      month: month,
+      yearRaw: m[3] || null,
+      token: m[1] + (slash ? '/' : '.') + m[2] + (m[3] ? (slash ? '/' : '.') + m[3] : '')
+    };
+  }
+  function namedWeekday(src) {
+    const he = src.match(/(?:ביום|יום)\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
+    const en = src.match(new RegExp('\\b(' + DAYS.join('|') + ')\\b', 'i'));
+    if (he && (!en || he.index <= en.index)) return { index: DAYS_HE.indexOf(he[1]), he: true, raw: he[0] };
+    if (en) return { index: DAYS.indexOf(en[1].toLowerCase()), he: false, raw: en[0] };
+    return null;
+  }
+  function choiceLabel(date, he) {
+    const name = he
+      ? DAYS_HE[date.getDay()]
+      : DAYS[date.getDay()].charAt(0).toUpperCase() + DAYS[date.getDay()].slice(1);
+    return name + ' ' + date.getDate() + '/' + (date.getMonth() + 1);
+  }
+  function nearestWeekday(anchor, weekday) {
+    for (let delta = 1; delta <= 3; delta++) {
+      const before = new Date(anchor.getTime());
+      before.setDate(anchor.getDate() - delta);
+      if (before.getDay() === weekday) return before;
+      const after = new Date(anchor.getTime());
+      after.setDate(anchor.getDate() + delta);
+      if (after.getDay() === weekday) return after;
+    }
+    return null;
+  }
+  // Weekday + a day-first date is one statement. 22/10 and 22.10 are 22
+  // October. When the weekday is that calendar day and a clock was written,
+  // the date stands. When it is not, and a clock was written, neither
+  // reading is chosen: both dates come back as choices and iso stays empty.
+  // No clock keeps the older read, so a conflict does not become a new event.
+  function weekdayDayFirst(text, now) {
+    const src = String(text || '');
+    const dayName = namedWeekday(src);
+    const num = numericDayMonth(src, dayName && dayName.he);
+    if (!dayName || !num || !now) return null;
+    const clock = hasStatedClock(src);
+    const raw = dayName.raw + ' ' + num.token;
+    if (dayName.index < 0 || num.month < 1 || num.month > 12 || num.day < 1 || num.day > 31) {
+      if (!clock) return null;
+      return { raw: raw, iso: null, invalidDate: true };
+    }
+    let year = null;
+    if (num.yearRaw) {
+      year = +num.yearRaw;
+      if (year < 100) year += 2000;
+    }
+    let written = null;
+    if (year) {
+      written = buildDate(year, num.month - 1, num.day);
+      if (!written) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
+    } else {
+      const y = now.getFullYear();
+      const inWindow = [y - 1, y, y + 1]
+        .map((yy) => buildDate(yy, num.month - 1, num.day))
+        .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
+      if (inWindow.length !== 1) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
+      written = inWindow[0];
+    }
+    if (written.getDay() === dayName.index) {
+      return { raw: raw, iso: iso(written), statedWeekday: true };
+    }
+    // No clock: leave the day to the older parser. A conflict with no
+    // clock must not become a new event the base judge does not make.
+    if (!clock) return null;
+    const other = nearestWeekday(written, dayName.index);
+    if (!other) return { raw: raw, iso: null, contradictsWeekday: true };
+    return {
+      raw: raw,
+      iso: null,
+      contradictsWeekday: true,
+      choices: [
+        { iso: iso(other), label: choiceLabel(other, dayName.he) },
+        { iso: iso(written), label: choiceLabel(written, dayName.he) }
+      ]
+    };
+  }
+
   // Only dates the message states outright. A date guessed from context is worse
   // than no date at all once it lands in someone's CRM.
+  // Forms people really write that the readers below do not take (Hebrew weekday abbreviations, dotted dates, «ב-8 בערב»,
+  // "half past 8", "by the 30th", «בעוד יומיים») are made explicit first by core/day-words.js, when it is loaded.
+  function dayWordsFirst(text, now) {
+    try {
+      const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : (typeof require !== 'undefined' ? require('./day-words.js').FlowDayWords : null);
+      return D ? D.normalize(text, now) : text;
+    } catch (e) { return text; }
+  }
+
   function parseDate(text, now) {
+    text = dayWordsFirst(text, now);
     now = now || new Date();
     let m;
 
@@ -287,6 +478,14 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + monthNames + ')(?:,?\\s+(\\d{4}))?\\b', 'i'));
     if (m) return monthDay(m[0], MONTHS.indexOf(m[2].toLowerCase()), +m[1], m[3], now);
 
+    // "Oct 8, 2026" / "Oct. 8". Same monthDay rules as "October 8, 2026":
+    // a written year is that year, a bare day uses the window. Checked
+    // before "tomorrow", so "tomorrow (Oct 8, 2026)" keeps October 8
+    // after tomorrow has moved on. "sept" is listed before "sep" so the
+    // shorter token does not clip it.
+    m = text.match(/\b(sept|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/i);
+    if (m) return monthDay(m[0], MONTH_ABBR[m[1].toLowerCase()], +m[2], m[3], now);
+
     // "7 בספטמבר" / "ב-21 בספטמבר 2026". The ב clings to the month name
     // (בספטמבר), the same way English puts the month name next to the day.
     // No year uses monthDay()'s window, so a bare day six months out stays
@@ -294,6 +493,11 @@ const FlowExtract = (() => {
     // after the month name ("בספטמבראי") is not that month.
     m = text.match(new RegExp('(?:^|[^\\d\\u0590-\\u05FF])(\\d{1,2})\\s+ב-?(' + MONTHS_HE.join('|') + ')(?![\\u0590-\\u05FF])(?:\\s+(\\d{4}))?'));
     if (m) return monthDay(m[0].replace(/^[^\d]+/, ''), MONTHS_HE.indexOf(m[2]), +m[1], m[3], now);
+
+    // Weekday + numeric day + any clock spelling. A conflict returns both
+    // dates and no iso, before a bare "ביום רביעי" can book a different day.
+    const stated = weekdayDayFirst(text, now);
+    if (stated) return stated;
 
     // "by Monday" / "next Friday" — only when a scheduling word introduces it,
     // so a signature line reading "Monday" is not mistaken for a deadline.
@@ -312,6 +516,9 @@ const FlowExtract = (() => {
       if (delta === 0) delta = 7;
       else if (/next\s/i.test(m[0])) delta += 7;
       d.setDate(d.getDate() + delta);
+      // "by Friday 23/10": the number is the day. The weekday name is the same Friday.
+      const numbered = slashDate(text, now);
+      if (numbered && numbered.iso) return numbered;
       return { raw: m[0], iso: iso(d) };
     }
 
@@ -429,10 +636,9 @@ const FlowExtract = (() => {
       return { raw: 'היום', iso: iso(d) };
     }
 
-    // Numeric M/D or D/M is genuinely ambiguous across locales, so it is kept as
-    // written and never normalized to an ISO date we cannot justify.
-    m = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
-    if (m) return { raw: m[0], iso: null };
+    // One side above 12 is a day or a month, not a guess. 5/6 stays unresolved.
+    const slash = slashDate(text, now);
+    if (slash) return slash.iso ? slash : { raw: slash.raw, iso: null };
 
     return null;
   }
@@ -443,10 +649,11 @@ const FlowExtract = (() => {
   // would be the same mistake parseDate() above already refuses to make for
   // an ambiguous year.
   //
-  // An hour that could be either half of the day is not a time. "at 3" and
-  // "בשעה 3" both used to be readable as 03:00; English already refused
-  // that, Hebrew did not, and a 03:00 Calendar event is a wrong close.
-  // A day-part word is the sender stating which half, so that hour is kept.
+  // An hour that could be either half of the day is not a time. English
+  // "at 3" stays unresolved, and a written ":00" with no half of the day
+  // stays unresolved: both used to become a 03:00 event. Hebrew "בשעה 3"
+  // names the hour and no minutes. That hour is the workday clock, the
+  // same as the word "שלוש", so the meeting keeps a calendar step.
   function resolveClock(hour, minute, marker) {
     let h = hour;
     if (h > 23 || minute > 59 || h < 0 || minute < 0) return null;
@@ -487,7 +694,16 @@ const FlowExtract = (() => {
   }
 
   function parseTime(text) {
+    text = dayWordsFirst(text);
     let m;
+
+    // "at 8.30 pm": a dotted clock that carries am or pm is that clock, not 8:00 with ".30 pm" left over.
+    m = text.match(/\bat\s+(\d{1,2})\.([0-5]\d)\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/i);
+    if (m) {
+      const clock0 = resolveClock(+m[1], +m[2], m[3].toLowerCase().replace(/\./g, ''));
+      if (!clock0) return null;
+      return { raw: m[0], hour: clock0.hour, minute: clock0.minute };
+    }
 
     m = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|(?:in the|this) (?:morning|afternoon|evening)|at night)?\b/i);
     if (m) {
@@ -505,7 +721,8 @@ const FlowExtract = (() => {
     // there, has the same Hebrew boundary: it must not be a prefix of a
     // longer word.
     const hePart = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
-    m = text.match(new RegExp('(?:בשעה|בשעות)\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(' + hePart + '))?(?![\\u0590-\\u05FF\\d])'));
+    // בעה is the typo of בשעה. It is the same "at the hour of" marker.
+    m = text.match(new RegExp('(?:בשעה|בשעות|(?<![\\u0590-\\u05FF])בעה)\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(' + hePart + '))?(?![\\u0590-\\u05FF\\d])'));
     if (m) {
       const rawPart = (m[3] || '').replace(/["״׳']/g, '');
       const marker = rawPart === 'בבוקר' ? 'in the morning'
@@ -514,9 +731,64 @@ const FlowExtract = (() => {
         : rawPart === 'בערב' ? 'in the evening'
         : rawPart === 'בלילה' ? 'at night'
         : '';
-      const clock = resolveClock(+m[1], m[2] ? +m[2] : 0, marker);
+      const minuteWritten = Boolean(m[2]);
+      let clock = resolveClock(+m[1], minuteWritten ? +m[2] : 0, marker);
+      // "בשעה 3" is an hour with no minutes. 1–7 with no day-part is the
+      // workday hour (15:00), not 03:00 and not an unresolved day.
+      if (!clock && !marker && !minuteWritten && +m[1] >= 1 && +m[1] <= 7) {
+        clock = resolveClock(+m[1], 0, 'pm');
+      }
       if (!clock) return null;
       return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
+    // בשלוש / בארבע is the same workday hour as בשעה 3. Longest first, so
+    // באחת עשרה is eleven and not one. A longer Hebrew word does not match.
+    // English "at 3" and "בשעה 3:00" stay unresolved.
+    const heHourWords = [
+      ['אחת עשרה', 11], ['אחד עשרה', 11],
+      ['שתיים עשרה', 12], ['שתים עשרה', 12],
+      ['שתיים', 2], ['שתים', 2],
+      ['שלוש', 3], ['ארבע', 4], ['חמש', 5], ['שש', 6],
+      ['שבע', 7], ['שמונה', 8], ['תשע', 9], ['עשר', 10], ['אחת', 1]
+    ];
+    const heHourAlt = heHourWords.map((pair) => pair[0]).join('|');
+    m = text.match(new RegExp('(?:^|[^\\u0590-\\u05FF])ב(' + heHourAlt + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + hePart + '))?(?![\\u0590-\\u05FF])'));
+    if (m) {
+      const spokenHour = heHourWords.find((pair) => pair[0] === m[1]);
+      const rawPart = (m[3] || '').replace(/["״׳']/g, '');
+      const marker = rawPart === 'בבוקר' ? 'in the morning'
+        : rawPart === 'בצהריים' ? 'noon-window'
+        : (rawPart === 'אחר הצהריים' || rawPart === 'אחר הצהרים' || rawPart === 'אחהצ') ? 'in the afternoon'
+        : rawPart === 'בערב' ? 'in the evening'
+        : rawPart === 'בלילה' ? 'at night'
+        : '';
+      const extra = m[2] && m[2].indexOf('חצי') !== -1 ? 30 : (m[2] && m[2].indexOf('רבע') !== -1 ? 15 : 0);
+      let clock = spokenHour ? resolveClock(spokenHour[1], extra, marker) : null;
+      if (!clock && spokenHour && !marker && spokenHour[1] >= 1 && spokenHour[1] <= 7) {
+        clock = resolveClock(spokenHour[1], extra, 'pm');
+      }
+      if (clock) return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
+    // "ב-14:00" is the same hour as "בשעה 14:00". A date ("ב-22/10") has no colon.
+    m = text.match(/(?:^|[^\u0590-\u05FF\d])ב-\s*(\d{1,2}):(\d{2})(?!\d)/);
+    if (m) {
+      const clock = resolveClock(+m[1], +m[2], '');
+      if (!clock) return null;
+      return { raw: m[0], hour: clock.hour, minute: clock.minute };
+    }
+
+    // 11:00 next to a meeting noun is the hour. A bare 11:00 with no meeting
+    // is still a flight, a room, or a price, and stays unresolved.
+    if (/(?:פגישה|שיחה|ראיון|\b(?:meeting|call|sync)\b)/i.test(text)) {
+      const re = /(?:^|[^\d])(\d{1,2}):(\d{2})(?!\d)/g;
+      let tm;
+      while ((tm = re.exec(text))) {
+        const clock = resolveClock(+tm[1], +tm[2], '');
+        if (!clock) continue;
+        return { raw: tm[1] + ':' + tm[2], hour: clock.hour, minute: clock.minute };
+      }
     }
 
     return null;
@@ -540,7 +812,9 @@ const FlowExtract = (() => {
   function senderIsAutomated(email, text) {
     const local = String(email || '').split('@')[0].toLowerCase();
     if (/^(no-?reply|do-?not-?reply|noreply|notifications?|alerts?|mailer|bounce|postmaster|automated|support-bot)/.test(local)) return true;
-    if (/\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b/i.test(text)) return true;
+    // newsletter@ news@ marketing@ — the local part, not a longer word such as newspaper.
+    if (/^(newsletter|news|marketing)(?![a-z0-9])/.test(local)) return true;
+    if (/\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b|\byou are receiving this\b|\byou(?:'|’)re receiving this\b|\byou received this email because\b|קיבלת מייל זה|להסרה מרשימת התפוצה|הנך רשום/i.test(text)) return true;
     return false;
   }
 
@@ -562,6 +836,7 @@ const FlowExtract = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExtract };
+else if (typeof globalThis !== 'undefined') globalThis.FlowExtract = FlowExtract;
 
 // The judgment engine: decides whether one email is worth speaking up about.
 //
@@ -592,6 +867,10 @@ const FlowJudgment = (() => {
   // ahead" with no figure and no date — while the old scorer let cold pitches
   // through. The cold-pitch penalty below is what buys the headroom to sit at 50.
   const BASE_THRESHOLD = 50;
+  // Strong authorisations have to clear this bar on their own. 42 is the
+  // weight; the gap up to BASE_THRESHOLD is added only when nothing else
+  // positive is present (see score), so a reply bonus is not required.
+  const STRONG_WEIGHT = 42;
   const MIN_THRESHOLD = 38;
   // Capped where a genuine decision can still clear it. Higher than this and a
   // run of dismissals mutes Flow outright, which is indistinguishable from a
@@ -610,7 +889,7 @@ const FlowJudgment = (() => {
   // assertedIn's per-sentence negation/hedge/question check (unlike
   // HANDOFF/HANDOFF_HE above and LOST/LOST_HE below, which are bare
   // .test() and documented separately for exactly that reason).
-  const COMMIT = /\b(we'?re good (?:at|with)|agreed?(?: to| on)?|confirm(?:ed|ing)?|accept(?:ed)?|we'?ll take|executed|sounds good|works for (?:us|me)|happy to (?:move forward|proceed)|let'?s proceed|we'?re on board|consider it done|that works (?:for us|for me)?|agreed upon|in agreement|we concur|we'?re aligned|you have our agreement|you have my (?:ok|okay|approval)|give you our ok|i commit to|on the hook to|count on me to)\b/i;
+  const COMMIT = /\b(we'?re good (?:at|with)|agreed?(?: to| on)?|confirm(?:ed|ing)?|accept(?:ed)?|we'?ll take|executed|sounds good|works for (?:us|me)|happy to (?:move forward|proceed)|let'?s proceed|we'?re on board|consider it done|that works (?:for us|for me)?|agreed upon|in agreement|we concur|we'?re aligned|you have our agreement|you have my (?:ok|okay|approval)|give you our ok|i commit to|on the hook to|count on me to|paid in full|(?:invoice|fee|payment) is paid)\b/i;
   // An explicit, unambiguous authorisation. These carry more weight than the
   // general list because "Approved — go ahead" is the single most common real
   // decision in business email and it arrives with no money and no date
@@ -637,7 +916,7 @@ const FlowJudgment = (() => {
   // addition below was verified against the full negative-test corpus in
   // test/intent-actions-corpus.cjs (vague asks, cold pitches, small talk)
   // before being kept.
-  const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|pay|remit|wire|settle|let (?:us|me) know)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise|pay|remit)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
+  const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|pay|remit|wire|settle|let (?:us|me) know|proofread|check|order|look over|take a look|fill (?:in|out)|complete|verify|validate)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise|pay|remit|acknowledge|reply|respond|revert|return|sign|approve|submit)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|(?:we|I)(?:'d| would) (?:be )?(?:grateful|thankful) (?:it )?if you|do you think you could|do you mind (?:send|upload|review|check|sign|fill|forward|share|updat|provid|resend)(?:ing)?\b|(?:^|[.!?]\s+|please\s+)make sure (?:that )?(?:the|we|all|this|it)\b|(?:please |kindly )?(?:get|come|write|reply|respond) back to me\b|kindly revert\b|please revert\b|let me know (?:your|what you|how you) (?:decision|thoughts|feedback|answer|availability|preference)|(?:we|I)(?:'d| would) appreciate (?:a |an |your |the )(?:quick |brief |prompt )?(?:update|reply|response|answer|confirmation|feedback|decision)|(?:we|I) need your (?:decision|answer|reply|response|signature|payment|go-?ahead)|need your (?:decision|answer|reply|response|signature|go-?ahead)|do let me know (?:by|whether|if)|if you could (?:please )?(?:send|share|forward|review|confirm|sign|approve|provide|upload|resend|check|take a look)|(?:we|I) need (?:the |your |that |those |these |a |an )(?!to\b)[^.?!\n]{1,50}?\bback(?=\s*(?:by|before|on|until|asap|today|tomorrow|this|next|end|[.!?,]|$))|(?:we|I) need (?:the |your |that |those |these |a |an )(?!to\b)[^.?!\n]{1,50}?\bfrom you\b|it would be (?:great|helpful|good|best|ideal|perfect) to (?:have|get|receive) (?:the |your |a |an )|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
   // A disagreement about money.
   const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|undercharged|incorrect (?:amount|invoice)|dispute|wrong amount|billing discrepancy|invoice error|charged incorrectly|duplicate charge|unauthorized charge)\b/i;
 
@@ -657,8 +936,13 @@ const FlowJudgment = (() => {
   // below threshold. Same false-positive-adjacent bug class this file's
   // NEG_BEFORE_HE/HEDGE_HE header comments already document — found here by
   // the same "run the negative corpus before committing" discipline.
-  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?|נשמע טוב|נשמח להתקדם|בואו נתקדם|אנחנו בעניין|רואים בזה סגור|תואמים|יש לנו הסכמה|אאשר|מתחייב|מתחייבת)/;
-  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה|מאושר סופית|אושר רשמית|קיבל אישור סופי|יצא אישור|האישור הסופי התקבל)/;
+  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?|נשמע טוב|נשמח להתקדם|בואו נתקדם|אנחנו בעניין|רואים בזה סגור|תואמים|יש לנו הסכמה|אאשר|מתחייב|מתחייבת|שול(?:מה|מו|ם)(?![\u0590-\u05FF]))/;
+  // "נחתם" is the passive twin of English "countersigned" / "fully executed",
+  // which already sit on COMMIT_STRONG. Left only on the weaker executed
+  // list, "ההסכם נחתם" cannot clear 50: executed is 26, and a short note
+  // also eats the length penalty. "עותק חתום" stays off this list — it is
+  // the document someone asks you to send, not the fact that it was signed.
+  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה|מאושר סופית|אושר רשמית|קיבל אישור סופי|יצא אישור|האישור הסופי התקבל|נחתם|ההסכם נחתם)/;
   const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא|לא הולכים על זה|בחרנו באופציה אחרת|בחרנו בספק אחר|לצערנו לא נוכל|אנחנו לא ממשיכים איתכם|ירדנו מהעניין|החלטנו לוותר|לא מתאים לנו|הולכים על ספק אחר|פורשים מההסכם|לא נמשיך בתהליך)/;
   const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם|חתמתי על|נחתם וסגור|חתום ומאושר|נשלח חתום|העותק החתום מצורף|העסקה נסגרה|הניירת הושלמה)/;
   const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון|עד סוף החודש|יש להעביר עד|נדרש לשלם עד|יש להשלים עד|יש להגיש עד|נדרש להשלים עד|התשלום נדרש עד|יש לסיים עד)/;
@@ -684,15 +968,164 @@ const FlowJudgment = (() => {
   // the same "asking you to do X" shape, each verified against the full
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
-  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|ת(?:אשר|אשרי|אשרו)\s+לי(?:\s+בבקשה)?(?![א-ת])|אפשר\s+ל(?:עדכן|תקן|סיים|הכין)(?![א-ת])[^?.!]{0,50}\sעד\s|(?:אשמח|נשמח)\s+ל(?:אישור|תשובה|עדכון|משוב|תגובה)\s+(?:שלך|שלכם|שלכן|ממך|ממכם)|אפשר\s+ש(?:ת|תי)(?:עיף|עיפי|סתכל|סתכלי|בדוק|בדקי|חתום|חתמי|אשר|אשרי|עדכן|עדכני|שלח|שלחי|חזור|חזרי|עבור|עברי|טפל|טפלי|סגור|סגרי)(?![א-ת])|(?:תוודא|תוודאי|תדאג|תדאגי)\s+ש?(?:ה|ל)|(?:תעיף|תעיפי)\s+מבט|אשמח ש(?:ת|תי)(?:חזור|חזרי|שלח|שלחי|עדכן|עדכני|אשר|אשרי|בדוק|בדקי|עבור|עברי|ענה|עני)(?![א-ת])|(?:אפשר|אשמח|נשמח)\s+לשמוע\s+(?:ממך|ממכם|ממך עדכון)|(?:אני|אנחנו)\s+(?:זקוק(?:ה|ים|ות)?|צריכ(?:ה|ים|ות)?|צריך)\s+(?:את\s+|ל)?(?:ה)?(?:חתימה|אישור|תשובה|החלטה|עדכון|תגובה|משוב)\s+(?:שלך|שלכם|ממך|ממכם)|(?:(?:אתה|את|אתם|אתן)\s+יכול(?:ה|ים|ות)?|היית(?:י)?\s+יכול(?:ה)?)\s+(?:בבקשה\s+)?ל(?:שלוח|העביר|אשר|בדוק|עבור|חתום|חזור|עדכן|שלם|הכין|סדר|תאם|מלא|הזמין|השיב|ענות|הוסיף|צרף|פתוח|ארגן|טפל|שמור|העלות|העלות|הגיש|הוציא|שחרר)(?![א-ת])|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
   // "Please follow up with Dana about the invoice" is an explicit ask, and
   // it never matched HANDOFF: "follow up" isn't in that verb list, and the
   // "send" later in the sentence isn't adjacent to "please". Kept out of
   // HANDOFF on purpose — these go through directedAsk() below (negation and
   // a hedge sitting in front of the phrase still kill them) instead of
   // HANDOFF's bare .test(), which cannot see "please don't follow up".
-  const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|send (?:a |the )?reminder)\b/i;
-  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי/;
+  const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|chase up|send (?:a |the )?reminder|send \w+ a reminder|please remind|please remember to)\b/i;
+  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
+  // The sender wants a call or a meeting and is waiting for the reader to name a time. It goes through
+  // directedAsk() like the follow-up asks, so a withdrawn or hedged ask stays quiet. A slot ask clears the
+  // bar on its own: the close is a reply that offers times (the draft names two slots to fill, never a time).
+  // Every way of asking for a time, a call, a meeting or the reader's availability. Each construct needs both halves
+  // (the ask and the thing asked about), so "what time is it" and "thanks for the call" stay out. They go through
+  // directedAsk(), so a hedged or withdrawn ask stays quiet.
+  const MEET_VERB = '(?:talk|chat|meet|call|connect|speak|catch up|sync|hop on|jump on|get together|touch base|check in|discuss|go over|have a (?:call|chat|word)|catch|grab|speak)';
+  const SLOT_ASKS = [
+    // when / what time / which day, with a word that makes it about fitting a time
+    /\bwhen\b[^.?!\n]{0,40}\b(?:free|available|around|good|best|convenient|suits?|works?|meet|talk|chat|call|speak|connect|catch up|sync|reach you|get together|discuss|open)\b/i,
+    /\bwhat(?:'s| is| are)?\s+(?:days?|times?|dates?|slots?)\b[^.?!\n]{0,40}\b(?:work|works|suit|suits|good|best|convenient|prefer|like|better)\b/i,
+    /\bwhich\s+(?:days?|times?|dates?|slots?)\b[^.?!\n]{0,40}\b(?:work|works|suit|suits|better|best|prefer|convenient)\b/i,
+    /\b(?:best|good|right|convenient|better)\s+time\s+to\s+(?:reach|call|contact|talk|meet|speak|catch|connect|chat)\b/i,
+    /\bis there (?:a|any)\s+(?:good |better |convenient |possible )?(?:time|slot|day|moment)\b/i,
+    // are you free / available / around, do you have time
+    /\b(?:are|will|were)\s+you\s+(?:free|available|around|open|up for|able to (?:meet|talk|chat|call|connect|speak|hop|jump))\b/i,
+    /\bfree\s+(?:for|to|on|at|this|next|tomorrow|today|later|sometime|one day)\b[^.?!\n]*\?/i,
+    /\b(?:are you )?(?:available|around)\s+(?:for|on|at|this|next|tomorrow|today|later)\b[^.?!\n]*\?/i,
+    /\bdo\s+you\s+have\s+(?:any |some |a |an |the |a few |\d+ )?(?:\w+ )?(?:time|minutes?|availability|slot|window|moment|opening|free)\b/i,
+    /\bwould\s+you\s+(?:be open to|be interested in|have time (?:for|to)|be up for|be willing to|be free)\b[^.?!\n]{0,30}\b(?:call|chat|meet|meeting|talk|speak|connect|demo|coffee|lunch|catch|sync|discuss|conversation)/i,
+    // can we / could we / shall we / may I + talk, meet, schedule, find a time
+    new RegExp('\\b(?:can|could|would|shall|may|might|should)\\s+(?:we|i)\\s+(?:possibly |maybe |quickly |just |perhaps )?(?:' + MEET_VERB.slice(3,-1) + '|schedule|set up|find|book|arrange|get on|fit|have)\\b(?!\\s+(?:the|our|your|their|this|that|these|those|my|his|her|expectations|requirements|deadlines?|goals?|targets?|budget)\\b)', 'i'),
+    /\bcan you (?:do|make|spare|find|fit)\s+(?:a |an |the |some )?(?:\d+[- ]?(?:min|minute|hour)\w* )?(?:call|meeting|chat|sync|session|lunch|coffee|catch|time|minutes|moment|slot)/i,
+    /\bany (?:chance|way|possibility)\b[^.?!\n]{0,30}\b(?:connect|chat|talk|meet|call|speak|catch up|sync|hop)\b/i,
+    /\bwould it be possible\b[^.?!\n]{0,25}\b(?:meet|talk|chat|call|connect|speak|catch up|get together)\b/i,
+    // would Thursday work, how about tomorrow, what about a call
+    /\bwould\s+(?:\w+day|tomorrow|today|next week|this week|the (?:morning|afternoon|evening)|\d{1,2}(?::\d\d)?\s?(?:am|pm)?)\b[^.?!\n]{0,25}\b(?:work|suit|be good|be fine|be ok|be okay|be better)\b/i,
+    /\b(?:how|what) about\b[^.?!\n]{0,40}\b(?:call|chat|meet|talk|tomorrow|today|\w+day|next week|this week|coffee|lunch|sync|morning|afternoon|evening)\b/i,
+    /\b(?:does|do|is)\s+(?:\w+day|tomorrow|today|next week|this week)\b[^.?!\n]{0,20}\b(?:work|suit)s?\b/i,
+    // let's, I'd love to, looking forward to, happy to
+    /\blet(?:'|’)?s\s+(?:find|set up|schedule|book|arrange|catch up|sync(?: up)?|talk|connect|touch base|hop on|jump on|get together|meet|speak|chat|grab|pick)\b/i,
+    /\b(?:i|we)(?:'d| would|'d really| really would| really)?\s+(?:love|like|appreciate|be happy|be glad|welcome|prefer|want|hope|wish|need)\s+(?:to\s+)?(?:set up|schedule|book|arrange|find a time|catch up|connect|chat|talk|meet|speak|get together|hop on|jump on|discuss|sync|touch base|hear|a few minutes|some of your time|a moment|\d+ minutes)\b/i,
+    /(?:^|[.!?,\n]\s*)(?:would |'d )?(?:really )?(?:love|like|appreciate) to\s+(?:set up|schedule|book|arrange|find a time|catch up|connect|chat|talk|meet|speak|get together|hop on|jump on|discuss|sync|touch base)\b/i,
+    /\b(?:looking|hoping|wanting|keen|eager)\s+(?:forward\s+)?to\s+(?:schedule|set up|book|connect|catch up|meet|talk|speak|chat|get together)/i,
+    /\bhappy to\s+(?:jump|hop|get)\s+on\b|\bhappy to\s+(?:meet|chat|talk|connect|catch up|speak|discuss|set up|schedule)\b/i,
+    // tell me when, send me times, pick a time, your calendar
+    /\b(?:(?:can|could|would|will) you (?:please )?)?(?:let me know|tell me|send me|share|give me|please advise|advise|come back (?:to me )?with|get back to me with|shoot me|text me)\b[^.?!\n]{0,40}\b(?:when|what time|your availability|a time|some times|a few times|times|what works|what day|which day|your schedule|slots?|the best time|what suits|whenever|availability)\b/i,
+    /\b(?:(?:can|could|would|will) you (?:please )?)?(?:suggest|propose|offer|give|send|share)\b[^.?!\n]{0,25}\b(?:slots?|times|options|windows|dates|days|timeframes?)\b/i,
+    /\b(?:what|how)(?:'s| is| does| are)\s+(?:your|the)\s+(?:calendar|schedule|availability|diary|week|day)\b/i,
+    /\bhow\s+(?:does|is|'s)\s+your\s+(?:calendar|schedule|week|availability|diary)\b/i,
+    /\bpick (?:a|the) (?:time|day|slot)\b|\bbook (?:a|some|me a) (?:time|slot)\b|\bget on your (?:calendar|schedule|diary)\b|\bfind (?:a|some|\d+ ?min\w*|\d+) (?:time|minutes?|slot)\b|\bfind a (?:time|day|slot)\b/i,
+    /\b(?:a few|a couple of|some|\d+) (?:minutes|mins)\b[^.?!\n]{0,20}\b(?:time|call|chat|talk|this week|today|tomorrow)\b/i
+  ];
+  const SLOT_ASKS_HE = [
+    /(?:^|[\s,.;:!?"(])מתי\s+(?:אפשר|נוח|מתאים|יתאים|יהיה\s+(?:לך|לכם|לכן|נוח|מתאים)|הכי|יוצא|תוכל(?:ו|י)?|אתה|את|אתם|אתן|ניתן|שנוח|שמתאים|תהיה|תהיו|פנוי|פנויה|פנויים|פנויות|נדבר|ניפגש|נקבע|נוכל|אוכל|אפשרי)/,
+    /(?:^|[\s,.;:!?"(])(?:אשמח|נשמח|הייתי\s+שמח|הייתי\s+שמחה|היינו\s+שמחים|הייתי\s+רוצה|היינו\s+רוצים|רציתי|רצינו|מעוניין|מעוניינת|מעוניינים)\s+(?:אם\s+)?(?:נוכל\s+|תוכל(?:ו|י)?\s+)?(?:ל(?:תאם|קבוע|דבר|היפגש|שוחח|פגוש|הכיר|התקשר|שמוע|סגור|מצוא|הציע)|שיחה|פגישה|דמו|הדגמה|זום|קפה)/,
+    /(?:^|[\s,.;:!?"(])(?:בוא|בואו|בואי)\s+(?:נ(?:קבע|תאם|דבר|פגש|סנכרן|שוחח|תקשר|מצא|סגור|כניס|סדר|ארגן|תחבר|עבור)|ניפגש)/,
+    /(?:^|[\s,.;:!?"(])(?:אפשר|ניתן|נוכל|יהיה\s+אפשר)\s+(?:\S+\s+){0,3}?(?:לקבוע|לתאם|לדבר|להיפגש|לשוחח|להתקשר|לסגור|שנדבר|שניפגש|שנקבע|שנתאם|זום|שיחה|פגישה|דמו)/,
+    /(?:^|[\s,.;:!?"(])(?:יש|יהיה)\s+(?:לך|לכם|לכן|לי)?\s*(?:קצת\s+)?(?:זמן|דקה|דקות|מצב|חלון|רגע|פנאי)\s+(?:קטן\s+|קצר\s+|פנוי\s+)?(?:(?:ל|ש)[א-ת]|השבוע|מחר|היום|בשבוע|ביום)/,
+    /(?:^|[\s,.;:!?"(])(?:תגיד|תגידי|תגידו|תכתוב|תכתבי|תכתבו|תעדכן|תעדכני|תעדכנו|תשלח|תשלחי|תשלחו|תחזור|תחזרי|תחזרו|תציע|תציעי|תציעו|תן|תני|תנו|שלח|שלחי|שלחו|עדכן|עדכני|עדכנו|הצע|הציעי|הציעו)\s+(?:לי\s+|לנו\s+)?(?:\S+\s+){0,3}?(?:מתי|מועד|מועדים|זמן|זמנים|זמינות|אילו\s+ימים|איזה\s+יום|איזו\s+שעה|שעות|חלונות)/,
+    /(?:^|[\s,.;:!?"(])(?:איזה|איזו|באיזה|באיזו)\s+(?:יום|שעה|ימים|שעות|מועד)\s+(?:\S+\s+){0,2}?(?:נוח|מתאים|עובד|טוב|הכי|מתאימים)/,
+    /(?:^|[\s,.;:!?"(])(?:מתאים|נוח|טוב|עובד|יתאים|יהיה\s+נוח)\s+(?:לך|לכם|לכן)\s+(?:ש(?:נדבר|ניפגש|נקבע|נתאם|אתקשר|אדבר|נסנכרן|נשוחח)|ביום|מחר|היום|בשבוע)/,
+    /(?:^|[\s,.;:!?"(])(?:נקבע|נתאם|נדבר|ניפגש|נסנכרן|נשוחח)\s+(?:משהו|שיחה|פגישה|זום|שוב|בקרוב|השבוע|מחר|בשבוע|ביום|ב\d)/,
+    /(?:^|[\s,.;:!?"(])(?:נוכל|אוכל|תוכל(?:ו|י)?)\s+(?:\S+\s+)?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח|להתחבר)/,
+    /(?:^|[\s,.;:!?"(])מה\s+(?:אצלך|אצלכם|אצלכן|עם)\s+(?:\S+\s+){0,2}?(?:ביום|בשבוע|מחר|היום|השבוע|בבוקר|בצהריים|בערב|ראשון|שני|שלישי|רביעי|חמישי|שישי)/,
+    /(?:^|[\s,.;:!?"(])מה\s+(?:ה)?(?:זמינות|יומן|לוח\s+הזמנים)\s+(?:שלך|שלכם)/,
+    /(?:^|[\s,.;:!?"(])מי\s+(?:מכם|מכן|מהצוות)\s+(?:פנוי|פנויה|יכול|יכולה)/,
+    /(?:^|[\s,.;:!?"(])(?:פנוי|פנויה|פנויים|פנויות)\s+(?:ל[א-ת]|ב(?!בקשה)[א-ת]|השבוע|מחר|היום)/,
+    /(?:^|[\s,.;:!?"(])(?:נשמח|אשמח)\s+(?:למצוא|לסגור|להציע)\s+(?:\S+\s+){0,2}?(?:זמן|מועד|שיחה|פגישה)/,
+    /(?:^|[\s,.;:!?"(])בא\s+(?:לך|לכם|לכן)\s+(?:ל|ש)(?:קבוע|דבר|היפגש|תאם|שוחח|התקשר)/
+  ];
+  // The structural half: a sentence that turns to the reader (a question, a request, an invitation, "whenever you") AND is
+  // about talking, meeting or fitting a time. This is what lets a phrasing nobody listed still count. A sentence that only
+  // states a fact (a call that happened, a meeting that is fixed, a schedule attached) has no turn to the reader.
+  const SLOT_COMM_EN = /\b(?:calls?|chat|talk|speak|spoke|meet|meeting|meetings|sync|catch[- ]?up|coffee|lunch|breakfast|drinks|dinner|demo|conversation|discuss|discussion|connect|touch base|walk you through|go (?:through|over)|video call|zoom|teams|hangout|visit|appointment|session|brainstorm|speak with|get together|meet up|hop on|jump on|walkthrough|briefing|kickoff|kick-off)\b/i;
+  const SLOT_TIME_EN = /\b(?:time|times|timing|slot|slots|availability|available|calendar|diary|schedule|minutes?|half an hour|an hour|spare|moment|gap|window|(?:mon|tues|wednes|thurs|fri|satur|sun)day|tomorrow|tonight|today|this week|next week|this afternoon|this morning|later|soon|sometime|end of the week|mornings?|afternoons?|evenings?)\b|\bfree(?! of charge| shipping| trial| to| for free)\b|\baround\b|\bfixed\b|\bconvenien(?:t|ce)\b|\bcouple of weeks\b|\bsometime\b|\bearliest\b/i;
+  const SLOT_TURN_EN = /\?|\b(?:could|can|would|might|will|shall|may|do|does|are|is|were)\s+(?:you|we|i|it|there|that|this|your)\b|\b(?:let me know|let us know|do let me|please|kindly|whenever|when ready|when you(?:'re| are)|if you(?:'re| are)? (?:free|available|around|able|open|keen|interested|up for)|i(?:'d| would) (?:really )?(?:love|like|welcome|appreciate|be grateful|be keen|be glad|be happy|be delighted|be pleased|prefer)|would (?:really )?(?:love|like|appreciate)|would be (?:great|nice|good|lovely|helpful|useful)|hoping (?:we|that|to)|i hope we|let us|how about|what about|any |care to|want to|up for|interested in|keen to|wondering|checking if|looking to|hoping to|just checking|perhaps|maybe|let(?:'|’)?s|wondered)\b/i;
+  const SLOT_FACT_EN = /\b(?:thanks for|thank you for|it was (?:great|good|nice) to|enjoyed|was scheduled|is scheduled|has been (?:scheduled|moved|cancelled|canceled|confirmed)|is confirmed|was cancelled|is cancelled|attached|recording|office hours|time zone|starts in|\bby (?:\w+day|tomorrow|tonight|eod|cob|end of (?:the )?(?:day|week))\b|\bwho (?:will|is|are|'s)\b|we (?:had|spoke|met|discussed)|i (?:had|spoke|met|called)|went well|free shipping|free trial|feel free|for free|no need|not needed|unsubscribe)\b/i;
+  const SLOT_COMM_HE = /(?:שיחה|שיחת|פגישה|פגישת|להיפגש|ניפגש|לדבר|נדבר|לשוחח|נשוחח|להתקשר|אתקשר|נתקשר|זום|טלפון|קפה|ארוחת|ארוחה|דמו|הדגמה|הכרות|סנכרון|נסנכרן|להתחבר|נתחבר|לקפוץ|וידאו|מפגש|לעבור על|נעבור על|לפגוש|נפגש|סשן|לדון|נדון|דיון|לארגן|ארגון|תדריך|סקירה|התנעה)/;
+  const SLOT_TIME_HE = /(?:זמן|זמנים|מועד|שעה|שעות|דקה|דקות|חצי שעה|פנוי|פנויה|פנויים|פנויות|זמין|זמינה|זמינים|זמינות|יומן|ביומן|חלון|רגע|פנאי|ימים|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|מחר|היום|השבוע|שבוע הבא|בקרוב|בהמשך|בבוקר|בצהריים|אחר הצהריים|בערב|לפני סוף|בארבע|בחמש|בשלוש|בעשר|שבועיים|בחודש|הקרובים|הקרוב|תאריך|תאריכים|נוח|מתאים|עובדים|טובים)/;
+  const SLOT_TURN_HE = /\?|(?:^|[\s,.;:!"(])(?:אפשר|נוכל|תוכל|תוכלו|תוכלי|אוכל|ניתן|יש\s+(?:לך|לכם)|יהיה\s+(?:לך|לכם)|בא\s+(?:לך|לכם)|מתאים|נוח|אשמח|נשמח|הייתי\s+(?:רוצה|שמח|שמחה)|אודה|רציתי|רצינו|מעוניין|מעוניינת|תגיד|תגידי|תגידו|תעדכן|תעדכני|תעדכנו|תשלח|תשלחי|תשלחו|תציע|תציעי|תציעו|בוא|בואו|בואי|נקבע|נתאם|אולי|האם|מה\s+עדיף|מה\s+דעתך|איך\s+נראה|מה\s+נראה|אכפת|מתי|איזה|איזו|אם\s+(?:אתה|את|אתם|אתן)|כש(?:יהיה|נוח|תוכל|תהיה)|רק\s+בודק|רק\s+בודקת|נגיד|נאמר|מעוניינים|בודק\s+אם|מקווה|מקווים|נסדר|נארגן|נציע|תהיה|תהיו|תהיי|זמין|זמינה|זמינים)/;
+  const SLOT_FACT_HE = /(?:תודה\s+על|נעים\s+להכיר|היה\s+(?:נעים|מצוין|כיף)|נקבע(?:ה)?\s+ל|בוטל|בוטלה|מצורפ|הקלטת|שעות\s+הפעילות|תזכורת:|בעוד\s+\S+\s+דקות|דיברנו|נפגשנו|דיברתי|משלוח\s+חינם|הסרה|אין\s+צורך|לא\s+צריך|הוא\s+אמר|היא\s+אמרה|אמר\s+ש|אמרה\s+ש|מי\s+(?:מכם\s+|מכן\s+)?(?:יגיע|תגיע|ישתתף|יצטרף|מגיע))/;
+  function slotAskSentence(sentence) {
+    const t = String(sentence || '');
+    if (t.length < 6 || t.length > 400) return false;
+    const he = /[֐-׿]/.test(t);
+    const comm = he ? SLOT_COMM_HE : SLOT_COMM_EN;
+    const time = he ? SLOT_TIME_HE : SLOT_TIME_EN;
+    const turn = he ? SLOT_TURN_HE : SLOT_TURN_EN;
+    const fact = he ? SLOT_FACT_HE : SLOT_FACT_EN;
+    if (fact.test(t)) return false;
+    // "Could you call me later?" asks the reader to do something; it does not ask when. A marker of availability or a time
+    // in the same sentence makes it an arrangement again.
+    if (!he && /\b(?:call|ring|phone)(?:ing)?\s+(?!me\b|us\b|back\b|in\b|with\b|about\b|this\b|it\b|today\b|tomorrow\b|later\b)(?:the |a |our |your |my )?(?:[A-Z][a-z]+|bank|office|supplier|vendor|client|customer|doctor|landlord)/.test(t) && !/\b(?:when|free|available|convenient|suits?|works?|availability)\b/i.test(t)) return false;
+    if (he && /(?:להתקשר|תתקשר|תתקשרי|תצלצל|תצלצלי)\s+ל(?!אחר)[א-ת]/.test(t) && !/(?:מתי|פנוי|זמין|נוח|מתאים|זמינות)/.test(t)) return false;
+    if (!he && /\b(?:call|ring|phone|text|ping|email|e-mail) me\b/i.test(t) && !/\b(?:when|whenever|free|available|convenient|suits?|works?|time|slot|slots|availability)\b/i.test(t)) return false;
+    if (he && /(?:להתקשר|תתקשר|תתקשרי|תצלצל|תצלצלי|לצלצל|תכתוב|תכתבי|לכתוב)\s+(?:אליי|אלי|לי)/.test(t) && !/(?:מתי|פנוי|זמין|נוח|מתאים|זמן|מועד|חלון|זמינות)/.test(t)) return false;
+    const question = /\?/.test(t);
+    // A statement that names a concrete day ("let's meet tomorrow", "we'll talk on Tuesday") proposes a meeting; the event and
+    // Schedule meeting gates already decide it. Only a question about a day asks the reader for a time.
+    const findsATime = /\b(?:find|pick|set|choose|fix|arrange)\s+(?:a|some|the)\s+(?:\w+\s+)?(?:time|day|slot)\b|(?:נמצא|נקבע|נבחר|נסדר|נתאם)\s+(?:לנו\s+)?(?:זמן|מועד|יום)/i.test(t);
+    if (!question && !findsATime && /\b(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day|tomorrow|tonight|today)\b|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|(?:^|\s)(?:מחר|היום|הערב)(?:\s|$|[.,])/i.test(t)) return false;
+    // Listed constructs: each already names both the ask and the thing asked about.
+    for (const re of SLOT_ASKS.concat(SLOT_ASKS_HE)) {
+      const m = t.match(re);
+      if (m && !isNegatedBefore(t.slice(0, m.index))) return true;
+    }
+    const mComm = t.match(comm);
+    if (!turn.test(t)) return false;
+    // Negation in front of the topic withdraws it ("no need for a call", "I can't meet").
+    if (mComm && isNegatedBefore(t.slice(0, mComm.index))) return false;
+    if (mComm && (time.test(t) || question)) return true;
+    // A question about which days, dates or hours suit the reader.
+    if (question && !he && /\b(?:which|what)\s+(?:days?|dates?|times?|hours?|slots?)\b/i.test(t) && /\b(?:you|your|suits?|works?|convenient|best|better|good|free|available|prefer)\b/i.test(t)) return true;
+    if (question && he && /(?:אילו|איזה|איזו|באיזה|באיזו)\s+(?:ימים|יום|שעה|שעות|מועד|מועדים|תאריכים|תאריך)/.test(t)) return true;
+    // "When are you next in the office?" "When can you do?": the reader is asked for a when.
+    if (question && !he && /\bwhen\s+(?:are|will|can|could|would|do|does|did)\s+(?:you|we|i)\b/i.test(t)) return true;
+    if (question && he && /(?:^|[\s,.;:!"(])מתי\s+(?:אתה|את|אתם|אתן|תוכל|תוכלו|תוכלי|תהיה|תהיו|נוכל|אפשר|נוח|מתאים|טוב|הכי)/.test(t)) return true;
+    // Setting time aside for the reader.
+    if (!he && /\b(?:set aside|block out|carve out|find|make|spare|take|allocate|reserve)\s+(?:some |a bit of |a little |a few |an? |\d+ )?(?:\w+ )?(?:time|minutes|moment|hour)\b/i.test(t)) return true;
+    // An invitation from the sender that names a meeting or a call ("we'd love a call", "נשמח לשיחה").
+    if (!he && /\b(?:i|we)(?:'d| would)? ?(?:love|like|be delighted|be keen|be happy|be glad|welcome)\b[^.?!\n]{0,25}\b(?:call|chat|conversation|meeting|catch up|coffee|lunch|demo)\b/i.test(t) && !/\b(?:thank|thanks)\b/i.test(t)) return true;
+    if (he && /(?:נשמח|אשמח|הייתי\s+רוצה|רוצה)\s+(?:ל\S+\s+)?(?:איתך\s+|איתכם\s+)?(?:שיחה|פגישה|קפה|דמו|לארגן)/.test(t)) return true;
+    // Putting something in the reader's calendar is the same ask.
+    if (!he && /\b(?:on|in|into|to) (?:the |our |my |your )?(?:calendar|diary|schedule)\b/i.test(t)) return true;
+    if (he && /(?:ליומן|ביומן)/.test(t)) return true;
+    // "Let me know a day that suits you": the thing asked for is a day, a date or a time.
+    if (!he && /\b(?:let me know|tell me|send me|share|give me|suggest|propose)\b[^.?!\n]{0,30}\b(?:day|days|date|dates|time|times|slot|slots|when)\b/i.test(t)) return true;
+    // A time with no talk word still counts when it is a question about the reader's availability or calendar.
+    return Boolean(!he && question && /\b(?:availability|available|calendar|diary|schedule|timing|free|spare|slot|slots|time works|times work|what does .{0,20} look like for you|how are you fixed)\b/i.test(t))
+      || Boolean(he && question && /(?:זמינות|פנוי|זמין|יומן|ביומן|חלון|איך\s+נראה\s+לך)/.test(t));
+  }
+  function slotAskText(text) {
+    return String(text || '').split(SENTENCE_SPLIT).some(slotAskSentence);
+  }
+
+  // A request to make a work product: a spreadsheet, a table, a report, a summary, a deck. The product has to be named, so
+  // "please create an account" and "write back when you can" stay quiet, and a bare "document" stays quiet on purpose
+  // (the create-when-missing family decides that). Kept out of HANDOFF so the sentence Glance quotes does not change.
+  const WORK_ASK = /\bplease (?:can you |could you )?(?:draft|write up|write|create|compile|put|enter|fill (?:in|out)|summari[sz]e|make|build) (?:\S+ ){0,5}?(?:spreadsheet|sheet|table|report|summary|figures|numbers|data|deck|presentation|proposal|memo)/i;
+  const WORK_ASK_HE = /(?:^|\s)(?:תכין|תכיני|תכינו|תכתוב|תכתבי|תכתבו|תיצור|תיצרי|תיצרו|תכניס|תכניסי|תכניסו|תסכם|תסכמי|תסכמו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?(?:את\s+)?(?:ה)?(?:מסמך\s+(?:סיכום|סטטוס|תקציב|הצעה|דוח)|טבלה|דוח|דו"ח|סיכום|נתונים|מספרים|גיליון|הצעה|מצגת)/;
+  // Asks for an update or an introduction. Each names the reader as the one who acts ("update me", "introduce me"), so a
+  // status line or a thank-you that merely mentions an update stays quiet. Kept out of HANDOFF so the quoted sentence is unchanged.
+  const STATUS_INTRO_ASK = /\b(?:(?:can|could|would|will) you (?:please )?(?:introduce|connect|put) me|(?:please )?(?:introduce|connect) me (?:to|with)|put me in touch with|what(?:'s| is) the (?:current )?status of|(?:please )?(?:keep|update) me (?:posted|updated|in the loop|on|about)|(?:please )?(?:give|send|get) me (?:a |an )?(?:quick |brief |short |written )?(?:status |progress )?(?:update|report)\b|i need (?:a |an )?(?:quick |brief )?(?:status |progress )?update\b|(?:please )?(?:countersign|co-sign)\b|let me know (?:the status|once|when)\b[^.?!\n]{0,60}\b(?:by|before|today|tonight|tomorrow|this week|ready|done|sent|paid))/i;
+  const STATUS_INTRO_ASK_HE = /(?:^|\s)(?:תעדכן|תעדכני|תעדכנו|עדכן|עדכני)\s+אותי|(?:^|\s)מה\s+(?:ה)?סטטוס\s+של|(?:אשמח|נשמח)\s+(?:ל(?:קבל\s+)?)?עדכון|(?:^|\s)(?:תעדכן|תעדכני|תעדכנו)\s+(?:אותי\s+)?(?:את\s+)?(?:ה)?סטטוס|(?:^|\s)(?:תפגיש|תפגישי|תכיר|תכירי|תחבר|תחברי)\s+(?:אותי|לי)|(?:ש|ל)(?:תפגיש|תפגישי)\s+אותי|(?:ל)?הכיר\s+לי\s+את|להפגיש\s+אותי/;
+  // Asks for an account action: access, a password reset, a transfer, a copy of the reply. The lead ("please", "can you") is
+  // required, so "access has been granted" and "your password was reset" stay quiet. Kept out of HANDOFF like the two above.
+  const ACCOUNT_ASK = /\b(?:please|kindly|can you|could you|would you(?: please)?)\s+(?:(?:return|send back)\s+(?:the|a|your)\s+(?:signed|countersigned|completed)\s+(?:copy|form|contract|agreement|paperwork)\b|add\s+your\s+availability\b|make\s+(?:the|this|your)\s+(?:payment|deposit)\b(?!\s+(?:details|information|info|method|card|online|here|on|at|via))|(?:refund|credit)\s+(?:the|our|my)\s+(?:duplicate|double|extra|incorrect)\s+(?:charge|payment)\b|(?:grant|give)\s+(?:me|us|[a-z]+)\s+(?:\S+\s+){0,2}?access\b|reset\s+(?:my|our|the)\s+(?:password|login|2fa)\b|transfer\s+(?:the|our|my)\s+(?:domain|account|licen[sc]e)\b|(?:copy|cc|bcc)\s+me\b)/i;
+  const ACCOUNT_ASK_HE = /(?:^|\s)(?:בצע|בצעי|בצעו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?את\s+(?:ה)?(?:תשלום|מקדמה)|(?:^|\s)(?:תוסיף|תוסיפי|תוסיפו)\s+(?:בבקשה\s+)?את\s+(?:ה)?זמינות\s+שלך|(?:^|\s)(?:תעלה|תעלי|תעלו|תעביר|תעבירי|תעבירו|תאפס|תאפסי|תאפסו|תשים|תשימי|תשימו)\s+(?:לי\s+)?(?:בבקשה\s+)?(?:(?:את\s+)?(?:ה)?(?:טופס|מסמך|קובץ|דומיין|סיסמה|חשבון|רישיון)|אותי\s+בעותק)|(?:^|\s)(?:תן|תני|תנו)\s+לי\s+גישה/;
+  // A short direct question that asks the reader for a named thing ("יש קישור לזום ?", "Do you have the invoice?"). Chat and
+  // mail both carry these; the length floor used to drop them on every surface. The whole message has to be the question, so a
+  // longer text, a bare "really?" and a greeting stay on the normal path.
+  const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|would it be possible to (?:get|have|send|share)\b|are you able to (?:send|share|forward|review|confirm|sign|approve|provide|upload|resend|check|take a look|get me)\b|is it possible to (?:get|have|send|share)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
+  const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון|לוגו|קובץ|מצגת|הקלטה|תמונות|טופס|חוזה|תיקייה)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
+  function shortAskText(text) {
+    const t = String(text || '').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').trim();
+    if (t.length < 8 || t.length > 90) return false;
+    return SHORT_ASK_EN.test(t) || SHORT_ASK_HE.test(t);
+  }
   // A first-person delivery promise. Not a COMMIT word ("agreed",
   // "approved") and not a reader reminder ("you agreed to") — "I will send
   // the contract by Friday" is the sender closing a dated obligation on
@@ -745,6 +1178,9 @@ const FlowJudgment = (() => {
     /^\s*בתאריך[\s\S]{3,200}?:\s*$/im,
     /^\s*-{2,}\s*Original Message\s*-{2,}\s*$/im,
     /^\s*-{2,}\s*Forwarded message\s*-{2,}\s*$/im,
+    // Hebrew forward banner ("---------- הודעה שהועברה ---------"). The same cut
+    // the Graph reader uses, so a forwarded ask is not judged as the new message.
+    /^\s*-{2,}\s*הודעה שהועברה.*$/im,
     /^\s*From:\s.*$\n^\s*Sent:\s/im,
     // Outlook's Hebrew locale equivalent of the From:/Sent: header block
     // above — same no-\b rule applies to both מאת and נשלח.
@@ -858,8 +1294,10 @@ const FlowJudgment = (() => {
     for (const s of String(text || '').split(SENTENCE_SPLIT)) {
       const m = s.match(pattern);
       if (!m) continue;
-      // A question asks for a decision; it does not record one.
+      // A question asks for a decision; it does not record one. "האם"
+      // is the Hebrew question particle and often arrives without "?".
       if (/\?\s*$/.test(s.trim())) continue;
+      if (/(?:^|\s)האם\s/.test(s)) continue;
       if (HEDGE.test(s) || HEDGE_HE.test(s)) continue;
       const before = s.slice(0, m.index);
       if (isNegatedBefore(before)) continue;
@@ -888,6 +1326,126 @@ const FlowJudgment = (() => {
   const anyOf = (text, pats, fn) => pats.some((p) => fn(text, p));
   const testsIn = (text, p) => p.test(text);
 
+  // Bare confirm / agree / accept / approve. Real closes still use these
+  // words ("I confirm", "we agree", "the proposal is accepted", "Approved").
+  // A reader-directed request uses the same words and is not a close
+  // ("can you agree", "please confirm", "do you accept", "אתה מסכים").
+  // The optional " to" / " on" in COMMIT is part of the match ("agree to"),
+  // so the head word is what decides bare vs phrase. "we're good at" does
+  // not start with one of these verbs.
+  const BARE_DECISION_WORD = /^(?:confirm(?:ed|ing)?|agree[ds]?|accept(?:ed|s)?|approv(?:e|ed))(?:\s|$)/i;
+  const BARE_DECISION_HE = /^(?:מאשר(?:ת|ים)?|מסכימה|מסכימים|מסכים|מאושר)/;
+  // Rightmost request cue before a decision word. "האם" is a question
+  // particle and withdraws every decision after it, the way "?" already
+  // does. The others withdraw only the bare verbs above, so "countersigned"
+  // and "we're good" in the same note still count.
+  const READER_CUE_RES = [
+    { re: /\b(?:(?:can|could|would|will) you|please|kindly|do you|(?:asking|requesting) you to|need you to)\b/gi, kind: 'ask' },
+    { re: /\byou\s+(?=agree[ds]?|accept(?:ed|s)?|confirm)/gi, kind: 'ask' },
+    { re: /בבקשה|אנא|(?:^|\s)נא(?=\s)/g, kind: 'ask' },
+    { re: /(?:^|\s)האם(?=\s)/g, kind: 'whether' },
+    { re: /(?:^|\s)אתה(?=\s)|(?:^|\s)אתם(?=\s)|(?:^|\s)אתן(?=\s)|(?:^|\s)את(?=\s+מ(?:אשר|סכימ))/g, kind: 'ask' }
+  ];
+
+  function isBareDecision(word) {
+    return BARE_DECISION_WORD.test(word) || BARE_DECISION_HE.test(word);
+  }
+
+  function cuesBefore(sentence, index) {
+    const cues = [];
+    for (const spec of READER_CUE_RES) {
+      const re = new RegExp(spec.re.source, spec.re.flags);
+      let found;
+      while ((found = re.exec(sentence))) {
+        if (!found[0]) { re.lastIndex += 1; continue; }
+        if (found.index < index) cues.push({ index: found.index, text: found[0], kind: spec.kind });
+      }
+    }
+    cues.sort((a, b) => a.index - b.index);
+    return cues;
+  }
+
+  // True when this match is the reader being asked to decide, not the
+  // sender deciding. "We agree, please send the contract" keeps "agree":
+  // the request cue sits after it. "Please confirm we are agreed" drops
+  // both verbs: "please" leads, and "confirm" sits between it and "agreed",
+  // so the "we" there is the content of the ask.
+  function decisionSuppressed(sentence, m) {
+    const cues = cuesBefore(sentence, m.index);
+    if (!cues.length) return false;
+    if (cues.some((c) => c.kind === 'whether')) return true;
+    if (!isBareDecision(m[0])) return false;
+    const cue = cues[cues.length - 1];
+    const between = sentence.slice(cue.index + cue.text.length, m.index);
+    const before = sentence.slice(0, m.index);
+    const speaker = /\b(?:we(?:'re|\s+are|\s+have)?|i(?:'m|\s+am|\s+have)?)\s+$/i.test(before)
+      || /(?:^|\s)(?:אני|אנחנו)\s+$/.test(before);
+    const requestVerbBetween = /\b(?:confirm(?:ed|ing)?|agree[ds]?|accept(?:ed|s)?|approv(?:e|ed)|please|kindly)\b/i.test(between)
+      || /(?:בבקשה|אנא|האם|מאשר|מסכימ)/.test(between);
+    if (speaker && !requestVerbBetween) return false;
+    return true;
+  }
+
+  // "nothing is confirmed yet" names the decision in order to say it has
+  // not been made. "not" already covers "do NOT approve"; "nothing" does
+  // not contain a free-standing "not", so it never reached that window.
+  function bareWithdrawn(sentence, m) {
+    if (!isBareDecision(m[0])) return false;
+    const before = sentence.slice(Math.max(0, m.index - 48), m.index);
+    const after = sentence.slice(m.index + m[0].length, m.index + m[0].length + 16);
+    if (/\b(?:nothing|nobody|no one|not yet|yet to be)\b/i.test(before)) return true;
+    if (/^\s*(?:yet|nothing)\b/i.test(after)) return true;
+    return false;
+  }
+
+  function eachMatch(sentence, pattern, visit) {
+    const re = new RegExp(pattern.source, pattern.flags.indexOf('g') === -1 ? pattern.flags + 'g' : pattern.flags);
+    let found;
+    while ((found = re.exec(sentence))) {
+      if (!found[0]) { re.lastIndex += 1; continue; }
+      if (visit(found)) return true;
+    }
+    return false;
+  }
+
+  // Same per-sentence hedge / negation / question test as assertedIn, plus
+  // the reader-ask bar above. Used only for commitment patterns. Executed
+  // and obligation stay on assertedIn: "please confirm the invoice is
+  // payable" is still an obligation.
+  function assertedCommit(text, pattern) {
+    for (const s of String(text || '').split(SENTENCE_SPLIT)) {
+      if (/\?\s*$/.test(s.trim())) continue;
+      if (HEDGE.test(s) || HEDGE_HE.test(s)) continue;
+      const hit = eachMatch(s, pattern, (found) => {
+        if (isNegatedBefore(s.slice(0, found.index))) return false;
+        if (bareWithdrawn(s, found)) return false;
+        if (decisionSuppressed(s, found)) return false;
+        return true;
+      });
+      if (hit) return true;
+    }
+    return false;
+  }
+
+  const COMMIT_MENTION_PATS = [COMMIT, COMMIT_HE, COMMIT_STRONG, COMMIT_STRONG_HE];
+
+  // Every commitment word in the note is a reader being asked to decide.
+  // "We do NOT approve" is not this — the word is a refusal, and the
+  // negated penalty below is what keeps the figure from reading as a close.
+  function commitMentionsAreReaderAsks(text) {
+    let saw = false;
+    for (const s of String(text || '').split(SENTENCE_SPLIT)) {
+      for (const pattern of COMMIT_MENTION_PATS) {
+        const open = eachMatch(s, pattern, (found) => {
+          saw = true;
+          return !decisionSuppressed(s, found);
+        });
+        if (open) return false;
+      }
+    }
+    return saw;
+  }
+
   function score(text, domain, facts) {
     const signals = [];
     const add = (id, weight, why) => signals.push({ id, weight, why });
@@ -903,14 +1461,17 @@ const FlowJudgment = (() => {
     const marketing = MARKETING.test(text);
     const solicitation = SOLICITATION.test(text);
     const calendarNoise = CALENDAR_NOISE.test(text);
-    const noise = automated || calendarNoise || PITCH_VETO.test(text) || MARKETING_VETO.test(text);
+    const automatedNoise = automated;
+    const marketingNoise = MARKETING_VETO.test(text);
+    const noise = automatedNoise || calendarNoise || PITCH_VETO.test(text) || marketingNoise;
     if (automated) add('automated', -60, 'The sender looks automated');
     if (marketing) add('marketing', -45, 'Reads like a mailing list, not a person');
     if (solicitation) add('solicitation', -55, 'Reads like a cold pitch, not your work');
     if (calendarNoise) add('calendar', -35, 'Calendar notification boilerplate');
-    if (facts.wordCount < 12) add('too-short', -25, 'Too little text to judge');
 
-    // A commitment counts only where a sentence actually states it. The
+    // A commitment counts only where a sentence actually states it. Bare
+    // confirm/agree/accept in a reader-directed ask do not — assertedCommit
+    // drops those and keeps "we agree" / "I confirm" / "Approved". The
     // "mentioned" forms are kept alongside so the difference between the two
     // can be scored: a message that talks about approving without approving is
     // not neutral evidence, it is evidence AGAINST acting.
@@ -919,8 +1480,13 @@ const FlowJudgment = (() => {
     const EXEC_PATS = [EXECUTED, EXECUTED_HE];
     const OBLIG_PATS = [OBLIGATION, OBLIGATION_HE];
 
-    const commitStrong = anyOf(text, STRONG_PATS, assertedIn);
-    const commit = commitStrong || anyOf(text, COMMIT_PATS, assertedIn);
+    const commitStrong = anyOf(text, STRONG_PATS, assertedCommit);
+    const commit = commitStrong || anyOf(text, COMMIT_PATS, assertedCommit);
+    // A length penalty is for a fragment that has not said what happened
+    // ("Thanks!", an empty reply). "Approved. Go ahead." and "מאושר. אפשר
+    // להתקדם." are short because the decision is the whole note — the flat
+    // <12 cutoff was silencing them. Weaker commitments stay under it.
+    if (facts.wordCount < 12 && !commitStrong) add('too-short', -25, 'Too little text to judge');
     const commitMentioned = anyOf(text, COMMIT_PATS, testsIn);
     const executed = anyOf(text, EXEC_PATS, assertedIn);
     const executedMentioned = anyOf(text, EXEC_PATS, testsIn);
@@ -930,12 +1496,16 @@ const FlowJudgment = (() => {
     const lost = LOST.test(text) || LOST_HE.test(text);
     const obligation = anyOf(text, OBLIG_PATS, assertedIn);
     const followUpAsk = anyOf(text, [FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE], directedAsk);
+    // A clock in the text ("Tuesday at 3", "בשעה 16:00") belongs to the event and hold gates, which already decide it.
+    const clockNamed = /\b(?:at|@)\s*\d{1,2}(?::\d{2})?\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b|בשעה\s*\d|(?:^|\s)ב-?\d{1,2}(?::\d{2})?(?:\s|$|[.,?!])/i.test(text);
+    const slotAsk = !clockNamed && slotAskText(text);
+    const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE, STATUS_INTRO_ASK, STATUS_INTRO_ASK_HE, ACCOUNT_ASK, ACCOUNT_ASK_HE], directedAsk);
     const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk;
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
 
     if (facts.money) add('money', 34, 'States a figure: ' + facts.moneyText);
-    if (commitStrong) add('commitment', 42, 'Someone authorised something outright');
+    if (commitStrong) add('commitment', STRONG_WEIGHT, 'Someone authorised something outright');
     else if (commit) add('commitment', 30, 'Someone committed to something');
     // Weighted to clear threshold alongside a domain match on its own — a lost
     // deal is exactly the kind of news worth logging without needing a second,
@@ -946,9 +1516,19 @@ const FlowJudgment = (() => {
     if (facts.date && obligation) add('deadline', 26, 'Sets a dated obligation: ' + facts.date.raw);
     else if (facts.date) add('date', 12, 'Names a date: ' + facts.date.raw);
     if (handoff) add('handoff', 18, 'Asks you to do something specific');
+    if (slotAsk) add('slot-ask', 34, 'Asks you for a time');
+    const shortAsk = shortAskText(text);
+    if (shortAsk) add('short-ask', 60, 'A short direct ask');
     const onDomain = domain.entityWords.test(text);
     if (onDomain) add('domain', 14, 'About ' + domain.entity.toLowerCase());
     if (facts.isReply) add('reply', 8, 'Part of an ongoing thread');
+    // COMMIT_STRONG is 42, eight under the bar, so "Approved. Go ahead."
+    // only cleared when a reply bonus happened to be present. The chip
+    // path does not set that bonus. A plain authorisation has to clear
+    // on its own — that is why this list is weighted above a normal commit.
+    if (commitStrong && !signals.some((s) => s.weight > 0 && s.id !== 'commitment')) {
+      add('bare-strong', BASE_THRESHOLD - STRONG_WEIGHT, 'States the authorisation on its own');
+    }
 
     // A message with a number and nothing else decided is a quote, not a decision.
     // Requiring a second signal alongside money is what keeps price lists quiet.
@@ -960,11 +1540,20 @@ const FlowJudgment = (() => {
     // bonus — 56 against a threshold of 50 — so it would clear the bar anyway
     // and be labelled from the money alone, which reads "Log $40,000 agreed".
     // A denied or merely-contemplated commitment has to push the other way.
-    if (!commit && commitMentioned) add('negated', -34, 'Names a decision the sentence does not actually make');
-    else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
+    if (!commit && commitMentioned) {
+      // "please confirm" next to a real dispute, a signed agreement, or a
+      // due invoice is the ask, not a denied decision. The other signal
+      // stands. A confirm/agree request with only a figure and a date does
+      // not: money + handoff + domain clears 50 and the label reads
+      // "Log $3,900 confirmed".
+      const readerAsk = commitMentionsAreReaderAsks(text);
+      const standsBeside = readerAsk && (lost || executed || dispute || obligation);
+      if (!standsBeside && readerAsk) add('unsettled', -55, 'Asks you to confirm or agree, which is not a decision');
+      else if (!standsBeside) add('negated', -34, 'Names a decision the sentence does not actually make');
+    } else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
 
     const total = signals.reduce((sum, s) => sum + s.weight, 0);
-    return { total, signals, flags: { commit, lost, executed, obligation, handoff, dispute, onDomain, senderPromise, noise } };
+    return { total, signals, flags: { commit, lost, executed, obligation, handoff, slotAsk, workAsk, shortAsk, dispute, onDomain, senderPromise, noise } };
   }
 
   // The threshold is the only thing that learns. Clicking says "more like that",
@@ -1169,7 +1758,7 @@ const FlowJudgment = (() => {
   // drifting copy of the same judgment.
   return {
     evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, isNegatedBefore, score, newContent,
-    HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE,
+    HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE, slotAskText, shortAskText, SLOT_ASKS, SLOT_ASKS_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };
 })();
