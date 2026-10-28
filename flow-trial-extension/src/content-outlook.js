@@ -1805,9 +1805,12 @@
       if (slot.firstChild) slot.insertBefore(line, slot.firstChild);
       else slot.appendChild(line);
     }
-    line.textContent = '';
+    const visible = whyNotText(reason);
+    const hideQuietAsk = visible === 'לא זוהתה בקשה';
+    line.textContent = hideQuietAsk ? '' : visible;
     line.setAttribute('data-glance-why', reason || 'quiet');
-    line.setAttribute('aria-hidden', 'true');
+    if (hideQuietAsk) line.setAttribute('aria-hidden', 'true');
+    else line.removeAttribute('aria-hidden');
     return line;
   }
 

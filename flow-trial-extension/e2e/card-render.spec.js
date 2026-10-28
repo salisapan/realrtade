@@ -36,6 +36,7 @@ test('Outlook silent case renders no card and keeps a Why-not-shown reason', asy
   await expect(paneWhy).toHaveCount(1);
   await expect(paneWhy).toHaveAttribute('data-glance-why', /.+/);
   await expect(paneWhy).toHaveText('');
+  await expect(paneWhy).toHaveAttribute('data-glance-why', /.+/);
 
   const popup = await glance.openPopup();
   const setupWhy = popup.locator('#surface-list [data-glance-why-line]');
@@ -77,4 +78,6 @@ test('Gmail silent case renders no card after the scan is recorded', async ({ gl
     const chips = await page.locator('div[role="main"] .flow-chip-host').count();
     return { chips, scanned: recent.length > 0 };
   }).toEqual({ chips: 0, scanned: true });
+  const gmailWhy = page.locator('div[role="main"] .flow-why-not');
+  await expect(gmailWhy).toHaveCount(0);
 });

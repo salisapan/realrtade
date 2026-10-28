@@ -63,6 +63,7 @@ async function runPage(opts) {
     glanceOwnNames: []
   }, o.store || {});
   const sent = [];
+  const graphCalls = o.trackGraphCalls ? [] : null;
   const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, internetMessageId: '<pilot@mail.gmail.com>',
     from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
     receivedDateTime: new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
@@ -71,6 +72,7 @@ async function runPage(opts) {
     if (msg.type === 'flow:outlook-session') return { ok: true, token: store.outlookAuth.token, changed: false, how: 'fresh' };
     if (msg.type === 'flow:outlook-fetch') {
       const u = String(msg.url);
+      if (graphCalls) graphCalls.push(u);
       const hdrs = (msg.init && msg.init.headers) || {};
       const bearer = /^Bearer\s+\S+/.test(String(hdrs.Authorization || ''));
       const immutable = /IdType="ImmutableId"/.test(String(hdrs.Prefer || ''));
@@ -124,6 +126,14 @@ async function runPage(opts) {
           return { ok: false, status: 404, body: '{}' };
         }
         if (/[\?&]\$select=[^&]*\bbody\b/i.test(u)) {
+          if (o.paneFallbackStrictId) {
+            const asked = decodeURIComponent(directMsg[1]);
+            const want = String(o.paneFallbackStrictId || graphMsg.id);
+            const canon = (s) => String(s || '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
+            if (asked !== want && canon(asked) !== canon(want)) {
+              return { ok: false, status: 404, body: '{}' };
+            }
+          }
           return { ok: true, status: 200, body: JSON.stringify(graphMsg) };
         }
         if (o.pathRestHit) {
@@ -231,7 +241,7 @@ async function runPage(opts) {
   if (typeof o.beforeClose === 'function') await o.beforeClose({ window: w, document: w.document, store, ctx, sent });
   let parsed = null;
   try { parsed = vm.runInContext('FlowOwaParse.readPane(document, location.href, { own: [' + JSON.stringify(ME) + '] })', ctx); } catch (e) { parsed = { error: e.message }; }
-  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), chipMessage, doc: w.document };
+  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), chipMessage, doc: w.document, graphCalls: graphCalls || [] };
   w.close();
   return res;
 }
@@ -303,6 +313,21 @@ async function runPage(opts) {
     const p = r.parsed || {};
     check('live 2026-10 fixture: body parses the status-meeting ask', (p.text || '').indexOf('פגישת סטטוס') >= 0, p);
     check('live 2026-10 fixture: sender name stays flow, not the subject', p.senderName === 'flow' && p.subject === 'סטטוס שישי', p);
+  }
+
+  console.log('\n--- Graph pane fallback (#245): message id and unreadable diagnostic ---\n');
+  {
+    const strip = (h) => h.replace(/<div role="document" aria-label="גוף ההודעה" class="XbIp4 allowTextSelection" tabindex="0">[\s\S]*?<\/div>/, '<div class="XbIp4" tabindex="0"></div>');
+    const r = await runPage({ htmlPatch: strip, trackGraphCalls: true, paneFallbackStrictId: MSG, messageId: MSG, urlId: MSG, waitMs: 3000 });
+    check('Graph fallback GET uses /me/messages/{id} with a body select', (r.graphCalls || []).some((u) => /\/me\/messages\/[^/?]+\?\$select=.*body/i.test(u)), r.graphCalls && r.graphCalls.slice(0, 6));
+    const wrong = await runPage({ htmlPatch: strip, trackGraphCalls: true, paneFallbackStrictId: 'WRONG-MESSAGE-ID', messageId: MSG, urlId: MSG, waitMs: 3000 });
+    check('Graph fallback does not mount when the strict id GET misses', !wrong.chip, { chip: Boolean(wrong.chip), diag: wrong.store.outlookPageDiag });
+  }
+  {
+    const strip = (h) => h.replace(/<div role="document" aria-label="גוף ההודעה" class="XbIp4 allowTextSelection" tabindex="0">[\s\S]*?<\/div>/, '<div class="XbIp4" tabindex="0"></div>');
+    const r = await runPage({ htmlPatch: strip, graphDown: true, waitMs: 3000 });
+    const reasons = (r.store.outlookPageDiag || []).map((d) => d.reason);
+    check('unreadable pane with Graph down records page:pane-unreadable', reasons.indexOf('page:pane-unreadable') >= 0, reasons);
   }
 
   console.log('\n--- live shape (0.9.15 live pass): the sender name is the heading inside the message, no address on the page ---\n');
