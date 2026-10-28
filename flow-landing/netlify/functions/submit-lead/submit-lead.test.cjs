@@ -13,7 +13,7 @@ const SECRET_MAIL = 'resend-api-sentinel-9f3a';
 const SB_LEADS = 'https://zjquktirlrhbqcnkfaok.supabase.co/rest/v1/leads';
 const RESEND = 'https://api.resend.com/emails';
 const OWNER = 'ai.local.flow@gmail.com';
-const HELLO = 'hello@theflow-ai.com';
+const HELLO = 'info@theflow-ai.com';
 
 global.fetch = async (url) => {
   throw new Error('unstubbed fetch: ' + url);
@@ -182,7 +182,7 @@ function expectHandRecord(mail, label) {
   check(label + ': raw angle brackets are not in the email', !mail.html.includes('<Lovelace>') && !mail.html.includes('<b>now</b>'));
   check(label + ': owner recipient', JSON.stringify(mail.to) === JSON.stringify([OWNER]));
   check(label + ': reply-to is the visitor', mail.reply_to === 'buyer@example.com');
-  check(label + ': from address', mail.from === 'Flow <hello@theflow-ai.com>');
+  check(label + ': from address', mail.from === 'Flow <info@theflow-ai.com>');
 }
 
 function bothKeys() {

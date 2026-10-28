@@ -3,7 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FROM = 'Flow <hello@theflow-ai.com>';
+const FROM = 'Flow <info@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
 const LOG_PREFIX = '[send-playbook]';

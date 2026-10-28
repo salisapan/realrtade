@@ -69,7 +69,7 @@ exports.handler = async function (event) {
         var match = domains.find(function (d) { return d.name === SENDING_DOMAIN; });
         report.resend_domain = match
           ? { ok: match.status === 'verified', name: match.name, status: match.status, region: match.region }
-          : { ok: false, note: SENDING_DOMAIN + ' is not registered in this Resend account at all — every send from hello@' + SENDING_DOMAIN + ' will be rejected until it is added and verified.' };
+          : { ok: false, note: SENDING_DOMAIN + ' is not registered in this Resend account at all — every send from info@' + SENDING_DOMAIN + ' will be rejected until it is added and verified.' };
       }
     } catch (err) {
       report.resend_domain = { ok: false, note: 'Network error reaching Resend API: ' + String(err) };

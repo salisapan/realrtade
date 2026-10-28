@@ -14,11 +14,11 @@
 // the database so someone can record it by hand, with every submitted field
 // in the body. If the write succeeds and the email fails, the visitor still
 // gets success and the failure is logged. The visitor gets an error, pointing
-// at hello@theflow-ai.com, only when both channels fail.
+// at info@theflow-ai.com, only when both channels fail.
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FROM = 'Flow <hello@theflow-ai.com>';
+const FROM = 'Flow <info@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const SB_URL = 'https://zjquktirlrhbqcnkfaok.supabase.co';
 const LOG_PREFIX = '[submit-lead]';

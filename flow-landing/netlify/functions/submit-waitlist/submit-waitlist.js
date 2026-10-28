@@ -259,7 +259,7 @@ exports.handler = async function (event) {
           signal: ctl ? ctl.signal : undefined,
           headers: { Authorization: 'Bearer ' + resendKey, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            from: 'Flow <hello@theflow-ai.com>',
+            from: 'Flow <info@theflow-ai.com>',
             to: [OWNER_EMAIL],
             subject: 'Flow deployment lead: ' + company + ' (' + role + ')',
             html: '<p>A visitor completed the Flow deployment form and is expecting a deployment plan.</p>' +

@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="Glance's Privacy Policy: what the Glance Chrome extension, Glance Pro and the download sign-up collect, how each feature handles your mail, and your rights.">
+<meta name="theme-color" content="#07090F">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="canonical" href="https://theflow-ai.com/glance-privacy.html">
+<title>Glance Privacy Policy — Glance</title>
+<link rel="stylesheet" href="/assets/fonts.css">
+<style>
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3568E5;
+  --navy:#07090F; --cat:#1A4EF5;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat,var(--accent-ink,#6E9BFF)))}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1741C4; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans,sans-serif); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+</style>
+<link rel="stylesheet" href="/assets/flow-premium.css">
+<script>
+(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
+</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
+</script>
+<link rel="stylesheet" href="/assets/site-nav.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async"></a>
+    <nav class="site-bar">
+      <div class="site-links">
+        <a href="/trial.html" data-nav="glance">Glance</a>
+        <a href="/#organization" data-nav="flow">Flow</a>
+        <a href="/pricing.html" data-nav="pricing">Pricing</a>
+        <a href="/security.html" data-nav="security">Security</a>
+        <a href="/contact.html" data-nav="contact">Contact</a>
+      </div>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+      </button>
+      <button class="lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<div class="mobile-nav" id="mobileNav" hidden>
+  <a href="/">Home</a><a href="/#how">Product</a><a href="/solutions/">Solutions</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a>
+  <div class="mobile-nav-legal"><a href="/trial.html">Glance</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/privacy.html">Privacy</a><a href="/glance-privacy.html">Glance Privacy</a><a href="/terms.html">Terms</a></div>
+</div>
+<main id="main">
+  <div class="wrap">
+    <span class="eyebrow">Legal</span>
+    <p class="langsw" style="font-family:var(--sans);font-size:.92rem"><a href="#en" data-set="en">English</a> &middot; <a href="#he" data-set="he" lang="he">עברית</a></p>
+<div class="plang" data-lang="en" lang="en">
+<h1 class="title">Glance Privacy Policy</h1>
+<div class="updated">Last updated: October 28, 2026 (DRAFT)</div>
+<p>This policy explains what information Flow ("Flow", "we", "us") collects and handles when you download or use <strong>Glance</strong>, the Chrome extension that closes open loops (starting in Gmail), including <strong>Glance Pro</strong>, and when you sign up to download Glance or subscribe to Pro on theflow-ai.com.</p>
+<p>Glance is a consumer product offered to individuals. It is a separate product from Flow (the enterprise product). Our website, the Flow waitlist and enquiries are covered by <a href="/privacy.html">the Flow Privacy Policy</a>, published separately on theflow-ai.com. Glance is intended for general business use. It is not designed for regulated or otherwise sensitive material, and it carries none of the contractual or compliance guarantees described on our Security page.</p>
+<p>What Glance does with your mail and messages is the part most worth being precise about, so Section 2 describes it feature by feature.</p>
+<h2>1. Information we collect</h2>
+<p><strong>Download sign-up.</strong> When you enter your email address to download Glance, we store it (with the page language) and email you the download link once. The download starts as soon as you enter your email. If you asked to be told when Glance Pro is available, we store that request too.</p>
+<p><strong>Glance Pro billing.</strong> If you start a Pro subscription, Stripe collects your payment details. Your card details go straight to Stripe. We never see or store them. We receive from Stripe your email address, the plan you chose, and the subscription's status, renewal and trial dates. We store these, together with Stripe's customer and subscription identifiers and a one-way hash of your licence key so the key can be checked. We do not store the key itself. We email the licence key to you and are notified by email when someone starts Pro.</p>
+<p><strong>Anonymous usage events.</strong> See Section 3.</p>
+<p><strong>Second-reading counters, licence checks and Pro requests.</strong> See Section 2.</p>
+<p><strong>Communications.</strong> If you email us, we keep the correspondence so we can respond and keep a record of it.</p>
+<p>Everything else Glance reads or records stays in the extension's storage on your device (Section 2) and is not sent to us.</p>
+<h2>2. What Glance does, feature by feature</h2>
+<p><strong>What it reads.</strong> When you open an email in Gmail, the extension reads that message's visible text, subject and sender to decide whether it records a decision worth logging.</p>
+<p><strong>Where that decision is made.</strong> On your device. The code that scores a message performs no network requests of any kind. No email text is transmitted in order to reach that judgment. This is an architectural property of the extension, not a policy promise.</p>
+<p><strong>What leaves your device when you click "Do It".</strong> Nothing is written anywhere unless you click the Do It button on a specific message. When you do, Glance writes directly to your own, already-signed-in Google account: a Google Calendar event, a Google Tasks reminder, a Gmail draft reply, or a combination of these, whichever the message calls for. It carries a short summary label, any amount or date it extracted and, for a drafted reply, a single quoted sentence from the message. That data goes directly from your browser to Google's API using your own OAuth grant. It does not pass through us and we do not receive a copy.</p>
+<p>If a message asks for a specific file (an invoice, a signed contract, a resume) that is not already attached to the thread and you have not chosen one, Glance searches your Google Drive by filename and content for a matching file and attaches whichever it finds to the draft. This is the one case where Glance reads more than the Gmail message itself, and it happens automatically, not on request. The search uses the same direct, your-own-OAuth-grant connection, so it does not pass through us either. A file found this way is never sent: it lands only in the draft, flagged in the draft's own text as an unverified guess for you to check before you send.</p>
+<p>Notion, HubSpot, Salesforce, Slack and Monday.com connectors also exist in the code but are not currently reachable from setup. If that changes, this policy will be updated before it does.</p>
+<p><strong>Draft-It and the attachment summary (Glance Pro).</strong> These appear only for an account with an active Pro licence, and the server refuses them without one. They use a real language model, so before either sends anything, Local Privacy Shield scans the text on your device and replaces the names, companies, monetary amounts, dates, email addresses and phone numbers it finds with placeholder tokens (for example [CLIENT_NAME_1]). It works by pattern-matching, not comprehension, and is tuned to over-mask rather than under-mask. But pattern-matching is not the same as omniscience, and we would rather say so than claim a guarantee no such system can make. An amount spelled out in words, or a first name used alone mid-sentence, can pass through.</p>
+<p>Only that masked text reaches our server. The server masks again before it calls a provider, and it does not send the text if an email address or phone number is still present. The real values are never sent.</p>
+<ul>
+<li><em>Drafts</em> go to Anthropic or xAI, whichever has been answering faster.</li>
+<li><em>Attachment summaries</em> go to Google first, then to that same pair. OpenAI is used for a summary only when Google's service is not configured or is being skipped after errors.</li>
+<li>The response comes back with the same placeholder tokens, and your browser substitutes the real values back in locally. That reconstruction happens only on your device.</li>
+<li>If a result is not one of the known categories, Glance stays silent instead of guessing.</li>
+</ul>
+<p>A separate automatic classification of a whole message, for when the on-device pass found nothing, exists in the code (Anthropic first, then xAI; never Google or OpenAI) but is switched off in this version. The "Second reading" below is not that. If it is ever turned on it will be opt-in, and this policy will change first.</p>
+<p>For Pro, Draft-It also receives, with the masked thread text, a short fixed description of how you open and close emails (for example "opens with Hi and the first name"), never your own text.</p>
+<p><strong>Second reading of one sentence (off until you turn it on).</strong> Glance reads your newest message on your device first, and with a model on your own computer if you use one (below). For the few sentences it still cannot place, and only after you press "Turn on" in the extension panel (you can turn it off there at any time), it can send that one sentence to our server for a second reading.</p>
+<ul>
+<li>Before the sentence leaves your browser it goes through the same masking as Draft-It: names, companies, amounts, dates, email addresses, phone numbers and labelled identifiers are replaced with placeholders, and nothing is sent if an email address, a phone number or an amount is still in it. That masking can miss things: a first name used alone, or a number with no label, can pass through.</li>
+<li>Our server masks again and asks a fast model (from Anthropic or xAI) twice, in two wordings, and accepts only an answer on which both agree. For Glance Pro, when the two answers disagree, it asks a more capable model (from Anthropic or xAI) once.</li>
+<li>Only the masked sentence is sent, never the thread, the subject or who wrote to whom. The answer is a suggestion: you still tap, and it can never close, write or send anything.</li>
+<li>There is a monthly allowance: 120 second readings on Free and 1,500 on Glance Pro. We count them on our server with a number kept against a one-way hash of your random install identifier (or of your Pro key) and, to stop abuse, per network address and per day for everyone together. We keep no sentence and no answer.</li>
+<li>When the allowance is used up, Glance carries on on your device as before and says so in the extension panel.</li>
+<li>To know whether this is running, and how many are left, the extension asks our server with your random install identifier and, for Pro, your key. No message text is part of that.</li>
+<li>On your device Glance keeps a short code for each masked sentence already asked, so it is never asked twice, and counts of how it went.</li>
+</ul>
+<p>Do not turn this on for regulated or otherwise sensitive mail.</p>
+<p><strong>Open loops (what you are waiting on, and what you promised).</strong> When you open a Gmail thread, Glance reads, on your device, your newest message to see whether it asks someone for something or promises something. When the other person's newest message arrives, Glance reads it on your device to tell an answer from an acknowledgement, an out-of-office, a promised date or a payment confirmation. It also reads a message that states a date something stops being valid (an offer, a trial) to offer a reminder.</p>
+<p>Only if you click "Stay on it" or "Remind me" does Glance add a Google Task to your own Google account (due on the day to look again) and keep a short record on your device: who, the sentence involved, the amount if there is one, and the dates. After a meeting you put on your Calendar, Glance keeps its title and date on your device so it can ask what came out of it. What you type there is read on your device and turned into loops. Glance also keeps, per person, only the dates on which you opened loops, to notice what comes around regularly. A draft nudge is created only when you ask, and is never sent. None of this passes through us, except the Second reading above when you have turned it on.</p>
+<p>Glance Pro lifts the number of loops you can follow at once and adds the firmer nudges, the money totals and the rhythm view.</p>
+<p><strong>Stay on this, from any page.</strong> The browser's right-click menu offers "Glance: stay on this" on selected text. Only the text you selected and the page's address without its query or fragment are kept, on your device, until you answer one question. If you choose "Stay on it", they become a loop like any other.</p>
+<p><strong>Loops that close without a reply.</strong> When you open a payment confirmation from a bank or payment provider, Glance reads it on your device to see whether it is for the amount a payment loop is waiting on. When you open the extension, for a "pick a time" loop it asks Google Calendar for events with that person on the invite, and for a document you promised it asks Google Drive for recently changed files with a matching name and the people they are shared with. Only ids, times and addresses come back, never titles or contents, and the answers stay on your device. A close made this way can be undone with "Reopen", and weaker evidence only asks you.</p>
+<p><strong>Requests for a receipt or proof of payment.</strong> When someone asks you to send a receipt or a proof of transfer, Glance works out, on your device, whether one already exists (a file attached in that thread, or exactly one matching file in Google Drive, found by name), whether the payment really arrived, and who would issue it. To know whether a payment arrived it keeps, when you open a confirmation from a bank or payment provider, only the amount, the currency and the day (never the message), and it reads your own payment loops. If you type the address of whoever issues your receipts, that one address is kept on your device. Glance only ever prepares a draft in your own Gmail Drafts: it never sends, and it never issues a receipt or any other tax document. The request stays open until a message you sent carries a real attachment named for it, or you tell Glance it is done. None of this passes through us.</p>
+<p><strong>Other apps (off until you turn them on).</strong> Gmail is where Glance starts. In setup you can turn on WhatsApp Web, Slack or Telegram Web, each on its own. Turning one on asks your browser for permission to that one website (an optional permission: nothing extra is asked when you install), and turning it off removes it again. It is read-only and experimental. Glance reads only the one-to-one chat or direct message you have open, never a group, a broadcast list, a channel, a thread or a status, to see whether something you asked was answered, using the same on-device rules as for email. It never types, sends, reacts to or opens anything, and nothing from that app is sent to us. A loop made there keeps a short record on your device (the number or name that app shows, the sentence, the day to look again), like a loop made in Gmail. These apps can change their pages without notice. If Glance cannot read one, it goes quiet and says so.</p>
+<p><strong>Outlook (off until you turn it on).</strong> In setup you can connect your Microsoft account. Glance then reads, on this device, the last 14 days of your Outlook inbox and sent folder while the panel or an Outlook on the web tab is open (asks made of you and answers to yours), and shows the same Do It card as in Gmail inside the message you open there. On Do It it writes a reply draft into your Outlook Drafts (Microsoft Graph "createReply"). To keep you signed in, the extension renews your Microsoft sign-in in the background about every 16 hours, without opening a window. That renewal talks only to Microsoft.</p>
+<p>Microsoft's permission is Mail.ReadWrite, which lets an app read, create, change and delete mail but not send it. Glance uses it only to create and delete its own drafts. It never sends and never requests Mail.Send. The Connect screen is one list: Select all, then Mail (always on), To Do, Calendar, OneDrive, Contacts and Teams. To Do, Calendar, OneDrive, Contacts and Teams are asked only if you check them:</p>
+<ul>
+<li><em>To Do</em> asks Tasks.ReadWrite. On a task-only Do It, Glance creates one task in Microsoft To Do on the default list, reads that task back, and says it is handled only when that read succeeds. Undo deletes that task.</li>
+<li><em>OneDrive</em> asks Files.ReadWrite. On that Do It, Glance writes one file, reads it back, and Undo deletes that file or restores the previous one. A mail does not search OneDrive.</li>
+<li><em>Calendar</em> asks Calendars.ReadWrite. When that permission is on the token, Do It on a note that names one file and a time creates one event on your Outlook calendar, with that file's link in the description, and Undo deletes that event. It does not invite anyone.</li>
+<li><em>Contacts and Teams</em> are read-only (Contacts.Read, Chat.Read).</li>
+</ul>
+<p>Undo deletes only the draft Glance created, and only while it is still a draft. The sign-in token stays in this browser. Nothing of your mail goes to Glance's servers.</p>
+<p><strong>A language model on your own computer (off until you turn it on).</strong> If you run a program such as Ollama or LM Studio on this computer, you can let Glance send it one sentence at a time that Glance could not read itself. The address must be on this computer (127.0.0.1 or localhost). Glance refuses any other address, and the browser asks your permission first. Before it is used, Glance tests that model on sentences written for the purpose and switches it on, per language, only if it is precise enough. It only suggests: you still tap, and it can never close, write or send anything. The sentence goes from your browser to that program on the same computer. Nothing about it is sent to us, and Glance does not download or install any model.</p>
+<p><strong>What Glance adapts, on your device.</strong> Glance adjusts to you with small numbers and counts kept only on your device: how it scored sentences you confirmed or turned down (numbers, never words), how long people usually take to answer, how you usually open and close an email (counts of greetings and sign-offs, per language), which names, addresses and numbers belong to the same person across apps, and a short plain list of each adjustment, which you can read in the extension. "Reset what Glance learned" deletes all of it. If your browser has a built-in language model, Glance may use it on your device to read wording it could not otherwise place, only after it passes an accuracy check there. It only suggests, and nothing leaves your device.</p>
+<p><strong>Connection credentials.</strong> Authorising a connector stores an access token in your browser's local extension storage on your own machine. We never receive or store these tokens. The one exception is the moment of authorisation itself: the provider's one-time authorisation code is exchanged for a token through our server, because that exchange requires an application secret that cannot safely be shipped inside an extension. We do not retain the code or the resulting token.</p>
+<p><strong>What stays on your device.</strong> Your chosen connector, the activity log of what Glance noticed and wrote (including which proposed steps you tend to keep or remove, used only to reorder or stop repeating a step you consistently do not want), and the sensitivity calibration all live in extension storage on your device. None of it is sent to us. Uninstalling the extension deletes all of it.</p>
+<h2>3. Anonymous product-usage events</h2>
+<p>Separately from everything above, Glance reports a small set of aggregate usage events: a Do It chip appeared, was clicked or was dismissed; a write completed; an action was undone; a process closed and by which method; a connector was set up; a follow-up was set, closed by a reply, or its nudge drafted, or the free limit was reached (counts only: never who, what or how much); the Glance Pro start button was clicked; a Pro key was activated; Draft-It generated a reply; an attachment was summarised; one ping per day the extension was active in a Gmail tab; and, at most once per install per calendar week, whether a recurring usage habit had formed.</p>
+<p>Each event is tagged only with a random per-install identifier (not tied to your email, Google account or anything else identifying) and which connector or line-of-work profile was involved. Events are sent to our server, which relays them to Google Analytics. This tells us whether the product is actually being used. It never includes message text, sender identity, or any extracted amount or date. Our server rejects any event name or field it does not already recognise, so this list is the complete list, not just an example of it.</p>
+<h2>4. What we do not do</h2>
+<p>We do not read your mailbox, do not receive your unmasked email content, do not sell any of it, and do not use any of it to train AI models, ours or anyone else's.</p>
+<p>The exceptions for message content are the masked model calls described in Section 2: placeholder text only, when a Pro subscriber asks for a draft or an attachment summary and, only after you turn it on, one masked sentence at a time for the second reading. A real name, company, amount, date, email address or phone number is not what those providers receive.</p>
+<p><em>Provider terms.</em> Anthropic's commercial terms state: "Anthropic may not train models on Customer Content from Services." OpenAI states that "data sent to the OpenAI API is not used to train or improve OpenAI models (unless you explicitly opt in to share data with us)." These are statements of those providers' published terms, which they may change.</p>
+<p><em>Google user data.</em> [OPTIONAL, to be confirmed by Flow before publication, only if Glance's Google OAuth access is covered by Google's Limited Use rules: "The use of information received from Google Workspace scopes will adhere to the Google User Data Policy, including the Limited Use requirements."]</p>
+<h2>5. Who processes data on our behalf</h2>
+<p>We share information only with the service providers that operate Glance's servers and billing on our behalf, under their own data-processing terms:</p>
+<ul>
+<li><strong>Supabase</strong> stores download sign-ups, Glance Pro licence records and the second-reading counters.</li>
+<li><strong>Resend</strong> delivers the install link and, for Pro, your licence key and billing emails.</li>
+<li><strong>Netlify</strong> hosts the site and runs the serverless functions that process sign-ups, licence checks, billing events and Pro requests (including masked text in transit).</li>
+<li><strong>Stripe</strong> takes payment for Glance Pro.</li>
+<li><strong>Google Analytics</strong> receives the anonymous usage events in Section 3.</li>
+<li><strong>Anthropic, xAI, Google and OpenAI</strong> process masked text only, as described in Section 2: drafts and second readings (Anthropic or xAI), attachment summaries (Google first, then Anthropic or xAI; OpenAI only when Google's service is not configured or is being skipped after errors).</li>
+</ul>
+<p>When Glance writes to your Google or Microsoft account, it connects directly from your browser to Google or Microsoft under your own authorisation (Section 2). Those providers are not our processors for that traffic.</p>
+<p>We do not share your information with any other third party for their own marketing purposes. We may disclose information if the law requires it, or to protect the rights, property or safety of Flow, our users or the public.</p>
+<h2>6. International transfers</h2>
+<p>Our service providers, including Anthropic, xAI, Google and OpenAI, may process data in the United States and in other countries. Where the law requires it, we rely on those providers' contractual safeguards for cross-border transfers.</p>
+<h2>7. Retention</h2>
+<ul>
+<li>Data held inside the Glance extension lives on your own device and is removed when you uninstall it.</li>
+<li>We keep download sign-ups and Glance Pro licence and billing records for as long as the sign-up or subscription is active, and for a reasonable period afterwards for our own records and legal obligations, unless you ask us to delete them sooner (see Section 8).</li>
+<li>We keep no second-reading sentence and no answer. The allowance counters are kept as one-way hashes, as described in Section 2.</li>
+</ul>
+<h2>8. Your rights</h2>
+<p>Under the Israeli Protection of Privacy Law, 5741-1981 and its regulations, you may have the right to review personal information we hold about you and to ask us to correct or delete it, in the cases the law provides. Where the GDPR applies, you may also have the right to access, rectify, erase, restrict, port and object to the processing of your personal data, to withdraw consent at any time, and to complain to a data protection authority. In Israel that is the Privacy Protection Authority.</p>
+<p>Most Glance data is on your device, where you control it: you can delete it with "Reset what Glance learned" or by uninstalling the extension. We cannot see or delete it for you. For what we hold (download sign-ups and Pro records), and for any request under this section, email <strong>info@theflow-ai.com</strong> and we will act on your request promptly.</p>
+<p>Our emails are transactional (the install link, your licence key and billing emails) and not a marketing newsletter, so they do not carry an unsubscribe footer. To stop hearing from us, email the same address.</p>
+<h2>9. Children</h2>
+<p>Glance is a consumer product. It is not directed at, and we do not knowingly collect information from, anyone under 16. If you are under 16, please do not install or use Glance or subscribe to Glance Pro.</p>
+<h2>10. Changes to this policy</h2>
+<p>We may update this policy as Glance evolves. We will change the "Last updated" date when we do. Material changes, including any new use of your mail or messages, will appear here before they take effect.</p>
+<h2>11. Contact</h2>
+<p>Questions about this policy or your data: <strong>info@theflow-ai.com</strong></p>
+</div>
+<div class="plang" data-lang="he" lang="he" dir="rtl" hidden>
+<h1 class="title">מדיניות הפרטיות של Glance</h1>
+<div class="updated">עודכן לאחרונה: 28 באוקטובר 2026 (טיוטה)</div>
+<p>מדיניות זו מסבירה איזה מידע Flow ("Flow", "אנו") אוספת ומטפלת בו כאשר אתם מורידים או משתמשים ב-<strong>Glance</strong>, תוסף Chrome הסוגר לולאות פתוחות (החל ב-Gmail), לרבות <strong>Glance Pro</strong>, וכאשר אתם נרשמים להורדת Glance או מנויים ל-Pro באתר theflow-ai.com.</p>
+<p>Glance הוא מוצר צרכני המוצע ליחידים. הוא מוצר נפרד מ-Flow (המוצר הארגוני). האתר שלנו, רשימת ההמתנה של Flow והפניות אלינו מוסדרים ב<a href="/privacy.html">מדיניות הפרטיות של Flow</a>, המתפרסמת בנפרד באתר theflow-ai.com. Glance מיועד לשימוש עסקי כללי. הוא אינו מיועד לחומר מוסדר או רגיש, ואין בו אף אחת מההתחייבויות החוזיות או ההתחייבויות לעמידה בדרישות רגולציה המתוארות בעמוד האבטחה שלנו.</p>
+<p>מה ש-Glance עושה עם הדואר וההודעות שלכם הוא החלק שחשוב ביותר לנסח בדיוק, ולכן סעיף 2 מתאר זאת תכונה אחר תכונה.</p>
+<h2>1. המידע שאנו אוספים</h2>
+<p><strong>הרשמה להורדה.</strong> כשאתם מזינים כתובת דוא"ל כדי להוריד את Glance, אנו שומרים אותה (יחד עם שפת הדף) ושולחים לכם את קישור ההורדה פעם אחת בדוא"ל. ההורדה מתחילה מיד עם הזנת הדוא"ל. אם ביקשתם שנודיע לכם כש-Glance Pro יהיה זמין, נשמור גם את הבקשה הזו.</p>
+<p><strong>חיוב ב-Glance Pro.</strong> אם תתחילו מנוי Pro, Stripe אוספת את פרטי התשלום שלכם. פרטי הכרטיס עוברים ישירות ל-Stripe; אנו אינם רואים אותם ואינם שומרים אותם. מ-Stripe אנו מקבלים את כתובת הדוא"ל שלכם, את המסלול שבחרתם, ואת סטטוס המנוי ותאריכי החידוש והניסיון. אנו שומרים נתונים אלה, יחד עם מזהי הלקוח והמנוי של Stripe ו-hash חד-כיווני של מפתח הרישיון שלכם, כדי שאפשר יהיה לאמת את המפתח. את המפתח עצמו איננו שומרים. אנו שולחים לכם את מפתח הרישיון בדוא"ל, ומקבלים הודעת דוא"ל כשמישהו מתחיל מנוי Pro.</p>
+<p><strong>אירועי שימוש אנונימיים.</strong> ראו סעיף 3.</p>
+<p><strong>מוני "קריאה שנייה", בדיקות רישיון ובקשות Pro.</strong> ראו סעיף 2.</p>
+<p><strong>התכתבות.</strong> אם תפנו אלינו בדוא"ל, נשמור את ההתכתבות כדי שנוכל להשיב ולנהל תיעוד.</p>
+<p>כל שאר מה ש-Glance קורא או רושם נשאר באחסון התוסף במכשיר שלכם (סעיף 2) ואינו נשלח אלינו.</p>
+<h2>2. מה Glance עושה, תכונה אחר תכונה</h2>
+<p><strong>מה הוא קורא.</strong> כשאתם פותחים הודעת דוא"ל ב-Gmail, התוסף קורא את הטקסט הגלוי של ההודעה, את הנושא ואת השולח, כדי להחליט אם יש בה החלטה ששווה לרשום.</p>
+<p><strong>היכן מתקבלת ההחלטה.</strong> במכשיר שלכם. הקוד שמדרג הודעה אינו מבצע שום בקשת רשת. שום טקסט של דוא"ל אינו מועבר כדי להגיע לשיפוט הזה. זו תכונה ארכיטקטונית של התוסף, לא הבטחת מדיניות.</p>
+<p><strong>מה יוצא מהמכשיר כשלוחצים "Do It".</strong> שום דבר אינו נכתב בשום מקום אלא אם לחצתם על הכפתור Do It בהודעה מסוימת. כשאתם עושים זאת, Glance כותב ישירות לחשבון ה-Google שלכם, שכבר מחובר: אירוע ב-Google Calendar, תזכורת ב-Google Tasks, טיוטת תשובה ב-Gmail, או שילוב ביניהם, לפי מה שההודעה דורשת. הוא נושא תווית סיכום קצרה, כל סכום או תאריך שחולץ, ובטיוטת תשובה — משפט מצוטט אחד מההודעה. המידע עובר ישירות מהדפדפן שלכם ל-API של Google באמצעות ההרשאה (OAuth) שלכם. הוא אינו עובר דרכנו, ואיננו מקבלים ממנו עותק.</p>
+<p>אם הודעה מבקשת קובץ מסוים (חשבונית, חוזה חתום, קורות חיים) שאינו מצורף כבר לשרשור ולא בחרתם קובץ בעצמכם, Glance מחפש ב-Google Drive שלכם לפי שם הקובץ ותוכנו קובץ תואם, ומצרף לטיוטה את מה שמצא. זה המקרה היחיד שבו Glance קורא יותר מהודעת ה-Gmail עצמה, והוא מתבצע אוטומטית ולא לפי בקשה. החיפוש משתמש באותו חיבור ישיר, מכוח ההרשאה שלכם, ולכן גם הוא אינו עובר דרכנו. קובץ שנמצא כך לעולם אינו נשלח: הוא מגיע רק לטיוטה, ומסומן בטקסט הטיוטה עצמו כהשערה לא מאומתת שעליכם לבדוק לפני השליחה.</p>
+<p>קיימים בקוד גם מחברים ל-Notion, HubSpot, Salesforce, Slack ו-Monday.com, אך כרגע אי אפשר להגיע אליהם מהגדרת התוסף. אם זה ישתנה, נעדכן מדיניות זו לפני כן.</p>
+<p><strong>Draft-It וסיכום קובץ מצורף (Glance Pro).</strong> התכונות מופיעות רק בחשבון עם רישיון Pro פעיל, והשרת מסרב לשרת אותן בלי רישיון. הן משתמשות במודל שפה אמיתי, ולכן לפני ששתיהן שולחות משהו, Local Privacy Shield סורק את הטקסט במכשיר שלכם ומחליף שמות, חברות, סכומי כסף, תאריכים, כתובות דוא"ל ומספרי טלפון שמצא בסמלים חלופיים (למשל [CLIENT_NAME_1]). הוא פועל בהתאמת תבניות ולא בהבנה, ומכוונן להסתיר יותר מדי ולא פחות מדי. אולם התאמת תבניות אינה כל-יודעת, ואנו מעדיפים לומר זאת מאשר להבטיח הבטחה שאף מערכת כזו אינה יכולה לתת. סכום שנכתב במילים, או שם פרטי שמופיע לבדו באמצע משפט, עלולים לעבור.</p>
+<p>רק הטקסט המוסתר הזה מגיע לשרת שלנו. השרת מסתיר שוב לפני שהוא פונה לספק, ואינו שולח את הטקסט אם נותרה בו כתובת דוא"ל או מספר טלפון. הערכים האמיתיים אינם נשלחים לעולם.</p>
+<ul>
+<li><em>טיוטות</em> נשלחות ל-Anthropic או ל-xAI, לפי מי שהשיב מהר יותר.</li>
+<li><em>סיכומי קבצים מצורפים</em> נשלחים תחילה ל-Google, ולאחר מכן לאותו צמד. OpenAI משמשת לסיכום רק כששירות Google אינו מוגדר או שמדלגים עליו בעקבות שגיאות.</li>
+<li>התשובה חוזרת עם אותם סמלים חלופיים, והדפדפן שלכם מחזיר את הערכים האמיתיים למקומם באופן מקומי. השחזור הזה מתבצע רק במכשיר שלכם.</li>
+<li>אם התוצאה אינה אחת מהקטגוריות המוכרות, Glance שותק ואינו מנחש.</li>
+</ul>
+<p>סיווג אוטומטי נפרד של הודעה שלמה, למקרה שהבדיקה במכשיר לא מצאה דבר, קיים בקוד (תחילה Anthropic ואחר כך xAI; לעולם לא Google או OpenAI) אך כבוי בגרסה זו. "קריאה שנייה" המתוארת להלן אינה אותו דבר. אם הסיווג יופעל אי פעם, הוא יהיה כפוף להסכמה מראש (opt-in), ומדיניות זו תשתנה קודם לכן.</p>
+<p>למנוי Pro, Draft-It מקבל גם, יחד עם טקסט השרשור המוסתר, תיאור קבוע וקצר של האופן שבו אתם פותחים וחותמים הודעות דוא"ל (למשל "פותח ב-Hi ובשם הפרטי"), ולעולם לא את הטקסט שלכם.</p>
+<p><strong>קריאה שנייה של משפט אחד (כבויה עד שתפעילו אותה).</strong> Glance קורא קודם את ההודעה האחרונה שלכם במכשיר, ובעזרת מודל במחשב שלכם אם אתם משתמשים בכזה (ראו להלן). עבור המשפטים המעטים שעדיין אינו מצליח למקם, ורק לאחר שתלחצו "Turn on" בלוח התוסף (אפשר לכבות שם בכל עת), הוא יכול לשלוח את המשפט היחיד הזה לשרת שלנו לקריאה שנייה.</p>
+<ul>
+<li>לפני שהמשפט עוזב את הדפדפן הוא עובר את אותה הסתרה כמו ב-Draft-It: שמות, חברות, סכומים, תאריכים, כתובות דוא"ל, מספרי טלפון ומזהים מתויגים מוחלפים בסמלים חלופיים, ושום דבר אינו נשלח אם נותרה בו כתובת דוא"ל, מספר טלפון או סכום. ההסתרה עלולה להחמיץ דברים: שם פרטי שמופיע לבדו, או מספר ללא תווית, עלולים לעבור.</li>
+<li>השרת שלנו מסתיר שוב ופונה למודל מהיר (של Anthropic או xAI) פעמיים, בשתי ניסוחים, ומקבל רק תשובה ששתי הפניות מסכימות עליה. ב-Glance Pro, כששתי התשובות חלוקות, הוא פונה פעם אחת למודל חזק יותר (של Anthropic או xAI).</li>
+<li>נשלח רק המשפט המוסתר, לעולם לא השרשור, הנושא או מי כתב למי. התשובה היא הצעה: עדיין עליכם ללחוץ, והיא אינה יכולה לסגור, לכתוב או לשלוח דבר.</li>
+<li>קיימת מכסה חודשית: 120 קריאות שניות במסלול החינמי ו-1,500 ב-Glance Pro. אנו סופרים אותן בשרת שלנו באמצעות מספר השמור מול hash חד-כיווני של מזהה ההתקנה האקראי שלכם (או של מפתח ה-Pro שלכם) ולמניעת ניצול לרעה — גם לפי כתובת רשת וליום, לכלל המשתמשים יחד. איננו שומרים משפט או תשובה.</li>
+<li>כשהמכסה מתרוקנת, Glance ממשיך לפעול במכשיר שלכם כבעבר ומודיע על כך בלוח התוסף.</li>
+<li>כדי לדעת אם התכונה פועלת וכמה קריאות נותרו, התוסף פונה לשרת שלנו עם מזהה ההתקנה האקראי שלכם ו, ב-Pro, עם המפתח שלכם. אין בפנייה זו טקסט של הודעה.</li>
+<li>במכשיר שלכם Glance שומר קוד קצר לכל משפט מוסתר שכבר נשאל, כדי שלא יישאל פעמיים, וכן מוני התוצאות.</li>
+</ul>
+<p>אל תפעילו תכונה זו לדואר מוסדר או רגיש.</p>
+<p><strong>לולאות פתוחות (על מה אתם ממתינים ומה הבטחתם).</strong> כשאתם פותחים שרשור ב-Gmail, Glance קורא, במכשיר שלכם, את ההודעה האחרונה שלכם כדי לראות אם היא מבקשת משהו ממישהו או מבטיחה משהו. כשמגיעה ההודעה האחרונה של הצד השני, Glance קורא אותה במכשיר שלכם כדי להבחין בין תשובה, אישור קבלה, הודעת היעדרות, מועד שהובטח או אישור תשלום. הוא קורא גם הודעה הקובעת תאריך שבו משהו מפסיק לתקוף (הצעה, תקופת ניסיון) כדי להציע תזכורת.</p>
+<p>רק אם תלחצו "Stay on it" או "Remind me", Glance מוסיף משימה ב-Google Tasks בחשבון ה-Google שלכם (לפי היום שבו כדאי לבדוק שוב) ושומר במכשיר שלכם רשומה קצרה: מי, המשפט הנוגע בדבר, הסכום אם יש, והתאריכים. לאחר פגישה שהוספתם ליומן, Glance שומר במכשיר את הכותרת והתאריך שלה כדי לשאול מה יצא ממנה. מה שתקלידו שם נקרא במכשיר שלכם והופך ללולאות. Glance שומר גם, לכל אדם, רק את התאריכים שבהם פתחתם לולאות, כדי להבחין במה שחוזר בקביעות. טיוטת תזכורת נוצרת רק לפי בקשתכם, ואינה נשלחת לעולם. דבר מכל זה אינו עובר דרכנו, מלבד "קריאה שנייה" לעיל, אם הפעלתם אותה.</p>
+<p>Glance Pro מגדיל את מספר הלולאות שאפשר לעקוב אחריהן בו-זמנית ומוסיף תזכורות תקיפות יותר, סיכומי כסף ותצוגת קצב.</p>
+<p><strong>"Stay on this" מכל דף.</strong> תפריט הלחיצה הימנית בדפדפן מציע "Glance: stay on this" על טקסט מסומן. רק הטקסט שסימנתם וכתובת הדף ללא פרמטרי השאילתה והקטע נשמרים, במכשיר שלכם, עד שתענו על שאלה אחת. אם תבחרו "Stay on it", הם הופכים ללולאה כמו כל לולאה אחרת.</p>
+<p><strong>לולאות שנסגרות בלי תשובה.</strong> כשאתם פותחים אישור תשלום מבנק או מספק תשלומים, Glance קורא אותו במכשיר שלכם כדי לראות אם הוא על הסכום שלולאת תשלום ממתינה לו. כשאתם פותחים את התוסף, עבור לולאה מסוג "לקבוע מועד" הוא מבקש מ-Google Calendar אירועים שבהם אותו אדם מופיע בהזמנה, ועבור מסמך שהבטחתם הוא מבקש מ-Google Drive קבצים ששונו לאחרונה בשם תואם ואת האנשים ששותפו בהם. חוזרים רק מזהים, מועדים וכתובות, לעולם לא כותרות או תכנים, והתשובות נשארות במכשיר שלכם. סגירה שנעשתה כך ניתנת לביטול באמצעות "Reopen", וראיה חלשה יותר רק גורמת לו לשאול אתכם.</p>
+<p><strong>בקשות לקבלה או להוכחת תשלום.</strong> כשמישהו מבקש שתשלחו קבלה או אישור העברה, Glance בודק, במכשיר שלכם, אם כבר קיימת כזו (קובץ מצורף בשרשור, או בדיוק קובץ תואם אחד ב-Google Drive, שנמצא לפי שם), אם התשלום אכן התקבל, ומי היה מנפיק אותה. כדי לדעת אם תשלום התקבל, הוא שומר, כשאתם פותחים אישור מבנק או מספק תשלומים, רק את הסכום, המטבע והיום (לעולם לא את ההודעה), וקורא את לולאות התשלום שלכם. אם תקלידו את כתובת מי שמנפיק עבורכם קבלות, הכתובת היחידה הזו נשמרת במכשיר שלכם. Glance מכין תמיד רק טיוטה בטיוטות ה-Gmail שלכם: הוא אינו שולח לעולם, ואינו מנפיק קבלה או מסמך מס אחר. הבקשה נשארת פתוחה עד שהודעה ששלחתם נושאת קובץ מצורף ממשי הנושא את שמה, או עד שתאמרו ל-Glance שהיא טופלה. דבר מכל זה אינו עובר דרכנו.</p>
+<p><strong>אפליקציות אחרות (כבויות עד שתפעילו אותן).</strong> Gmail הוא נקודת ההתחלה של Glance. בהגדרות אפשר להפעיל WhatsApp Web, Slack או Telegram Web, כל אחת בנפרד. הפעלה מבקשת מהדפדפן הרשאה לאתר האחד הזה (הרשאה אופציונלית: בהתקנה לא מתבקש דבר נוסף), וכיבוי מסיר אותה שוב. התכונה היא לקריאה בלבד וניסיונית. Glance קורא רק את השיחה האישית או ההודעה הישירה שפתחתם, לעולם לא קבוצה, רשימת תפוצה, ערוץ, שרשור או סטטוס, כדי לראות אם משהו ששאלתם נענה, לפי אותם כללים במכשיר כמו בדוא"ל. הוא אינו מקליד, שולח, מגיב או פותח דבר, ושום דבר מהאפליקציה הזו אינו נשלח אלינו. לולאה שנוצרה שם שומרת במכשיר שלכם רשומה קצרה (המספר או השם שהאפליקציה מציגה, המשפט, היום לבדיקה חוזרת), כמו לולאה שנוצרה ב-Gmail. אפליקציות אלה עשויות לשנות את הדפים שלהן ללא הודעה מראש. אם Glance אינו מצליח לקרוא אחת מהן, הוא משתתק ואומר זאת.</p>
+<p><strong>Outlook (כבוי עד שתפעילו אותו).</strong> בהגדרות אפשר לחבר את חשבון Microsoft שלכם. אז Glance קורא, במכשיר זה, את 14 הימים האחרונים בתיבת הדואר הנכנס ובתיקיית הדואר שנשלח ב-Outlook כל עוד לוח התוסף או לשונית Outlook באינטרנט פתוחים (בקשות שהופנו אליכם ותשובות לבקשותיכם), ומציג את אותו כרטיס Do It כמו ב-Gmail בתוך ההודעה שאתם פותחים שם. ב-Do It הוא כותב טיוטת תשובה לתיקיית הטיוטות ב-Outlook שלכם (Microsoft Graph, "createReply"). כדי לשמור אתכם מחוברים, התוסף מחדש את ההתחברות ל-Microsoft ברקע בערך כל 16 שעות, בלי לפתוח חלון. החידוש הזה מדבר רק עם Microsoft.</p>
+<p>ההרשאה של Microsoft היא Mail.ReadWrite, המאפשרת ליישום לקרוא, ליצור, לשנות ולמחוק דואר, אך לא לשלוח אותו. Glance משתמש בה רק כדי ליצור ולמחוק טיוטות משלו. הוא אינו שולח לעולם ואינו מבקש Mail.Send לעולם. מסך החיבור הוא רשימה אחת: Select all, ואחריו Mail (תמיד פעיל), To Do, Calendar, OneDrive, Contacts ו-Teams. To Do, Calendar, OneDrive, Contacts ו-Teams מתבקשים רק אם סימנתם אותם:</p>
+<ul>
+<li><em>To Do</em> מבקש Tasks.ReadWrite. ב-Do It של משימה בלבד, Glance יוצר משימה אחת ב-Microsoft To Do ברשימת ברירת המחדל, קורא אותה בחזרה, ואומר שהטיפול הושלם רק אם הקריאה הצליחה. ביטול (Undo) מוחק את המשימה.</li>
+<li><em>OneDrive</em> מבקש Files.ReadWrite. ב-Do It זה, Glance כותב קובץ אחד, קורא אותו בחזרה, וביטול מוחק את הקובץ או משחזר את הקודם. דוא"ל אינו מחפש ב-OneDrive.</li>
+<li><em>Calendar</em> מבקש Calendars.ReadWrite. כשההרשאה הזו קיימת באסימון, Do It על הערה הנוקבת בקובץ אחד ובמועד יוצר אירוע אחד ביומן ה-Outlook שלכם, עם הקישור לאותו קובץ בתיאור, וביטול מוחק את האירוע. הוא אינו מזמין איש.</li>
+<li><em>Contacts ו-Teams</em> הם לקריאה בלבד (Contacts.Read, Chat.Read).</li>
+</ul>
+<p>ביטול מוחק רק את הטיוטה ש-Glance יצר, ורק כל עוד היא עדיין טיוטה. אסימון ההתחברות נשאר בדפדפן זה. שום דבר מהדואר שלכם אינו עובר לשרתי Glance.</p>
+<p><strong>מודל שפה במחשב שלכם (כבוי עד שתפעילו אותו).</strong> אם אתם מריצים במחשב זה תוכנה כגון Ollama או LM Studio, אפשר לאפשר ל-Glance לשלוח אליה, משפט אחד בכל פעם, משפטים ש-Glance לא הצליח לקרוא בעצמו. הכתובת חייבת להיות במחשב זה (127.0.0.1 או localhost). Glance מסרב לכל כתובת אחרת, והדפדפן מבקש תחילה את רשותכם. לפני השימוש, Glance בוחן את המודל הזה על משפטים שנכתבו לשם כך, ומפעיל אותו, לכל שפה בנפרד, רק אם הוא מדויק מספיק. הוא רק מציע: עדיין עליכם ללחוץ, והוא אינו יכול לסגור, לכתוב או לשלוח דבר. המשפט עובר מהדפדפן שלכם לתוכנה ההיא באותו מחשב. דבר ממנו אינו נשלח אלינו, ו-Glance אינו מוריד או מתקין שום מודל.</p>
+<p><strong>מה Glance מתאים, במכשיר שלכם.</strong> Glance מתאים את עצמו אליכם באמצעות מספרים ומונים קטנים הנשמרים רק במכשיר שלכם: כיצד דירג משפטים שאישרתם או דחיתם (מספרים, לעולם לא מילים), כמה זמן אנשים לוקחים בדרך כלל להשיב, כיצד אתם פותחים וחותמים בדרך כלל הודעת דוא"ל (מניית ברכות וחתימות, לכל שפה), אילו שמות, כתובות ומספרים שייכים לאותו אדם בין אפליקציות, ורשימה פשוטה וקצרה של כל התאמה, שאפשר לקרוא בתוסף. "Reset what Glance learned" מוחק את כולם. אם בדפדפן שלכם מובנה מודל שפה, Glance עשוי להשתמש בו במכשיר שלכם כדי לקרוא ניסוח שלא הצליח למקם אחרת, רק לאחר שהוא עובר שם בדיקת דיוק. הוא רק מציע, ושום דבר אינו עוזב את המכשיר שלכם.</p>
+<p><strong>אישורי חיבור.</strong> הרשאת מחבר שומרת אסימון גישה באחסון המקומי של התוסף בדפדפן שלכם, במחשב שלכם. איננו מקבלים או שומרים אסימונים אלה לעולם. החריג היחיד הוא רגע ההרשאה עצמו: קוד ההרשאה החד-פעמי של הספק מומר לאסימון דרך השרת שלנו, משום שההמרה דורשת סוד יישום שאי אפשר לשלוח בבטחה בתוך תוסף. איננו שומרים לא את הקוד ולא את האסימון שהתקבל.</p>
+<p><strong>מה נשאר במכשיר שלכם.</strong> המחבר שבחרתם, יומן הפעילות של מה ש-Glance זיהה וכתב (לרבות אילו צעדים מוצעים אתם נוהגים להשאיר או להסיר, ששימושו רק לסדר מחדש או להפסיק לחזור על צעד שאתם מסרבים לו בעקביות), וכיול הרגישות — כולם נשמרים באחסון התוסף במכשיר שלכם. דבר מהם אינו נשלח אלינו. הסרת התוסף מוחקת את כולם.</p>
+<h2>3. אירועי שימוש אנונימיים במוצר</h2>
+<p>בנפרד מכל האמור לעיל, Glance מדווח על קבוצה קטנה של אירועי שימוש מצטברים: שבב Do It הופיע, נלחץ או נדחה; כתיבה הושלמה; פעולה בוטלה; תהליך נסגר ובאיזו שיטה; מחבר הוגדר; מעקב הוגדר, נסגר בתשובה, או שתזכורת לגביו נוסחה, או שהמכסה החינמית הגיעה (ספירות בלבד: לעולם לא מי, מה או כמה); כפתור ההתחלה של Glance Pro נלחץ; מפתח Pro הופעל; Draft-It יצר תשובה; קובץ מצורף סוכם; פינג אחד ליום שבו התוסף היה פעיל בלשונית Gmail; ולכל היותר פעם אחת להתקנה בשבוע קלנדרי — האם נוצר הרגל שימוש חוזר.</p>
+<p>כל אירוע מסומן רק במזהה אקראי לכל התקנה (שאינו קשור לדוא"ל שלכם, לחשבון Google שלכם או לכל דבר מזהה אחר) ובאיזה מחבר או פרופיל תחום עיסוק היה מעורב. האירועים נשלחים לשרת שלנו, המעביר אותם ל-Google Analytics. כך אנו יודעים אם נעשה במוצר שימוש בפועל. הם אינם כוללים לעולם טקסט הודעה, זהות שולח, או סכום או תאריך שחולצו. השרת שלנו דוחה כל שם אירוע או שדה שאינו מוכר לו מראש, ולכן הרשימה הזו היא הרשימה המלאה, ולא רק דוגמה.</p>
+<h2>4. מה איננו עושים</h2>
+<p>איננו קוראים את תיבת הדואר שלכם, איננו מקבלים את תוכן הדוא"ל שלכם ללא הסתרה, איננו מוכרים דבר ממנו, ואיננו משתמשים בשום חלק ממנו לאימון מודלי בינה מלאכותית, שלנו או של אחרים.</p>
+<p>החריגים לתוכן הודעות הם קריאות המודל המוסתרות המתוארות בסעיף 2: טקסט עם סמלים חלופיים בלבד, כשמנוי Pro מבקש טיוטה או סיכום קובץ מצורף, ורק לאחר שהפעלתם — משפט מוסתר אחד בכל פעם עבור הקריאה השנייה. שם אמיתי, חברה, סכום, תאריך, כתובת דוא"ל או מספר טלפון אינם מה שאותם ספקים מקבלים.</p>
+<p><em>תנאי הספקים.</em> תנאי השימוש המסחריים של Anthropic קובעים: "Anthropic may not train models on Customer Content from Services." OpenAI מציינת ש-"data sent to the OpenAI API is not used to train or improve OpenAI models (unless you explicitly opt in to share data with us)." אלה דברי התנאים שהספקים האלה מפרסמים, והם רשאים לשנותם.</p>
+<p><em>נתוני משתמש של Google.</em> [אופציונלי, באישור Flow לפני הפרסום ורק אם הגישה של Glance ל-Google באמצעות OAuth כפופה לכללי "Limited Use" של Google: "The use of information received from Google Workspace scopes will adhere to the Google User Data Policy, including the Limited Use requirements."]</p>
+<h2>5. מי מעבד מידע מטעמנו</h2>
+<p>אנו חולקים מידע רק עם ספקי השירות המפעילים עבורנו את שרתי Glance והחיוב, בהתאם לתנאי עיבוד הנתונים שלהם:</p>
+<ul>
+<li><strong>Supabase</strong> — מאחסנת הרשמות להורדה, רישומי רישיון Glance Pro ואת מוני "הקריאה השנייה".</li>
+<li><strong>Resend</strong> — מספקת את קישור ההתקנה, וב-Pro את מפתח הרישיון והודעות החיוב.</li>
+<li><strong>Netlify</strong> — מארחת את האתר ומריצה את הפונקציות (serverless) המעבדות הרשמות, בדיקות רישיון, אירועי חיוב ובקשות Pro (לרבות טקסט מוסתר במעבר).</li>
+<li><strong>Stripe</strong> — גובה תשלום עבור Glance Pro.</li>
+<li><strong>Google Analytics</strong> — מקבלת את אירועי השימוש האנונימיים שבסעיף 3.</li>
+<li><strong>Anthropic, xAI, Google ו-OpenAI</strong> — מעבדות טקסט מוסתר בלבד, כמתואר בסעיף 2: טיוטות וקריאות שניות (Anthropic או xAI), סיכומי קבצים מצורפים (תחילה Google, ולאחר מכן Anthropic או xAI; OpenAI רק כששירות Google אינו מוגדר או שמדלגים עליו בעקבות שגיאות).</li>
+</ul>
+<p>כש-Glance כותב לחשבון Google או Microsoft שלכם, הוא מתחבר ישירות מהדפדפן שלכם אל Google או Microsoft מכוח ההרשאה שלכם (סעיף 2). ספקים אלה אינם מעבדים מטעמנו עבור אותה תעבורה.</p>
+<p>איננו חולקים את המידע שלכם עם צד שלישי אחר למטרות השיווק שלו. ייתכן שנגלה מידע אם החוק מחייב זאת, או כדי להגן על זכויותיהם, רכושם או ביטחונם של Flow, של המשתמשים שלנו או של הציבור.</p>
+<h2>6. העברת מידע אל מחוץ לישראל</h2>
+<p>ספקי השירות שלנו, ובהם Anthropic, xAI, Google ו-OpenAI, עשויים לעבד מידע בארצות הברית ובמדינות אחרות. כאשר הדין מחייב זאת, אנו נשענים על ההגנות החוזיות של אותם ספקים להעברת מידע בין מדינות.</p>
+<h2>7. תקופת שמירה</h2>
+<ul>
+<li>מידע המוחזק בתוך תוסף Glance נמצא במכשיר שלכם ונמחק עם הסרת התוסף.</li>
+<li>אנו שומרים הרשמות להורדה ורישומי רישיון וחיוב של Glance Pro כל עוד ההרשמה או המנוי פעילים, ולתקופה סבירה לאחר מכן לצורכי התיעוד שלנו והחובות החוקיות שלנו, אלא אם ביקשתם למחוק אותם מוקדם יותר (ראו סעיף 8).</li>
+<li>איננו שומרים משפט או תשובה של "קריאה שנייה". מוני המכסה נשמרים כ-hash חד-כיווני, כמתואר בסעיף 2.</li>
+</ul>
+<h2>8. זכויותיכם</h2>
+<p>לפי חוק הגנת הפרטיות, התשמ"א-1981 ותקנותיו, ייתכן שעומדת לכם הזכות לעיין במידע אישי עליכם המוחזק אצלנו ולבקש לתקנו או למחקו, במקרים שהחוק קובע. כאשר חל ה-GDPR, ייתכן שעומדות לכם גם הזכויות לגשת למידע, לתקנו, למחקו, להגביל את עיבודו, לקבלו בפורמט נייד ולהתנגד לעיבודו, לבטל הסכמה בכל עת, ולהגיש תלונה לרשות להגנת מידע. בישראל זו הרשות להגנת הפרטיות.</p>
+<p>רוב המידע של Glance נמצא במכשיר שלכם, ושם הוא בשליטתכם: אפשר למחוק אותו באמצעות "Reset what Glance learned" או בהסרת התוסף. איננו יכולים לראות אותו או למחוק אותו עבורכם. לגבי מה שמוחזק אצלנו (הרשמות להורדה ורישומי Pro), ולכל בקשה לפי סעיף זה, כתבו אל <strong>info@theflow-ai.com</strong> ונטפל בבקשתכם בהקדם.</p>
+<p>הודעות הדוא"ל שלנו הן תפעוליות (קישור ההתקנה, מפתח הרישיון והודעות חיוב) ואינן ניוזלטר שיווקי, ולכן אין בהן קישור להסרה מרשימת תפוצה. כדי להפסיק לקבל הודעות מאיתנו, כתבו לאותה כתובת.</p>
+<h2>9. קטינים</h2>
+<p>Glance הוא מוצר צרכני. הוא אינו מיועד לבני פחות מ-16, ואיננו אוספים ביודעין מידע מהם. אם אתם מתחת לגיל 16, אל תתקינו ואל תשתמשו ב-Glance ואל תירשמו כמנויים ל-Glance Pro.</p>
+<h2>10. שינויים במדיניות</h2>
+<p>ייתכן שנעדכן מדיניות זו ככל ש-Glance יתפתח. בכל עדכון נשנה את תאריך "עודכן לאחרונה". שינויים מהותיים, לרבות כל שימוש חדש בדואר או בהודעות שלכם, יופיעו כאן לפני כניסתם לתוקף.</p>
+<h2>11. יצירת קשר</h2>
+<p>שאלות על מדיניות זו או על המידע שלכם: <strong>info@theflow-ai.com</strong></p>
+</div>
+</article>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">&copy; 2026 Flow. <a href="/">theflow-ai.com</a> · <a href="/about.html">About</a> &middot; <a href="/security.html">Security</a> &middot; <a href="/contact.html">Contact</a> &middot; <a href="/terms.html">Terms of Service</a> &middot; <a href="/privacy.html">Flow Privacy</a> · <a href="/blog/rss.xml">RSS</a></div>
+</footer>
+<script>
+(function(){
+  var tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try{localStorage.setItem('flow_theme', next);}catch(e){}
+  });
+})();
+</script>
+<script>
+(function(){
+  var mb=document.getElementById('menuBtn'), mn=document.getElementById('mobileNav');
+  if(!mb||!mn) return;
+  function close(){ mn.classList.remove('open'); mb.setAttribute('aria-expanded','false'); setTimeout(function(){ mn.hidden=true; },250); }
+  function open(){ mn.hidden=false; requestAnimationFrame(function(){ mn.classList.add('open'); }); mb.setAttribute('aria-expanded','true'); }
+  mb.addEventListener('click',function(){ mn.hidden ? open() : close(); });
+  mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
+  mn.addEventListener('click',function(e){ if(e.target===mn) close(); });
+  document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && !mn.hidden) close(); });
+})();
+</script>
+<script src="/assets/flow-premium.js" defer></script>
+<script src="/assets/site-nav.js" defer></script>
+<script>
+(function(){
+  var blocks=document.querySelectorAll('.plang'),links=document.querySelectorAll('.langsw a');
+  function pick(l){
+    for(var i=0;i<blocks.length;i++){blocks[i].hidden=blocks[i].getAttribute('data-lang')!==l;}
+    for(var j=0;j<links.length;j++){links[j].setAttribute('aria-current',links[j].getAttribute('data-set')===l?'true':'false');links[j].style.fontWeight=links[j].getAttribute('data-set')===l?'700':'400';}
+    document.documentElement.lang=l; document.documentElement.dir=l==='he'?'rtl':'ltr';
+    try{localStorage.setItem('flow_lang',l);}catch(e){}
+  }
+  var l='en';
+  try{ if(location.hash==='#he'||location.hash==='#en'){l=location.hash.slice(1);} else if(localStorage.getItem('flow_lang')==='he'){l='he';} }catch(e){}
+  for(var k=0;k<links.length;k++){links[k].addEventListener('click',function(e){e.preventDefault();pick(this.getAttribute('data-set'));});}
+  pick(l);
+})();
+</script>
+</body>
+</html>
