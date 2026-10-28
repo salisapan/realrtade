@@ -361,6 +361,8 @@ const FlowExtract = (() => {
     let month = null;
     if (a > 12 && a <= 31 && b >= 1 && b <= 12) { day = a; month = b; }
     else if (b > 12 && b <= 31 && a >= 1 && a <= 12) { day = b; month = a; }
+    // Hebrew mail writes day first (5/11 is 5 November). Same rule as slashDate().
+    else if (a >= 1 && a <= 12 && b >= 1 && b <= 12 && /[\u0590-\u05FF]/.test(src)) { day = a; month = b; }
     else return null;
     return { day: day, month: month, yearRaw: m[3] || null, token: m[1] + (slash ? '/' : '.') + m[2] + (m[3] ? (slash ? '/' : '.') + m[3] : '') };
   }
@@ -918,7 +920,7 @@ const FlowJudgment = (() => {
   // addition below was verified against the full negative-test corpus in
   // test/intent-actions-corpus.cjs (vague asks, cold pitches, small talk)
   // before being kept.
-  const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|pay|remit|wire|settle|let (?:us|me) know)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise|pay|remit)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
+  const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|pay|remit|wire|settle|let (?:us|me) know|proofread|check|order|look over|take a look|fill (?:in|out)|complete|verify|validate)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise|pay|remit|acknowledge|reply|respond|revert|return|sign|approve|submit)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|(?:we|I)(?:'d| would) (?:be )?(?:grateful|thankful) (?:it )?if you|do you think you could|do you mind (?:send|upload|review|check|sign|fill|forward|share|updat|provid|resend)(?:ing)?\b|(?:^|[.!?]\s+|please\s+)make sure (?:that )?(?:the|we|all|this|it)\b|(?:please |kindly )?(?:get|come|write|reply|respond) back to me\b|kindly revert\b|please revert\b|let me know (?:your|what you|how you) (?:decision|thoughts|feedback|answer|availability|preference)|(?:we|I)(?:'d| would) appreciate (?:a |an |your |the )(?:quick |brief |prompt )?(?:update|reply|response|answer|confirmation|feedback|decision)|(?:we|I) need your (?:decision|answer|reply|response|signature|payment|go-?ahead)|need your (?:decision|answer|reply|response|signature|go-?ahead)|do let me know (?:by|whether|if)|if you could (?:please )?(?:send|share|forward|review|confirm|sign|approve|provide|upload|resend|check|take a look)|(?:we|I) need (?:the |your |that |those |these |a |an )(?!to\b)[^.?!\n]{1,50}?\bback(?=\s*(?:by|before|on|until|asap|today|tomorrow|this|next|end|[.!?,]|$))|(?:we|I) need (?:the |your |that |those |these |a |an )(?!to\b)[^.?!\n]{1,50}?\bfrom you\b|it would be (?:great|helpful|good|best|ideal|perfect) to (?:have|get|receive) (?:the |your |a |an )|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
   // A disagreement about money.
   const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|undercharged|incorrect (?:amount|invoice)|dispute|wrong amount|billing discrepancy|invoice error|charged incorrectly|duplicate charge|unauthorized charge)\b/i;
 
@@ -970,7 +972,7 @@ const FlowJudgment = (() => {
   // the same "asking you to do X" shape, each verified against the full
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
-  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|ת(?:אשר|אשרי|אשרו)\s+לי(?:\s+בבקשה)?(?![א-ת])|אפשר\s+ל(?:עדכן|תקן|סיים|הכין)(?![א-ת])[^?.!]{0,50}\sעד\s|(?:אשמח|נשמח)\s+ל(?:אישור|תשובה|עדכון|משוב|תגובה)\s+(?:שלך|שלכם|שלכן|ממך|ממכם)|אפשר\s+ש(?:ת|תי)(?:עיף|עיפי|סתכל|סתכלי|בדוק|בדקי|חתום|חתמי|אשר|אשרי|עדכן|עדכני|שלח|שלחי|חזור|חזרי|עבור|עברי|טפל|טפלי|סגור|סגרי)(?![א-ת])|(?:תוודא|תוודאי|תדאג|תדאגי)\s+ש?(?:ה|ל)|(?:תעיף|תעיפי)\s+מבט|אשמח ש(?:ת|תי)(?:חזור|חזרי|שלח|שלחי|עדכן|עדכני|אשר|אשרי|בדוק|בדקי|עבור|עברי|ענה|עני)(?![א-ת])|(?:אפשר|אשמח|נשמח)\s+לשמוע\s+(?:ממך|ממכם|ממך עדכון)|(?:אני|אנחנו)\s+(?:זקוק(?:ה|ים|ות)?|צריכ(?:ה|ים|ות)?|צריך)\s+(?:את\s+|ל)?(?:ה)?(?:חתימה|אישור|תשובה|החלטה|עדכון|תגובה|משוב)\s+(?:שלך|שלכם|ממך|ממכם)|(?:(?:אתה|את|אתם|אתן)\s+יכול(?:ה|ים|ות)?|היית(?:י)?\s+יכול(?:ה)?)\s+(?:בבקשה\s+)?ל(?:שלוח|העביר|אשר|בדוק|עבור|חתום|חזור|עדכן|שלם|הכין|סדר|תאם|מלא|הזמין|השיב|ענות|הוסיף|צרף|פתוח|ארגן|טפל|שמור|העלות|העלות|הגיש|הוציא|שחרר)(?![א-ת])|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
   // "Please follow up with Dana about the invoice" is an explicit ask, and
   // it never matched HANDOFF: "follow up" isn't in that verb list, and the
   // "send" later in the sentence isn't adjacent to "please". Kept out of
@@ -1112,13 +1114,17 @@ const FlowJudgment = (() => {
   const WORK_ASK_HE = /(?:^|\s)(?:תכין|תכיני|תכינו|תכתוב|תכתבי|תכתבו|תיצור|תיצרי|תיצרו|תכניס|תכניסי|תכניסו|תסכם|תסכמי|תסכמו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?(?:את\s+)?(?:ה)?(?:מסמך\s+(?:סיכום|סטטוס|תקציב|הצעה|דוח)|טבלה|דוח|דו"ח|סיכום|נתונים|מספרים|גיליון|הצעה|מצגת)/;
   // Asks for an update or an introduction. Each names the reader as the one who acts ("update me", "introduce me"), so a
   // status line or a thank-you that merely mentions an update stays quiet. Kept out of HANDOFF so the quoted sentence is unchanged.
-  const STATUS_INTRO_ASK = /\b(?:(?:can|could|would|will) you (?:please )?(?:introduce|connect|put) me|(?:please )?(?:introduce|connect) me (?:to|with)|put me in touch with|what(?:'s| is) the (?:current )?status of|(?:please )?(?:keep|update) me (?:posted|updated|in the loop|on|about)|let me know (?:the status|once|when)\b[^.?!\n]{0,60}\b(?:by|before|today|tonight|tomorrow|this week|ready|done|sent|paid))/i;
-  const STATUS_INTRO_ASK_HE = /(?:^|\s)(?:תעדכן|תעדכני|תעדכנו|עדכן|עדכני)\s+אותי|(?:^|\s)מה\s+(?:ה)?סטטוס\s+של|אשמח\s+לעדכון|(?:^|\s)(?:תפגיש|תפגישי|תכיר|תכירי|תחבר|תחברי)\s+(?:אותי|לי)|(?:ש|ל)(?:תפגיש|תפגישי)\s+אותי|(?:ל)?הכיר\s+לי\s+את|להפגיש\s+אותי/;
+  const STATUS_INTRO_ASK = /\b(?:(?:can|could|would|will) you (?:please )?(?:introduce|connect|put) me|(?:please )?(?:introduce|connect) me (?:to|with)|put me in touch with|what(?:'s| is) the (?:current )?status of|(?:please )?(?:keep|update) me (?:posted|updated|in the loop|on|about)|(?:please )?(?:give|send|get) me (?:a |an )?(?:quick |brief |short |written )?(?:status |progress )?(?:update|report)\b|i need (?:a |an )?(?:quick |brief )?(?:status |progress )?update\b|(?:please )?(?:countersign|co-sign)\b|let me know (?:the status|once|when)\b[^.?!\n]{0,60}\b(?:by|before|today|tonight|tomorrow|this week|ready|done|sent|paid))/i;
+  const STATUS_INTRO_ASK_HE = /(?:^|\s)(?:תעדכן|תעדכני|תעדכנו|עדכן|עדכני)\s+אותי|(?:^|\s)מה\s+(?:ה)?סטטוס\s+של|(?:אשמח|נשמח)\s+(?:ל(?:קבל\s+)?)?עדכון|(?:^|\s)(?:תעדכן|תעדכני|תעדכנו)\s+(?:אותי\s+)?(?:את\s+)?(?:ה)?סטטוס|(?:^|\s)(?:תפגיש|תפגישי|תכיר|תכירי|תחבר|תחברי)\s+(?:אותי|לי)|(?:ש|ל)(?:תפגיש|תפגישי)\s+אותי|(?:ל)?הכיר\s+לי\s+את|להפגיש\s+אותי/;
+  // Asks for an account action: access, a password reset, a transfer, a copy of the reply. The lead ("please", "can you") is
+  // required, so "access has been granted" and "your password was reset" stay quiet. Kept out of HANDOFF like the two above.
+  const ACCOUNT_ASK = /\b(?:please|kindly|can you|could you|would you(?: please)?)\s+(?:(?:return|send back)\s+(?:the|a|your)\s+(?:signed|countersigned|completed)\s+(?:copy|form|contract|agreement|paperwork)\b|add\s+your\s+availability\b|make\s+(?:the|this|your)\s+(?:payment|deposit)\b(?!\s+(?:details|information|info|method|card|online|here|on|at|via))|(?:refund|credit)\s+(?:the|our|my)\s+(?:duplicate|double|extra|incorrect)\s+(?:charge|payment)\b|(?:grant|give)\s+(?:me|us|[a-z]+)\s+(?:\S+\s+){0,2}?access\b|reset\s+(?:my|our|the)\s+(?:password|login|2fa)\b|transfer\s+(?:the|our|my)\s+(?:domain|account|licen[sc]e)\b|(?:copy|cc|bcc)\s+me\b)/i;
+  const ACCOUNT_ASK_HE = /(?:^|\s)(?:בצע|בצעי|בצעו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?את\s+(?:ה)?(?:תשלום|מקדמה)|(?:^|\s)(?:תוסיף|תוסיפי|תוסיפו)\s+(?:בבקשה\s+)?את\s+(?:ה)?זמינות\s+שלך|(?:^|\s)(?:תעלה|תעלי|תעלו|תעביר|תעבירי|תעבירו|תאפס|תאפסי|תאפסו|תשים|תשימי|תשימו)\s+(?:לי\s+)?(?:בבקשה\s+)?(?:(?:את\s+)?(?:ה)?(?:טופס|מסמך|קובץ|דומיין|סיסמה|חשבון|רישיון)|אותי\s+בעותק)|(?:^|\s)(?:תן|תני|תנו)\s+לי\s+גישה/;
   // A short direct question that asks the reader for a named thing ("יש קישור לזום ?", "Do you have the invoice?"). Chat and
   // mail both carry these; the length floor used to drop them on every surface. The whole message has to be the question, so a
   // longer text, a bare "really?" and a greeting stay on the normal path.
-  const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
-  const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
+  const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|would it be possible to (?:get|have|send|share)\b|are you able to (?:send|share|forward|review|confirm|sign|approve|provide|upload|resend|check|take a look|get me)\b|is it possible to (?:get|have|send|share)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
+  const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון|לוגו|קובץ|מצגת|הקלטה|תמונות|טופס|חוזה|תיקייה)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
   function shortAskText(text) {
     const t = String(text || '').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').trim();
     if (t.length < 8 || t.length > 90) return false;
@@ -1497,7 +1503,7 @@ const FlowJudgment = (() => {
     // A clock in the text ("Tuesday at 3", "בשעה 16:00") belongs to the event and hold gates, which already decide it.
     const clockNamed = /\b(?:at|@)\s*\d{1,2}(?::\d{2})?\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b|בשעה\s*\d|(?:^|\s)ב-?\d{1,2}(?::\d{2})?(?:\s|$|[.,?!])/i.test(text);
     const slotAsk = !clockNamed && slotAskText(text);
-    const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE, STATUS_INTRO_ASK, STATUS_INTRO_ASK_HE], directedAsk);
+    const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE, STATUS_INTRO_ASK, STATUS_INTRO_ASK_HE, ACCOUNT_ASK, ACCOUNT_ASK_HE], directedAsk);
     const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk;
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
@@ -6060,7 +6066,7 @@ const FlowIntent = (() => {
   // list (e.g. "חשבונית מס" needs no fix because bare "חשבונית" already
   // matches regardless), so only the handful with no such fallback needed
   // this treatment.
-  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים)/;
+  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים|תיקייה|תיקיה|תיקיית|לוגו|תמונה|תמונות|צילומים|הקלטה|סרטון|קבוצה|ערוץ|כתובת|פרטי קשר|לוח (?:ה)?משימות)/;
 
   // A short English label for the write paths that still expect one (Google
   // Tasks title, Notion title, popup activity log) — kept alongside the full
@@ -6153,7 +6159,7 @@ const FlowIntent = (() => {
   // במידה ו / בהנחה ש / בכפוף ל are the conditionals judgment.js already
   // hedges, and they never reached this gate. כשיהיה לך and מתי שנוח are
   // "whenever you" / "when convenient".
-  const SOFT_ASK_HE = /(?:^|\s)אולי|במידה ו|בהנחה ש|בכפוף ל|כשיהיה לך|מתי שנוח/;
+  const SOFT_ASK_HE = /(?:^|\s)אולי|במידה ו|בהנחה ש|בכפוף ל|כשיהיה לך|מתי שנוח|אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|כשיתאפשר|בהזדמנות/;
   // "Can you agree to the proposal by Monday" is a handoff plus a date, so
   // the request gate would draft it as a follow-up close. Agreeing is the
   // decision the reader has not made. "Could you confirm the payment by
@@ -6868,6 +6874,10 @@ const FlowIntent = (() => {
   function classify(text, ctx) {
     ctx = ctx || {};
     text = FlowJudgment.newContent(text);
+    // «האם תוכל לשלוח...?» and «האם אפשר לקבל...?» are the polite ask, the same as «תוכל לשלוח...?» and «אפשר לקבל...?». Only these two
+    // openings: «האם אפשר לשלוח לך» asks whether the writer may send, and «האם שלחת» asks for a status.
+    // A note to oneself keeps its own reading («האם תוכל לתאם...» there is a task, not an ask of someone else).
+    if (!addressedToSelf(ctx) && !mailIsOwn(ctx)) text = String(text || '').replace(/(^|[.!?\n]\s*)(?:(?:היי|הי|שלום)[,!]?\s+)?האם\s+(?=(?:תוכל(?:י|ו)?\s|אפשר\s+לקבל\s|יש\s+(?:לך|לכם)\s))/g, '$1');
     // A quoted older ask is not a live close. Family H strips it before
     // any gate can draft or file it.
     if (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.stripQuotedAsks) {
@@ -10578,7 +10588,11 @@ const FlowSystemNotice = (() => {
     'amazon.com', 'amazonaws.com', 'aws.amazon.com', 'heroku.com', 'render.com', 'fly.io', 'digitalocean.com', 'atlassian.com',
     'zoom.us', 'dropbox.com', 'apple.com', 'stripe.com', 'paypal.com', 'meta.com', 'facebook.com', 'facebookmail.com',
     'slack.com', 'notion.so', 'figma.com', 'canva.com', 'mailchimp.com', 'hostinger.com', 'bluehost.com', 'monday.com',
-    'quickbooks.com', 'intuit.com', 'twilio.com', 'sendgrid.net', 'openai.com', 'anthropic.com'
+    'quickbooks.com', 'intuit.com', 'twilio.com', 'sendgrid.net', 'openai.com', 'anthropic.com',
+    // Israeli services an Israeli freelancer deals with (exact domain or a subdomain, never a lookalike): the state, the electric company, the
+    // big telecoms, the invoicing services and the two payment apps.
+    'gov.il', 'iec.co.il', 'bezeq.co.il', 'partner.co.il', 'cellcom.co.il', 'pelephone.co.il', 'hot.net.il',
+    'greeninvoice.co.il', 'morning.co', 'icount.co.il', 'paybox.co.il', 'bitpay.co.il'
   ];
 
   const MONTHS = {
@@ -10630,8 +10644,10 @@ const FlowSystemNotice = (() => {
     return null;
   }
 
+  const PROVIDER_NAMES = { 'gov.il': 'gov.il', 'iec.co.il': 'IEC', 'bezeq.co.il': 'Bezeq', 'hot.net.il': 'HOT', 'icount.co.il': 'iCount', 'greeninvoice.co.il': 'Green Invoice', 'morning.co': 'Morning' };
   function providerName(email, known) {
     const dom = known || domainOf(email);
+    if (PROVIDER_NAMES[dom]) return PROVIDER_NAMES[dom];
     const label = String(dom).split('.')[0] || '';
     return label ? label.charAt(0).toUpperCase() + label.slice(1) : '';
   }
@@ -10668,6 +10684,15 @@ const FlowSystemNotice = (() => {
     }
     const reHe = /\b(\d{1,2})\s+ב?(ינואר|פברואר|מרץ|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)(?:\s+(20\d{2}))?/g;
     while ((m = reHe.exec(t))) cands.push({ at: m.index, md: [MONTHS[m[2]], +m[1], m[3] ? +m[3] : null] });
+    // A numeric day.month in a Hebrew notice ("ב-5.11", "עד 15/11/2026"): day first, as it is written in Israel. Not in English text, where 5/11 is
+    // ambiguous, and not inside a longer number ("v5.11.2").
+    if (/[א-ת]/.test(t)) {
+      const reNum = /(?<![\d./\w])(\d{1,2})[./](\d{1,2})(?:[./](20\d{2}))?(?![\d\w]|[./]\d)/g;
+      while ((m = reNum.exec(t))) {
+        const d = +m[1]; const mo = +m[2];
+        if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) cands.push({ at: m.index, md: [mo, d, m[3] ? +m[3] : null] });
+      }
+    }
     const out = [];
     for (const c of cands) {
       let v = c.iso;
@@ -13396,11 +13421,12 @@ const FlowIncomingJudge = (() => {
     return out;
   }
 
-  function firstHit(api, body, now, kind) {
-    if (!api || typeof api.recognize !== 'function') return null;
+  function firstHit(api, body, now, kind, fn) {
+    const method = fn || 'recognize';
+    if (!api || typeof api[method] !== 'function') return null;
     const wins = windowsOf(body);
     for (let k = 0; k < wins.length; k++) {
-      const r = api.recognize(wins[k], now);
+      const r = api[method](wins[k], now);
       if (r && r.kind === kind) return r;
     }
     return null;
@@ -13443,10 +13469,11 @@ const FlowIncomingJudge = (() => {
   function paymentAsk(i, body) {
     const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
     const api = sibling(typeof FlowChatPaymentAsk !== 'undefined' ? FlowChatPaymentAsk : null, './chat-payment-ask.js', 'FlowChatPaymentAsk');
-    const pay = firstHit(api, body, now0, 'ask');
+    const pay = firstHit(api, body, now0, 'ask') || firstHit(api, body, now0, 'ask', 'recognizeBill');
     if (!pay) return null;
     const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-    const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
+    const what = pay.ref ? (pay.lang === 'he' ? 'חשבונית ' : 'invoice ') + pay.ref : pay.amount + ' ' + pay.currency;
+    const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + what + (who ? ' · ' + who : '')).slice(0, 120);
     return {
       intent: { type: 'request', label: title, confidence: 0.9, paymentAsk: true, personalClose: 'payment-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: pay.dateIso }, facts: { date: { iso: pay.dateIso } } },
       process: { id: 'log-it', name: 'Log It', closingLine: pay.lang === 'he' ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: pay.lang === 'he' ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, paymentAsk: true,
@@ -13488,7 +13515,7 @@ const FlowIncomingJudge = (() => {
     if (dlv) {
       const he = dlv.lang === 'he';
       const win = dlv.endHour != null ? ' ' + pad2(dlv.hour) + ':' + pad2(dlv.minute) + '–' + pad2(dlv.endHour) + ':' + pad2(dlv.endMinute) : '';
-      const title = ((he ? 'משלוח' : 'Delivery') + win + tail).slice(0, 120);
+      const title = ((he ? (dlv.visit ? 'ביקור' : 'משלוח') : (dlv.visit ? 'Visit' : 'Delivery')) + win + tail).slice(0, 120);
       return {
         intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'delivery', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: dlv.dateIso, hour: dlv.hour, minute: dlv.minute }, facts: { date: { iso: dlv.dateIso } } },
         process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,
