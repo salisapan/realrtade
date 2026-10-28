@@ -32,6 +32,11 @@ test('Outlook silent case renders no card and keeps a Why-not-shown reason', asy
     };
   }).toEqual({ chips: 0, reason: true });
 
+  const paneWhy = page.locator('#ReadingPaneContainerId .flow-why-not');
+  await expect(paneWhy).toHaveCount(1);
+  await expect(paneWhy).toHaveAttribute('data-glance-why', /.+/);
+  await expect(paneWhy).toHaveText('');
+
   const popup = await glance.openPopup();
   const setupWhy = popup.locator('#surface-list [data-glance-why-line]');
   await expect(setupWhy).toHaveCount(1);

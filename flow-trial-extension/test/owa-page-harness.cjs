@@ -42,6 +42,7 @@ async function runPage(opts) {
   const o = opts || {};
   const files = registeredFiles();
   let html = fs.readFileSync(path.join(__dirname, 'fixtures/owa-reading-pane-he.html'), 'utf8');
+  if (o.htmlOverride) html = o.htmlOverride;
   if (o.htmlPatch) html = o.htmlPatch(html);
   const url = o.url || ('https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(o.urlId || CONV));
   const dom = new JSDOM(html, { url, runScripts: 'outside-only', pretendToBeVisual: true });
@@ -121,6 +122,9 @@ async function runPage(opts) {
         if (typeof o.pathRestMisses === 'number' && o.pathRestMisses > 0) {
           o.pathRestMisses -= 1;
           return { ok: false, status: 404, body: '{}' };
+        }
+        if (/[\?&]\$select=[^&]*\bbody\b/i.test(u)) {
+          return { ok: true, status: 200, body: JSON.stringify(graphMsg) };
         }
         if (o.pathRestHit) {
           const asked = decodeURIComponent(directMsg[1]);
@@ -272,16 +276,33 @@ async function runPage(opts) {
   }
 
   {
-    // A message is open but none of the body anchors are on the page (Outlook changed its markup): the reason says so.
-    const strip = (h) => h.replace('role="document" aria-label="גוף ההודעה" class="XbIp4 allowTextSelection"', 'class="XbIp4"');
+    // A message is open but none of the body anchors are on the page (Outlook changed its markup): read from Graph.
+    const strip = (h) => h.replace(/<div role="document" aria-label="גוף ההודעה" class="XbIp4 allowTextSelection" tabindex="0">[\s\S]*?<\/div>/, '<div class="XbIp4" tabindex="0"></div>');
     const r = await runPage({ htmlPatch: strip, waitMs: 2500 });
+    check('an open message whose body anchor is gone still mounts from Graph', Boolean(r.chip), r.store.outlookPageDiag);
     const diag = (r.store.outlookPageDiag || []).find((d) => d.reason === 'page:pane-unreadable');
-    check('an open message whose body Glance cannot find: "page:pane-unreadable", with the anchors it saw', !r.chip && diag && diag.anchors && diag.anchors.main === 1, r.store.outlookPageDiag);
+    check('Graph fallback avoids page:pane-unreadable', !diag, r.store.outlookPageDiag);
   }
   {
     // The conversation is in the mailbox but the address carries a message id Graph spells with the other alphabet.
     const r = await runPage({ urlId: MSG.replace(/_/g, '/').replace(/-/g, '+'), store: { glanceDebug: true } });
     check('a message id in EWS spelling (+ and /) still matches the Graph id (- and _)', Boolean(r.chip) && r.logs.some((l) => /^Glance: matched/.test(l) && /message id/.test(l)), r.logs.filter((l) => /^Glance: matched/.test(l)));
+  }
+
+  console.log('\n--- live shape 2026-10: message-body testid without role=document ---\n');
+  {
+    const html = fs.readFileSync(path.join(__dirname, 'fixtures/owa-reading-pane-live-2026-10.html'), 'utf8');
+    const STATUS = 'אפשר לקבוע פגישת סטטוס ביום שישי 30/10 בשעה 10:00 לחצי שעה?';
+    const r = await runPage({
+      htmlOverride: html,
+      mailBody: STATUS,
+      listedSubject: 'סטטוס שישי',
+      store: { glanceDebug: true },
+      waitMs: 4000
+    });
+    const p = r.parsed || {};
+    check('live 2026-10 fixture: body parses the status-meeting ask', (p.text || '').indexOf('פגישת סטטוס') >= 0, p);
+    check('live 2026-10 fixture: sender name stays flow, not the subject', p.senderName === 'flow' && p.subject === 'סטטוס שישי', p);
   }
 
   console.log('\n--- live shape (0.9.15 live pass): the sender name is the heading inside the message, no address on the page ---\n');

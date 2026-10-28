@@ -39,6 +39,7 @@ jobs:
           node test/cc-only-recipients-corpus.cjs
           node test/glance-0956-corpus.cjs
           node test/outlook-calendar-corpus.cjs
+          node test/smoke227-meeting-ask-corpus.cjs
           node test/regress-144-corpus.cjs
           node test/negation-conditional-corpus.cjs
           node test/self-title-preposition-corpus.cjs

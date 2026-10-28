@@ -126,7 +126,8 @@ test('the why line is one line for the current mail and hides when a card shows'
   });
   const why = silent.locator('#ReadingPaneContainerId .flow-why-not');
   await expect(why).toHaveCount(1);
-  await expect(why).toContainText('לא זוהתה בקשה');
+  await expect(why).toHaveAttribute('data-glance-why', /.+/);
+  await expect(why).toHaveText('');
   const show = await glance.openOutlook({
     id: S.MSG_SHOW,
     subject: 'Transfer',
