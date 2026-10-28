@@ -68,6 +68,11 @@ check('Mon (+2) Wed name with 5/11 has no iso', iso('פגישה ביום רבי�
 // No clock: Hebrew Thu + 5/11 on Monday is still 5 November (not next-Thursday 29/10).
 check('Mon (+2) Thu 5/11 with no clock is 5 November', iso('ביום חמישי 5/11', '2026-10-26T09:00:00+02:00') === '2026-11-05');
 
+// Pins #241 heDayFirst: Hebrew letter within ±48 of the slash plus meeting context,
+// without a weekday name beside the date (would fail if day-first required hebrewWeekdayNear only).
+check('Hebrew within ±48 of 01/11 with meeting word is 1 November',
+  iso('פגישה 01/11 בשעה 11:00', '2026-10-25T11:00:00+02:00') === '2026-11-01');
+
 // English / mixed: US M/D must survive (kills always-day-first mutant).
 check('English US Fri 12/4 is 4 December', iso('Call on Friday 12/4 at 10:00', '2026-12-01T12:00:00Z') === '2026-12-04');
 check('mixed subject keeps US 12/4', iso('Re: הצעה – Call on Friday 12/4 at 10:00', '2026-12-01T12:00:00Z') === '2026-12-04');

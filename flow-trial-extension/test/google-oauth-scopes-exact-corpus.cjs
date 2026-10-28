@@ -60,6 +60,10 @@ function run() {
   check('manifest excludes gmail.compose and drive.readonly',
     manifestScopes.indexOf('https://www.googleapis.com/auth/gmail.compose') === -1
     && manifestScopes.indexOf('https://www.googleapis.com/auth/drive.readonly') === -1);
+  check('manifest excludes forms.body (No-CASA; base 9040a311 is not #241)',
+    !manifestScopes.includes('https://www.googleapis.com/auth/forms.body'));
+  check('manifest excludes forms.googleapis.com host',
+    !(manifest.host_permissions || []).some((h) => String(h).indexOf('forms.googleapis.com') >= 0));
 
   if (failures) {
     console.log('\n' + failures + ' failure(s)');
