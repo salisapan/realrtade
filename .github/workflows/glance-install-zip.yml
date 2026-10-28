@@ -14,3 +14,5 @@ jobs:
           node-version: "20"
       - name: Package the extension and serve it through the download function
         run: python3 scripts/verify_trial_install.py
+      - name: Scope allowlist (fails on forms.body, gmail.modify or any scope off the final list)
+        run: node flow-trial-extension/test/scope-allowlist-corpus.cjs

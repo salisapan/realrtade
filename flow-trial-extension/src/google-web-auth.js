@@ -33,7 +33,6 @@ export const GOOGLE_OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/gmail.compose',
   'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/drive.file',
-  'https://www.googleapis.com/auth/forms.body',
   'openid',
   'https://www.googleapis.com/auth/userinfo.profile'
 ];

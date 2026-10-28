@@ -119,7 +119,8 @@ function fs_(p) { return require('fs').readFileSync(p, 'utf8'); }
   const r7 = await W.write(Object.assign({}, input, { flags: {} }), server().http);
   check('switch off: nothing is created', r7.ok === false && r7.reason === 'switch-off', r7);
 
-  // Own switch (owner approval 2026-10-24): WORKSPACE_FILE alone never creates or offers a form, and a doc is unaffected.
+  // Own switch, off by default: WORKSPACE_FILE alone never creates or offers a form, and a doc is unaffected.
+  // The Forms scope is not on the final scope list (CTO ruling 2026-10-28), so no scope list asks for it.
   const only = { [W.SWITCH]: true };
   const r8 = await W.write(Object.assign({}, input, { flags: only }), server().http);
   check('GOOGLE_FORMS off: no form is created', r8.ok === false && r8.reason === 'switch-off', r8);
@@ -129,10 +130,30 @@ function fs_(p) { return require('fs').readFileSync(p, 'utf8'); }
   check('GOOGLE_FORMS off: a doc is still offered', p9.action === 'offer' && p9.fileKind === 'doc', p9);
   const p10 = W.plan({ flags, text: 'Can you create a feedback form for the Q4 launch?' });
   check('GOOGLE_FORMS on: the form card is offered', p10.action === 'offer' && p10.fileKind === 'form', p10);
+
+  // Flag off (default): zero Forms calls, zero calls of any kind, for every way the switch can be off.
+  const offFlagSets = [undefined, {}, { [W.SWITCH]: true }, { [W.SWITCH]: true, [W.FORMS_SWITCH]: false },
+    { [W.SWITCH]: true, [W.FORMS_SWITCH]: 'true' }, { [W.SWITCH]: true, [W.FORMS_SWITCH]: 1 }, { [W.FORMS_SWITCH]: true }];
+  for (let k = 0; k < offFlagSets.length; k++) {
+    const so = server();
+    const ro = await W.write(Object.assign({}, input, { flags: offFlagSets[k] }), so.http);
+    const formCalls = so.calls.filter((c) => /forms\.googleapis\.com/.test(typeof c === 'string' ? c : JSON.stringify(c)));
+    check('flag off #' + k + ': nothing created and zero Forms calls', ro.ok === false && ro.reason === 'switch-off' && formCalls.length === 0 && so.calls.length === 0 && Object.keys(so.forms).length === 0, { ro: ro, calls: so.calls });
+    const po = W.plan({ flags: offFlagSets[k], text: 'Can you create a feedback form for the Q4 launch?' });
+    check('flag off #' + k + ': no form card is offered', po.action !== 'offer', po);
+  }
+  const { FlowLabsSwitches: Labs } = require(path.join(__dirname, '..', 'core', 'labs-switches.js'));
+  check('GOOGLE_FORMS is a Labs switch and is never on by default', Labs.IDS.indexOf('GOOGLE_FORMS') >= 0 && Labs.isOn({}, 'GOOGLE_FORMS') === false && Labs.isOn(undefined, 'GOOGLE_FORMS') === false && W.formsEnabled(undefined) === false && W.formsEnabled({}) === false);
+
+  // No Forms scope anywhere the code or the manifest asks for scopes, and no Forms host.
   const man = JSON.parse(fs_(path.join(__dirname, '..', 'manifest.json')));
-  check('manifest asks forms.body and the Forms host, nothing broader', man.oauth2.scopes.includes('https://www.googleapis.com/auth/forms.body') && man.host_permissions.includes('https://forms.googleapis.com/*') && !man.oauth2.scopes.some((x) => /\/auth\/forms$/.test(x)));
+  const FORMS_RE = /forms\.body|googleapis\.com\/auth\/forms|forms\.googleapis\.com/;
+  check('manifest asks no Forms scope and no Forms host', !man.oauth2.scopes.some((x) => FORMS_RE.test(x)) && !man.host_permissions.some((x) => FORMS_RE.test(x)) && !JSON.stringify(man).match(FORMS_RE), man.oauth2.scopes);
   const { FlowGoogleConfig: Cfg } = require(path.join(__dirname, '..', 'core', 'google-config.js'));
-  check('the lane allowlist accepts forms.body', Cfg.assertAllowed(['https://www.googleapis.com/auth/forms.body']).ok === true);
+  check('the lane scope list asks no Forms scope', !Cfg.SCOPES.some((x) => FORMS_RE.test(x)), Cfg.SCOPES);
+  check('the lane allowlist refuses forms.body', Cfg.assertAllowed(['https://www.googleapis.com/auth/forms.body']).ok === false);
+  const wa = fs_(path.join(__dirname, '..', 'src', 'google-web-auth.js'));
+  check('the web-auth scope list asks no Forms scope', !/GOOGLE_OAUTH_SCOPES\s*=\s*\[[^\]]*forms/.test(wa) && !/auth\/forms/.test(wa));
 
   // Wiring the page and the lane already carry.
   const fs = require('fs');

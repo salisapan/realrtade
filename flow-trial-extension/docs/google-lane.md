@@ -10,7 +10,7 @@ Chrome loads `manifest.json`. That file is the only manifest. `options_ui` opens
 
 - The store id the lane expects is `lbihckfmoffgjjlnneoeaehbhoonfenh`.
 - `oauth2.client_id` is `93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com`.
-- Scopes are `openid`, `email`, `profile`, `drive.file`, `calendar.events`, `tasks`, `gmail.compose` (reply drafts only, never send), `drive.readonly` and `forms.body` (owner approval 2026-10-24: creates one empty Google Form from a named request, behind the Labs switch `GOOGLE_FORMS`, off; Glance writes no questions and sends nothing; Google's verification of the scope is the owner's step). There is no contacts scope. Docs and Sheets run on a file Glance created or the person picked, and there is no documents or spreadsheets scope.
+- Scopes are `openid`, `email`, `profile`, `drive.file`, `calendar.events`, `tasks`, `gmail.compose` (reply drafts only, never send) and `drive.readonly`. There is no contacts scope. Docs and Sheets run on a file Glance created or the person picked, and there is no documents or spreadsheets scope.
 - `src/google-lane-sw.js` imports `src/background.js` and then the lane. Chrome's service worker entry is `src/background.js`. That worker imports `src/google-lane-host.js` once so the cards can reach the lane. The corpus loader drops that import before it evaluates the worker as a classic script.
 - With a reply open, compose is filled in the Gmail page DOM; the person edits it and presses Send. With no reply open, the draft is created in the thread through the Gmail drafts API (`core/google-drafts.js`), read back by its id, and Undo deletes it. Glance never sends. Glance does not refill the window after the person types, and it does not watch the DOM to put its text back.
 
