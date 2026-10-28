@@ -64,7 +64,7 @@
       <description>Automating customs documentation and denied-party screening touches supply-chain security programs with their own audit expectations — a framework for doing it defensibly.</description>
     </item>
     <item>
-      <title>Inside a Fully Local AI Deployment: The Technical Architecture Behind On-Premises Inference</title>
+      <title>Inside an On-Premises or Edge AI Deployment: The Technical Architecture Behind In-House Inference</title>
       <link>https://theflow-ai.com/blog/edge-ai-inference-architecture-technical.html</link>
       <guid isPermaLink="true">https://theflow-ai.com/blog/edge-ai-inference-architecture-technical.html</guid>
       <category>AI Infrastructure</category>
@@ -77,7 +77,7 @@
       <guid isPermaLink="true">https://theflow-ai.com/blog/edge-vs-cloud-ai-architecture.html</guid>
       <category>Architecture &amp; Security</category>
       <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
-      <description>A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.</description>
+      <description>A standards-based framework for choosing between masked-cloud and on-premises or edge AI deployment based on the actual threat model of a workload.</description>
     </item>
     <item>
       <title>Technology-Assisted Review Meets Generative AI: Defensibility in e-Discovery Automation</title>

@@ -173,7 +173,6 @@ footer.site a{color:var(--muted)}
         <a href="/security.html" data-nav="security">Security</a>
         <a href="/contact.html" data-nav="contact">Contact</a>
       </div>
-      <a class="doit sm nav-get" href="/trial.html" data-ga="nav_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-nav="cta">Get Glance</span></a>
       <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
         <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
       </button>
@@ -188,7 +187,7 @@ footer.site a{color:var(--muted)}
 </header>
 <div class="mobile-nav" id="mobileNav" hidden>
   <a href="/">Home</a><a href="/#how">Product</a><a href="/solutions/">Solutions</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a>
-  <div class="mobile-nav-legal"><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+  <div class="mobile-nav-legal"><a href="/trial.html">Glance</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
 </div>
 <main id="main">
   <div class="wrap">
@@ -265,8 +264,8 @@ footer.site a{color:var(--muted)}
 
 <div class="contact-alt">
   <p><b>Just you, not an organisation?</b><a href="/trial.html" data-ga="contact_trial">Get Glance &mdash; free</a> &mdash; a separate product for everyday email, not intended for sensitive or regulated data.</p>
-  <p><b>Privacy &amp; data requests</b><a href="mailto:hello@theflow-ai.com?subject=Privacy%20request">hello@theflow-ai.com</a> &mdash; access, correction, export or deletion. See the <a href="/privacy.html">Privacy Policy</a>.</p>
-  <p><b>Partnerships &amp; press</b><a href="mailto:hello@theflow-ai.com?subject=Partnership">hello@theflow-ai.com</a> &mdash; integrations, resellers, and media enquiries.</p>
+  <p><b>Privacy &amp; data requests</b><a href="mailto:info@theflow-ai.com?subject=Privacy%20request">info@theflow-ai.com</a> &mdash; access, correction, export or deletion. See the <a href="/privacy.html">Privacy Policy</a>.</p>
+  <p><b>Partnerships &amp; press</b><a href="mailto:info@theflow-ai.com?subject=Partnership">info@theflow-ai.com</a> &mdash; integrations, resellers, and media enquiries.</p>
 </div>
     </article>
   </div>
@@ -373,9 +372,9 @@ footer.site a{color:var(--muted)}
       }
       // Never strand the enquiry: if the endpoint is unreachable or refuses,
       // the visitor still gets a working way to reach a human.
-      say((data && data.error) || 'Something went wrong. Please email hello@theflow-ai.com and we will pick it up there.', 'err');
+      say((data && data.error) || 'Something went wrong. Please email info@theflow-ai.com and we will pick it up there.', 'err');
     } catch (err) {
-      say('We could not reach the server. Please email hello@theflow-ai.com and we will pick it up there.', 'err');
+      say('We could not reach the server. Please email info@theflow-ai.com and we will pick it up there.', 'err');
     }
     btn.disabled = false;
     btnLabel.textContent = original;
