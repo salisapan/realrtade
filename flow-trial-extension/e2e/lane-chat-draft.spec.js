@@ -134,23 +134,9 @@ test('an open Business Suite thread drafts the existing last row and sends nothi
   expect(registered).toBe(true);
 
   await glance.seedOutlook();
-  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: '2026-10-08T10:00:00.000Z' });
-  await glance.context.addInitScript(() => {
-    window.__glanceSendClicks = 0;
-    document.addEventListener('click', (ev) => {
-      const label = ev.target && ev.target.getAttribute && (ev.target.getAttribute('aria-label') || '');
-      if (/^send$/i.test(String(label || ''))) window.__glanceSendClicks += 1;
-    }, true);
-  });
-  const page = await glance.context.newPage();
-  await freezeDate(page, FIXTURE_NOW);
-  await page.goto('https://business.facebook.com/latest/inbox/all/?selected_item_id=bs-existing', { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.evaluate((html) => {
-    document.open();
-    document.write(html);
-    document.close();
-  }, SUITE_HTML);
-  glance.page = page;
+  // Fixture rows use 2026-10-27 (fresh on CI). "שבוע שעבר" is lastWeek(message time), not the dev fixture clock.
+  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: '2026-10-21T10:00:00.000Z' });
+  const page = await glance.openBusiness(SUITE_HTML);
   const before = await page.locator('[role="row"]').count();
   const box = page.locator('[data-glance-composer="1"]');
   await expect(box).toContainText('דיזנגוף', { timeout: 15000 });
