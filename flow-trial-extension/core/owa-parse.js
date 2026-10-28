@@ -554,9 +554,14 @@ const FlowOwaParse = (() => {
       '[aria-label="גוף ההודעה"]',
       '#ReadingPaneContainerId [aria-label="גוף ההודעה"]',
       '#ReadingPaneContainerId [class*="MessageBody"]',
+      '#ReadingPaneContainerId [data-testid="message-body"]',
+      '[role="main"] [data-testid="message-body"]',
+      '[role="main"] [data-testid="MessageBody"]',
       '[role="main"] .ReadingPaneContents',
       'div[aria-label="Message body"]',
-      '[data-testid="message-body"]'
+      '[data-testid="message-body"]',
+      '#ReadingPaneContainerId [class*="RtfEditor"]',
+      '[role="main"] [class*="RtfEditor"]'
     ];
     const out = [];
     sels.forEach((sel) => {
@@ -598,8 +603,18 @@ const FlowOwaParse = (() => {
     const list = (roots || []).filter(Boolean);
     const isSubject = (n) => /^CONV_.*_SUBJECT$/.test(n.id || '') ||
       Boolean(n.querySelector && n.querySelector('[id^="CONV_"][id$="_SUBJECT"]'));
-    const isBody = (n) => (n.getAttribute && n.getAttribute('role') === 'document') ||
-      Boolean(n.querySelector && n.querySelector('[role="document"]'));
+    function looksLikeBodyShell(n) {
+      if (!n || !n.getAttribute) return false;
+      if (n.getAttribute('role') === 'document') return true;
+      if (n.querySelector && n.querySelector('[role="document"]')) return true;
+      const cls = String(n.getAttribute('class') || '');
+      if (/allowTextSelection|UniqueMessageBody|RtfEditor/i.test(cls)) return true;
+      const tid = String(n.getAttribute('data-testid') || '');
+      if (/^message-body$/i.test(tid) || tid === 'MessageBody') return true;
+      if (String(n.getAttribute('data-app-section') || '') === 'MessageBody') return true;
+      return false;
+    }
+    const isBody = looksLikeBodyShell;
     let pool = list.filter((n) => isBody(n) && !isSubject(n));
     if (!pool.length) pool = list.filter((n) => !isSubject(n));
     if (!pool.length) return list.find((n) => n.id === 'ReadingPaneContainerId') || null;

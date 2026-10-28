@@ -1230,7 +1230,11 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
     ['EN explicit schedule-a-call ask', 'Can you schedule a call Friday, September 18 at 3pm?'],
     ['EN could-you-meet ask', 'Could you meet Friday, September 18 at 3pm to review the contract?'],
     ['EN can-we-meet ask', 'Can we meet Friday, September 18 at 10:00am?'],
-    ['HE please-set-a-meeting ask', 'בבקשה תקבע פגישה ביום שישי בשעה 15:00.']
+    ['HE please-set-a-meeting ask', 'בבקשה תקבע פגישה ביום שישי בשעה 15:00.'],
+    ['HE אפשר לקבוע פגישה', 'אפשר לקבוע פגישה ביום שישי 30/10 בשעה 10:00'],
+    ['HE אפשר לתאם שיחה', 'אפשר לתאם שיחה ביום שישי 30/10 בשעה 10:00'],
+    ['HE נוכל להיפגש', 'נוכל להיפגש ביום שישי 30/10 בשעה 10:00?'],
+    ['HE אפשר לקבוע פגישת (construct)', 'אפשר לקבוע פגישת סטטוס ביום שישי 30/10 בשעה 10:00 לחצי שעה?']
   ];
   for (const [label, text] of holds) {
     const { intent, process } = planOf(text);
