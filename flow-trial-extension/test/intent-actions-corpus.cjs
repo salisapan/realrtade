@@ -275,6 +275,12 @@ console.log('--- intent.js: type + entity checks ---\n');
     enAfternoon && enAfternoon.type === FlowIntent.TYPES.SCHEDULED_EVENT && enAfternoon.entities.hour === 15 && enAfternoon.entities.dateIso === '2026-09-21',
     enAfternoon && enAfternoon.entities);
 
+  console.log('--- intent.js: Gate gap D5 (find us N minutes) ---\n');
+  const findUs = classify('Can you find us 30 minutes next week to go over the quote?', { now });
+  check('find us 30 minutes stays quiet (rehearsal D5)', !findUs || findUs.type === null, findUs && findUs.type);
+  const findTime = classify('Can you find 20 minutes next week to go over the quote?', { now });
+  check('find 20 minutes (not "find us") is still a request', findTime && findTime.type === FlowIntent.TYPES.REQUEST, findTime && findTime.type);
+
   const pitch = classify('Hope this email finds you well. Can we schedule a call tomorrow at 3pm? Our pricing starts at $99/mo.', { now });
   check('a cold pitch that says "tomorrow" stays silent',
     !pitch || pitch.type === null, pitch && pitch.type);

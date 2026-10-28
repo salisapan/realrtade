@@ -8,6 +8,12 @@ const { gmailHtml, outlookHtml, outlookUrl, gmailUrl } = require('./fixtures');
 const EXT_ROOT = path.resolve(__dirname, '../..');
 const SKIP_DIRS = new Set(['node_modules', 'e2e', 'e2e-report', 'test-results', 'playwright-report', 'test']);
 
+function manifestGoogleGrantedVersion() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(EXT_ROOT, 'manifest.json'), 'utf8'));
+  const scopes = (manifest.oauth2 && manifest.oauth2.scopes) || [];
+  return scopes.slice().sort().join('\n');
+}
+
 function copyExtension(opts) {
   const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-ext-'));
   fs.cpSync(EXT_ROOT, dest, {
@@ -109,7 +115,7 @@ function installE2EHooks() {
   e2e.authFail = false;
   e2e.scenario = e2e.scenario || { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
   e2e.googleTasks = e2e.googleTasks || {};
-  e2e.tokenAccounts = e2e.tokenAccounts || {};
+  e2e.tokenAccounts = e2e.tokenAccounts || { 'ya29.e2e': 'me@x.com' };
   e2e.todoTasks = e2e.todoTasks || {};
   e2e.outlookEvents = e2e.outlookEvents || {};
   e2e.drafts = e2e.drafts || {};
@@ -149,10 +155,24 @@ function installE2EHooks() {
     const scenario = e2e.scenario || {};
 
     if (host === 'login.microsoftonline.com') return Promise.resolve(json(400, { error: 'e2e-no-login' }));
-    if (host === 'gmail.googleapis.com' && /\/users\/me\/profile$/.test(path)) {
-      const auth = String((init && init.headers && (init.headers.Authorization || init.headers.authorization)) || '');
+    function googleAccountEmailFromAuth(initBag) {
+      const auth = String((initBag && initBag.headers && (initBag.headers.Authorization || initBag.headers.authorization)) || '');
       const token = auth.replace(/^Bearer\s+/i, '');
-      const email = (e2e.tokenAccounts || {})[token] || 'ai.local.flow@gmail.com';
+      return (e2e.tokenAccounts || {})[token] || 'me@x.com';
+    }
+    function googleUserinfoBody(initBag) {
+      const email = googleAccountEmailFromAuth(initBag);
+      return {
+        email: email,
+        emailAddress: email,
+        name: 'Glance E2E',
+        given_name: 'Glance',
+        family_name: 'E2E',
+        verified_email: true
+      };
+    }
+    if (host === 'gmail.googleapis.com' && /\/users\/me\/profile$/.test(path)) {
+      const email = googleAccountEmailFromAuth(init);
       return Promise.resolve(json(200, { emailAddress: email, messagesTotal: 1, threadsTotal: 1, historyId: '1' }));
     }
     if (host === 'theflow-ai.com' || host === 'gmail.googleapis.com' || host === 'oauth2.googleapis.com') {
@@ -168,6 +188,9 @@ function installE2EHooks() {
         return Promise.resolve(json(200, {
           items: [{ id: 'e2e-gcal-1', status: 'confirmed', location: loc, start: { dateTime: when } }]
         }));
+      }
+      if (/\/oauth2\/(v2|v3)\/userinfo/.test(path)) {
+        return Promise.resolve(json(200, googleUserinfoBody(init)));
       }
       if (path.indexOf('/oauth2/') >= 0 || path.indexOf('/drive/') >= 0) {
         return Promise.resolve(json(200, { files: [], items: [] }));
@@ -873,17 +896,12 @@ async function boot() {
       // Headless Chrome has no browser sign-in. The lane asks identity first,
       // then this stored Connect token. Production never reads an e2e hook for it.
       googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
+      googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' },
       googleGrantedScopes: {
-        version: [
-          'https://www.googleapis.com/auth/calendar.events',
-          'https://www.googleapis.com/auth/drive.file',
-          'https://www.googleapis.com/auth/drive.readonly',
-          'https://www.googleapis.com/auth/forms.body',
-          'https://www.googleapis.com/auth/gmail.compose',
-          'https://www.googleapis.com/auth/tasks',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'openid'
-        ].slice().sort().join('\n'),
+        // Headless lane exercises mailbox Drive search and Gmail drafts; production OAuth never requests these.
+        version: manifestGoogleGrantedVersion()
+          + '\nhttps://www.googleapis.com/auth/drive.readonly'
+          + '\nhttps://www.googleapis.com/auth/gmail.compose',
         status: 'granted',
         source: 'chrome',
         at: Date.now()

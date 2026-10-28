@@ -19,7 +19,16 @@ const LADDER_IMPORT = /^import \{ LADDER \} from '\.\.\/config\/ladder\.public\.
 const CARRY_IMPORT = /^import \{ CARRY \} from '\.\.\/config\/carry\.public\.js';\r?\n/m;
 const CONNECTORS_IMPORT = /^import \{ CONNECTORS \} from '\.\.\/config\/connectors\.public\.js';\r?\n/m;
 const LANE_HOST_IMPORT = /^import '\.\/google-lane-host\.js';\r?\n/m;
-const CLASSIC_IMPORT = /^import '((?:\.\.\/core|\.\.\/lane-chat|\.)\/[\w-]+\.js)';[^\n]*\r?\n/gm;
+const CLASSIC_IMPORT = /^import '((?:\.\.\/core|\.\.\/lane-chat|\.\.\/src|\.)\/[\w-]+\.js)';[^\n]*\r?\n/gm;
+const ECOSYSTEM_SW_IMPORT = /^import \{ connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras(?:, requestMicrosoftOptionalScopes)? \} from '\.\/connect-ecosystem-sw\.js';\r?\n/m;
+
+function stripEsmExports(source) {
+  return source
+    .replace(/^import\s+[^;]+;\s*/gm, '')
+    .replace(/^export\s+async\s+function\s+/gm, 'async function ')
+    .replace(/^export\s+\{[^}]+\};?\s*$/gm, '')
+    .replace(/^export\s+/gm, '');
+}
 const HYBRID_IMPORTS = /^import \{ HYBRID \} from '\.\.\/config\/hybrid\.public\.js';\r?\nimport '\.\/hybrid-sw\.js';[^\n]*\r?\n/m;
 
 function backgroundScript() {
@@ -34,7 +43,15 @@ function backgroundScript() {
   // Classic scripts imported for their side effect (they set a global): inline them, with their CommonJS export line
   // turned into the same global assignment they make in the service worker.
   const classic = [];
-  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '').replace(LANE_HOST_IMPORT, '').replace(CONNECTORS_IMPORT, '').replace(CARRY_IMPORT, '');
+  let ecoSw = stripEsmExports(fs.readFileSync(path.join(root, 'src', 'connect-ecosystem-sw.js'), 'utf8'));
+  ecoSw = ecoSw
+    .replace(/\bconst OUTLOOK_AUTH_KEY\b/g, 'const ECO_SW_OUTLOOK_AUTH_KEY')
+    .replace(/\bconst OUTLOOK_STATE_KEY\b/g, 'const ECO_SW_OUTLOOK_STATE_KEY')
+    .replace(/\bconst OUTLOOK_PENDING_KEY\b/g, 'const ECO_SW_OUTLOOK_PENDING_KEY')
+    .replace(/\bOUTLOOK_AUTH_KEY\b/g, 'ECO_SW_OUTLOOK_AUTH_KEY')
+    .replace(/\bOUTLOOK_STATE_KEY\b/g, 'ECO_SW_OUTLOOK_STATE_KEY')
+    .replace(/\bOUTLOOK_PENDING_KEY\b/g, 'ECO_SW_OUTLOOK_PENDING_KEY');
+  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '').replace(LANE_HOST_IMPORT, '').replace(CONNECTORS_IMPORT, '').replace(CARRY_IMPORT, '').replace(ECOSYSTEM_SW_IMPORT, '');
   bg = bg.replace(CLASSIC_IMPORT, (line, rel) => {
     const file = path.join(root, 'src', rel);
     const src = fs.readFileSync(file, 'utf8');
@@ -47,7 +64,7 @@ function backgroundScript() {
   }
   // hybrid-sw.js is a classic script that sets globalThis.FlowHybridSW when it is not run under Node's module system.
   return oauth + '\n' + webAuth + '\n' + hybridCfg + '\n' + ladderCfg + '\n' + carryCfg + '\n' + connectorsCfg + '\n' + hybridSw.replace(/^if \(typeof module[\s\S]*$/m, 'globalThis.FlowHybridSW = FlowHybridSW;\n') + '\n' +
-    classic.map((c) => '{\n' + c + '\n}').join('\n') + '\n' + bg;
+    classic.map((c) => '{\n' + c + '\n}').join('\n') + '\n' + ecoSw + '\n' + bg;
 }
 
 // The lane host (src/google-lane-host.js) owns the one lookup-then-create of
@@ -64,4 +81,6 @@ const LANE_ACCOUNT_STUB = `globalThis.FlowGoogleLaneAccount = { read: async () =
   return made.ok ? (await made.json()).id : '';
 } };`;
 
-module.exports = { backgroundScript, LANE_ACCOUNT_STUB };
+const GOOGLE_CONFIG_SRC = fs.readFileSync(path.join(__dirname, '..', 'core', 'google-config.js'), 'utf8');
+
+module.exports = { backgroundScript, LANE_ACCOUNT_STUB, GOOGLE_CONFIG_SRC };

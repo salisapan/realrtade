@@ -123,6 +123,7 @@
         "core/draft-reply.js",
         "core/google-config.js",
         "core/google-compose.js",
+        "core/google-contacts.js",
         "src/google-compose-page.js",
         "src/chip-peek.js",
         "src/content-gmail.js"
@@ -173,21 +174,20 @@
     "https://www.googleapis.com/oauth2/*",
     "https://www.googleapis.com/upload/drive/*",
     "https://gmail.googleapis.com/*",
-    "https://forms.googleapis.com/*",
+    "https://people.googleapis.com/*",
     "https://*.googleusercontent.com/*",
     "https://theflow-ai.com/*"
   ],
   "oauth2": {
     "client_id": "93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/tasks",
       "https://www.googleapis.com/auth/calendar.events",
-      "https://www.googleapis.com/auth/gmail.compose",
-      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/tasks",
+      "https://www.googleapis.com/auth/contacts.readonly",
       "https://www.googleapis.com/auth/drive.file",
-      "https://www.googleapis.com/auth/forms.body",
       "openid",
-      "https://www.googleapis.com/auth/userinfo.profile"
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/userinfo.email"
     ]
   },
   "web_accessible_resources": [
@@ -215,6 +215,7 @@
     "https://web.telegram.org/*",
     "https://graph.microsoft.com/*",
     "https://login.microsoftonline.com/*",
+    "https://teams.microsoft.com/*",
     "http://127.0.0.1/*",
     "http://localhost/*",
     "https://outlook.live.com/*",

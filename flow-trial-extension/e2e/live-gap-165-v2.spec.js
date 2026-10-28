@@ -316,7 +316,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('a recorded account but the profile cannot be read: nothing is written, Hebrew UI', async ({ glance }) => {
     await glance.seedGmail({ glanceUiLanguage: 'he', googleConnectedAccount: { email: SELF, at: Date.now(), source: 'web' } });
-    server.failGet('/gmail/v1/users/me/profile');
+    server.failGet('/oauth2/v3/userinfo');
     const page = await glance.openGmail(opts('v-unread-he', 'he'));
     await click(page);
     await refused(page, glance, 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש', 'חבר מחדש את Google');
@@ -327,7 +327,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('profile unreadable with no record at all, English UI', async ({ glance }) => {
     await glance.seedGmail({});
-    server.failGet('/gmail/v1/users/me/profile');
+    server.failGet('/oauth2/v3/userinfo');
     const page = await glance.openGmail(opts('v-unread-en', 'en'));
     await click(page);
     await refused(page, glance, "Couldn't verify the account — reconnect Google", 'Reconnect Google');
@@ -354,6 +354,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('no record yet but the tab account matches the token: the write goes out and the match is recorded', async ({ glance }) => {
     await glance.seedGmail({});
+    await glance.evaluateWorker(() => chrome.storage.local.remove('googleConnectedAccount'));
     const page = await glance.openGmail(opts('v-match-adopt', 'en'));
     await click(page);
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 25000 });
@@ -361,9 +362,19 @@ test.describe('3b. no write without a positive match of the token account', () =
     await expect.poll(async () => { const s = await glance.storage(); return s.googleConnectedAccount && s.googleConnectedAccount.email; }).toBe(SELF);
   });
 
+  test('Handled banner never appears when account verification fails', async ({ glance }) => {
+    await glance.seedGmail({});
+    server.failGet('/oauth2/v3/userinfo');
+    const page = await glance.openGmail(opts('v-no-handled', 'en'));
+    await click(page);
+    await expect(main(page)).not.toContainText(/Handled/i, { timeout: 25000 });
+    await expect(page.locator('div[role="main"] .flow-chip-handled')).toHaveCount(0);
+    expect(posts()).toHaveLength(0);
+  });
+
   test('the Reconnect button asks Google for the tab account (login_hint, interactive) and writes nothing', async ({ glance }) => {
     await glance.seedGmail({});
-    server.failGet('/gmail/v1/users/me/profile');
+    server.failGet('/oauth2/v3/userinfo');
     await glance.evaluateWorker(() => { globalThis.__glanceE2e.flows = []; });
     const page = await glance.openGmail(opts('v-btn-flow', 'en'));
     await click(page);

@@ -57,7 +57,6 @@ test('E2 "תוציאי חשבונית מס" in the same sitting: no card, no wri
 });
 
 test('E3 Gate: the contract mail has one offer, and nothing calls a draft plus a task closed', async ({ glance }) => {
-  test.fail(true, 'Today the same mail shows the resolution card AND the Reply & Track chip (src/content-gmail.js file-ask branch does not step aside for FlowResolution.owns). The chip Do It writes a draft and a task and says "Handled … Closed — set a reminder", while the card says done only when the file is sent.');
   const page = await open(glance, 'one', ASK, [CONTRACT]);
   await expect(page.locator(CARD)).toContainText('הסכם.pdf', { timeout: 20000 });
   await page.waitForTimeout(2000);

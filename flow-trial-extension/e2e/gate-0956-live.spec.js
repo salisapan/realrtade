@@ -96,6 +96,7 @@ test('a hold card shows the time in the card text, and a dateless hold is not a 
     body: HOLD_BODY
   });
   const title = page.locator('#ReadingPaneContainerId .gs-intent, #ReadingPaneContainerId .flow-chip-process-name').first();
+  await expect(title).toBeVisible({ timeout: 20000 });
   await expect(title).toHaveText(hold.title);
   const when = page.locator('#ReadingPaneContainerId [data-glance-when]');
   await expect(when).toBeVisible();
