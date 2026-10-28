@@ -5,8 +5,48 @@
     <link>https://theflow-ai.com/blog/</link>
     <description>Research on regulated AI deployment — compliance, architecture, and efficiency across law, healthcare, finance, insurance, government, and technical AI infrastructure.</description>
     <language>en-us</language>
-    <lastBuildDate>Mon, 31 Aug 2026 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Wed, 28 Oct 2026 00:00:00 +0000</lastBuildDate>
     <atom:link href="https://theflow-ai.com/blog/rss.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>AI Automation for Healthcare: PHI, Approval Gates, and Where Processing Runs</title>
+      <link>https://theflow-ai.com/blog/healthcare.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/healthcare.html</guid>
+      <category>Healthcare</category>
+      <pubDate>Wed, 28 Oct 2026 00:00:00 +0000</pubDate>
+      <description>AI automation under HIPAA with human approval gates for clinical and administrative workflows, and the three deployment setups a healthcare office can choose between.</description>
+    </item>
+    <item>
+      <title>AI Workflow vs RPA: When You Need Human Approval Before Every Write</title>
+      <link>https://theflow-ai.com/blog/ai-workflow-vs-rpa.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/ai-workflow-vs-rpa.html</guid>
+      <category>Workflow</category>
+      <pubDate>Wed, 28 Oct 2026 00:00:00 +0000</pubDate>
+      <description>When classic RPA breaks on a UI change, and when an AI workflow still must wait for a human before writing to a system of record.</description>
+    </item>
+    <item>
+      <title>What Real Human-in-the-Loop Means for Enterprise AI Agents</title>
+      <link>https://theflow-ai.com/blog/human-in-the-loop-ai-agents.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/human-in-the-loop-ai-agents.html</guid>
+      <category>Human-in-the-Loop</category>
+      <pubDate>Wed, 28 Oct 2026 00:00:00 +0000</pubDate>
+      <description>Oversight that happens before the write, not a checkbox after the agent already changed the record.</description>
+    </item>
+    <item>
+      <title>Close What You Meant From Gmail: One Do It, No Prompt, No Auto-Send</title>
+      <link>https://theflow-ai.com/blog/close-from-gmail-without-a-prompt.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/close-from-gmail-without-a-prompt.html</guid>
+      <category>Glance</category>
+      <pubDate>Wed, 28 Oct 2026 00:00:00 +0000</pubDate>
+      <description>One Do It when a real close is clear. Writes into personal destinations already connected for that close. Stays quiet when unsure. Not inbox AI.</description>
+    </item>
+    <item>
+      <title>Browser AI Agent Hijack via Extension: Why Glance Uses Do It, Not Auto-Act</title>
+      <link>https://theflow-ai.com/blog/browser-ai-agent-extension-hijack.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/browser-ai-agent-extension-hijack.html</guid>
+      <category>Glance</category>
+      <pubDate>Wed, 28 Oct 2026 00:00:00 +0000</pubDate>
+      <description>BragJack (2026) showed extensions can force prompts into agentic browsers. Glance is a personal Gmail Do It close: one click, Undo, no auto-send. Not an agentic browser.</description>
+    </item>
     <item>
       <title>The Action Graph: How Institutional Knowledge Gets Captured Without Centralizing Raw Data</title>
       <link>https://theflow-ai.com/blog/action-graph-institutional-knowledge.html</link>
