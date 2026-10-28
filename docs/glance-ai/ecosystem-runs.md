@@ -873,3 +873,134 @@ Nothing changed on the Google side since the fifteenth run: no new unwired modul
 - **Grok sync:** nothing new in `card-requests-*.md`; one other agent's commit (AI engine, #206) touched no file I changed.
 - **Tests:** new `test/hebrew-share-ask-corpus.cjs` (6 asks written after the change, 4 quiet lines; 4 of 6 asks fail on the old code; one held-out line failed on my first patterns and led to the wider short-ask nouns); every `test/*corpus.cjs` green. Phone-card `CoreBundle.js` rebuilt. No real-browser spec this run.
 - **Open:** live Gate; «זכור להגיש את הדוח השבועי…» (a reminder to the reader) still quiet; the run-101 «We need to talk … back at the office» false positive.
+
+### Run 106 (2026-10-26)
+- **Capability shipped (behind `TASK_ASK` / `CHAT_TASK_CARD`, off):** "Please bring your passport tomorrow" and «תביא איתך את הרישיון מחר» (a plain imperative "bring" with the thing and a day, no "don't forget") gave no card; it is now the To Do task "bring your passport" due that day, in mail and in chat.
+- **Proof added for run 104:** the "Pay invoice 2231" task (no amount) is now proved in a real browser, English and Hebrew, with write, read-back, Undo and the duplicate guard for a second mail about the same invoice.
+- **Code:** `core/chat-reminder.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`; two other agents' AI-engine commits (#206, #240) touched none of my files.
+- **Tests:** `test/chat-reminder-corpus.cjs` +6 lines and 5 quiet ones (6 fail on the old code); 5 new cases in `e2e/outlook-booking-notice.spec.js` (all 28 + 3 pass), `chat-whatsapp-card` and `outlook-teams-and-series` specs green (33); every `test/*corpus.cjs` green.
+- **Open:** live Gate; Messenger and Instagram have no spec for the "bring" task (same lane as WhatsApp); «Hi Sali, make sure the invoice is signed before Friday» still quiet.
+
+### Run 107 (2026-10-26)
+- **Capability shipped (behind `CHAT_TASK_CARD`, off):** a vendor's or landlord's chat message that names an invoice number and a due day but no amount ("Reminder: your invoice 2231 is due on Thursday", «חשבונית מספר 2231 לתשלום עד יום חמישי») gave no card in chat (the payment reader needed an amount); it is now the task "Pay invoice 2231" through the existing Log It card, the mail path of run 104 carried to chat.
+- **Code:** `src/chat-task-card.js` (fallback to `FlowChatPaymentAsk.recognizeBill`, the title).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-payment-ask-corpus.cjs` +4 bills and 6 quiet lines; 2 new cases in `e2e/chat-whatsapp-card.spec.js`; the chat specs (whatsapp-card, payment-close, chase-draft, document-close) pass, 39; every `test/*corpus.cjs` green. Phone-card `CoreBundle.js` rebuilt.
+- **Open:** live Gate; a "paid" claim does not close an invoice-number task (the close matches by amount); no Messenger or Instagram spec for this task.
+
+### Run 108 (2026-10-26)
+- **Capability shipped (behind `CHAT_TASK_CARD` and `CHAT_PROMISE_CARD`, off):** the loop that run 107 opened is closed. After "Pay invoice 2231" (or "Pay 500 NIS") is on the person's task list from a chat, their own "I paid invoice 2231" / «שילמתי את חשבונית מספר 2231» / "I paid 500 NIS" offers Mark done on exactly that task; Do It completes it and reads it back, Undo reopens it, an edited task is left alone.
+- **Code:** `core/chat-payment-claim.js` (`fitsOwn`, the invoice number on the claim), `src/chat-task-card.js` (the own-message branch).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `e2e/chat-own-paid-close.spec.js` (4 cases: close and Undo, Hebrew, an edited task, no card for a promise, another invoice or a question); `test/chat-payment-claim-corpus.cjs` +7 checks (one caught a real bug of mine, Hebrew invoice numbers with letters, fixed); the five chat specs pass (43); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; an own "I paid" does not yet close a Pay task written from mail (only chat-written ones are in this chat's log); no Messenger or Instagram spec for this close; the own-message path needs `CHAT_PROMISE_CARD` too (the existing own-message switch).
+
+### Run 109 (2026-10-26)
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** a plumber's, technician's or electrician's "I'll come between 8 and 12 on Tuesday" (English and Hebrew) gave no card; it is now a calendar hold titled "Visit 08:00–12:00" / «ביקור», no guest, in mail and chat.
+- **Probe:** 18 invented lines across the chat readers (flights, tables, car service, plumber windows, parent meetings, passport pickup, webinars) found real gaps; this run took the service-visit window. Still quiet: Hebrew table booking («השולחן שלכם נשמר…»), «התעודה שלך מוכנה לאיסוף עד…» (Hebrew pickup), «הטיפול ברכב נקבע למחר…», flights ("Your flight departs Thursday at 6:30"), a parent-teacher meeting, a webinar, "Your visit to the clinic is on 5/11 at 10:20".
+- **The run-101 "We need to talk … back at the office" item:** re-probed; "We need to talk about the budget" is a fair reply-needed card, so it is not logged as a false positive any more.
+- **Code:** `core/chat-delivery-window.js`, `core/incoming-judge.js` (title), `src/chat-task-card.js` (title).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-delivery-window-corpus.cjs` +6 visits, 4 flag checks, 5 quiet lines; 3 new real-browser cases (WhatsApp English and Hebrew, Outlook); booking and WhatsApp specs pass (51); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; the Hebrew and service-noun gaps above; Messenger and Instagram have no visit spec of their own (same lane as WhatsApp).
+
+### Run 110 (2026-10-26)
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** the Hebrew gaps the run-109 probe found. A Hebrew table booking («השולחן שלכם נשמר…»), a car service or a check-up told without a possessive («הטיפול ברכב נקבע למחר…»), the English "car service" and "haircut", and a Hebrew pickup of an ID, a licence or photos used to give no card; they now give the existing hold or pickup task.
+- **Code:** `core/chat-appointment-notice.js`, `core/chat-pickup-notice.js` (vocabulary and frames only).
+- **Grok sync:** nothing new in `card-requests-*.md`; one other agent's commit (#254-line, "Breadth Y3") touched none of my files.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` +7 lines and 4 quiet ones (7 fail on the old code), `test/chat-pickup-notice-corpus.cjs` +3 (3 fail on the old code); a real-browser WhatsApp case for the Hebrew table; booking and WhatsApp specs pass (52); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; flights ("Your flight departs Thursday at 6:30"), a parent-teacher meeting, a webinar and a date written 5/11 are still quiet; no Hebrew pickup spec in a real browser.
+
+### Run 111 (2026-10-26)
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** a flight or train told as "is on Thursday at 06:30" / «הטיסה שלך ביום חמישי בשעה 06:30» (no verb such as "departs") gave no card; it is now the Trip hold.
+- **Code:** `core/chat-travel-notice.js` only (the confirming frame).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-travel-notice-corpus.cjs` +6 lines (all fail on the old code) and 5 quiet ones; one real-browser WhatsApp case (Hebrew flight); booking and WhatsApp specs pass (53); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; an unmarked hour under 8 with minutes ("at 6:30", "at 7:45") stays quiet by design (ambiguous with the evening); a parent-teacher meeting, a webinar and a date written 5/11 are still quiet.
+
+### Run 112 (2026-10-26)
+- **Capability shipped (behind `BOOKING_NOTICE` / `CHAT_TASK_CARD`, off):** "Your appointment is Tuesday at 14:00" (no "on", no "confirmed") and a Hebrew dotted date («התור שלך ב-5.11 בשעה 10:20») gave no card; they are now the Appointment hold. The Hebrew «התור שלך ביום שלישי בשעה 14:00» already worked (the probe showed it), so only the English and the dotted-date forms are new.
+- **Probe findings that are not gaps:** a webinar is excluded on purpose (marketing); a school or group announcement never reaches the card (groups are not offered); "5/11" and "12/11" stay quiet because day-first and month-first cannot be told apart.
+- **Code:** `core/chat-appointment-notice.js` only (frames; "on sale" and discount as quiet words).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-appointment-notice-corpus.cjs` +5 lines and 4 quiet ones (6 fail on the old code); 2 real-browser Outlook cases; booking and WhatsApp specs pass (55); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; an ambiguous slash date is still quiet; no Messenger or Instagram spec for these forms.
+
+### Run 113 (2026-10-26)
+- **Capability shipped:** common work asks that gave no card ("make sure X is signed by Thursday", "proofread … and send it back", "order … by Tuesday", "fill out the form", "do you mind uploading", «תוודא ש…», «אפשר שתעיף מבט…») now offer the reply card.
+- **Caught by the sweep:** my first version added a broad "please + verb" list (call, add, email, draft, book, cancel, …); three other corpora went red (`chat-task-card`: "Please call me back tomorrow" is the call-back task; `close-families` and `flip-sample-0956`: add-to-calendar and draft-from-template routing). Narrowed to proofread, check, order, look over, take a look, fill in/out, complete, verify, validate, plus a standalone "make sure the/we/all/this/it" and the Hebrew forms; all corpora green again. "Please make sure to follow us on social media" had also turned into a card and is quiet again.
+- **Code:** `core/judgment.js` only (English and Hebrew handoff readers).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/work-ask-corpus.cjs` (8 fresh asks, 6 quiet look-alikes; 7 of the 8 asks fail on the old code); a 16-line probe of polite notices and marketing; every `test/*corpus.cjs` green on the second sweep; phone-card bundle rebuilt. No real-browser spec this run.
+- **Open:** live Gate; "Do you mind if I call you later?" shows a card (pre-existing, not changed); "Please call/add/email/draft/book/cancel …" are still routed by their own readers, not by this list.
+
+### Run 114 (2026-10-26)
+- **Capability shipped (behind `CHAT_TASK_CARD` / `CHAT_PROMISE_CARD`, off):** the way people really say they paid ("Paid via Bit just now", "Sent you 500 NIS on Paybox", «שולם!», «התשלום יצא») did not close a "Waiting on Dana: Payment" task, because the claim reader wanted "I paid" or "I transferred". It now reads those casual forms; the card is the existing Mark done.
+- **Proof added (Meta row):** `e2e/chat-meta-lanes.spec.js`: invoice task, own "I paid" close on Microsoft To Do, and the Visit hold, on Messenger and Instagram (4 cases pass first time).
+- **Code:** `core/chat-payment-claim.js` only.
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-payment-claim-corpus.cjs` +8 claims (all fail on the old code) and 5 quiet lines; 3 new real-browser cases in `e2e/chat-payment-close.spec.js`; the new Meta spec; chat specs (payment-close, own-paid-close, meta-lanes, whatsapp-card, document-close) pass, 46; every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; the other side's claim still needs a "Waiting on" payment task made from this chat; no spec for the document and chase closes on Messenger and Instagram.
+
+### Run 115 (2026-10-26)
+- **Capability shipped (behind `TASK_ASK` / `CHAT_TASK_CARD`, off):** an instruction to call or write to a named third party on a day ("Call the plumber tomorrow", «תתקשר לבנק ביום שני») gave no card (only "call me" did); it is now a To Do reminder task.
+- **Probe finding that is not a gap:** an undated call-back ("Call me when you get a chance") stays quiet on purpose (no day, no task).
+- **Code:** `core/chat-reminder.js` only (two cues).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-reminder-corpus.cjs` +6 lines (all fail on the old code) and 6 quiet ones; 2 real-browser Outlook cases; booking, WhatsApp and Meta-lane specs pass (61); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; no Messenger or Instagram spec for this task; "Please ring me back this afternoon" (no day) stays quiet.
+
+### Run 116 (2026-10-26)
+- **Capability shipped:** Hebrew and formal-English asks to confirm or acknowledge (a few forms the reader missed) now offer the reply card, and the Hebrew soft-ask words that were missing ("אין לחץ", "כשיתאפשר", "בהזדמנות") now keep a soft ask quiet, as "no rush" does in English. My first pass made «אשמח לאישור שלך על ההצעה, אין לחץ» show a card; the soft words fixed it before the sweep.
+- **Code:** `core/judgment.js` (handoff readers), `core/intent.js` (soft Hebrew words).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** new `test/confirm-ask-corpus.cjs` (6 asks, 5 quiet lines; the 6 asks fail on the old code); every `test/*corpus.cjs` green; phone-card bundle rebuilt. No real-browser spec this run (recognition only, no new write).
+- **Open:** live Gate; "Let me know if Thursday works for you" and «תודיע לי אם זה מתאים לך» (scheduling replies) stay quiet on purpose; «תוכל לאשר שהתשלום התקבל?» stays a hedge.
+
+### Run 117 (2026-10-26)
+- **Capability shipped (behind `TASK_ASK` / `CHAT_TASK_CARD`, off):** "Friendly reminder to submit your expense report by Thursday" and «תזכורת: להגיש את הדוח השבועי עד יום חמישי» (the commonest reminder wording at work) gave no card; they are now the To Do reminder task.
+- **Probe findings, not built:** an expiry notice ("Your parking permit expires on 15/11", «הרישיון שלך פג תוקף ב-15/11») has no action verb and belongs to the system-notice reader (`SYSTEM_NOTICE`), not the reminder reader.
+- **Code:** `core/chat-reminder.js` only (two cues).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/chat-reminder-corpus.cjs` +6 lines (all fail on the old code) and 3 quiet ones; 2 real-browser Outlook cases; every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; no Messenger or Instagram spec for the reminder tasks; expiry notices without an action verb stay quiet.
+
+### Run 118 (2026-10-26)
+- **Capability shipped:** «אפשר לעדכן / לתקן / לסיים / להכין … עד <יום>?» (a common Hebrew way for a client to ask for a small change by a day) gave no card; it now offers the reply card. The writer's own «אפשר לעדכן אותך מחר?» stays quiet.
+- **Proof added (Meta row):** three more reminder tasks run on Messenger and Instagram in `e2e/chat-meta-lanes.spec.js` (10 of 10 pass).
+- **Investigated, not changed:** the 5 red add-on tests (open-tasks row 83) are not a bug in the add-on: the shared judge deliberately returns no process for a date-only meeting ("Meeting Oct 22" with no clock) and titles a hold in English, while the tests expect an all-day event with a Hebrew title. Whether a date-only meeting should offer a card is a product decision for the owner and David.
+- **Code:** `core/judgment.js` (one Hebrew handoff alternative).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/work-ask-corpus.cjs` +2 asks and 2 quiet lines; the new Meta cases; every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; the date-only meeting decision; «אפשר לשלוח לך את החוזה עד מחר?» is routed to the file chain, not changed.
+
+### Run 119 (2026-10-27)
+- **Capability shipped (behind `SYSTEM_NOTICE`, off):** a notice from an Israeli service with a deadline and a preventing action (the electric company, the state, a telecom, an invoicing service) used to be dropped: the sender was not on the known list and Hebrew dates like "ב-5.11" were not read. It now gives the existing Log It card with the date.
+- **Trust decision to note (owner):** the known-sender list is a trust list. I added eleven Israeli domains (listed in `ecosystem-coverage.md`); matching is exact-domain-or-subdomain, so a lookalike never passes, and the result is only a task the person approves. If the owner wants a narrower or wider list, it is one array in `core/system-notice.js`.
+- **Code:** `core/system-notice.js` only (domains, the provider names, the numeric Hebrew date).
+- **Grok sync:** nothing new in `card-requests-*.md`.
+- **Tests:** `test/system-notice-corpus.cjs` +4 Israeli positives and 5 quiet cases; 2 real-browser Outlook cases (the task with date and sender, Undo; a lookalike sender shows nothing); every `test/*corpus.cjs` green; phone-card bundle rebuilt.
+- **Open:** live Gate; English day/month dates stay quiet (ambiguous); no WhatsApp or Gmail spec for the Israeli notices.
+
+### Run 120 (2026-10-27)
+- **Capability shipped (behind `GOOGLE_FORMS` + `WORKSPACE_FILE`, off):** "Create a feedback form called X" / «תפתח טופס הרשמה בשם X» could be recognised but the write always answered not-connected; the manifest now carries `forms.body` and the Forms host, so Do It creates the empty form, reads it back by id and Undo trashes it unless it was edited. The form has its own Labs switch; a doc or sheet is unaffected.
+- **Note for the owner:** the scope list changed, so connected people are asked to reconnect Google once; Google's verification of the scope and the privacy and store wording are your steps (open-tasks row 85, wording proposed there).
+- **Code:** `manifest.json`, `core/workspace-file.js`, `core/google-config.js`, `core/labs-switches.js`, `core/consent-catalog.js`, `src/google-lane-host.js`, `src/google-web-auth.js`.
+- **Tests:** `test/google-form-corpus.cjs` +6 checks (switch off, doc unaffected, manifest, allowlist); scope lists updated in the web-auth, write and e2e launch fixtures. The real-browser spec was updated but could not start in this container (`chrome is not defined` in the extension worker, same on the untouched base).
+- **Open:** live Gate; Google scope verification; next backlog item (3) the five red add-on tests (row 83 says they are a product decision), then (4) Messenger and Instagram parity.
+
+### Run 121 (2026-10-27)
+- **Capability shipped:** an ask for an update or a countersignature that was silent now offers the reply card: "Please give me a status update on the migration by Tuesday", "Could you send me a quick update ...", "Please send me a short progress report by Monday", "I need a status update ...", "Please countersign the NDA and return it by Friday", «נשמח לעדכון סטטוס על ...», «נשמח לקבל עדכון ...», «תעדכני את הסטטוס של הפרויקט עד מחר». The writer's own update, an attached report and «נשמח לעדכן אותך» stay quiet.
+- **Probe (40 invented lines, 28 asks and 12 quiet, not tuned on):** 7 real misses found and fixed; the rest are on purpose (a file ask is the file gate's, a decision is the reader's, «תעדכני את הגיליון» goes to the Google chain). The known open item 2 and 3 of `real-mail-misses-2026-10-21.md` were not touched.
+- **Code:** `core/judgment.js` only (two patterns); phone-card bundle rebuilt. **Tests:** new `test/status-update-ask-corpus.cjs` (9 asks, 9 quiet; 5 fail on the old core); related corpora, surface-parity, docs-consistency, identity-copy, labs-switches green; add-on `v1.test.cjs` still has its 5 old red (row 83). Gate: not run live.
+
+### Run 122 (2026-10-27)
+- **Capability shipped:** asks for an account action that were silent now offer the reply card: "Please grant me access to the shared folder by Monday", "Please reset my password by end of day tomorrow", "Please transfer the domain to the new registrar by the 30th", "Please copy me on the reply to the client", «תעלה בבקשה את הטופס החתום לפורטל עד יום חמישי», «בבקשה תעביר את הדומיין לרשם החדש», «תשים אותי בעותק בתשובה ללקוח». The done-state twins ("access has been granted", «הגישה לתיקייה אושרה») and the writer's own promise stay quiet.
+- **Probe (40 more invented lines, 27 asks and 13 quiet):** 8 real misses fixed; left on purpose: cancel a subscription (the cancel family decides), "give Dana edit access to the sheet" (Google chain), "check whether ... and let me know" (hedge).
+- **Daily sweep (first run after 06:00 UTC):** every `test/*corpus.cjs` green. Add-on `v1.test.cjs` keeps its 5 old red (row 83, product decision). **Code:** `core/judgment.js` (two patterns), phone-card bundle rebuilt; `test/account-ask-corpus.cjs` (9 asks, 8 quiet). Full headless e2e not run: it cannot start in this container (`chrome is not defined`, also on the untouched base), CI runs it. Gate: not run live.
+
+### Run 123 (2026-10-27)
+- **Capability shipped:** four more everyday asks that were silent now offer the reply card: "Please return the signed copy to our office by Thursday", "Please make the payment before the end of the month", "Please add your availability to the shared calendar by Thursday", "Please refund the duplicate charge by Friday", and in Hebrew «בבקשה בצע את התשלום לפני סוף החודש», «תוסיפי את הזמינות שלך ליומן המשותף עד יום חמישי». "Make the payment online", "return the item to the shop", "return to the main page" and done-state lines stay quiet.
+- **Probe (40 more invented lines, 30 asks and 10 quiet):** 5 fixed here; left on purpose: asks to issue an invoice (the file gate), «תוסיף את העובד למערכת השכר», a survey. **Found, not mine:** "Please submit your payment details on our secure site to avoid suspension" (a phishing shape) is offered as a request on the old code too; worth a quiet rule for payment-detail asks from unknown senders (owner/David call, not changed).
+- **Code:** `core/judgment.js` (extends the run-122 patterns), phone-card bundle rebuilt; `test/account-ask-corpus.cjs` now 15 asks and 15 quiet. Related corpora and surface-parity, docs-consistency, identity-copy, labs-switches green. Gate: not run live.

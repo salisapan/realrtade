@@ -1,6 +1,6 @@
 # Today's engine (tip) alone vs the AI engine on top of it
 
-Spec labels. Tier 2 = cached Qwen3.5-4B answers, real device mask, strict gate and veto. No model run.
+Spec labels. Tier 2 = cached Qwen3.5-4B answers, real device mask, the lab strict gate and veto. No model run.
 
 | set | system | wrong Do It | missed | HE missed | EN missed |
 |---|---|---|---|---|---|
@@ -16,3 +16,4 @@ Spec labels. Tier 2 = cached Qwen3.5-4B answers, real device mask, strict gate a
 | ALL pooled 786 | tip + AI engine | 25/464 | 86/322 | 29/153 | 57/169 |
 
 Model cards: 42 (planned 42, carried by the follow loop 32); model cards on a gold-silent mail: 0. Mails that reached the cloud tier: 227/796.
+Model cards with a different step than the label: 3 (v2syn-1061:draft≠task, v2syn-1100:task≠calendar, ctrl-he-4:task≠draft). File cards handed to suggest-save (shown only if it finds the real attachment): 0, of which the label is a file save: 0.

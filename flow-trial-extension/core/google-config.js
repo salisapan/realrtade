@@ -6,7 +6,7 @@
 // lbihckfmoffgjjlnneoeaehbhoonfenh.
 //
 // Allowed scopes, and nothing else: openid, email, profile, drive.file,
-// calendar.events, tasks. Docs and Sheets are used only
+// calendar.events, tasks, contacts.readonly. Docs and Sheets are used only
 // on a file Glance created or the person picked. A gmail.* scope is refused
 // here. Gmail is read and filled on the Gmail page. Glance never presses Send.
 const FlowGoogleConfig = (() => {

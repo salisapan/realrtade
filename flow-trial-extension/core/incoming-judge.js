@@ -389,7 +389,7 @@ const FlowIncomingJudge = (() => {
     if (dlv) {
       const he = dlv.lang === 'he';
       const win = dlv.endHour != null ? ' ' + pad2(dlv.hour) + ':' + pad2(dlv.minute) + '–' + pad2(dlv.endHour) + ':' + pad2(dlv.endMinute) : '';
-      const title = ((he ? 'משלוח' : 'Delivery') + win + tail).slice(0, 120);
+      const title = ((he ? (dlv.visit ? 'ביקור' : 'משלוח') : (dlv.visit ? 'Visit' : 'Delivery')) + win + tail).slice(0, 120);
       return {
         intent: { type: 'event', label: title, confidence: 0.9, bookingNotice: 'delivery', personalClose: 'booking-notice', signals: { score: 90, threshold: 50 }, entities: { dateIso: dlv.dateIso, hour: dlv.hour, minute: dlv.minute }, facts: { date: { iso: dlv.dateIso } } },
         process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null, bookingNotice: true,

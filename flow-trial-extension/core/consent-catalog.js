@@ -13,7 +13,7 @@ const FlowConsentCatalog = (() => {
   const GROUPS = ['google', 'microsoft', 'chat', 'tasks', 'files', 'sign', 'meetings', 'payments', 'learning'];
 
   const SERVICES = [
-    { id: 'google', label: 'Google', detail: 'Gmail drafts, Tasks, Calendar and Drive files Glance itself creates. Never sends.', group: 'google', state: 'built',
+    { id: 'google', label: 'Google', detail: 'Gmail drafts, Tasks, Calendar, Drive files and, when you ask for one, an empty Google Form that Glance itself creates. Never sends.', group: 'google', state: 'built',
       steps: [{ type: 'google-signin' }] },
     { id: 'ms-mail', label: 'Outlook mail', detail: 'Read mail and write a reply draft. Never sends.', group: 'microsoft', state: 'built',
       steps: [{ type: 'microsoft-service', service: 'mail' }] },
