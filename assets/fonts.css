@@ -1,0 +1,62 @@
+/* Self-hosted webfonts: Assistant (body), Rubik (display), JetBrains Mono
+   (code/mono UI). Latin + Hebrew subsets. No request to fonts.googleapis.com
+   or fonts.gstatic.com — same bytes on every page, one shared URL.
+
+   The woff2 files live in fonts/ next to this stylesheet. They used to be
+   base64 inside this file (~131KB, ~99KB on the wire, because base64 of an
+   already-compressed font barely gzips). That whole payload was
+   render-blocking: every page waited for it before first paint. External
+   files are not. font-display:swap paints with the system fallback while
+   the files arrive, and unicode-range means an English page does not
+   download the Hebrew subsets until Hebrew text is actually shown.
+
+   Assistant and Rubik are each a variable font declared as
+   font-weight:400 800 (a range, not one weight), so 400 through 800 all
+   resolve to the same file. Hebrew faces stay listed before Latin so the
+   few code points that sit in both ranges keep the Hebrew subset.
+*/
+
+@font-face{
+  font-family:'Assistant';
+  font-style:normal;
+  font-weight:400 800;
+  font-display:swap;
+  src:url("fonts/assistant-hebrew.woff2") format("woff2");
+  unicode-range:U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+
+@font-face{
+  font-family:'Assistant';
+  font-style:normal;
+  font-weight:400 800;
+  font-display:swap;
+  src:url("fonts/assistant-latin.woff2") format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face{
+  font-family:'Rubik';
+  font-style:normal;
+  font-weight:400 800;
+  font-display:swap;
+  src:url("fonts/rubik-hebrew.woff2") format("woff2");
+  unicode-range:U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+
+@font-face{
+  font-family:'Rubik';
+  font-style:normal;
+  font-weight:400 800;
+  font-display:swap;
+  src:url("fonts/rubik-latin.woff2") format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face{
+  font-family:'JetBrains Mono';
+  font-style:normal;
+  font-weight:500;
+  font-display:swap;
+  src:url("fonts/jetbrains-mono-latin.woff2") format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
