@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FROM = 'Glance <hello@theflow-ai.com>';
+const FROM = 'Glance <info@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/glance-logo.png';
 const MARK_URL = 'https://theflow-ai.com/glance-mark.png';

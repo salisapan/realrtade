@@ -1,8 +1,8 @@
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FROM_FLOW = 'Flow <hello@theflow-ai.com>';
-const FROM_GLANCE = 'Glance <hello@theflow-ai.com>';
+const FROM_FLOW = 'Flow <info@theflow-ai.com>';
+const FROM_GLANCE = 'Glance <info@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL_FLOW = 'https://theflow-ai.com/email-logo.png';
 const LOGO_URL_GLANCE = 'https://theflow-ai.com/glance-logo.png';
@@ -13,7 +13,7 @@ function fromFor(kind) { return (kind === 'trial' || kind === 'pro') ? FROM_GLAN
 const TOKEN_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
 const LOG_PREFIX = '[send-confirmation]';
 
-// This endpoint sends branded mail from hello@theflow-ai.com to any address a
+// This endpoint sends branded mail from info@theflow-ai.com to any address a
 // caller names, and notifies the founder's inbox for each one. Until now the
 // only defence was a honeypot field, which a script bypasses trivially — so a
 // single loop could mailbomb a victim from our domain, flood the founder's

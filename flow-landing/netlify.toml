@@ -27,10 +27,124 @@
   node_bundler = "none"
   included_files = ["netlify/functions/send-playbook/hybrid-automation-playbook.pdf"]
 
-# Clean slug for the Glance BragJack trust page. The file stays .html,
-# matching the rest of flow-landing. This rewrite serves it at the
-# extensionless path even if Pretty URLs are off in the Netlify UI.
+# Permanent redirects for pages that were removed, merged or moved to Insights
+# (2026-10-28). Each old URL is covered with and without the .html suffix.
+[[redirects]]
+  from = "/missed-deadline"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/missed-deadline.html"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/almost-missed"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/almost-missed.html"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/chatgpt-copilot-law-firms"
+  to = "/solutions/legal.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/chatgpt-copilot-law-firms.html"
+  to = "/solutions/legal.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/on-prem-ai-regulated-work"
+  to = "/solutions/deployment.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/on-prem-ai-regulated-work.html"
+  to = "/solutions/deployment.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/financial-services"
+  to = "/solutions/cpas.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/financial-services.html"
+  to = "/solutions/cpas.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/healthcare"
+  to = "/blog/healthcare.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/healthcare.html"
+  to = "/blog/healthcare.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/ai-workflow-vs-rpa"
+  to = "/blog/ai-workflow-vs-rpa.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/ai-workflow-vs-rpa.html"
+  to = "/blog/ai-workflow-vs-rpa.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/human-in-the-loop-ai-agents"
+  to = "/blog/human-in-the-loop-ai-agents.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/human-in-the-loop-ai-agents.html"
+  to = "/blog/human-in-the-loop-ai-agents.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/close-from-gmail-without-a-prompt"
+  to = "/blog/close-from-gmail-without-a-prompt.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/close-from-gmail-without-a-prompt.html"
+  to = "/blog/close-from-gmail-without-a-prompt.html"
+  status = 301
+  force = true
+
 [[redirects]]
   from = "/solutions/browser-ai-agent-extension-hijack"
-  to = "/solutions/browser-ai-agent-extension-hijack.html"
-  status = 200
+  to = "/blog/browser-ai-agent-extension-hijack.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/solutions/browser-ai-agent-extension-hijack.html"
+  to = "/blog/browser-ai-agent-extension-hijack.html"
+  status = 301
+  force = true

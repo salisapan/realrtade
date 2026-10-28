@@ -114,7 +114,7 @@ exports.handler = async function (event) {
       statusCode: 500,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
       body: errorPage(
-        'Download is temporarily unavailable. Please try again shortly or contact hello@theflow-ai.com.',
+        'Download is temporarily unavailable. Please try again shortly or contact info@theflow-ai.com.',
         'Download is temporarily unavailable'
       )
     };
