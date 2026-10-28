@@ -44,6 +44,21 @@ test('Dana says she transferred it: the card marks the waiting task done, read b
   await expect.poll(() => tasks()[0].status).toBe('needsAction');
 });
 
+for (const [label, text] of [['Bit, no "I"', 'Paid via Bit just now'], ['Hebrew «שולם!»', 'שולם!'], ['the amount without "I"', 'Sent you 500 NIS on Paybox']]) {
+  test('a casual payment claim (' + label + ') marks the one waiting payment task done, read back as completed, and Undo reopens it', async ({ glance }) => {
+    await setup(glance);
+    const page = await glance.openWhatsApp(whatsappHtml(text, { id: 'CAS' + label.length }));
+    await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+    await page.locator(CARD + ' button.flow-chip').click();
+    await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+    expect(tasks()).toHaveLength(1);
+    expect(tasks()[0].status).toBe('completed');
+    expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+    await page.locator(CARD + ' button.flow-chip-undo').click();
+    await expect.poll(() => tasks()[0].status).toBe('needsAction');
+  });
+}
+
 test('a task the person changed is left alone and the card says so', async ({ glance }) => {
   await setup(glance);
   const id = Object.keys(server.tasks())[0];

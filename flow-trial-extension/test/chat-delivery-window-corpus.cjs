@@ -17,11 +17,28 @@ const YES = [
   ['השליח יגיע מחר בין 14:00 ל-18:00', '2026-10-26', 14, 0, 18, 0],
   ['המשלוח שלך יגיע ביום שני בין השעות 10:00-12:00', '2026-10-26', 10, 0, 12, 0],
   ['החבילה שלך תגיע מחר בין 10 ל-12', '2026-10-26', 10, 0, 12, 0],
-  ['ההזמנה שלך תגיע ביום שלישי בשעה 16:30', '2026-10-27', 16, 30, null, null]
+  ['ההזמנה שלך תגיע ביום שלישי בשעה 16:30', '2026-10-27', 16, 30, null, null],
+  // a person who comes to do work (a visit, run 109)
+  ['The plumber will come between 8 and 12 on Tuesday', '2026-10-27', 8, 0, 12, 0],
+  ['The technician will arrive tomorrow between 14:00 and 18:00', '2026-10-26', 14, 0, 18, 0],
+  ['Our electrician will be there Thursday at 10:00', '2026-10-29', 10, 0, null, null],
+  ['האינסטלטור יגיע ביום שלישי בין 8 ל-12', '2026-10-27', 8, 0, 12, 0],
+  ['הטכנאי יגיע מחר בין 14:00 ל-18:00', '2026-10-26', 14, 0, 18, 0],
+  ['החשמלאי יגיע ביום חמישי בשעה 10:00', '2026-10-29', 10, 0, null, null]
 ];
 for (const [text, day, h, m, eh, em] of YES) { const r = A.recognize(text, NOW); check('delivery: ' + text, r.kind === 'delivery' && r.dateIso === day && r.hour === h && r.minute === m && r.endHour === eh && r.endMinute === em, r); }
+// A visit is told apart from a delivery: the hold is titled "Visit".
+for (const [text, visit] of [['The plumber will come between 8 and 12 on Tuesday', true], ['הטכנאי יגיע מחר בין 14:00 ל-18:00', true], ['Your package will be delivered tomorrow between 14:00 and 18:00', false], ['השליח יגיע מחר בין 14:00 ל-18:00', false]]) {
+  const r = A.recognize(text, NOW);
+  check('visit flag ' + visit + ': ' + text, r.kind === 'delivery' && r.visit === visit, r);
+}
 const NO = [
   ['Your package was delivered tomorrow between 14:00 and 18:00', 'a look back'],
+  ['The plumber came yesterday between 8 and 12', 'a look back'],
+  ['The plumber will come on Tuesday', 'no clock'],
+  ['The plumber will come between 8 and 12 on Tuesday, can you make it?', 'question'],
+  ['The plumber cancelled Tuesday between 8 and 12', 'cancelled'],
+  ['הטכנאי ביטל את הביקור ביום שלישי בין 8 ל-12', 'cancelled'],
   ['Your package was delivered yesterday at 14:00', 'delivered'],
   ['Your order is ready for pickup tomorrow between 14:00 and 18:00', 'a pickup'],
   ['Your package will arrive tomorrow', 'no clock'],

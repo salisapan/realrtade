@@ -10,7 +10,7 @@ function check(name, cond, detail) {
   if (cond) console.log('PASS:', name);
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
-const flags = { [W.SWITCH]: true };
+const flags = { [W.SWITCH]: true, [W.FORMS_SWITCH]: true };
 
 // Recognition.
 const POS = [
@@ -80,6 +80,7 @@ function server(opts) {
   return { http, forms, drive, calls };
 }
 
+function fs_(p) { return require('fs').readFileSync(p, 'utf8'); }
 (async () => {
   const input = { flags: flags, fileKind: 'form', name: 'Q4 launch feedback form' };
   const s = server();
@@ -117,6 +118,21 @@ function server(opts) {
 
   const r7 = await W.write(Object.assign({}, input, { flags: {} }), server().http);
   check('switch off: nothing is created', r7.ok === false && r7.reason === 'switch-off', r7);
+
+  // Own switch (owner approval 2026-10-24): WORKSPACE_FILE alone never creates or offers a form, and a doc is unaffected.
+  const only = { [W.SWITCH]: true };
+  const r8 = await W.write(Object.assign({}, input, { flags: only }), server().http);
+  check('GOOGLE_FORMS off: no form is created', r8.ok === false && r8.reason === 'switch-off', r8);
+  const p8 = W.plan({ flags: only, text: 'Can you create a feedback form for the Q4 launch?' });
+  check('GOOGLE_FORMS off: no form card is offered', p8.action === 'silence' && p8.reason === 'forms-off', p8);
+  const p9 = W.plan({ flags: only, text: 'Please set up a shared doc called Q4 plan' });
+  check('GOOGLE_FORMS off: a doc is still offered', p9.action === 'offer' && p9.fileKind === 'doc', p9);
+  const p10 = W.plan({ flags, text: 'Can you create a feedback form for the Q4 launch?' });
+  check('GOOGLE_FORMS on: the form card is offered', p10.action === 'offer' && p10.fileKind === 'form', p10);
+  const man = JSON.parse(fs_(path.join(__dirname, '..', 'manifest.json')));
+  check('manifest asks forms.body and the Forms host, nothing broader', man.oauth2.scopes.includes('https://www.googleapis.com/auth/forms.body') && man.host_permissions.includes('https://forms.googleapis.com/*') && !man.oauth2.scopes.some((x) => /\/auth\/forms$/.test(x)));
+  const { FlowGoogleConfig: Cfg } = require(path.join(__dirname, '..', 'core', 'google-config.js'));
+  check('the lane allowlist accepts forms.body', Cfg.assertAllowed(['https://www.googleapis.com/auth/forms.body']).ok === true);
 
   // Wiring the page and the lane already carry.
   const fs = require('fs');

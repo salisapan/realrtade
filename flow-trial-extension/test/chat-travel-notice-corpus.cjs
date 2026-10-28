@@ -5,6 +5,13 @@ const NOW = new Date(2026, 9, 23, 10, 0, 0); // Friday
 let failures = 0;
 function check(name, ok, detail) { if (ok) console.log('PASS: ' + name); else { failures++; console.log('FAIL: ' + name + (detail ? ' ' + JSON.stringify(detail) : '')); } }
 const YES = [
+  // A trip told as "is on <day> at <clock>", with no departure verb (run 111)
+  ['Your flight is on Thursday at 06:30', '2026-10-29', 6, 30],
+  ['Your train is on Wednesday at 18:20', '2026-10-28', 18, 20],
+  ['Your bus to Eilat is on Sunday at 13:15', '2026-10-25', 13, 15],
+  ['הטיסה שלך ביום חמישי בשעה 06:30', '2026-10-29', 6, 30],
+  ['הטיסה שלך ביום חמישי בשעה 06:30 מנתב"ג, נא להגיע שלוש שעות קודם', '2026-10-29', 6, 30],
+  ['הרכבת שלך מחר ב-08:15', '2026-10-24', 8, 15],
   // A change that names the new time is the same trip at that time (owner-visible change of 2026-10-24: these were quiet before).
   ['Your flight has been delayed, now departs Sunday at 08:00', '2026-10-25', 8, 0],
   ['Your flight LY001 has been delayed, it now departs Sunday at 07:15', '2026-10-25', 7, 15],
@@ -25,6 +32,11 @@ const YES = [
 ];
 for (const [text, day, h, m] of YES) { const r = A.recognize(text, NOW); check('trip: ' + text, r.kind === 'trip' && r.dateIso === day && r.hour === h && r.minute === m, r); }
 const NO = [
+  ['Your flight was on Thursday at 06:30', 'a look back'],
+  ['Is your flight on Thursday at 06:30?', 'a question'],
+  ['Your flight is on sale on Thursday at 18:00', 'an offer'],
+  ['הטיסה שלך בוטלה ביום חמישי בשעה 06:30', 'cancelled'],
+  ['Your flight is on Thursday', 'no clock'],
   ['Your flight has been delayed', 'a delay with no new time'],
   ['הטיסה שלך עוכבה', 'a delay with no new time'],
   ['Unfortunately your flight is delayed and now departs Sunday at 07:15 instead', 'sorry / instead'],

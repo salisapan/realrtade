@@ -134,3 +134,10 @@ The chat card now has one more state, drawn with the existing canonical Do It co
 
 One more state of the chat card, drawn with the existing canonical Do It component, no new design: title "Paid? Waiting on Dana: Payment 500 NIS" (Hebrew «שולם? …»), one step "Mark done: <task>" («לסמן כבוצע: …»), Do It, closed line "Task marked done." («המשימה סומנה כבוצעה.»), Handled receipt with Undo ("Google Task is open again."). Error text when the person changed the task: "You changed this task, so I left it" («שינית את המשימה, השארתי אותה»). Grok: the error text is set through `data-glance-chip-label` on the halo chip; please confirm it is visible in the card.
 
+## Y3 — the money you chased arrived
+
+- Module `flow-trial-extension/core/money-arrived.js`, switch `MONEY_ARRIVED`. Map row Y3.
+- When: a payment-received notice from the person's bank or payment app matches one open chase.
+- Line: `התשלום התקבל: <amount>` / `Payment received: <amount>`. The loop moves to closed (paid); the chase task is no longer due.
+- No action needed from the person; the card shows the close and offers Undo.
+- Undo: reopens the chase. If the person changed the loop since, the card says Undo unavailable.

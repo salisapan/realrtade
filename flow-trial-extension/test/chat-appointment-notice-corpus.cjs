@@ -10,6 +10,20 @@ const YES = [
   ['התור שלך הועבר ליום שני בשעה 11:00', '2026-10-26', 11, 0],
   ['התור שלך נדחה ליום שלישי ב-09:00', '2026-10-27', 9, 0],
   ['Your appointment is confirmed for Sunday at 10:00', '2026-10-25', 10, 0],
+  // Hebrew booking verbs without a possessive, and service nouns (run 110)
+  ['השולחן שלכם נשמר ליום שבת בשעה 20:00', '2026-10-24', 20, 0],
+  ['הטיפול ברכב נקבע למחר בשעה 9:00', '2026-10-24', 9, 0],
+  ['הבדיקה שלך נקבעה ליום רביעי בשעה 8:15', '2026-10-28', 8, 15],
+  ['השולחן נשמר ליום חמישי בשעה 19:30', '2026-10-29', 19, 30],
+  ['Your car service is scheduled for tomorrow at 9:00', '2026-10-24', 9, 0],
+  // "is <weekday> at <clock>" without "on", and a Hebrew possessive with a dotted date (run 112)
+  ['Your appointment is Tuesday at 14:00', '2026-10-27', 14, 0],
+  ['Your appointment is at 14:00 on Tuesday', '2026-10-27', 14, 0],
+  ['Your table is Thursday at 8pm', '2026-10-29', 20, 0],
+  ['Your session is Monday at 9:00 am', '2026-10-26', 9, 0],
+  ['התור שלך ב-5.11 בשעה 10:20', '2026-11-05', 10, 20],
+  ['Your haircut is booked for Thursday at 17:30', '2026-10-29', 17, 30],
+  ['Your dental check-up is confirmed for Sunday at 8:30', '2026-10-25', 8, 30],
   ['Reminder: your table is booked Thursday at 8pm', '2026-10-29', 20, 0],
   ['Hi, your haircut appointment is scheduled for tomorrow at 14:30', '2026-10-24', 14, 30],
   ['Your reservation has been confirmed. See you Monday at 7:30pm', '2026-10-26', 19, 30],
@@ -28,6 +42,14 @@ const YES = [
 ];
 for (const [text, day, h, m] of YES) { const r = A.recognize(text, NOW); check('appointment: ' + text, r.kind === 'appointment' && r.dateIso === day && r.hour === h && r.minute === m, r); }
 const NO = [
+  ['Your appointment is on sale Tuesday at 14:00', 'an offer'],
+  ['Your appointment was Tuesday at 14:00', 'a look back'],
+  ['Is your appointment Tuesday at 14:00?', 'a question'],
+  ['Your appointment is Tuesday', 'no clock'],
+  ['הטיפול ברכב בוטל למחר בשעה 9:00', 'cancelled (Hebrew service)'],
+  ['הטיפול נקבע ליום חמישי, אבל אולי אבטל', 'hedge'],
+  ['Customer service is open until 17:00 on Thursday', 'opening hours, not a booking'],
+  ['Your service is not scheduled yet, we will call you', 'not scheduled'],
   ['Unfortunately your appointment has been moved to Monday at 11:00 instead', 'sorry / instead'],
   ['Your appointment on Sunday at 10:00 was cancelled', 'cancelled'],
   ['Your appointment was moved, sorry for the change', 'no new day'],
