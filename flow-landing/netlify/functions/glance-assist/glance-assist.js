@@ -373,7 +373,7 @@ exports.handler = async function (event) {
   } catch (err) {
     if (err.configMissing) {
       logErr('no LLM provider configured');
-      return { statusCode: 500, body: JSON.stringify({ error: 'This feature is not configured yet. Please email hello@theflow-ai.com.' }) };
+      return { statusCode: 500, body: JSON.stringify({ error: 'This feature is not configured yet. Please email info@theflow-ai.com.' }) };
     }
     if (err.pii || err.refusal) {
       logErr(err.pii ? 'blocked unmasked contact details' : 'model refused');

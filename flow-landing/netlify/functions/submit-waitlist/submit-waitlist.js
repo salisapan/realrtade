@@ -119,13 +119,13 @@ exports.handler = async function (event) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) {
     logErr('SUPABASE_SERVICE_ROLE_KEY not configured — cannot store signup');
-    return { statusCode: 500, body: JSON.stringify({ error: 'Signup is not configured. Please email hello@theflow-ai.com.' }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Signup is not configured. Please email info@theflow-ai.com.' }) };
   }
 
   const verifySecret = process.env.EMAIL_VERIFY_SECRET;
   if (!verifySecret) {
     logErr('EMAIL_VERIFY_SECRET not configured — cannot bind the update step to this signup');
-    return { statusCode: 500, body: JSON.stringify({ error: 'Signup is not configured. Please email hello@theflow-ai.com.' }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Signup is not configured. Please email info@theflow-ai.com.' }) };
   }
 
   if (action === 'create') {
@@ -160,12 +160,12 @@ exports.handler = async function (event) {
       if (!res.ok && res.status !== 409) {
         const detail = await res.text();
         logErr('Supabase rejected the waitlist insert', { status: res.status, detail });
-        return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email hello@theflow-ai.com.' }) };
+        return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email info@theflow-ai.com.' }) };
       }
       log('waitlist row stored', { email: maskEmail(email), source, alreadyExisted: res.status === 409 });
     } catch (err) {
       logErr('network error storing waitlist row', String(err));
-      return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email hello@theflow-ai.com.' }) };
+      return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email info@theflow-ai.com.' }) };
     }
 
     // Emails the confirmation link (double opt-in). Awaited with a timeout:
@@ -232,7 +232,7 @@ exports.handler = async function (event) {
     if (!res.ok) {
       const detail = await res.text();
       logErr('Supabase rejected the waitlist update', { status: res.status, detail });
-      return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email hello@theflow-ai.com.' }) };
+      return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email info@theflow-ai.com.' }) };
     }
     const rows = await res.json().catch(() => []);
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -275,7 +275,7 @@ exports.handler = async function (event) {
     }
   } catch (err) {
     logErr('network error updating waitlist row', String(err));
-    return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email hello@theflow-ai.com.' }) };
+    return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email info@theflow-ai.com.' }) };
   }
 
   return { statusCode: 200, body: JSON.stringify({ ok: true }) };

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Intended architecture for how Flow handles data. Deployment models, Flow-Edge, and the append-only audit log are a deployment offer (roadmap), not live toggles today.">
+<meta name="description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-Onprem.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/security.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -15,12 +15,12 @@
 <title>Security &amp; Architecture — Flow</title>
 <meta property="og:type" content="website">
 <meta property="og:title" content="Security &amp; Architecture — Flow">
-<meta property="og:description" content="Intended architecture for how Flow handles data. Deployment models, Flow-Edge, and the append-only audit log are a deployment offer (roadmap), not live toggles today.">
+<meta property="og:description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-Onprem.">
 <meta property="og:url" content="https://theflow-ai.com/security.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Security &amp; Architecture — Flow">
-<meta name="twitter:description" content="Intended architecture for how Flow handles data. Deployment models, Flow-Edge, and the append-only audit log are a deployment offer (roadmap), not live toggles today.">
+<meta name="twitter:description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-Onprem.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Security &amp; Architecture","item":"https://theflow-ai.com/security.html"}]}</script>
@@ -162,34 +162,38 @@ footer.site a{color:var(--muted)}
   <div class="wrap">
     <span class="eyebrow">Trust</span>
     <h1 class="title">Security &amp; Architecture</h1>
-    <div class="updated">Last updated: September 30, 2026</div>
+    <div class="updated">Last updated: October 28, 2026</div>
     <article>
-<p class="note">Flow is in pre-release. This page describes intended architecture. SSO, the audit log, and Flow-Edge are part of the deployment offer (roadmap) &mdash; not capabilities marked live in the product today. For current status in writing: <a href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>.</p>
+<p class="note">This page describes how Flow is designed to handle data. For the current status of any individual control, certification or audit report, in writing: <a href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>.</p>
 <p class="lead">Flow is built for organizations that cannot send raw sensitive data to a third-party model &mdash; legal, healthcare, finance, insurance, and government. This page describes how the system is designed, so your security team can evaluate it without a call.</p>
 
-<h2>1. Planned Deployment Models</h2>
-<p>The most important security decision is where processing happens. Flow is planned for two deployment models, per engagement &mdash; not as live product toggles today:</p>
-<div class="cards two">
+<h2>1. Deployment Models</h2>
+<p>The most important security decision is where processing happens. The office chooses between three setups:</p>
+<div class="cards">
   <div class="card">
-    <h3>Masked Secure Cloud</h3>
-    <p>Processing is designed for a managed environment, with personally identifiable and confidential fields masked <b>before</b> processing. That is the architecture; deployment status is closed in the project, not a live toggle today.</p>
+    <h3>Flow's Dedicated Secure Cloud</h3>
+    <p>Flow's own dedicated cloud environment. All sensitive data &mdash; personally identifiable and confidential fields &mdash; is masked <b>before</b> any processing.</p>
   </div>
   <div class="card">
-    <h3>Flow-Edge (Fully Local) &mdash; roadmap</h3>
-    <p>When policy requires that data not leave the network, this is the deployment path designed into the engagement &mdash; not a cloud configuration with a flag, and not a live product toggle today.</p>
+    <h3>Flow-Edge</h3>
+    <p>For computers with suitable hardware. Data is stored only on the employee's own computer and never leaves it.</p>
+  </div>
+  <div class="card">
+    <h3>Flow-Onprem</h3>
+    <p>A dedicated server inside the office's internal network. Data never goes to an external cloud.</p>
   </div>
 </div>
-<p>If your obligations make cloud processing untenable &mdash; export-controlled manufacturing data, NERC CIP-scoped operational systems, classified or CUI-adjacent government work &mdash; Flow-Edge (roadmap) is the deployment path designed into the engagement, not a configuration flag on a cloud product.</p>
+<p>If your obligations make cloud processing untenable &mdash; export-controlled manufacturing data, NERC CIP-scoped operational systems, classified or CUI-adjacent government work &mdash; the choice is between the Flow-Edge and Flow-Onprem setups, not a configuration flag on a cloud product. See <a href="/solutions/deployment.html">the deployment page</a>.</p>
 
 <h2>2. Data Masking</h2>
-<p>In the masked-cloud model, sensitive fields are designed to be identified and replaced with structure-preserving placeholders before processing. The model is designed to operate on the masked representation, with the mapping back to real values staying under your control, so a prompt, a log, or a model provider is not meant to receive the underlying identifier. Deployment status is closed in the engagement &mdash; not a live product toggle today.</p>
-<p>Masking is a mitigation, not a substitute for architecture. Where the requirement is "this data must not leave the building," the deployment path designed into the engagement is Flow-Edge (roadmap). We will say that directly rather than offer a cloud deployment with extra controls as if it were the same thing.</p>
+<p>In Flow's dedicated secure cloud, sensitive fields are identified and replaced with structure-preserving placeholders before processing. The model operates on the masked representation, with the mapping back to real values staying under your control, so a prompt, a log, or a model provider does not receive the underlying identifier.</p>
+<p>Masking is a mitigation, not a substitute for architecture. Where the requirement is "this data must not leave the building," the right setups are Flow-Edge or Flow-Onprem. We will say that directly rather than offer a cloud deployment with extra controls as if it were the same thing.</p>
 
 <h2>3. Zero-Retention Processing</h2>
 <p>Flow is designed so that content processed through the engine is not retained for model training and is not persisted beyond the life of the task that required it. "Zero-retention" is a claim worth verifying with any vendor &mdash; including us. We wrote a guide on <a href="/blog/zero-retention-ai-architecture.html">how to verify a vendor's zero-retention claim</a>, and we expect you to apply it to Flow.</p>
 
 <h2>4. Audit Logging &amp; Provenance</h2>
-<p><b>Immutable audit trail &mdash; roadmap.</b> For regulated deployments, an append-only log is planned: what was observed, what was proposed, who approved it, and what was executed. This is not a live product toggle today; it is closed in the engagement and the deployment. When it ships with a regulated rollout, the purpose is defensibility &mdash; when a regulator, auditor, or opposing counsel asks why a system did something eighteen months ago, the answer must be reconstructible from records rather than from memory.</p>
+<p><b>Audit trail.</b> For regulated deployments, the scope of the audit log &mdash; what was observed, what was proposed, who approved it, and what was executed &mdash; is agreed with your security team in the engagement. The purpose is defensibility: when a regulator, auditor, or opposing counsel asks why a system did something eighteen months ago, the answer must be reconstructible from records rather than from memory.</p>
 <p>Related reading: <a href="/blog/auditability-by-design-ai-systems.html">Auditability by Design</a> and <a href="/blog/ai-observability-tracing-debugging.html">Tracing a workflow decision back to its source</a>.</p>
 
 <h2>5. Human Approval Gates</h2>
@@ -209,7 +213,7 @@ footer.site a{color:var(--muted)}
 <p>We treat prompt injection and data exfiltration through model outputs as first-class threats rather than edge cases, because an automation engine with real system access has a materially larger blast radius than a chat interface. Our analysis is public: <a href="/blog/prompt-injection-ai-threat-modeling.html">Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation</a>.</p>
 
 <h2>9. Compliance Posture</h2>
-<p>Flow is currently in pre-release. The architecture above is designed to support deployment under HIPAA, GDPR, SOC 2, and sector-specific frameworks including 21 CFR Part 11, NERC CIP, CJIS, and FedRAMP-aligned government requirements.</p>
+<p>The architecture above is designed to support deployment under HIPAA, GDPR, SOC 2, and sector-specific frameworks including 21 CFR Part 11, NERC CIP, CJIS, and FedRAMP-aligned government requirements.</p>
 <p><b>If you are running a formal vendor assessment</b>, contact us at <a href="mailto:info@theflow-ai.com?subject=Security%20review">info@theflow-ai.com</a> for the current status of individual certifications and audit reports, along with the deployment model that fits your control environment. We would rather give you an accurate answer in writing than have you infer a certification status from a badge.</p>
 
 <h2>10. Reporting a Vulnerability</h2>
