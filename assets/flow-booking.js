@@ -57,17 +57,17 @@
     if (st.step === 1) {
       h = dots() + '<h2>' + t.t1 + '</h2><p class="fb-sub">' + t.s1 + '</p>' +
         '<div class="fb-sso"><button type="button" class="fb-oauth" data-sso="google">' + G_SVG + '<span>' + t.gg + '</span></button><button type="button" class="fb-oauth" data-sso="microsoft">' + MS_SVG + '<span>' + t.ms + '</span></button></div><div class="fb-or" aria-hidden="true"><span>' + t.or + '</span></div>' +
-        '<form data-f novalidate><label>' + t.email + '<input type="email" name="email" dir="ltr" autocomplete="email" inputmode="email" placeholder="' + t.emailPh + '" value="' + esc(st.email) + '" required></label><p class="fb-err" data-err role="alert"></p><button class="fb-btn" type="submit">' + t.next + '</button></form>';
+        '<form data-f novalidate><label>' + t.email + '<input type="email" name="email" dir="ltr" autocomplete="email" inputmode="email" placeholder="' + t.emailPh + '" value="' + esc(st.email) + '" required></label><p class="fb-err" data-err role="alert"></p><button class="fb-btn doit" type="submit"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">' + t.next + '</span></button></form>';
     } else if (st.step === 2) {
       var pre = !isPersonal(domainOf(st.email));
       h = dots() + '<h2>' + t.t2 + '</h2><p class="fb-sub">' + (pre ? t.s2 : t.s2e) + '</p>' +
         '<form data-f novalidate><label>' + t.company + '<input name="company" autocomplete="organization" value="' + esc(st.company) + '" required></label>' +
         '<label>' + t.site + '<input name="site" dir="ltr" autocomplete="url" inputmode="url" placeholder="' + t.sitePh + '" value="' + esc(st.site) + '" required></label><p class="fb-err" data-err role="alert"></p>' +
-        '<button class="fb-btn" type="submit">' + t.next + '</button><button type="button" class="fb-link" data-back>' + t.back + '</button></form>';
+        '<button class="fb-btn doit" type="submit"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">' + t.next + '</span></button><button type="button" class="fb-link" data-back>' + t.back + '</button></form>';
     } else {
       h = dots() + '<h2>' + t.t3 + '</h2><p class="fb-sub">' + t.s3 + '</p>' +
         '<div class="fb-sum"><b>' + esc(st.company) + '</b><span>' + esc(st.site) + '</span></div>' +
-        '<div class="fb-act"><button type="button" class="fb-btn" data-open>' + t.open + '</button><button type="button" class="fb-link" data-back>' + t.back + '</button></div>';
+        '<div class="fb-act"><button type="button" class="fb-btn doit" data-open><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">' + t.open + '</span></button><button type="button" class="fb-link" data-back>' + t.back + '</button></div>';
     }
     b.innerHTML = h;
     var f = b.querySelector('[data-f]'); if (f) f.addEventListener('submit', onSubmit);

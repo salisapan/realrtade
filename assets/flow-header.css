@@ -1,8 +1,8 @@
 /* Flow shared header (reusable) — v13r34
    Usage on any page:
-     <link rel="stylesheet" href="../assets/flow-header.css">
+     <link rel="stylesheet" href="/assets/flow-header.css">
      <flow-header data-brand="auto"></flow-header>
-     <script src="../assets/flow-header.js"></script>
+     <script src="/assets/flow-header.js"></script>
    Uses page tokens when present (--bg0 --ink --ink2 --ink3 --hair --card --accent) with safe fallbacks.
    Primary CTA is always Flow blue #2D5EFF. Opens the booking flow (assets/flow-booking.js) via [data-book]. */
 flow-header{display:block;height:0}
