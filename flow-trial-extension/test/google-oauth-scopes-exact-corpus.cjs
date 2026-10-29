@@ -1,5 +1,5 @@
 // OAuth scopes: manifest oauth2.scopes, runtime GOOGLE_OAUTH_SCOPES, and
-// FlowGoogleConfig.oauthScopeSetExact() must be the same seven scopes (no CASA).
+// FlowGoogleConfig.oauthScopeSetExact() must match the six v1 manifest scopes (no CASA).
 // Run: node test/google-oauth-scopes-exact-corpus.cjs
 'use strict';
 
