@@ -4316,8 +4316,10 @@
     if (!mailTokenLive(token)) return;
     const own = ownAddressesOf(st);
     const ids = FlowOwaParse.urlIds(location.href);
+    const anchorReport = FlowOwaParse.rootsReport ? FlowOwaParse.rootsReport(document) : {};
+    const bodyAnchorMissing = anchorReport.document === 0;
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
-    let domBodyUnreadable = Boolean(pane && !(String(pane.text || '').trim()));
+    let domBodyUnreadable = bodyAnchorMissing || Boolean(pane && !(String(pane.text || '').trim()));
     if ((!pane || domBodyUnreadable) && ids.kind && st && st.outlookAuth && st.outlookAuth.token) {
       try {
         const fromGraph = await paneFromGraphWhenUnreadable(ids);
