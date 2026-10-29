@@ -41,6 +41,7 @@
         "core/build-stamp.js",
         "core/fact-reply.js",
         "core/close-families.js",
+        "core/name-match.js",
         "core/intent.js",
         "core/file-attach.js",
         "core/actions.js",
@@ -173,21 +174,18 @@
     "https://www.googleapis.com/oauth2/*",
     "https://www.googleapis.com/upload/drive/*",
     "https://gmail.googleapis.com/*",
-    "https://forms.googleapis.com/*",
     "https://*.googleusercontent.com/*",
     "https://theflow-ai.com/*"
   ],
   "oauth2": {
     "client_id": "93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/tasks",
       "https://www.googleapis.com/auth/calendar.events",
-      "https://www.googleapis.com/auth/gmail.compose",
-      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/tasks",
       "https://www.googleapis.com/auth/drive.file",
-      "https://www.googleapis.com/auth/forms.body",
       "openid",
-      "https://www.googleapis.com/auth/userinfo.profile"
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/userinfo.email"
     ]
   },
   "web_accessible_resources": [
@@ -210,30 +208,13 @@
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "optional_host_permissions": [
-    "https://web.whatsapp.com/*",
-    "https://app.slack.com/*",
-    "https://web.telegram.org/*",
     "https://graph.microsoft.com/*",
     "https://login.microsoftonline.com/*",
     "http://127.0.0.1/*",
     "http://localhost/*",
     "https://outlook.live.com/*",
     "https://outlook.office.com/*",
-    "https://outlook.office365.com/*",
-    "https://www.messenger.com/*",
-    "https://messenger.com/*",
-    "https://www.facebook.com/messages",
-    "https://www.facebook.com/messages/*",
-    "https://facebook.com/messages",
-    "https://facebook.com/messages/*",
-    "https://business.facebook.com/latest/inbox",
-    "https://business.facebook.com/latest/inbox/*",
-    "https://www.business.facebook.com/latest/inbox",
-    "https://www.business.facebook.com/latest/inbox/*",
-    "https://www.instagram.com/direct",
-    "https://www.instagram.com/direct/*",
-    "https://instagram.com/direct",
-    "https://instagram.com/direct/*"
+    "https://outlook.office365.com/*"
   ],
   "options_ui": {
     "page": "lane-chat/enable.html",

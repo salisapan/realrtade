@@ -4,26 +4,44 @@ on:
   pull_request:
     branches:
       - claude/install-uiux-pro-max-skill-a4agox
+      - cursor/c1-connect-claude-4978-8c95
+      - cursor/d1-usercontext-on-c1-4978-8c95
   workflow_dispatch:
 
 jobs:
   e2e:
-    name: e2e (${{ matrix.tz }})
+    name: e2e (${{ matrix.tz }} shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    # The suite runs about 15 minutes on a hosted runner, so 15 cancelled it mid-run.
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include:
           - tz: UTC
-            artifact: glance-e2e-UTC
+            tz_slug: UTC
+            shard: 1
+          - tz: UTC
+            tz_slug: UTC
+            shard: 2
+          - tz: UTC
+            tz_slug: UTC
+            shard: 3
           - tz: Asia/Jerusalem
-            artifact: glance-e2e-Asia-Jerusalem
+            tz_slug: Asia-Jerusalem
+            shard: 1
+          - tz: Asia/Jerusalem
+            tz_slug: Asia-Jerusalem
+            shard: 2
+          - tz: Asia/Jerusalem
+            tz_slug: Asia-Jerusalem
+            shard: 3
     env:
       TZ: ${{ matrix.tz }}
+      CI: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -39,23 +57,96 @@ jobs:
           node test/cc-only-recipients-corpus.cjs
           node test/glance-0956-corpus.cjs
           node test/outlook-calendar-corpus.cjs
+          node test/smoke227-meeting-ask-corpus.cjs
           node test/regress-144-corpus.cjs
           node test/negation-conditional-corpus.cjs
           node test/self-title-preposition-corpus.cjs
           node test/display-144-followups-corpus.cjs
+          node test/connect-ecosystem-corpus.cjs
       - name: Install Chromium
         working-directory: flow-trial-extension
         run: npx playwright install --with-deps chromium
       - name: Run the headless suite
         working-directory: flow-trial-extension
-        run: xvfb-run -a npx playwright test
-      - name: Upload the Playwright report
+        run: xvfb-run -a npx playwright test --shard=${{ matrix.shard }}/3
+      - name: Upload blob report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: |
-            flow-trial-extension/e2e-report/
-            flow-trial-extension/test-results/
+          name: blob-${{ matrix.tz_slug }}-${{ matrix.shard }}
+          path: flow-trial-extension/blob-report
           if-no-files-found: ignore
           retention-days: 7
+
+  merge-reports:
+    name: Merge Playwright reports
+    runs-on: ubuntu-latest
+    needs: e2e
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: flow-trial-extension/package-lock.json
+      - name: Install dependencies
+        working-directory: flow-trial-extension
+        run: npm ci
+      - name: Install Chromium
+        working-directory: flow-trial-extension
+        run: npx playwright install --with-deps chromium
+      - name: Download blob reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-blob-reports
+          pattern: blob-*
+          merge-multiple: true
+      - name: Merge into HTML report
+        working-directory: flow-trial-extension
+        run: |
+          if [ -d ../all-blob-reports ] && [ "$(find ../all-blob-reports -name '*.zip' 2>/dev/null | head -1)" ]; then
+            npx playwright merge-reports --reporter html ../all-blob-reports
+          else
+            echo "No blob reports to merge"
+            mkdir -p e2e-report
+            echo '<html><body><p>No blob reports uploaded</p></body></html>' > e2e-report/index.html
+          fi
+      - name: Upload merged Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glance-e2e-merged-report
+          path: flow-trial-extension/e2e-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Meta Messenger / Business Suite / Instagram chat lanes are out of the v1
+  # product path (META_CHAT_LANES defaults off). Specs stay unchanged; this job
+  # proves them with the lane switch on and does not block merge.
+  e2e-meta-lanes-future:
+    name: e2e Meta chat lanes (non-blocking, META_CHAT_LANES on)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    continue-on-error: true
+    env:
+      TZ: UTC
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: flow-trial-extension/package-lock.json
+      - name: Install dependencies
+        working-directory: flow-trial-extension
+        run: npm ci
+      - name: Install Chromium
+        working-directory: flow-trial-extension
+        run: npx playwright install --with-deps chromium
+      - name: Run Meta lane specs with META_CHAT_LANES on
+        working-directory: flow-trial-extension
+        run: |
+          xvfb-run -a env GLANCE_E2E_SWITCHES='{"META_CHAT_LANES":true,"CHAT_TASK_CARD":true}' \
+            npx playwright test e2e/chat-whatsapp-card.spec.js e2e/chat-meta-lanes.spec.js e2e/lane-chat-draft.spec.js e2e/lane-register-meta.spec.js

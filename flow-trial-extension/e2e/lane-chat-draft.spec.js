@@ -29,7 +29,8 @@ const LANE_JS = [
   'src/content-messenger.js'
 ];
 const PLACE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/messenger-place.html'), 'utf8');
-const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8');
+const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8')
+  .replace(/2026-10-14/g, '2026-10-27');
 const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
 async function registerMessenger(glance) {
@@ -134,7 +135,8 @@ test('an open Business Suite thread drafts the existing last row and sends nothi
   expect(registered).toBe(true);
 
   await glance.seedOutlook();
-  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: '2026-10-08T10:00:00.000Z' });
+  // Fixture rows use 2026-10-27 (fresh on CI). "שבוע שעבר" is lastWeek(message time), not the dev fixture clock.
+  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: '2026-10-21T10:00:00.000Z' });
   const page = await glance.openBusiness(SUITE_HTML);
   const before = await page.locator('[role="row"]').count();
   const box = page.locator('[data-glance-composer="1"]');

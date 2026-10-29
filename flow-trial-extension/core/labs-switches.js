@@ -10,6 +10,7 @@ const FlowLabsSwitches = (() => {
     { id: 'SYSTEM_NOTICE', who: 'התראת מערכת עם מועד', note: '"הפרויקט ייעצר", "הדומיין יפוג" הופכים למשימה' },
     { id: 'CHAT_TASK_CARD', who: 'צ\'אט: כרטיס עשה', note: 'וואטסאפ, מסנג\'ר ואינסטגרם: בקשה בצ\'אט מקבלת כרטיס' },
     { id: 'CHAT_PROMISE_CARD', who: 'צ\'אט: הבטחה אליך', note: 'הבטחה שקיבלת בצ\'אט נרשמת כ"ממתין ל..."' },
+    { id: 'META_CHAT_LANES', who: 'צ\'אטים של Meta (מסנג\'ר, אינסטגרם, וואטסאפ)', note: 'רישום סקריפטים לצ\'אטים של Meta אחרי הסכמה — כבוי ב-v1; לא נבדק בבדיקה חיה' },
     { id: 'MEET_LINK', who: 'קישור לשיחת וידאו של Google', note: 'שיחה שהוצעה מקבלת אירוע ביומן עם קישור לשיחת וידאו של Google' },
     { id: 'EVENT_CALL_LINK', who: 'קישור לשיחת וידאו באירוע קיים', note: 'מוסיף קישור לאירוע שאתה מארגן' },
     { id: 'TEAMS_MEETING', who: 'קישור Teams לשיחה', note: 'שיחה שהוצעה ב-Outlook מקבלת אירוע עם קישור Teams' },
@@ -18,12 +19,16 @@ const FlowLabsSwitches = (() => {
     { id: 'RECURRING_REMINDER', who: 'תזכורת חוזרת', note: 'התחייבות חוזרת הופכת לתזכורת חוזרת' },
     { id: 'RECURRING_TODO', who: 'משימה חוזרת', note: 'משימה של Microsoft שחוזרת על עצמה' },
     { id: 'WORKSPACE_FILE', who: 'מסמך, גיליון או מצגת של Google', note: 'קובץ ריק בשם שביקשו, ב-Drive' },
-    { id: 'GOOGLE_FORMS', who: 'טופס של Google (דורש WORKSPACE_FILE)', note: 'טופס ריק בשם שביקשו; מבקש הרשאת Forms, בלי שאלות ובלי שליחה' },
+    { id: 'GOOGLE_FORMS', who: 'טופס של Google (אחרי מסמך ב-Drive)', note: 'טופס ריק בשם שביקשו; בלי שאלות ובלי שליחה' },
     { id: 'ONEDRIVE_NEW_FILE', who: 'מסמך או גיליון של Microsoft', note: 'קובץ ריק בשם שביקשו, ב-OneDrive' },
     { id: 'SHAREPOINT_NEW_FILE', who: 'מסמך או גיליון באתר SharePoint', note: 'קובץ ריק בשם שביקשו, באתר אחד ששמו נכתב במייל' },
     { id: 'SHAREPOINT_SAVE_FILE', who: 'קובץ מצורף באתר SharePoint', note: 'שמירת הקובץ המצורף, כמו שהוא, באתר אחד ששמו נכתב במייל' },
     { id: 'CHAT_CHASE_DRAFT', who: 'תזכורת בצ\'אט למי שמאחר', note: 'טיוטת תזכורת בתיבת הצ\'אט כשמשימת "מחכים ל..." עברה את היום שלה (לא נשלחת)' },
-    { id: 'PLANNER_TASK', who: 'משימה בתוכנית עבודה של Microsoft', note: 'משימה בתוכנית ששמה בא במייל, בלי הקצאה לאף אחד' }
+    { id: 'PLANNER_TASK', who: 'משימה בתוכנית עבודה של Microsoft', note: 'משימה בתוכנית ששמה בא במייל, בלי הקצאה לאף אחד' },
+    { id: 'GOOGLE_CONTACTS', who: 'אנשי קשר של Google', note: 'שאלה על כתובת או העברה לשם — מילוי טיוטה בגימייל בלבד, בלי שליחה' },
+    { id: 'CONNECT_ECOSYSTEM', who: 'חיבור לפי מערכת', note: 'מסך חיבור אחד לכל מערכת (Google, Microsoft, Meta) — לא נבדק בבדיקה חיה' },
+    { id: 'FULL_DOCUMENT_CLOSE', who: 'מסמך מלא בסגנון שלך', note: 'הצעת מחיר או מסמך מלא במסמך Google לפי סגנון הכתיבה שלך — לא נבדק בבדיקה חיה' },
+    { id: 'USER_CONTEXT_WRITER', who: 'עדכון פרופיל מקומי', note: 'רושם בפרופיל המקומי איך טיפלת בדומה — לא נבדק בבדיקה חיה' }
   ];
   const IDS = LIST.map((r) => r.id);
   function isOn(bag, id) { return Boolean(bag && bag[id] === true); }

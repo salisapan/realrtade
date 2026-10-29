@@ -47,13 +47,12 @@ function load(opts) {
     stored.googleGrantedScopes = {
       version: [
         'https://www.googleapis.com/auth/calendar.events',
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/drive.readonly',
-        'https://www.googleapis.com/auth/forms.body',
-        'https://www.googleapis.com/auth/gmail.compose',
         'https://www.googleapis.com/auth/tasks',
+        'https://www.googleapis.com/auth/contacts.readonly',
+        'https://www.googleapis.com/auth/drive.file',
+        'openid',
         'https://www.googleapis.com/auth/userinfo.profile',
-        'openid'
+        'https://www.googleapis.com/auth/userinfo.email'
       ].join('\n'),
       status: 'granted',
       source: 'chrome',
@@ -96,7 +95,7 @@ function load(opts) {
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com', scopes: ['https://www.googleapis.com/auth/tasks'] } }),
+        getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com', scopes: OAUTH_SCOPES_EXACT.slice() } }),
         onMessage: { addListener() {} },
         onInstalled: { addListener() {} },
         onStartup: { addListener() {} },
@@ -116,7 +115,8 @@ function load(opts) {
       },
       windows: { create: () => {}, onRemoved: { addListener() {} } },
       tabs: { sendMessage: () => {} },
-      alarms: { create: () => {}, onAlarm: { addListener() {} } }
+      alarms: { create: () => {}, onAlarm: { addListener() {} } },
+      contextMenus: { create() {}, onClicked: { addListener() {} } }
     },
     // A bare vm context has no Node/browser globals beyond the ECMAScript
     // spec ones (encodeURIComponent, unescape, ... are already there) —
@@ -133,6 +133,9 @@ function load(opts) {
   sandbox.self = sandbox;
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
+  if (opts.loadGoogleConfig) {
+    vm.runInContext(require('./load-background.cjs').GOOGLE_CONFIG_SRC, sandbox, { filename: 'google-config.js' });
+  }
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
   vm.runInContext(require('./load-background.cjs').LANE_ACCOUNT_STUB, sandbox);
   return {
@@ -154,6 +157,18 @@ function check(name, cond, detail) {
 async function attempt(promise) {
   try { return await promise; }
   catch (e) { return { ok: false, threw: String((e && e.message) || e) }; }
+}
+
+function apiCalls(calls) {
+  return (calls || []).filter((c) => typeof c === 'string' && !c.startsWith('EVICT '));
+}
+
+function driveListCall(calls) {
+  return (calls || []).find((c) => typeof c === 'string' && c.includes('/drive/v3/files'));
+}
+
+function draftPostBody(env) {
+  return (env.bodies || []).find((b) => b && b.message && typeof b.message.raw === 'string') || null;
 }
 
 // Decodes a Gmail drafts.create request's base64url `raw` field back into
@@ -181,7 +196,31 @@ function decodeDraftRaw(raw) {
 
 // A connected person has a granted-scope record for the scope list in the manifest; without it the first write drops
 // the cached token once and asks again (googleScopeAction), which is the upgrade path and not the ordinary write.
-const CONNECTED = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: { version: 'https://www.googleapis.com/auth/tasks', status: 'granted' } };
+const OAUTH_SCOPES_EXACT = [
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/contacts.readonly',
+  'https://www.googleapis.com/auth/drive.file',
+  'openid',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email'
+];
+const GRANTED_OAUTH = { version: OAUTH_SCOPES_EXACT.join('\n'), status: 'granted', source: 'chrome', at: 1 };
+const GRANTED_MAILBOX_DRIVE = {
+  version: OAUTH_SCOPES_EXACT.concat(['https://www.googleapis.com/auth/drive.readonly']).join('\n'),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
+const GRANTED_GMAIL_COMPOSE = {
+  version: OAUTH_SCOPES_EXACT.concat(['https://www.googleapis.com/auth/gmail.compose']).join('\n'),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
+const CONNECTED = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: GRANTED_OAUTH };
+const CONNECTED_DRIVE_SEARCH = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: GRANTED_MAILBOX_DRIVE };
+const CONNECTED_GMAIL_DRAFT = { googleTasksAuth: { taskListId: 'LIST_A' }, googleGrantedScopes: GRANTED_GMAIL_COMPOSE };
 const PAYLOAD = { label: 'Send the signed SOW', facts: {}, senderName: 'Dana', threadUrl: 'https://mail.google.com/x' };
 
 async function run() {
@@ -197,7 +236,7 @@ async function run() {
     check('the undo ref names the list it actually wrote to',
       (out.ref || {}).taskListId === 'LIST_A' && (out.ref || {}).taskId === 'task_1' && (out.ref || {}).externalId === 'task_1', out);
     check('POST then one read-back, no extra round trips',
-      env.calls.length === 2 && env.calls[0] === 'POST /lists/LIST_A/tasks' && env.calls[1] === 'GET /lists/LIST_A/tasks/task_1', env.calls);
+      apiCalls(env.calls).length === 2 && apiCalls(env.calls)[0] === 'POST /lists/LIST_A/tasks' && apiCalls(env.calls)[1] === 'GET /lists/LIST_A/tasks/task_1', env.calls);
     check('the read-back is a proof',
       out.proof && out.proof.fetchedBack === true && out.proof.system === 'google/tasks' && out.proof.externalId === 'task_1' && typeof out.proof.verifiedAt === 'string',
       out.proof);
@@ -413,7 +452,7 @@ async function run() {
     const missed = await attempt(miss.fn('googleTasksWrite')(PAYLOAD));
     check('a GET miss is not ok', missed.ok === false && missed.reason === 'verify_failed' && !missed.proof, missed);
     check('POST still happened, then the GET that missed',
-      miss.calls[0] === 'POST /lists/LIST_A/tasks' && miss.calls[1] === 'GET /lists/LIST_A/tasks/task_miss', miss.calls);
+      apiCalls(miss.calls)[0] === 'POST /lists/LIST_A/tasks' && apiCalls(miss.calls)[1] === 'GET /lists/LIST_A/tasks/task_miss', miss.calls);
     const missCopy = Receipt.confirmation({
       succeeded: 0, total: 1, priorCloses: 0, requireProof: true, proofs: [], verifyStatus: missed.reason
     });
@@ -427,7 +466,7 @@ async function run() {
     });
     const unconfirmed = await attempt(pending.fn('googleTasksWrite')(PAYLOAD));
     check('a create with no id is proof_pending and does not GET',
-      unconfirmed.ok === false && unconfirmed.reason === 'proof_pending' && pending.calls.length === 1 && pending.calls[0].startsWith('POST '),
+      unconfirmed.ok === false && unconfirmed.reason === 'proof_pending' && apiCalls(pending.calls).length === 1 && apiCalls(pending.calls)[0].startsWith('POST '),
       { out: unconfirmed, calls: pending.calls });
 
     const mismatch = load({
@@ -559,7 +598,8 @@ async function run() {
   console.log('\n--- background.js: gmailDraftWrite — a plain draft with nothing to attach ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_1' }), method: 'POST' }]
@@ -573,8 +613,9 @@ async function run() {
     check('target reads as a plain draft reply, no attachment claim', out.target === 'a draft reply', out.target);
     check('the receipt names the draft and the ask it wrote',
       out.written === 'Gmail draft · the signed contract', out.written);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    check('the Gmail drafts POST body is captured', Boolean(draftCall), { calls: env.calls });
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('no attachment filename ends up in the MIME message', decoded.attachmentFilename === null, decoded);
     check('no auto-find verification note when nothing was ever attached', !decoded.body.includes('found'), decoded.body);
     // Nobody supplied requestedObjectTerm — Drive must never be searched
@@ -585,7 +626,8 @@ async function run() {
   console.log('\n--- background.js: gmailDraftWrite — a resolved file is attached; a bare term is not a search ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/drive\/v3\/files\/file_1\?fields=/, { reply: res(200, { name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '2048' }) }],
@@ -600,13 +642,14 @@ async function run() {
     check('the resolved file still produces a draft', out.ok === true, out);
     check('target names a real attachment, not an unverified guess', out.target === 'a draft reply with the attachment', out.target);
     check('the writer does not run a fresh Drive search when the file id is already known', !env.calls.some((c) => c.includes('/drive/v3/files?q=')), env.calls);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the resolved filename lands in the MIME attachment', decoded.attachmentFilename === 'Contract-Signed.pdf', decoded);
     check('the body names the attached file', decoded.body.includes('Attached: Contract-Signed.pdf'), decoded.body);
 
     const termOnly = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_term' }), method: 'POST' }]
@@ -622,7 +665,8 @@ async function run() {
   console.log('\n--- background.js: a Google Doc match is exported, not downloaded as media ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/drive\/v3\/files\/doc_1\?fields=/, { reply: res(200, { name: 'Invoice', mimeType: 'application/vnd.google-apps.document' }) }],
@@ -637,8 +681,8 @@ async function run() {
     check('a Doc export still attaches', out.ok === true, out);
     check('the Doc is exported as PDF', env.calls.some((c) => c.includes('/files/doc_1/export') && c.includes('application%2Fpdf')), env.calls);
     check('alt=media is not used for a Google Doc', !env.calls.some((c) => c.includes('doc_1') && c.includes('alt=media')), env.calls);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the exported PDF name is what gets attached', decoded.attachmentFilename === 'Invoice.pdf', decoded);
   }
 
@@ -646,7 +690,7 @@ async function run() {
   {
     let page = 0;
     const env = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: () => {
         page += 1;
         if (page === 1) {
@@ -662,7 +706,7 @@ async function run() {
     check('the second request carries the page token', env.calls.some((c) => c.includes('pageToken=tok2')), env.calls);
     check('page size is 100, not a top-five sample', env.calls.some((c) => c.includes('pageSize=100')), env.calls);
     const broken = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: res(500, {}) }]]
     });
     const failed = await attempt(broken.fn('searchDriveFiles')("trashed = false and name contains 'invoice'"));
@@ -683,7 +727,7 @@ async function run() {
 
     let n = 0;
     const once = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: () => {
         n += 1;
         if (n === 1) return res(403, { error: { errors: [{ reason: 'insufficientPermissions' }], message: 'Insufficient Permission' } });
@@ -696,7 +740,7 @@ async function run() {
     check('Drive is listed twice, not left on the first 403', once.calls.filter((c) => c.indexOf('/drive/v3/files?q=') >= 0).length === 2, once.calls);
 
     const twice = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: res(403, { error: { errors: [{ reason: 'insufficientPermissions' }], message: 'Insufficient Permission' } }) }]]
     });
     const detail = {};
@@ -706,7 +750,7 @@ async function run() {
     check('a missing scope is not retried forever', twice.calls.filter((c) => c.indexOf('/drive/v3/files?q=') >= 0).length === 2, twice.calls);
 
     const http = {};
-    const five = load({ stored: CONNECTED, routes: [[/\/drive\/v3\/files\?q=/, { reply: res(500, { error: { message: 'backend' } }) }]] });
+    const five = load({ stored: CONNECTED_DRIVE_SEARCH, routes: [[/\/drive\/v3\/files\?q=/, { reply: res(500, { error: { message: 'backend' } }) }]] });
     const fiveOut = await attempt(five.fn('searchDriveFiles')("name contains 'invoice'", http));
     check('a 500 stays null, drive-search-failed, and does not evict', fiveOut === null && http.reason === 'drive-search-failed' && http.error === 'backend' && !five.calls.some((c) => c.indexOf('EVICT ') === 0), { fiveOut, http, calls: five.calls });
 
@@ -715,12 +759,19 @@ async function run() {
     const blankOut = await attempt(blank.fn('searchDriveFiles')('', emptyDetail));
     check('an empty query does not call Drive', blankOut === null && emptyDetail.reason === 'drive-search-failed' && emptyDetail.error === 'empty-query' && blank.calls.length === 0, { blankOut, emptyDetail, calls: blank.calls });
 
+    const hiddenMailbox = load({ loadGoogleConfig: true, stored: CONNECTED });
+    const hiddenDetail = {};
+    const hiddenSearch = await attempt(hiddenMailbox.fn('searchDriveFiles')("name contains 'invoice'", hiddenDetail));
+    check('without drive.readonly mailbox search stays hidden and never calls Drive', hiddenSearch === null && hiddenDetail.reason === 'drive-search-unavailable' && hiddenMailbox.calls.length === 0, { hiddenSearch, hiddenDetail, calls: hiddenMailbox.calls });
+    const hiddenDraft = await attempt(hiddenMailbox.fn('gmailDraftWrite')({ senderEmail: 'dana@meridian.com', subject: 'Hi', params: { what: 'invoice' } }));
+    check('without gmail.compose the Gmail drafts API path stays hidden', hiddenDraft && hiddenDraft.ok === false && hiddenDraft.reason === 'compose-closed' && !hiddenMailbox.calls.some((c) => c.includes('/users/me/drafts')), hiddenDraft);
+
     const off = load({ stored: {} });
     const notConn = await attempt(off.fn('searchDriveMessage')({ query: "name contains 'x'", trace: true }));
     check('Google not connected is drive-not-granted', notConn && notConn.ok === false && notConn.reason === 'drive-not-granted' && notConn.error === 'not-connected' && notConn.fileCount === 0, notConn);
 
     const traced = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [
         [/\/drive\/v3\/files\?q=/, { reply: res(200, { files: [{ id: 'q4', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' }] }) }],
         [/\/oauth2\/v3\/tokeninfo/, { reply: res(200, { scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/tasks' }) }]
@@ -733,7 +784,7 @@ async function run() {
     check('without the trace, scopes are absent', noTrace && noTrace.ok === true && noTrace.fileCount === 1 && noTrace.scopes == null, noTrace);
 
     const failedMsg = load({
-      stored: CONNECTED,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?q=/, { reply: res(503, { error: { message: 'backend' } }) }]]
     });
     const msgOut = await attempt(failedMsg.fn('searchDriveMessage')({ query: "name contains 'x'" }));
@@ -751,7 +802,8 @@ async function run() {
     // silently masking the real bug — so the call log itself is the
     // assertion, not just the final attachment.
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_4' }), method: 'POST' }]
@@ -765,8 +817,8 @@ async function run() {
     check('a real thread attachment still produces a successful draft', out.ok === true, out);
     check('target reflects a confirmed attachment, not an unverified guess', out.target === 'a draft reply with the attachment', out.target);
     check('Drive is never queried once a real thread attachment already exists', !env.calls.some((c) => c.includes('/drive/v3/')), env.calls);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the thread attachment\'s own filename is what actually gets attached', decoded.attachmentFilename === 'from-thread.pdf', decoded);
     check('no "please confirm" note for a thread attachment the user already saw', !decoded.body.includes('confirm'), decoded.body);
   }
@@ -774,7 +826,8 @@ async function run() {
   console.log('\n--- background.js: a resolved file that cannot be read does not become a plain success ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/drive\/v3\/files\/file_big\?fields=/, { reply: res(200, { name: 'Contract-4K-Scan.pdf', mimeType: 'application/pdf', size: String(50 * 1024 * 1024) }) }]
@@ -792,7 +845,8 @@ async function run() {
   console.log('\n--- background.js: create-when-missing copies a template, attaches it, and undo deletes both ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
         [/\/drive\/v3\/files\/tpl\?fields=/, { reply: res(200, { name: 'Invoice Template', mimeType: 'application/vnd.google-apps.document' }) }],
@@ -818,12 +872,12 @@ async function run() {
     const upload = env.bodies.find((b) => typeof b === 'string' && b.includes('"name"') && b.includes('1042'));
     check('the uploaded file is named from the filled facts', Boolean(upload) && upload.includes('Dana'), upload && upload.slice(0, 220));
     check('the template itself is exported, not replaced', env.calls.some((c) => c.includes('/files/tpl/export')) && !env.calls.some((c) => c.startsWith('DELETE ') && c.includes('/files/tpl')), env.calls);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the prepared file is the draft attachment', decoded.attachmentFilename === 'invoice — Dana — 1042.pdf', decoded);
     check('the draft body carries the filled fields', decoded.body.includes('Bill to: Dana') && decoded.body.includes('Invoice number: 1042'), decoded.body);
 
-    const empty = load({ stored: CONNECTED, routes: [] });
+    const empty = load({ loadGoogleConfig: true, stored: CONNECTED_GMAIL_DRAFT, routes: [] });
     const refused = await attempt(empty.fn('gmailDraftWrite')({
       senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Invoice',
       params: { templateId: 'tpl', fields: [{ id: 'number', label: 'Invoice number', value: '  ' }] }
@@ -834,7 +888,8 @@ async function run() {
   console.log('\n--- background.js: Gmail draft undo deletes that draft, and a missing one is already undone ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/users\/me\/drafts\/draft_1$/, { reply: res(204, {}) }],
         [/\/users\/me\/drafts\/gone$/, { reply: res(404, {}) }]
@@ -846,7 +901,8 @@ async function run() {
       && env.calls.some((c) => c.startsWith('DELETE ') && c.includes('/users/me/drafts/draft_1')),
       env.calls);
     const withFile = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/users\/me\/drafts\/draft_tpl$/, { reply: res(204, {}) }],
         [/\/drive\/v3\/files\/copy_1$/, { reply: res(204, {}) }]
@@ -1081,7 +1137,7 @@ async function run() {
     check('the receipt names Calendar, the title, and the time that was written',
       out.written === 'Calendar · I will send you the signed contract by Friday, September 18 at 3pm. · Sep 18 15:00',
       out.written);
-    check('one request', env.calls.length === 1, env.calls);
+    check('one request', apiCalls(env.calls).length === 1, env.calls);
   }
 
   console.log('\n--- background.js: an invalid date or time is not written, and does not look like success ---\n');
@@ -1241,7 +1297,7 @@ async function run() {
     check('a single event at that minute is deleted', out.ok === true && out.ref && out.ref.eventId === 'ev_sync' && out.ref.restore && out.ref.restore.start, out);
     check('the receipt says the event is off that clock', out.written === 'Calendar · Friday sync · off Sep 18 15:00', out.written);
     check('delete lists then deletes, and does not insert',
-      env.calls[0].indexOf('GET /calendars/primary/events?') === 0 &&
+      apiCalls(env.calls)[0].indexOf('GET /calendars/primary/events?') === 0 &&
         env.calls.some((c) => c === 'DELETE /calendars/primary/events/ev_sync') &&
         !env.calls.some((c) => c === 'POST /calendars/primary/events'),
       env.calls);
@@ -1289,9 +1345,10 @@ async function run() {
     });
     const undone = await attempt(undoEnv.fn('googleCalendarUndo')(out.ref));
     check('undo of a move patches the previous start back',
-      undone.ok === true && undoEnv.calls[0] === 'PATCH /calendars/primary/events/ev_move' &&
-        undoEnv.bodies[0] && undoEnv.bodies[0].start.dateTime === previousStart.dateTime,
-      { calls: undoEnv.calls, body: undoEnv.bodies[0] });
+      undone.ok === true && apiCalls(undoEnv.calls)[0] === 'PATCH /calendars/primary/events/ev_move' &&
+        undoEnv.bodies[undoEnv.calls.findIndex((c) => c === 'PATCH /calendars/primary/events/ev_move')] &&
+        undoEnv.bodies[undoEnv.calls.findIndex((c) => c === 'PATCH /calendars/primary/events/ev_move')].start.dateTime === previousStart.dateTime,
+      { calls: undoEnv.calls, body: undoEnv.bodies[undoEnv.calls.findIndex((c) => c === 'PATCH /calendars/primary/events/ev_move')] });
   }
   {
     const one = (id, minute) => ({
@@ -1306,7 +1363,7 @@ async function run() {
     const empty = await attempt(none.fn('googleCalendarWrite')({
       params: { calendarOp: 'delete', dateIso: '2026-09-18', hour: 15, minute: 0 }
     }));
-    check('zero events at that minute is not a write', empty.ok === false && empty.reason === 'not-found' && !empty.written && none.calls.length === 1, { out: empty, calls: none.calls });
+    check('zero events at that minute is not a write', empty.ok === false && empty.reason === 'not-found' && !empty.written && apiCalls(none.calls).length === 1, { out: empty, calls: none.calls });
     const two = load({
       stored: CONNECTED,
       routes: [[/\/calendars\/primary\/events\?/, { reply: res(200, { items: [one('a', '00'), one('b', '00')] }) }]]
@@ -1314,7 +1371,7 @@ async function run() {
     const both = await attempt(two.fn('googleCalendarWrite')({
       params: { calendarOp: 'delete', dateIso: '2026-09-18', hour: 15, minute: 0 }
     }));
-    check('two events at that minute are not deleted', both.ok === false && both.reason === 'not-found' && !both.written && two.calls.length === 1, { out: both, calls: two.calls });
+    check('two events at that minute are not deleted', both.ok === false && both.reason === 'not-found' && !both.written && apiCalls(two.calls).length === 1, { out: both, calls: two.calls });
     const other = load({
       stored: CONNECTED,
       routes: [[/\/calendars\/primary\/events\?/, { reply: res(200, { items: [one('later', '30')] }) }]]
@@ -1323,7 +1380,7 @@ async function run() {
       params: { calendarOp: 'delete', dateIso: '2026-09-18', hour: 15, minute: 0 }
     }));
     check('an event that starts on another minute is not deleted',
-      overlap.ok === false && overlap.reason === 'not-found' && other.calls.length === 1, { out: overlap, calls: other.calls });
+      overlap.ok === false && overlap.reason === 'not-found' && apiCalls(other.calls).length === 1, { out: overlap, calls: other.calls });
     const missing = load({
       stored: CONNECTED,
       routes: [[/\/calendars\/primary\/events/, { reply: res(200, { id: 'should_not' }) }]]
@@ -1358,7 +1415,8 @@ async function run() {
   console.log('\n--- background.js: reply-with-facts writes one fact and undo deletes the draft ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_GMAIL_DRAFT,
       routes: [
         [/\/users\/me\/threads\?/, { reply: res(200, { threads: [{ id: 'th_fact' }] }) }],
         [/\/users\/me\/drafts$/, { reply: res(200, { id: 'dr_fact' }), method: 'POST' }],
@@ -1373,8 +1431,8 @@ async function run() {
     }));
     check('a fact reply creates a draft', out.ok === true && out.ref && out.ref.draftId === 'dr_fact' && !out.ref.replyFact && !out.ref.factLine, out);
     check('the receipt uses the shared draft undo sentence', !out.undoHint && !out.undoneLine, out);
-    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
-    const decoded = decodeDraftRaw(draftCall.message.raw);
+    const draftCall = draftPostBody(env);
+    const decoded = draftCall ? decodeDraftRaw(draftCall.message.raw) : { attachmentFilename: null, body: '' };
     check('the draft body is the greeting plus that one fact',
       decoded.body.indexOf('Hi Dana,') === 0 && decoded.body.indexOf('Q3 total: 12400') !== -1 && decoded.body.indexOf('[Write your reply here]') === -1 && !decoded.attachmentFilename,
       decoded);
@@ -1389,7 +1447,8 @@ async function run() {
   console.log('\n--- background.js: fact lookup stays silent when Drive has too many files ---\n');
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?/, { reply: res(200, {
         files: [
           { id: 'a', name: 'Budget', mimeType: 'application/vnd.google-apps.spreadsheet' },
@@ -1402,14 +1461,15 @@ async function run() {
     const out = await attempt(env.fn('factSources')({ factLabel: 'Q3 total', sourceKind: 'sheet', sourceName: 'budget' }));
     check('four files is truncated silence', out.ok === true && out.truncated === true && out.sources.length === 0, out);
     check('it does not export those files', !env.calls.some((c) => /\/export/.test(c)), env.calls);
-    const q = env.calls[0] || '';
+    const q = driveListCall(env.calls) || '';
     check('the query is a spreadsheet name search through searchDriveFiles',
       q.indexOf('spreadsheet') !== -1 && q.indexOf('budget') !== -1 && q.indexOf('fullText') === -1 && q.indexOf('pageSize=100') !== -1 && q.indexOf('corpora=user') !== -1, q);
   }
 
   {
     const env = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [
         [/\/drive\/v3\/files\?/, { reply: res(200, { files: [
           { id: 'sheet1', name: 'Acme Budget', mimeType: 'application/vnd.google-apps.spreadsheet' }
@@ -1425,7 +1485,8 @@ async function run() {
       disconnected.ok === false && disconnected.reason === 'not-connected' && offline.calls.length === 0,
       disconnected);
     const quoted = load({
-      stored: CONNECTED,
+      loadGoogleConfig: true,
+      stored: CONNECTED_DRIVE_SEARCH,
       routes: [[/\/drive\/v3\/files\?/, { reply: res(200, { files: [] }) }]]
     });
     await attempt(quoted.fn('factSources')({
@@ -1433,7 +1494,7 @@ async function run() {
       sourceKind: 'sheet',
       sourceName: "a'b"
     }));
-    const quotedUrl = decodeURIComponent(quoted.calls[0] || '');
+    const quotedUrl = decodeURIComponent(driveListCall(quoted.calls) || '');
     check('a quote in the file name stays inside the Drive query literal',
       quotedUrl.indexOf("a\\'b") !== -1 && quotedUrl.indexOf("name contains 'secret") === -1, quotedUrl);
   }

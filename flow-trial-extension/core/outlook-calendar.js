@@ -218,7 +218,8 @@ const FlowOutlookCalendar = (() => {
     const link = fileLink(i.fileUrl);
     const name = String(i.fileName || i.fileTerm || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!date || hour == null || minute == null || !link || !name) return null;
-    const zone = String(i.timeZone || 'UTC').trim().slice(0, 80) || 'UTC';
+    const zone = holdTimeZone(i.timeZone, i.mailboxTimeZone);
+    if (!zone) return null;
     const quote = i.quote ? String(i.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
     const lines = [];
     if (quote) lines.push(quote);
@@ -269,6 +270,7 @@ const FlowOutlookCalendar = (() => {
       senderName: i.senderName || null,
       subject: i.subject || '',
       fileMatch: i.fileMatch || null,
+      driveSearchUnavailable: i.driveSearchUnavailable === true,
       attachmentCount: 0,
       now: now
     });
@@ -297,8 +299,26 @@ const FlowOutlookCalendar = (() => {
     };
   }
 
-  // The person's zone, never a silent UTC default. An explicit zone wins.
-  // Otherwise the host zone (Intl). An empty result means the hold stays quiet.
+  // Calendar holds use the mailbox zone from Graph mailboxSettings.timeZone.
+  // An explicit zone wins; the browser zone is never used here.
+  // IANA zones and Graph mailboxSettings Windows display names (not the browser).
+  function graphTimeZoneOk(zone) {
+    const z = String(zone || '').trim().slice(0, 80);
+    if (!z) return false;
+    if (zoneOk(z)) return true;
+    if (z === 'UTC' || / Standard Time$/i.test(z)) return true;
+    return false;
+  }
+
+  function holdTimeZone(explicit, mailboxZone) {
+    const given = String(explicit || '').trim().slice(0, 80);
+    if (given) return graphTimeZoneOk(given) ? given : '';
+    const mailbox = String(mailboxZone || '').trim().slice(0, 80);
+    if (mailbox && graphTimeZoneOk(mailbox)) return mailbox;
+    return '';
+  }
+
+  // Legacy name: browser Intl only. Do not use for Graph event writes.
   function zoneName(explicit) {
     const given = String(explicit || '').trim().slice(0, 80);
     if (given) return given;
@@ -375,8 +395,8 @@ const FlowOutlookCalendar = (() => {
     if (String(i.fileUrl || i.fileName || i.fileTerm || '').trim()) return null;
     const title = String(i.title || i.quote || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!title) return null;
-    const zone = zoneName(i.timeZone);
-    if (!zone || !zoneOk(zone)) return null;
+    const zone = holdTimeZone(i.timeZone, i.mailboxTimeZone);
+    if (!zone) return null;
     const startIso = wallIso(date, hour, minute, 0);
     const endIso = wallIso(date, hour, minute, durationOf(i.durationMinutes));
     if (!startIso || !endIso || /Z$/i.test(startIso)) return null;
@@ -421,6 +441,9 @@ const FlowOutlookCalendar = (() => {
     meetingBody: meetingBody,
     contentHash: contentHash,
     zoneName: zoneName,
+    holdTimeZone: holdTimeZone,
+    graphTimeZoneOk: graphTimeZoneOk,
+    zoneOk: zoneOk,
     whenLabel: whenLabel,
     undoRequest: undoRequest,
     decide: decide

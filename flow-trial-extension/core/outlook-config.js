@@ -29,19 +29,19 @@ const FlowOutlookConfig = {
   // Calendars.ReadWrite only when that box is checked. The Entra app must list
   // that delegated permission or consent for the box fails.
   // SharePoint asks Sites.ReadWrite.All only when that box is checked (see the row below).
-  // OneDrive asks Files.ReadWrite only when that box is checked (it starts
-  // ticked). One file write into the Glance folder, then a read-back. A mail does not search OneDrive. Files.Read
+  // OneDrive asks Files.ReadWrite only when that box is checked. One file
+  // write into the Glance folder, then a read-back. A mail does not search OneDrive. Files.Read
   // cannot write. Files.ReadWrite.All is not this scope.
   CONNECT_SERVICES: [
     { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', scopes: ['Mail.Read', 'Mail.ReadWrite'], required: true },
     { id: 'todo', label: 'To Do', detail: 'Add one task on a task-only Do It. Glance reads it back before it is handled. Undo deletes that task.', scopes: ['Tasks.ReadWrite'], required: false },
     // Write one event for a named file at a clock. Not added to the default
     // mail sign-in. Never Mail.Send, never Calendars.ReadWrite.Shared.
-    { id: 'calendar', label: 'Calendar', detail: 'Place one named file on the calendar. Undo removes that event. Never invites anyone.', scopes: ['Calendars.ReadWrite'], required: false },
+    { id: 'calendar', label: 'Calendar', detail: 'Place one named file on the calendar. Undo removes that event. Never invites anyone.', scopes: ['Calendars.ReadWrite', 'MailboxSettings.Read'], required: false },
     // defaultOn pre-ticks the box on a new connection. It does not change
     // defaultConnectIds() or the scopes of an existing sign-in: the person can
     // untick it, and an account that never ticked it is asked only when they do.
-    { id: 'onedrive', label: 'OneDrive', detail: 'Save one file into OneDrive > Glance, read it back, and Undo deletes it. A mail does not search OneDrive.', scopes: ['Files.ReadWrite'], required: false, defaultOn: true },
+    { id: 'onedrive', label: 'OneDrive', detail: 'Save one file into OneDrive > Glance, read it back, and Undo deletes it. A mail does not search OneDrive.', scopes: ['Files.ReadWrite'], required: false },
     // SharePoint asks Sites.ReadWrite.All only when its box is checked (never ticked for you). One empty Word or Excel file into the
     // Glance folder of the one site a mail names, read back by id; Undo deletes it unless it was edited. Owner approval 2026-10-24
     // (row 79a). The Entra app must list the delegated permission and an admin may need to consent; the switch SHAREPOINT_NEW_FILE
@@ -77,6 +77,34 @@ FlowOutlookConfig.defaultConnectIds = function defaultConnectIds() {
   return ['mail'];
 };
 
+// Connect UI: selection (what the person ticks before sign-in) vs granted
+// (what the token's scp already includes). Never pre-tick optional boxes from
+// stale grants on a new sign-in; after connect, show granted only.
+FlowOutlookConfig.connectServiceUi = function connectServiceUi(svc, ctx) {
+  const granted = Array.isArray(ctx && ctx.granted) ? ctx.granted : [];
+  const tokenStatus = ctx && ctx.tokenStatus ? String(ctx.tokenStatus) : 'missing';
+  const required = Boolean(svc && (svc.required || svc.id === 'mail'));
+  const scopes = (svc && svc.scopes) || [];
+  const has = scopes.length > 0 && scopes.every((sc) => granted.indexOf(sc) >= 0);
+  const calendarGranted = svc && svc.id === 'calendar' && granted.indexOf('Calendars.ReadWrite') >= 0;
+  const serviceGranted = calendarGranted || has;
+  if (required) return { checked: true, disabled: true, granted: serviceGranted || true };
+  if (tokenStatus === 'valid' || tokenStatus === 'expired' || tokenStatus === 'missing-scope') {
+    return { checked: false, disabled: false, granted: serviceGranted };
+  }
+  const checked = svc && svc.defaultOn === true;
+  return { checked: Boolean(checked), disabled: false, granted: serviceGranted };
+};
+
+FlowOutlookConfig.connectIdsFromChecked = function connectIdsFromChecked(services, isChecked) {
+  const fn = typeof isChecked === 'function' ? isChecked : () => false;
+  return (services || []).filter((svc) => {
+    if (!svc) return false;
+    if (svc.required || svc.id === 'mail') return true;
+    return fn(svc.id) === true;
+  }).map((svc) => svc.id);
+};
+
 // Incremental consent for Hold. The only new scope is Calendars.ReadWrite.
 // Scopes already granted stay on the request so Mail is not dropped.
 // Mail.Send and any Shared scope are never added.
@@ -94,6 +122,7 @@ FlowOutlookConfig.incrementalConsentScopes = function incrementalConsentScopes(e
     if (out.indexOf(name) < 0) out.push(name);
   });
   if (out.indexOf(add) < 0) out.push(add);
+  if (add === 'Calendars.ReadWrite' && out.indexOf('MailboxSettings.Read') < 0) out.push('MailboxSettings.Read');
   return out;
 };
 

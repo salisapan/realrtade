@@ -9,8 +9,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install flow-trial-extension devDependencies (jsdom for corpora)
+        working-directory: flow-trial-extension
+        run: npm ci
       - name: Package the extension and serve it through the download function
         run: python3 scripts/verify_trial_install.py
+      - name: Scope allowlist (strict final Google OAuth scope list)
+        run: node flow-trial-extension/test/scope-allowlist-corpus.cjs
+      - name: Gmail add-on bundle and corpora
+        run: |
+          node glance-gmail-addon/scripts/check-core-bundle.cjs
+          node glance-gmail-addon/test/v1.test.cjs
+          node glance-gmail-addon/test/card-titles-corpus.cjs
+          node glance-gmail-addon/test/build-stamp.test.cjs
+          node flow-trial-extension/test/name-match-corpus.cjs
+          node flow-trial-extension/test/docs-consistency-corpus.cjs

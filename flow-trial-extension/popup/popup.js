@@ -497,8 +497,16 @@
       pill.setAttribute('dir', 'auto');
       return;
     }
-    const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
+    const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected && k !== 'meta');
     if (live.length) {
+      const msIds = ['microsoft', 'microsoftTodo', 'outlook'];
+      if (live.some((k) => msIds.indexOf(k) >= 0)) {
+        stampMicrosoft(pill, microsoft);
+        stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
+        pill.textContent = microsoftFaceLabel(microsoft);
+        pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
+        return;
+      }
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
       pill.textContent = uiLang() === 'he' ? 'מחובר' : ((conn ? conn.label : live[0]) + ' connected');
       pill.className = 'ver on';
@@ -602,6 +610,16 @@
     return (token && token.grantedScopes) || [];
   }
 
+  // Reconnect pre-tick: Calendar counts as granted when Calendars.ReadWrite is already
+  // on the token; MailboxSettings.Read is added on the next Connect if missing.
+  function outlookReconnectServiceGranted(svc, granted) {
+    const list = Array.isArray(granted) ? granted : [];
+    const scopes = (svc && svc.scopes) || [];
+    if (!scopes.length) return false;
+    if (svc.id === 'calendar') return list.indexOf('Calendars.ReadWrite') >= 0;
+    return scopes.every((sc) => list.indexOf(sc) >= 0);
+  }
+
   function missingScopeSentence(scope, service) {
     if (uiLang() === 'he') return 'ההרשאה לא כלולה בכניסה. בהגדרות, סמן ' + service + '.';
     if (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine) return FlowReceipt.missingScopeLine(scope, service);
@@ -667,9 +685,10 @@
     const services = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [
       { id: 'mail', label: 'Mail', required: true },
       { id: 'todo', label: 'To Do', scopes: ['Tasks.ReadWrite'] },
-      { id: 'calendar', label: 'Calendar', scopes: ['Calendars.ReadWrite'] }
+      { id: 'calendar', label: 'Calendar', scopes: ['Calendars.ReadWrite', 'MailboxSettings.Read'] }
     ];
     const granted = grantedOutlookScopes();
+    const connectCtx = { granted: granted, tokenStatus: tokenStatus };
     const boxes = {};
     services.forEach((svc) => {
       const lab = document.createElement('label');
@@ -677,11 +696,12 @@
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.setAttribute('data-glance-service', svc.id);
-      const required = Boolean(svc.required || svc.id === 'mail');
-      const has = (svc.scopes || []).every((sc) => granted.indexOf(sc) >= 0);
-      if (required) { box.checked = true; box.disabled = true; }
-      else if (has && granted.length) box.checked = true;
-      else if (svc.defaultOn === true && !has) box.checked = true;
+      const ui = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.connectServiceUi === 'function')
+        ? FlowOutlookConfig.connectServiceUi(svc, connectCtx)
+        : { checked: Boolean(svc.required || svc.id === 'mail'), disabled: Boolean(svc.required || svc.id === 'mail'), granted: false };
+      box.checked = ui.checked;
+      box.disabled = ui.disabled;
+      if (ui.granted) lab.setAttribute('data-glance-granted', '1');
       boxes[svc.id] = box;
       const copy = el('span', null, serviceLabel(svc));
       if (svc.detail) {
@@ -689,7 +709,7 @@
         small.textContent = svc.detail;
         copy.appendChild(small);
       }
-      if (!required && !has) appendMissingScopeLine(copy, svc);
+      if (!ui.granted && !ui.disabled) appendMissingScopeLine(copy, svc);
       lab.appendChild(box);
       lab.appendChild(copy);
       screen.appendChild(lab);
@@ -736,10 +756,15 @@
         await refresh();
         return;
       }
-      const ids = services.filter((svc) => {
-        const box = boxes[svc.id];
-        return box && (box.checked || box.disabled);
-      }).map((svc) => svc.id);
+      const ids = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.connectIdsFromChecked === 'function')
+        ? FlowOutlookConfig.connectIdsFromChecked(services, (id) => {
+          const box = boxes[id];
+          return box && (box.checked || box.disabled);
+        })
+        : services.filter((svc) => {
+          const box = boxes[svc.id];
+          return box && (box.checked || box.disabled);
+        }).map((svc) => svc.id);
       const scopes = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.scopesFor === 'function')
         ? FlowOutlookConfig.scopesFor(ids) : null;
       const r = scopes ? await o.connect({ scopes: scopes }) : await o.connect();
@@ -1792,7 +1817,7 @@
     note.hidden = true;
     const acts = el('div', 'wait-acts');
     let offRow = null;
-    if (link === 'missing' && st.configured) {
+    if ((link === 'missing' || link === 'expired' || link === 'missing-scope') && st.configured) {
       // One Connect screen: Select all, then one checkbox per Graph service.
       // Mail stays on. Extra scopes are added only for a checked box.
       const screen = el('div', 'ms-connect');
@@ -1801,6 +1826,7 @@
         { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', required: true },
         { id: 'todo', label: 'To Do', detail: 'Add one task on a task-only Do It. Glance reads it back before it is handled. Undo deletes that task.', scopes: ['Tasks.ReadWrite'], required: false }
       ];
+      const grantedReconnect = (link === 'missing') ? [] : grantedOutlookScopes();
       const boxes = {};
       const all = document.createElement('label');
       all.className = 'ms-svc';
@@ -1817,7 +1843,9 @@
         box.type = 'checkbox';
         box.setAttribute('data-glance-service', svc.id);
         const required = Boolean(svc.required || svc.id === 'mail');
+        const has = outlookReconnectServiceGranted(svc, grantedReconnect);
         if (required) { box.checked = true; box.disabled = true; }
+        else if (has && grantedReconnect.length) box.checked = true;
         else if (svc.defaultOn === true) box.checked = true;
         boxes[svc.id] = box;
         const copy = el('span', null, serviceLabel(svc));
@@ -1852,7 +1880,8 @@
         optionalBoxes().forEach((box) => { box.checked = allBox.checked; });
       });
       optionalBoxes().forEach((box) => box.addEventListener('change', syncAll));
-      const c = el('button', 'ghost sm', 'התחבר');
+      const connectBtnLabel = (link === 'missing') ? 'התחבר' : 'התחבר מחדש';
+      const c = el('button', 'ghost sm', connectBtnLabel);
       c.type = 'button';
       c.setAttribute('data-glance-connect-go', '1');
       c.addEventListener('click', async () => {
@@ -1876,19 +1905,6 @@
       });
       screen.appendChild(c);
       acts.appendChild(screen);
-    } else if (link === 'expired' || link === 'missing-scope') {
-      const again = el('button', 'ghost sm', 'התחבר מחדש');
-      again.type = 'button';
-      again.addEventListener('click', async () => {
-        beginRender();
-        try {
-          again.disabled = true;
-          const r = await o.connect();
-          if (!r.ok) { again.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
-          await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
-        } finally { endRender(); }
-      });
-      acts.appendChild(again);
     } else if (link === 'valid') {
       const grantedNow = grantedOutlookScopes();
       const scopeServices = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [];
@@ -1901,10 +1917,12 @@
         const box = document.createElement('input');
         box.type = 'checkbox';
         box.setAttribute('data-glance-service', svc.id);
-        const required = Boolean(svc.required || svc.id === 'mail');
-        const has = (svc.scopes || []).every((sc) => grantedNow.indexOf(sc) >= 0);
-        if (required) { box.checked = true; box.disabled = true; }
-        else box.checked = has || svc.defaultOn === true;
+        const ui = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.connectServiceUi === 'function')
+          ? FlowOutlookConfig.connectServiceUi(svc, { granted: grantedNow, tokenStatus: 'valid' })
+          : { checked: false, disabled: false, granted: false };
+        box.checked = ui.checked;
+        box.disabled = ui.disabled;
+        if (ui.granted) lab.setAttribute('data-glance-granted', '1');
         scopeBoxes[svc.id] = box;
         lab.appendChild(box);
         lab.appendChild(el('span', null, serviceLabel(svc)));
@@ -1921,7 +1939,21 @@
           return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
         });
         for (let i = 0; i < add.length; i++) {
-          const scopes = add[i].scopes || [];
+          const svc = add[i];
+          const bucket = (globalThis.FlowConnectEcosystem && typeof FlowConnectEcosystem.optionalScopeBucketForOutlookService === 'function')
+            ? FlowConnectEcosystem.optionalScopeBucketForOutlookService(svc.id)
+            : null;
+          if (bucket) {
+            const grantedScope = await send({ type: 'flow:microsoft-optional-scopes', bucket: bucket });
+            if (!grantedScope || grantedScope.ok !== true) {
+              addScope.disabled = false;
+              note.hidden = false;
+              note.textContent = (grantedScope && (grantedScope.reason || grantedScope.error)) || 'ההרשאה לא נוספה.';
+              return;
+            }
+            continue;
+          }
+          const scopes = svc.scopes || [];
           for (let j = 0; j < scopes.length; j++) {
             if (grantedNow.indexOf(scopes[j]) >= 0) continue;
             const grantedScope = await send({ type: 'flow:outlook-consent-scope', scope: scopes[j], policy: 'always' });
@@ -2260,6 +2292,15 @@
     FlowMetaConsent.paintConnection(host, { granted: on, lang: metaLang(), chrome: chrome });
   }
 
+  async function labsOptionalScopeAfterFlip(switchId) {
+    if (!globalThis.FlowConnectEcosystem || typeof FlowConnectEcosystem.optionalScopeBucketForLabsSwitch !== 'function') return;
+    const bucket = FlowConnectEcosystem.optionalScopeBucketForLabsSwitch(switchId);
+    if (!bucket) return;
+    try {
+      await chrome.runtime.sendMessage({ type: 'flow:microsoft-optional-scopes', bucket: bucket });
+    } catch (e) { /* optional consent */ }
+  }
+
   // The off switches, one row each, in the rows the popup already uses. It reads and writes one storage object and nothing else.
   async function renderLabs() {
     const host = document.getElementById('labs-list');
@@ -2288,7 +2329,9 @@
       btn.type = 'button';
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, !on) });
+        const turningOn = !on;
+        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, turningOn) });
+        if (turningOn) await labsOptionalScopeAfterFlip(r.id);
         await renderLabs();
       });
       acts.appendChild(btn);

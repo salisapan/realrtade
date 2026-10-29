@@ -8,7 +8,7 @@
 // the person and the people they share it with. Glance does not share it.
 // Drive files.create uses `drive.file`, already granted, no new scope.
 // A Form is created through the Forms API (forms.googleapis.com/v1, scope forms.body and its host
-// permission; both are in manifest.json since owner approval 2026-10-24, behind the second off switch GOOGLE_FORMS). The read-back is the form by id: same title. Undo trashes it through Drive only
+// permission; neither is in manifest.json or any scope list: the Forms scope is not on the final scope list, so a form is never offered or created unless the second off switch GOOGLE_FORMS is turned on, and with it on the write answers not-connected). The read-back is the form by id: same title. Undo trashes it through Drive only
 // while the form's revisionId is the one read back; a form the person edited is left alone.
 // Handled only when the read-back by id shows the same name, the Doc or Sheet
 // type, and not trashed. Undo trashes it only while version and modifiedTime
@@ -34,7 +34,7 @@ const FlowWorkspaceFile = (() => {
 
   const SWITCH = 'WORKSPACE_FILE';
   const SWITCH_DEFAULT = false;
-  // A form needs its own switch on top of WORKSPACE_FILE: it is the only file here that asks the extra scope forms.body.
+  // A form needs its own switch on top of WORKSPACE_FILE (default off). Glance requests no Forms scope anywhere, so even with the switch on the Forms API answers 401/403 and the write ends not-connected.
   const FORMS_SWITCH = 'GOOGLE_FORMS';
   const SYSTEM_DOC = 'google/docs';
   const SYSTEM_SHEET = 'google/sheets';

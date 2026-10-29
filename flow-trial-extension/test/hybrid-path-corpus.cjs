@@ -92,7 +92,14 @@ const gpu = (o) => ({ requestAdapter: async () => (o === null ? null : { feature
   check('enabled, by the config defaults: no model, no server', st.enabled === true && st.isModelLoaded === false && st.serverConsent === false && st.consent.localModel === false);
   check('the config defaults can turn the server fallback on', (await mk(f, { enabled: true, autoDownload: false, serverFallback: true }).status()).serverConsent === true);
   check('a content script cannot give consent or retry', (await sw.handle({ type: 'flow:hybrid-consent', patch: { server: true } }, tab)).reason === 'popup-only' && (await sw.handle({ type: 'flow:hybrid-retry' }, tab)).reason === 'popup-only' && f.store[SW.KEY_CONSENT] === undefined);
-  check('a foreign extension is refused', (await sw.handle({ type: 'flow:hybrid-status' }, { id: 'someone-else' })).reason === 'foreign-sender');
+  const foreign = { id: 'someone-else' };
+  check('a foreign extension is refused on status', (await sw.handle({ type: 'flow:hybrid-status' }, foreign)).reason === 'foreign-sender');
+  check('a foreign extension is refused on probe', (await sw.handle({ type: 'flow:hybrid-probe' }, foreign)).reason === 'foreign-sender');
+  check('a foreign extension is refused on consent', (await sw.handle({ type: 'flow:hybrid-consent', patch: { server: true } }, foreign)).reason === 'foreign-sender');
+  check('a foreign extension is refused on retry', (await sw.handle({ type: 'flow:hybrid-retry' }, foreign)).reason === 'foreign-sender');
+  check('a foreign extension is refused on infer', (await sw.handle({ type: 'flow:hybrid-infer', prompt: 'x' }, foreign)).reason === 'foreign-sender');
+  check('a foreign extension is refused on execute', (await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'x' } }, foreign)).reason === 'foreign-sender');
+  check('a foreign extension is refused on hybrid:state', (await sw.handle({ type: 'hybrid:state', state: {} }, foreign)).reason === 'foreign-sender');
   check('unknown messages are left to the worker\'s other handlers', sw.handle({ type: 'flow:draft-reply' }, tab) === undefined && sw.handle(null, tab) === undefined);
   check('the server is refused without server consent', (await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'x' } }, tab)).reason === 'needs-consent' && assistCalls.length === 0);
   await sw.handle({ type: 'flow:hybrid-consent', patch: { server: true } }, popup);

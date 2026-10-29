@@ -6,6 +6,8 @@
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
 const { expectedMissing, SEND_URL } = require('./support/rehearsal');
+const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
+const { testIfDriveReadonly, driveReadonlyInManifest } = bindV1ScopeGates(test);
 const S = require('./support/sentences');
 
 const ASK = 'שלחי לי בבקשה את ההסכם החתום.';
@@ -31,7 +33,16 @@ async function open(glance, id, body, hits) {
   return glance.openGmail({ messageId: 'm-e-' + id, threadId: 't-e-' + id, subject: 'הסכם', senderEmail: S.SENDER, senderName: 'Dana', body: body });
 }
 
-test('E1 the contract: found in Drive, not sent, done only when it is sent as a real file', async ({ glance }, testInfo) => {
+test('v1 without drive.readonly: contract follow card stays off when Drive stub has the PDF', async ({ glance }) => {
+  expect(driveReadonlyInManifest).toBe(false);
+  const page = await open(glance, 'v1-off', ASK, [CONTRACT]);
+  await page.waitForTimeout(7000);
+  await expect(page.locator(CARD)).toHaveCount(0);
+});
+
+testIfDriveReadonly(
+  'E1 the contract: found in Drive, not sent, done only when it is sent as a real file',
+  async ({ glance }, testInfo) => {
   const page = await open(glance, 'contract', ASK, [CONTRACT]);
   const card = page.locator(CARD);
   await expect(card).toContainText('הסכם.pdf', { timeout: 20000 });
@@ -44,7 +55,15 @@ test('E1 the contract: found in Drive, not sent, done only when it is sent as a 
   expectedMissing(testInfo, 'U3', 'the steps list says the found PDF needs a signature; the person signs on their machine; Glance does not sign');
   expectedMissing(testInfo, 'row 53, X1', 'the reply is a preview; the person approves; the close is the sent attachment, read back');
   expectedMissing(testInfo, 'X1, C1', 'a Friday follow-up event on the same steps list, with its own GET');
-});
+  },
+  async ({ glance }) => {
+    expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
+    const page = await open(glance, 'contract-off', ASK, [CONTRACT]);
+    await page.waitForTimeout(7000);
+    await expect(page.locator(CARD)).toHaveCount(0);
+    expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+  }
+);
 
 test('E2 "תוציאי חשבונית מס" in the same sitting: no card, no write, nothing Handled', async ({ glance }) => {
   const page = await open(glance, 'invoice', 'תוציאי חשבונית מס על הריטיינר.', []);
@@ -56,10 +75,19 @@ test('E2 "תוציאי חשבונית מס" in the same sitting: no card, no wri
   expect(calls.some((c) => /morning|greeninvoice/i.test(c.url))).toBe(false);
 });
 
-test('E3 Gate: the contract mail has one offer, and nothing calls a draft plus a task closed', async ({ glance }) => {
-  test.fail(true, 'Today the same mail shows the resolution card AND the Reply & Track chip (src/content-gmail.js file-ask branch does not step aside for FlowResolution.owns). The chip Do It writes a draft and a task and says "Handled … Closed — set a reminder", while the card says done only when the file is sent.');
+testIfDriveReadonly(
+  'E3 Gate: the contract mail has one offer, and nothing calls a draft plus a task closed',
+  async ({ glance }) => {
   const page = await open(glance, 'one', ASK, [CONTRACT]);
   await expect(page.locator(CARD)).toContainText('הסכם.pdf', { timeout: 20000 });
   await page.waitForTimeout(2000);
   await expect(page.locator(MAIN + ' .flow-chip-host')).toHaveCount(0, { timeout: 1000 });
-});
+  },
+  async ({ glance }) => {
+    expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
+    const page = await open(glance, 'one-off', ASK, [CONTRACT]);
+    await page.waitForTimeout(7000);
+    await expect(page.locator(CARD)).toHaveCount(0);
+    expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+  }
+);

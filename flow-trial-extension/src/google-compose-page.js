@@ -139,9 +139,10 @@ const FlowGoogleComposePage = (() => {
     return true;
   }
 
-  function kept(before, seen, draft) {
-    if (before.to && seen.to !== before.to) return false;
-    if (before.subject && seen.subject !== before.subject) return false;
+  function kept(before, seen, draft, opts) {
+    const o = opts || {};
+    if (before.to && seen.to !== before.to && !o.overwriteTo) return false;
+    if (before.subject && seen.subject !== before.subject && !o.overwriteSubject) return false;
     if (!seen.body || seen.body.indexOf(draft) < 0) return false;
     const rest = String(before.body || '').trim();
     if (rest && seen.body.indexOf(rest) < 0) return false;
@@ -174,8 +175,10 @@ const FlowGoogleComposePage = (() => {
     if (String(aboveText || '').trim()) return edited();
     const planned = Compose.plan(payload || {});
     if (!planned.ok) return planned;
-    if (toEl && !before.to) writeValue(toEl, planned.to);
-    if (subEl && !before.subject) writeValue(subEl, planned.subject);
+    const overwriteTo = !!(payload && payload.overwriteTo);
+    const overwriteSubject = !!(payload && payload.overwriteSubject);
+    if (toEl && (overwriteTo || !before.to)) writeValue(toEl, planned.to);
+    if (subEl && (overwriteSubject || !before.subject)) writeValue(subEl, planned.subject);
     insertDraft(bodyEl, boundary, planned.body, plain ? plain.rest : '');
     watchInput(toEl);
     watchInput(subEl);
@@ -186,11 +189,11 @@ const FlowGoogleComposePage = (() => {
       body: readValue(bodyEl),
       sendClicks: 0
     };
-    if (!kept(before, seen, planned.body)) {
+    if (!kept(before, seen, planned.body, { overwriteTo: overwriteTo, overwriteSubject: overwriteSubject })) {
       removeDraft(bodyEl);
       if (!boundary && !plain) writeValue(bodyEl, before.body);
-      if (toEl && !before.to) writeValue(toEl, '');
-      if (subEl && !before.subject) writeValue(subEl, '');
+      if (toEl && (overwriteTo || !before.to)) writeValue(toEl, overwriteTo ? before.to : '');
+      if (subEl && (overwriteSubject || !before.subject)) writeValue(subEl, overwriteSubject ? before.subject : '');
       return { ok: false, reason: 'verify_failed', preview: true, closes: false, sent: false, error: 'The compose window is still empty.', proof: null };
     }
     const stamped = Compose.stamp(planned, before);

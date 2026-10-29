@@ -125,6 +125,23 @@ test('Cc-only Dana stays quiet and a To ask drafts, on Outlook and Gmail', async
     cc: [S.ME]
   });
   await expect(cc.locator('#ReadingPaneContainerId button.flow-chip')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    return (bag.outlookPageDiag || []).some((row) => row && row.reason === 'quiet:hedge');
+  }).toBe(true);
+
+  const toOther = await glance.openOutlook({
+    id: 'AQMkGlanceE2EDanaToOther',
+    subject: 'Q3 summary',
+    senderEmail: S.SENDER,
+    body: Q3,
+    to: ['dana@meridian.com']
+  });
+  await expect(toOther.locator('#ReadingPaneContainerId button.flow-chip')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    return (bag.outlookPageDiag || []).some((row) => row && row.reason === 'quiet:hedge');
+  }).toBe(true);
 
   const to = await glance.openOutlook({
     id: 'AQMkGlanceE2EDanaTo',

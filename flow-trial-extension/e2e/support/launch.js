@@ -8,6 +8,12 @@ const { gmailHtml, outlookHtml, outlookUrl, gmailUrl } = require('./fixtures');
 const EXT_ROOT = path.resolve(__dirname, '../..');
 const SKIP_DIRS = new Set(['node_modules', 'e2e', 'e2e-report', 'test-results', 'playwright-report', 'test']);
 
+function manifestGoogleGrantedVersion() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(EXT_ROOT, 'manifest.json'), 'utf8'));
+  const scopes = (manifest.oauth2 && manifest.oauth2.scopes) || [];
+  return scopes.slice().sort().join('\n');
+}
+
 function copyExtension(opts) {
   const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-ext-'));
   fs.cpSync(EXT_ROOT, dest, {
@@ -22,33 +28,36 @@ function copyExtension(opts) {
   const manifestPath = path.join(dest, 'manifest.json');
   if (opts && opts.bare) return dest;
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  const extra = [
+  const hostExtra = [
     'https://outlook.live.com/*',
     'https://outlook.office.com/*',
     'https://outlook.office365.com/*',
     'https://graph.microsoft.com/*',
     'https://login.microsoftonline.com/*',
     'http://127.0.0.1/*',
-    'http://localhost/*',
-    // This copy only. The repo manifest does not list Messenger. The lane
-    // spec registers the chat scripts against a fixture on this host.
+    'http://localhost/*'
+  ];
+  const optionalChat = [
+    // E2E copy only. v1 product manifest omits chat optional hosts; Meta lane specs patch them in.
     'https://www.messenger.com/*',
     'https://messenger.com/*',
-    // This copy only. The repo manifest lists WhatsApp Web as an optional host;
-    // the scenario rehearsal registers the WhatsApp lane against a fixture here.
     'https://web.whatsapp.com/*',
-    // This copy only. The repo manifest already lists these as optional hosts.
+    'https://www.facebook.com/messages',
+    'https://www.facebook.com/messages/*',
+    'https://facebook.com/messages',
+    'https://facebook.com/messages/*',
     'https://business.facebook.com/latest/inbox',
     'https://business.facebook.com/latest/inbox/*',
     'https://www.business.facebook.com/latest/inbox',
     'https://www.business.facebook.com/latest/inbox/*',
-    // This copy only: the Instagram lane against a fixture on this host.
     'https://www.instagram.com/direct',
     'https://www.instagram.com/direct/*',
     'https://instagram.com/direct',
     'https://instagram.com/direct/*'
   ];
-  manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(extra)));
+  const whatsappE2eHost = ['https://web.whatsapp.com/*'];
+  manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(hostExtra, whatsappE2eHost)));
+  manifest.optional_host_permissions = Array.from(new Set((manifest.optional_host_permissions || []).concat(optionalChat)));
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return dest;
 }
@@ -58,7 +67,10 @@ function outlookAuth(opts) {
   const scopes = ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'];
   if (o.tasks !== false) scopes.push('Tasks.ReadWrite');
   if (o.files !== false) scopes.push('Files.ReadWrite');
-  if (o.calendar === true) scopes.push('Calendars.ReadWrite');
+  if (o.calendar === true) {
+    scopes.push('Calendars.ReadWrite');
+    scopes.push('MailboxSettings.Read');
+  }
   if (o.sharepoint === true) scopes.push('Sites.ReadWrite.All');
   const now = Date.now();
   return {
@@ -109,7 +121,7 @@ function installE2EHooks() {
   e2e.authFail = false;
   e2e.scenario = e2e.scenario || { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
   e2e.googleTasks = e2e.googleTasks || {};
-  e2e.tokenAccounts = e2e.tokenAccounts || {};
+  e2e.tokenAccounts = e2e.tokenAccounts || { 'ya29.e2e': 'me@x.com' };
   e2e.todoTasks = e2e.todoTasks || {};
   e2e.outlookEvents = e2e.outlookEvents || {};
   e2e.drafts = e2e.drafts || {};
@@ -149,10 +161,24 @@ function installE2EHooks() {
     const scenario = e2e.scenario || {};
 
     if (host === 'login.microsoftonline.com') return Promise.resolve(json(400, { error: 'e2e-no-login' }));
-    if (host === 'gmail.googleapis.com' && /\/users\/me\/profile$/.test(path)) {
-      const auth = String((init && init.headers && (init.headers.Authorization || init.headers.authorization)) || '');
+    function googleAccountEmailFromAuth(initBag) {
+      const auth = String((initBag && initBag.headers && (initBag.headers.Authorization || initBag.headers.authorization)) || '');
       const token = auth.replace(/^Bearer\s+/i, '');
-      const email = (e2e.tokenAccounts || {})[token] || 'ai.local.flow@gmail.com';
+      return (e2e.tokenAccounts || {})[token] || 'me@x.com';
+    }
+    function googleUserinfoBody(initBag) {
+      const email = googleAccountEmailFromAuth(initBag);
+      return {
+        email: email,
+        emailAddress: email,
+        name: 'Glance E2E',
+        given_name: 'Glance',
+        family_name: 'E2E',
+        verified_email: true
+      };
+    }
+    if (host === 'gmail.googleapis.com' && /\/users\/me\/profile$/.test(path)) {
+      const email = googleAccountEmailFromAuth(init);
       return Promise.resolve(json(200, { emailAddress: email, messagesTotal: 1, threadsTotal: 1, historyId: '1' }));
     }
     if (host === 'theflow-ai.com' || host === 'gmail.googleapis.com' || host === 'oauth2.googleapis.com') {
@@ -168,6 +194,9 @@ function installE2EHooks() {
         return Promise.resolve(json(200, {
           items: [{ id: 'e2e-gcal-1', status: 'confirmed', location: loc, start: { dateTime: when } }]
         }));
+      }
+      if (/\/oauth2\/(v2|v3)\/userinfo/.test(path)) {
+        return Promise.resolve(json(200, googleUserinfoBody(init)));
       }
       if (path.indexOf('/oauth2/') >= 0 || path.indexOf('/drive/') >= 0) {
         return Promise.resolve(json(200, { files: [], items: [] }));
@@ -457,10 +486,32 @@ function installE2EHooks() {
       // on conversationId is. A mailbox subject query selects conversationId
       // and must fall through to the subject filter below.
       if (path.indexOf('/me/messages') >= 0 && /conversationId/i.test(graphFilterValue(parsed.search))) {
-        return Promise.resolve(json(200, { value: scenario.conversation || [] }));
+        const filter = graphFilterValue(parsed.search);
+        const convMatch = filter.match(/conversationId\s+eq\s+'([^']+)'/i);
+        const convId = convMatch ? convMatch[1] : '';
+        const enrich = (row) => {
+          if (!row || !row.id) return row;
+          const full = scenario.messages && scenario.messages[row.id];
+          return full ? Object.assign({}, row, full) : row;
+        };
+        const pool = []
+          .concat(scenario.conversation || [])
+          .concat(scenario.inbox || [])
+          .concat(scenario.sent || [])
+          .concat(Object.values(scenario.messages || {}));
+        const seen = new Set();
+        const matched = [];
+        for (let i = 0; i < pool.length; i++) {
+          const row = pool[i];
+          if (!row || !row.id || seen.has(row.id)) continue;
+          if (convId && String(row.conversationId || '') !== convId) continue;
+          seen.add(row.id);
+          matched.push(enrich(row));
+        }
+        return Promise.resolve(json(200, { value: matched }));
       }
       if (path.indexOf('/me/mailboxSettings') >= 0) {
-        return Promise.resolve(json(200, scenario.mailboxSettings || { timeFormat: 'h:mm tt' }));
+        return Promise.resolve(json(200, scenario.mailboxSettings || { timeFormat: 'h:mm tt', timeZone: 'UTC' }));
       }
       if (path.indexOf('/me/messages') >= 0 && (parsed.search.indexOf('$filter=') >= 0 || parsed.search.indexOf('%24filter') >= 0 || parsed.search.indexOf('$skip=') >= 0 || parsed.search.indexOf('$skiptoken') >= 0)) {
         if (scenario.mailboxOverflow) {
@@ -683,6 +734,13 @@ async function boot() {
 
   const hooked = await evalWorker(installE2EHooks);
   harness.identityHook = hooked;
+  let e2eDefaultSwitches = {};
+  try { e2eDefaultSwitches = JSON.parse(String(process.env.GLANCE_E2E_SWITCHES || '{}')); } catch (err) { e2eDefaultSwitches = {}; }
+  if (Object.keys(e2eDefaultSwitches).length) {
+    await evalWorker(async (sw) => {
+      await chrome.storage.local.set({ glanceSwitches: sw });
+    }, e2eDefaultSwitches);
+  }
   await evalWorker(() => { globalThis.__glanceE2e.authCalls = []; globalThis.__glanceE2e.calls = []; });
 
   const extensionId = worker.url().split('/')[2];
@@ -767,9 +825,12 @@ async function boot() {
     }
     await Promise.all(closing);
     harness.page = null;
+    let e2eDefaultSwitches = {};
+    try { e2eDefaultSwitches = JSON.parse(String(process.env.GLANCE_E2E_SWITCHES || '{}')); } catch (err) { e2eDefaultSwitches = {}; }
     await evalWorker(installE2EHooks);
-    await evalWorker(async () => {
+    await evalWorker(async (sw) => {
       await chrome.storage.local.clear();
+      if (sw && Object.keys(sw).length) await chrome.storage.local.set({ glanceSwitches: sw });
       const e = globalThis.__glanceE2e;
       e.calls = [];
       e.authCalls = [];
@@ -785,7 +846,7 @@ async function boot() {
       e.seq = 1;
       delete e.httpOrigin;
       if (globalThis.FlowGoogleLaneAccount && globalThis.FlowGoogleLaneAccount.forget) globalThis.FlowGoogleLaneAccount.forget();
-    });
+    }, e2eDefaultSwitches);
   };
 
   async function openDocument(url, html) {
@@ -798,8 +859,140 @@ async function boot() {
     return page;
   }
 
+  async function registerOutlookGraphMessage(o) {
+    const mail = o || {};
+    const id = mail.id;
+    if (!id) return;
+    await evalWorker((m) => {
+      const e = globalThis.__glanceE2e;
+      const prev = e.scenario || {};
+      const sc = Object.assign({ inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] }, prev);
+      if (prev.me) sc.me = prev.me;
+      if (prev.meFail) sc.meFail = prev.meFail;
+      if (prev.attachments) sc.attachments = Object.assign({}, prev.attachments, sc.attachments);
+      const urlId = String(m.id || '');
+      if (!urlId) return;
+      const isConvUrl = /^AQQk/i.test(urlId);
+      let convId = m.convId ? String(m.convId) : (isConvUrl ? urlId : '');
+      let msgId = m.graphMessageId ? String(m.graphMessageId) : (isConvUrl ? '' : urlId);
+      function convPeersFor(id) {
+        const pool = (sc.conversation || [])
+          .concat(sc.inbox || [])
+          .concat(sc.sent || [])
+          .concat(Object.values(sc.messages || {}));
+        const seen = new Set();
+        const out = [];
+        for (let i = 0; i < pool.length; i++) {
+          const peer = pool[i];
+          if (!peer || !peer.id || seen.has(peer.id)) continue;
+          if (String(peer.conversationId || '') !== id) continue;
+          seen.add(peer.id);
+          out.push(peer);
+        }
+        return out;
+      }
+      function sizeFromLabel(label) {
+        const raw = String(label || '').trim();
+        const kb = raw.match(/^([\d.]+)\s*KB$/i);
+        if (kb) return Math.round(parseFloat(kb[1]) * 1024);
+        const b = raw.match(/^([\d.]+)\s*B$/i);
+        if (b) return Math.round(parseFloat(b[1]));
+        return null;
+      }
+      function pickConvPeer(peers) {
+        if (!peers.length) return null;
+        if (m.graphMessageId) {
+          const byId = peers.find((peer) => String(peer.id) === String(m.graphMessageId));
+          if (byId) return byId;
+        }
+        const attHints = [];
+        (m.attachments || []).forEach((a) => {
+          if (!a) return;
+          if (a.name) attHints.push(String(a.name));
+          if (a.titleName) attHints.push(String(a.titleName));
+        });
+        const wantSize = m.attachments && m.attachments[0] && sizeFromLabel(m.attachments[0].sizeLabel);
+        if (wantSize != null) {
+          const bySize = peers.filter((peer) => {
+            const atts = sc.attachments && sc.attachments[peer.id];
+            return atts && atts.some((att) => att && Math.abs(Number(att.size || 0) - wantSize) <= 512);
+          });
+          if (bySize.length === 1) return bySize[0];
+        }
+        if (attHints.length) {
+          for (let i = 0; i < peers.length; i++) {
+            const atts = sc.attachments && sc.attachments[peers[i].id];
+            if (!atts || !atts.length) continue;
+            for (let j = 0; j < atts.length; j++) {
+              const an = String(atts[j].name || '');
+              for (let k = 0; k < attHints.length; k++) {
+                const hint = attHints[k];
+                if (an === hint || an.indexOf(hint) >= 0 || hint.indexOf(an) >= 0) return peers[i];
+              }
+            }
+          }
+        }
+        const whenOpen = m.receivedDateTime || m.received || '';
+        if (whenOpen) {
+          const byWhen = peers.find((peer) => String(peer.receivedDateTime || '') === String(whenOpen));
+          if (byWhen) return byWhen;
+        }
+        const subj = m.subject ? String(m.subject) : '';
+        if (subj) {
+          const subPeers = peers.filter((peer) => String(peer.subject || '') === subj);
+          if (subPeers.length === 1) return subPeers[0];
+        }
+        return peers.find((peer) => /^AQMk/i.test(String(peer.id || ''))) || peers[0];
+      }
+      if (isConvUrl && !msgId) {
+        const hit = pickConvPeer(convPeersFor(convId));
+        if (hit && hit.id) msgId = String(hit.id);
+      }
+      if (!msgId) msgId = isConvUrl ? (urlId + '-open') : urlId;
+      if (!convId) convId = 'conv-' + msgId;
+      const toList = Array.isArray(m.to) ? m.to : ['glance.salisapan@outlook.com'];
+      const ccList = Array.isArray(m.cc) ? m.cc : [];
+      const row = {
+        id: msgId,
+        conversationId: convId,
+        subject: m.subject || 'Hello',
+        receivedDateTime: m.receivedDateTime || m.received || new Date().toISOString(),
+        from: { emailAddress: { address: String(m.senderEmail || 'ai.local.flow@gmail.com').toLowerCase(), name: m.senderName || '' } },
+        sender: { emailAddress: { address: String(m.senderEmail || 'ai.local.flow@gmail.com').toLowerCase(), name: m.senderName || '' } },
+        toRecipients: toList.map((address) => ({ emailAddress: { address: String(address || '').toLowerCase() } })),
+        ccRecipients: ccList.map((address) => ({ emailAddress: { address: String(address || '').toLowerCase() } })),
+        body: { contentType: 'text', content: String(m.body || '') },
+        bodyPreview: String(m.body || '').slice(0, 255)
+      };
+      const existing = sc.messages[msgId] || (sc.conversation || []).find((peer) => peer && peer.id === msgId);
+      if (existing) {
+        if (existing.from) row.from = existing.from;
+        if (existing.sender) row.sender = existing.sender;
+        if (existing.subject) row.subject = existing.subject;
+        if (existing.conversationId) row.conversationId = existing.conversationId;
+        if (existing.receivedDateTime && !m.receivedDateTime && !m.received) row.receivedDateTime = existing.receivedDateTime;
+        if (existing.hasAttachments != null) row.hasAttachments = existing.hasAttachments;
+        if (existing.body && existing.body.content && (!m.body || !String(m.body).trim())) {
+          row.body = existing.body;
+          row.bodyPreview = existing.bodyPreview || row.bodyPreview;
+        }
+      }
+      const atts = sc.attachments && sc.attachments[msgId];
+      if (atts && atts.length) row.hasAttachments = true;
+      sc.messages[msgId] = row;
+      const convPeers = (sc.conversation || []).filter((peer) => peer && peer.id !== msgId);
+      const sameConv = convPeers.filter((peer) => String(peer.conversationId || '') === convId);
+      sc.conversation = sameConv.concat([row]);
+      e.scenario = sc;
+    }, mail);
+  }
+
   harness.openOutlook = async function openOutlook(opts) {
     const o = opts || {};
+    if (!o.convId && o.id && /^AQMk/i.test(String(o.id))) {
+      o.convId = 'conv-' + String(o.id);
+    }
+    await registerOutlookGraphMessage(o);
     const id = o.id;
     const url = outlookUrl(id);
     return openDocument(url, outlookHtml(o));
@@ -873,17 +1066,9 @@ async function boot() {
       // Headless Chrome has no browser sign-in. The lane asks identity first,
       // then this stored Connect token. Production never reads an e2e hook for it.
       googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
+      googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' },
       googleGrantedScopes: {
-        version: [
-          'https://www.googleapis.com/auth/calendar.events',
-          'https://www.googleapis.com/auth/drive.file',
-          'https://www.googleapis.com/auth/drive.readonly',
-          'https://www.googleapis.com/auth/forms.body',
-          'https://www.googleapis.com/auth/gmail.compose',
-          'https://www.googleapis.com/auth/tasks',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'openid'
-        ].slice().sort().join('\n'),
+        version: manifestGoogleGrantedVersion(),
         status: 'granted',
         source: 'chrome',
         at: Date.now()

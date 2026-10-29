@@ -275,6 +275,12 @@ console.log('--- intent.js: type + entity checks ---\n');
     enAfternoon && enAfternoon.type === FlowIntent.TYPES.SCHEDULED_EVENT && enAfternoon.entities.hour === 15 && enAfternoon.entities.dateIso === '2026-09-21',
     enAfternoon && enAfternoon.entities);
 
+  console.log('--- intent.js: Gate gap D5 (find us N minutes) ---\n');
+  const findUs = classify('Can you find us 30 minutes next week to go over the quote?', { now });
+  check('find us 30 minutes stays quiet (rehearsal D5)', !findUs || findUs.type === null, findUs && findUs.type);
+  const findTime = classify('Can you find 20 minutes next week to go over the quote?', { now });
+  check('find 20 minutes (not "find us") is still a request', findTime && findTime.type === FlowIntent.TYPES.REQUEST, findTime && findTime.type);
+
   const pitch = classify('Hope this email finds you well. Can we schedule a call tomorrow at 3pm? Our pricing starts at $99/mo.', { now });
   check('a cold pitch that says "tomorrow" stays silent',
     !pitch || pitch.type === null, pitch && pitch.type);
@@ -1230,7 +1236,11 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
     ['EN explicit schedule-a-call ask', 'Can you schedule a call Friday, September 18 at 3pm?'],
     ['EN could-you-meet ask', 'Could you meet Friday, September 18 at 3pm to review the contract?'],
     ['EN can-we-meet ask', 'Can we meet Friday, September 18 at 10:00am?'],
-    ['HE please-set-a-meeting ask', 'בבקשה תקבע פגישה ביום שישי בשעה 15:00.']
+    ['HE please-set-a-meeting ask', 'בבקשה תקבע פגישה ביום שישי בשעה 15:00.'],
+    ['HE אפשר לקבוע פגישה', 'אפשר לקבוע פגישה ביום שישי 30/10 בשעה 10:00'],
+    ['HE אפשר לתאם שיחה', 'אפשר לתאם שיחה ביום שישי 30/10 בשעה 10:00'],
+    ['HE נוכל להיפגש', 'נוכל להיפגש ביום שישי 30/10 בשעה 10:00?'],
+    ['HE אפשר לקבוע פגישת (construct)', 'אפשר לקבוע פגישת סטטוס ביום שישי 30/10 בשעה 10:00 לחצי שעה?']
   ];
   for (const [label, text] of holds) {
     const { intent, process } = planOf(text);

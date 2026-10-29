@@ -230,6 +230,7 @@ check('a search that never ran is file-chain-not-run', C.searchSilence(null) ===
 check('a finished search is not a silence', C.searchSilence({ ok: true, files: [] }) === null);
 check('Google not connected is drive-not-granted', C.searchSilence({ ok: false, reason: 'not-connected' }) === 'drive-not-granted' && C.searchSilence({ ok: false, reason: 'drive-not-granted', status: 403 }) === 'drive-not-granted');
 check('any other search failure is drive-search-failed', C.searchSilence({ ok: false, reason: 'error', status: 500 }) === 'drive-search-failed' && C.searchSilence({ ok: false }) === 'drive-search-failed');
+check('mailbox search off the grant is hidden (no why line)', C.searchSilence({ ok: false, reason: 'drive-search-unavailable' }) === null);
 check('the old file-needs-drive spelling still counts as the chain not having run', C.isFileChainPending('file-needs-drive') && C.isFileChainPending('file-chain-not-run') && !C.isFileChainPending('drive-search-failed'));
 
 console.log('--- a Hebrew UI localizes the not-found card, including an English mail ---');
