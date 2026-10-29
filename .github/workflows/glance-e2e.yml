@@ -18,16 +18,22 @@ jobs:
       matrix:
         include:
           - tz: UTC
+            tz_slug: UTC
             shard: 1
           - tz: UTC
+            tz_slug: UTC
             shard: 2
           - tz: UTC
+            tz_slug: UTC
             shard: 3
           - tz: Asia/Jerusalem
+            tz_slug: Asia-Jerusalem
             shard: 1
           - tz: Asia/Jerusalem
+            tz_slug: Asia-Jerusalem
             shard: 2
           - tz: Asia/Jerusalem
+            tz_slug: Asia-Jerusalem
             shard: 3
     env:
       TZ: ${{ matrix.tz }}
@@ -67,7 +73,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-blob-${{ matrix.tz }}-${{ matrix.shard }}
+          name: playwright-blob-${{ matrix.tz_slug }}-${{ matrix.shard }}
           path: flow-trial-extension/blob-report
           if-no-files-found: ignore
           retention-days: 7

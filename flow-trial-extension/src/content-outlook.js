@@ -5679,10 +5679,33 @@
     const id = crossed ? null : (pane.itemId || null);
     const wantConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.conversationId) : '';
     const wantNet = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.internetMessageId) : '';
+    const openAsConversation = isConversationId(String(pane.pathId || ''))
+      || isConversationId(String(pane.conversationId || ''))
+      || (pane && pane.idKind === 'conversation' && pane.idSource === 'open-mail');
     if (!id && !wantConv && !wantNet && !(pane && pane.subject)) return suggestFail('suggest:no-message-id');
     if (id && !isConversationId(id)) {
       const direct = await attachmentListFor(id);
-      if (Array.isArray(direct)) return { files: direct, messageId: id };
+      if (Array.isArray(direct)) {
+        let paneNames = [];
+        if (pane && Array.isArray(pane.attachments)) {
+          pane.attachments.forEach((a) => {
+            if (!a) return;
+            const n = String(a.name || a.titleName || a.shownName || '').trim().toLowerCase();
+            if (n) paneNames.push(n);
+          });
+        }
+        if (paneNames.length) {
+          const graphNames = direct.map((a) => String((a && a.name) || '').trim().toLowerCase()).filter(Boolean);
+          const agrees = paneNames.some((want) => graphNames.some((got) => got === want || got.indexOf(want) >= 0 || want.indexOf(got) >= 0));
+          if (!agrees) {
+            /* Resolved id is not the open attachment; link through the mailbox set. */
+          } else if (!openAsConversation && !wantNet) {
+            return { files: direct, messageId: id };
+          }
+        } else if (!openAsConversation && !wantNet) {
+          return { files: direct, messageId: id };
+        }
+      }
       if (!wantConv && !wantNet && !(pane && pane.subject && pane.senderEmail)) {
         const st = lastGraphStatus;
         if (st && st !== 200) return suggestFail('suggest:graph-' + st);

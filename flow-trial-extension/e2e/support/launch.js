@@ -862,18 +862,77 @@ async function boot() {
       const isConvUrl = /^AQQk/i.test(urlId);
       let convId = m.convId ? String(m.convId) : (isConvUrl ? urlId : '');
       let msgId = m.graphMessageId ? String(m.graphMessageId) : (isConvUrl ? '' : urlId);
-      if (isConvUrl && !msgId) {
+      function convPeersFor(id) {
         const pool = (sc.conversation || [])
           .concat(sc.inbox || [])
           .concat(sc.sent || [])
           .concat(Object.values(sc.messages || {}));
-        const peers = pool.filter((peer) => peer && String(peer.conversationId || '') === convId);
-        const hit = peers.find((peer) => /^AQMk/i.test(String(peer.id || ''))) || peers[0];
-        if (hit && hit.id) msgId = String(hit.id);
+        const seen = new Set();
+        const out = [];
+        for (let i = 0; i < pool.length; i++) {
+          const peer = pool[i];
+          if (!peer || !peer.id || seen.has(peer.id)) continue;
+          if (String(peer.conversationId || '') !== id) continue;
+          seen.add(peer.id);
+          out.push(peer);
+        }
+        return out;
+      }
+      function sizeFromLabel(label) {
+        const raw = String(label || '').trim();
+        const kb = raw.match(/^([\d.]+)\s*KB$/i);
+        if (kb) return Math.round(parseFloat(kb[1]) * 1024);
+        const b = raw.match(/^([\d.]+)\s*B$/i);
+        if (b) return Math.round(parseFloat(b[1]));
+        return null;
+      }
+      function pickConvPeer(peers) {
+        if (!peers.length) return null;
+        if (m.graphMessageId) {
+          const byId = peers.find((peer) => String(peer.id) === String(m.graphMessageId));
+          if (byId) return byId;
+        }
+        const attHints = [];
+        (m.attachments || []).forEach((a) => {
+          if (!a) return;
+          if (a.name) attHints.push(String(a.name));
+          if (a.titleName) attHints.push(String(a.titleName));
+        });
+        const wantSize = m.attachments && m.attachments[0] && sizeFromLabel(m.attachments[0].sizeLabel);
+        if (wantSize != null) {
+          const bySize = peers.filter((peer) => {
+            const atts = sc.attachments && sc.attachments[peer.id];
+            return atts && atts.some((att) => att && Math.abs(Number(att.size || 0) - wantSize) <= 512);
+          });
+          if (bySize.length === 1) return bySize[0];
+        }
+        if (attHints.length) {
+          for (let i = 0; i < peers.length; i++) {
+            const atts = sc.attachments && sc.attachments[peers[i].id];
+            if (!atts || !atts.length) continue;
+            for (let j = 0; j < atts.length; j++) {
+              const an = String(atts[j].name || '');
+              for (let k = 0; k < attHints.length; k++) {
+                const hint = attHints[k];
+                if (an === hint || an.indexOf(hint) >= 0 || hint.indexOf(an) >= 0) return peers[i];
+              }
+            }
+          }
+        }
+        const whenOpen = m.receivedDateTime || m.received || '';
+        if (whenOpen) {
+          const byWhen = peers.find((peer) => String(peer.receivedDateTime || '') === String(whenOpen));
+          if (byWhen) return byWhen;
+        }
+        const subj = m.subject ? String(m.subject) : '';
+        if (subj) {
+          const subPeers = peers.filter((peer) => String(peer.subject || '') === subj);
+          if (subPeers.length === 1) return subPeers[0];
+        }
+        return peers.find((peer) => /^AQMk/i.test(String(peer.id || ''))) || peers[0];
       }
       if (isConvUrl && !msgId) {
-        const peers = (sc.conversation || []).filter((peer) => peer && String(peer.conversationId || '') === convId);
-        const hit = peers.find((peer) => /^AQMk/i.test(String(peer.id || ''))) || peers[0];
+        const hit = pickConvPeer(convPeersFor(convId));
         if (hit && hit.id) msgId = String(hit.id);
       }
       if (!msgId) msgId = isConvUrl ? (urlId + '-open') : urlId;
@@ -884,7 +943,7 @@ async function boot() {
         id: msgId,
         conversationId: convId,
         subject: m.subject || 'Hello',
-        receivedDateTime: m.receivedDateTime || new Date().toISOString(),
+        receivedDateTime: m.receivedDateTime || m.received || new Date().toISOString(),
         from: { emailAddress: { address: String(m.senderEmail || 'ai.local.flow@gmail.com').toLowerCase(), name: m.senderName || '' } },
         sender: { emailAddress: { address: String(m.senderEmail || 'ai.local.flow@gmail.com').toLowerCase(), name: m.senderName || '' } },
         toRecipients: toList.map((address) => ({ emailAddress: { address: String(address || '').toLowerCase() } })),
@@ -898,6 +957,7 @@ async function boot() {
         if (existing.sender) row.sender = existing.sender;
         if (existing.subject) row.subject = existing.subject;
         if (existing.conversationId) row.conversationId = existing.conversationId;
+        if (existing.receivedDateTime && !m.receivedDateTime && !m.received) row.receivedDateTime = existing.receivedDateTime;
         if (existing.hasAttachments != null) row.hasAttachments = existing.hasAttachments;
         if (existing.body && existing.body.content && (!m.body || !String(m.body).trim())) {
           row.body = existing.body;

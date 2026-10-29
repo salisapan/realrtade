@@ -329,7 +329,15 @@ const FlowOwaParse = (() => {
     if (pane.idSource === 'url-unconfirmed' || pane.idSource === 'url-stale') return false;
     const paneItem = canonId(pane.itemId);
     const msgId = canonId(m.id);
-    if (paneItem && msgId && paneItem !== msgId) return false;
+    if (paneItem && msgId && paneItem !== msgId) {
+      const paneConv = canonId(pane.conversationId);
+      const msgConv = canonId(m.conversationId);
+      if (paneConv && msgConv && paneConv === msgConv && fileRows(pane.attachments).length) {
+        const rel = fileRelation(pane.attachments, m.attachments || m.files);
+        if (rel === 'yes') return true;
+      }
+      return false;
+    }
     if (paneItem && msgId && paneItem === msgId) return true;
     const paneNet = canonId(pane.internetMessageId);
     const msgNet = canonId(m.internetMessageId);
