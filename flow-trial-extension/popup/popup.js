@@ -497,7 +497,7 @@
       pill.setAttribute('dir', 'auto');
       return;
     }
-    const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
+    const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected && k !== 'meta');
     if (live.length) {
       const msIds = ['microsoft', 'microsoftTodo', 'outlook'];
       if (live.some((k) => msIds.indexOf(k) >= 0)) {

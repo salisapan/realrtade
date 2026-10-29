@@ -55,7 +55,8 @@ function copyExtension(opts) {
     'https://instagram.com/direct',
     'https://instagram.com/direct/*'
   ];
-  manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(hostExtra, optionalChat)));
+  const whatsappE2eHost = ['https://web.whatsapp.com/*'];
+  manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(hostExtra, whatsappE2eHost)));
   manifest.optional_host_permissions = Array.from(new Set((manifest.optional_host_permissions || []).concat(optionalChat)));
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return dest;
