@@ -96,13 +96,15 @@ function load(opts) {
       runtime: { getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }), onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} }, lastError: null, getURL: (s) => s, id: 'ext' },
       identity: { getAuthToken: (o, cb) => cb('tok'), removeCachedAuthToken: (o, cb) => cb(), launchWebAuthFlow: () => {} },
       storage: { local: { get: async (k) => (typeof k === 'string' ? { [k]: stored[k] } : stored), set: async (p) => { Object.assign(stored, p); }, remove: async (k) => { delete stored[k]; } } },
-      windows: { create() {}, onRemoved: { addListener() {} } }, tabs: { sendMessage() {} }, alarms: { create() {}, onAlarm: { addListener() {} } }
+      windows: { create() {}, onRemoved: { addListener() {} } }, tabs: { sendMessage() {} }, alarms: { create() {}, onAlarm: { addListener() {} } },
+      contextMenus: { create() {}, onClicked: { addListener() {} } }
     },
     URLSearchParams, btoa: (s) => Buffer.from(s, 'binary').toString('base64'), atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     crypto: webcrypto, TextEncoder, Uint8Array
   };
   sandbox.self = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
+  vm.runInContext(require('./load-background.cjs').GOOGLE_CONFIG_SRC, sandbox, { filename: 'google-config.js' });
   vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
   vm.runInContext(require('./load-background.cjs').LANE_ACCOUNT_STUB, sandbox);
   return { calls, stored, fn: (n) => vm.runInContext(n, sandbox) };
@@ -111,8 +113,31 @@ const ok = (data) => ({ ok: true, status: 200, json: async () => data });
 const status = (s) => ({ ok: s < 300, status: s, json: async () => ({ error: { message: 'x' } }) });
 const decodeRaw = (raw) => Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
 
+const GMAIL_COMPOSE_SCOPES = {
+  version: [
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/tasks',
+    'https://www.googleapis.com/auth/contacts.readonly',
+    'https://www.googleapis.com/auth/drive.file',
+    'openid',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/gmail.compose'
+  ].join('\n'),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
+
+const OAUTH_NO_COMPOSE = {
+  version: GMAIL_COMPOSE_SCOPES.version.replace(/\nhttps:\/\/www\.googleapis\.com\/auth\/gmail\.compose$/, ''),
+  status: 'granted',
+  source: 'chrome',
+  at: 1
+};
+
 async function backgroundTests() {
-  const auth = { googleTasksAuth: { taskListId: 'LIST1' } };
+  const auth = { googleTasksAuth: { taskListId: 'LIST1' }, googleGrantedScopes: GMAIL_COMPOSE_SCOPES };
   const TASKS = /tasks\.googleapis\.com/;
 
   let w = load({ stored: {} });
@@ -175,6 +200,10 @@ async function backgroundTests() {
   check('reopening makes the Task open again on the new day', r.ok && reopened.body.status === 'needsAction' && reopened.body.completed === null && reopened.body.due === '2026-10-13T00:00:00.000Z', { r, reopened });
   r = await w.fn('followTaskReopen')({ taskListId: 'LIST1', taskId: 'T1' }, null);
   check('reopening without a day still reopens', r.ok && w.calls[1].body.status === 'needsAction' && !('due' in w.calls[1].body), w.calls[1]);
+
+  w = load({ stored: Object.assign({}, auth, { googleGrantedScopes: OAUTH_NO_COMPOSE }), routes: [[/gmail\.googleapis\.com/, { reply: ok({}) }]] });
+  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Vendor', body: 'Hi' });
+  check('without gmail.compose: follow draft stays compose-closed, no Gmail HTTP', r.ok === false && r.reason === 'compose-closed' && !w.calls.some((c) => /gmail\.googleapis\.com/.test(c.url)), { r, calls: w.calls });
 
   // nudge draft
   const watch = F.buildWatch({ threadId: 't', messageId: 'm', subject: 'Vendor booking', counterpart: { email: 'dana@acme.com', name: 'Dana Cole' }, ask: F.classifyOutgoing('Please confirm the final figure by Monday so I can book the vendor.', { now: new Date(2026, 9, 1, 12).getTime(), extract: FlowExtract }), now: 1 });

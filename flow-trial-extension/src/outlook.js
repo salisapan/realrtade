@@ -324,10 +324,37 @@ const FlowOutlook = (() => {
       const o = opts || {};
       const prev = await read(AUTH_KEY, null);
       const chosen = (o.scopes && o.scopes.length) ? o.scopes : ((prev && prev.requestedScopes && prev.requestedScopes.length) ? prev.requestedScopes : cfg.SCOPES);
-      // Mail scopes stay on every sign-in. Tasks.ReadWrite is included only when
-      // the Connect screen passed it (the To Do checkbox). Mail.Send is never added.
+      const catalogOnly = Boolean(prev && prev.ecosystem);
+      let scopeSources;
+      if (catalogOnly) {
+        const E = typeof globalThis !== 'undefined' ? globalThis.FlowConnectEcosystem : null;
+        const allow = (E && typeof E.microsoftConsentScopes === 'function')
+          ? E.microsoftConsentScopes()
+          : ((E && typeof E.microsoftScopes === 'function') ? E.microsoftScopes() : ((E && E.MICROSOFT_SCOPES) ? E.MICROSOFT_SCOPES.slice() : []));
+        const optional = [];
+        if (E && E.microsoftOptionalScopes) {
+          Object.keys(E.microsoftOptionalScopes).forEach((k) => {
+            (E.microsoftOptionalScopes[k] || []).forEach((s) => { if (optional.indexOf(s) < 0) optional.push(s); });
+          });
+        }
+        const prevNames = (E && typeof E.scopeNames === 'function')
+          ? E.scopeNames((prev && prev.token && prev.token.grantedScopes) || (prev && prev.requestedScopes) || [])
+          : [];
+        const keptOptional = prevNames.filter((s) => optional.indexOf(s) >= 0);
+        const chosenList = Array.isArray(chosen) ? chosen : [];
+        const CAL_SCOPE = 'Calendars.ReadWrite';
+        const SITES_SCOPE = 'Sites.ReadWrite.All';
+        const base = allow.slice();
+        if (chosenList.indexOf(CAL_SCOPE) >= 0 && base.indexOf(CAL_SCOPE) < 0) base.push(CAL_SCOPE);
+        if (chosenList.indexOf(SITES_SCOPE) >= 0 && base.indexOf(SITES_SCOPE) < 0) base.push(SITES_SCOPE);
+        scopeSources = (E && typeof E.mergeMicrosoftScopes === 'function')
+          ? E.mergeMicrosoftScopes(base, keptOptional)
+          : base.concat(keptOptional);
+      } else {
+        scopeSources = (chosen || []).concat(cfg.SCOPES || []);
+      }
       const scopes = [];
-      (chosen || []).concat(cfg.SCOPES || []).forEach((s) => {
+      scopeSources.forEach((s) => {
         if (!s || /Mail\.Send/i.test(s) || /\.Send$/i.test(s)) return;
         if (scopes.indexOf(s) < 0) scopes.push(s);
       });
@@ -340,7 +367,10 @@ const FlowOutlook = (() => {
       if (!primary) return { ok: false, error: 'profile' };
       const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
       const storedProfile = { mail: profile.mail, userPrincipalName: profile.userPrincipalName, displayName: profile.displayName || null, givenName: profile.givenName || null, surname: profile.surname || null, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] };
-      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: storedProfile });
+      await write(AUTH_KEY, {
+        token: r.token, account, ownAddresses, requestedScopes: scopes, profile: storedProfile,
+        ecosystem: Boolean(prev && prev.ecosystem)
+      });
       await rememberProfileNames(storedProfile);
       // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
       await clearOutlookJudgmentState();
@@ -486,6 +516,10 @@ const FlowOutlook = (() => {
         let searched = null;
         try { searched = await deps.send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.searchTerms || gate.ask.query) }); }
         catch (e) { searched = { ok: false, reason: 'drive-search-failed', status: 0, error: String(e && e.message || e) }; }
+        if (searched && searched.reason === 'drive-search-unavailable') {
+          silence.push({ conversationId: d.conversationId, reason: 'file-chain-not-run' });
+          continue;
+        }
         const failed = searchSilenceOf(searched);
         if (failed) { silence.push({ conversationId: d.conversationId, reason: failed }); continue; }
         const chain = FlowCloseChains.resolve({
@@ -493,7 +527,7 @@ const FlowOutlook = (() => {
           origin: 'outlook',
           now,
           evidence: FlowCloseChains.fileEvidence({
-            driveOk: true,
+            driveOk: Boolean(searched && searched.ok),
             driveFiles: (searched && searched.files) || [],
             threadFiles: msg.hasAttachments ? null : []
           })

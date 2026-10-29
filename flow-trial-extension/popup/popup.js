@@ -499,6 +499,14 @@
     }
     const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
     if (live.length) {
+      const msIds = ['microsoft', 'microsoftTodo', 'outlook'];
+      if (live.some((k) => msIds.indexOf(k) >= 0)) {
+        stampMicrosoft(pill, microsoft);
+        stampMicrosoft(document.getElementById('outlookBlock'), microsoft);
+        pill.textContent = microsoftFaceLabel(microsoft);
+        pill.className = microsoft === 'valid' ? 'ver on' : 'ver';
+        return;
+      }
       const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
       pill.textContent = uiLang() === 'he' ? 'מחובר' : ((conn ? conn.label : live[0]) + ' connected');
       pill.className = 'ver on';
@@ -1799,7 +1807,7 @@
     note.hidden = true;
     const acts = el('div', 'wait-acts');
     let offRow = null;
-    if (link === 'missing' && st.configured) {
+    if ((link === 'missing' || link === 'expired' || link === 'missing-scope') && st.configured) {
       // One Connect screen: Select all, then one checkbox per Graph service.
       // Mail stays on. Extra scopes are added only for a checked box.
       const screen = el('div', 'ms-connect');
@@ -1808,6 +1816,7 @@
         { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', required: true },
         { id: 'todo', label: 'To Do', detail: 'Add one task on a task-only Do It. Glance reads it back before it is handled. Undo deletes that task.', scopes: ['Tasks.ReadWrite'], required: false }
       ];
+      const grantedReconnect = (link === 'missing') ? [] : grantedOutlookScopes();
       const boxes = {};
       const all = document.createElement('label');
       all.className = 'ms-svc';
@@ -1824,7 +1833,9 @@
         box.type = 'checkbox';
         box.setAttribute('data-glance-service', svc.id);
         const required = Boolean(svc.required || svc.id === 'mail');
+        const has = (svc.scopes || []).every((sc) => grantedReconnect.indexOf(sc) >= 0);
         if (required) { box.checked = true; box.disabled = true; }
+        else if (has && grantedReconnect.length) box.checked = true;
         else if (svc.defaultOn === true) box.checked = true;
         boxes[svc.id] = box;
         const copy = el('span', null, serviceLabel(svc));
@@ -1859,7 +1870,8 @@
         optionalBoxes().forEach((box) => { box.checked = allBox.checked; });
       });
       optionalBoxes().forEach((box) => box.addEventListener('change', syncAll));
-      const c = el('button', 'ghost sm', 'התחבר');
+      const connectBtnLabel = (link === 'missing') ? 'התחבר' : 'התחבר מחדש';
+      const c = el('button', 'ghost sm', connectBtnLabel);
       c.type = 'button';
       c.setAttribute('data-glance-connect-go', '1');
       c.addEventListener('click', async () => {
@@ -1883,19 +1895,6 @@
       });
       screen.appendChild(c);
       acts.appendChild(screen);
-    } else if (link === 'expired' || link === 'missing-scope') {
-      const again = el('button', 'ghost sm', 'התחבר מחדש');
-      again.type = 'button';
-      again.addEventListener('click', async () => {
-        beginRender();
-        try {
-          again.disabled = true;
-          const r = await o.connect();
-          if (!r.ok) { again.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
-          await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
-        } finally { endRender(); }
-      });
-      acts.appendChild(again);
     } else if (link === 'valid') {
       const grantedNow = grantedOutlookScopes();
       const scopeServices = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [];
@@ -1930,7 +1929,21 @@
           return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
         });
         for (let i = 0; i < add.length; i++) {
-          const scopes = add[i].scopes || [];
+          const svc = add[i];
+          const bucket = (globalThis.FlowConnectEcosystem && typeof FlowConnectEcosystem.optionalScopeBucketForOutlookService === 'function')
+            ? FlowConnectEcosystem.optionalScopeBucketForOutlookService(svc.id)
+            : null;
+          if (bucket) {
+            const grantedScope = await send({ type: 'flow:microsoft-optional-scopes', bucket: bucket });
+            if (!grantedScope || grantedScope.ok !== true) {
+              addScope.disabled = false;
+              note.hidden = false;
+              note.textContent = (grantedScope && (grantedScope.reason || grantedScope.error)) || 'ההרשאה לא נוספה.';
+              return;
+            }
+            continue;
+          }
+          const scopes = svc.scopes || [];
           for (let j = 0; j < scopes.length; j++) {
             if (grantedNow.indexOf(scopes[j]) >= 0) continue;
             const grantedScope = await send({ type: 'flow:outlook-consent-scope', scope: scopes[j], policy: 'always' });
@@ -2269,6 +2282,15 @@
     FlowMetaConsent.paintConnection(host, { granted: on, lang: metaLang(), chrome: chrome });
   }
 
+  async function labsOptionalScopeAfterFlip(switchId) {
+    if (!globalThis.FlowConnectEcosystem || typeof FlowConnectEcosystem.optionalScopeBucketForLabsSwitch !== 'function') return;
+    const bucket = FlowConnectEcosystem.optionalScopeBucketForLabsSwitch(switchId);
+    if (!bucket) return;
+    try {
+      await chrome.runtime.sendMessage({ type: 'flow:microsoft-optional-scopes', bucket: bucket });
+    } catch (e) { /* optional consent */ }
+  }
+
   // The off switches, one row each, in the rows the popup already uses. It reads and writes one storage object and nothing else.
   async function renderLabs() {
     const host = document.getElementById('labs-list');
@@ -2297,7 +2319,9 @@
       btn.type = 'button';
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, !on) });
+        const turningOn = !on;
+        await chrome.storage.local.set({ glanceSwitches: FlowLabsSwitches.flipped(bag, r.id, turningOn) });
+        if (turningOn) await labsOptionalScopeAfterFlip(r.id);
         await renderLabs();
       });
       acts.appendChild(btn);

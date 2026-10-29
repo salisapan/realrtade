@@ -339,6 +339,7 @@ const CASES = [
     const runnerSrc = read('src/outlook.js');
     check('Gmail, the Outlook page and the Outlook runner pass the same evidence helper', /FlowCloseChains\.fileEvidence\(/.test(gmailSrc) && /FlowCloseChains\.fileEvidence\(/.test(pageSrc) && /FlowCloseChains\.fileEvidence\(/.test(runnerSrc));
     check('neither Outlook host turns Calendar or Sheets on by itself', !/calendar:\s*true/.test(pageSrc) && !/sheets:\s*true/.test(pageSrc) && !/calendar:\s*true/.test(runnerSrc) && !/sheets:\s*true/.test(runnerSrc));
+    check('Outlook file chain runs when a template close was already planned', /function outlookFileChainNow/.test(pageSrc) && /googleClose/.test(pageSrc) && /resolveFileChain/.test(pageSrc));
     check('a found Drive file is a prepare Do It, and a missing attachment id stays silence', /data-glance-chain', 'prepare'/.test(pageSrc) && /attachmentId/.test(pageSrc) && /outlook:file-found-no-attach/.test(pageSrc) && /data-glance-chain', 'needs-you'/.test(pageSrc));
     const writer = read('src/background.js');
     check('the Outlook writer posts a fileAttachment and names attached only with an id', /\/attachments/.test(writer) && /attachmentId/.test(writer) && /with the file attached/.test(writer));

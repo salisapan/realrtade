@@ -12,6 +12,12 @@ import '../core/recurring-reminder.js';
 import '../core/workspace-file.js';
 // FlowEventCallLink: a Meet link on an event already on the calendar, switch EVENT_CALL_LINK, off.
 import '../core/event-call-link.js';
+// FlowFullDocumentClose: a full quote/proposal Doc in the person's style (Gmail+Docs), switch FULL_DOCUMENT_CLOSE, off.
+import '../core/google-closes.js';
+import '../core/style-profile.js';
+import '../core/full-document-close.js';
+// FlowGoogleContacts: resolve a name in Google Contacts (G8), switch GOOGLE_CONTACTS, off.
+import '../core/google-contacts.js';
 import '../core/google-tasks.js';
 import '../core/google-task-close.js';
 import '../core/google-drive.js';
@@ -30,7 +36,7 @@ let laneSource = 'chrome';
 
 // The token of the account the person consented to in Glance, and only that.
 // The stored Connect token and Chrome's own token are both read, each one's
-// account comes from the Gmail profile, and the account recorded at Connect
+// account comes from the openid/userinfo email claim, and the account recorded at Connect
 // decides. Chrome's token is used only when it is the same account. Interactive
 // stays false. No e2e hook is required.
 const CONNECTED_ACCOUNT_KEY = 'googleConnectedAccount';
@@ -90,14 +96,14 @@ function identityToken() {
   });
 }
 
-// The address a token belongs to, from the Gmail profile (gmail.compose is
-// on the grant). A 401 here is this probe's answer: the token is kept.
+// The address a token belongs to, from the openid/userinfo email claim (already
+// on the manifest grant). A 401 here is this probe's answer: the token is kept.
 async function accountOfToken(token) {
   const hit = seenAccounts.get(token);
   if (hit && Date.now() - hit.at < SEEN_MS) return hit.email;
   let email = '';
   try {
-    const res = await fetch(laneUrl('https://gmail.googleapis.com/gmail/v1/users/me/profile'), {
+    const res = await fetch(laneUrl('https://www.googleapis.com/oauth2/v3/userinfo'), {
       method: 'GET',
       headers: { Authorization: 'Bearer ' + token }
     });
@@ -238,7 +244,12 @@ function noteGoogleAuthFailure(reason, account) {
       if (account) flag.account = String(account);
       const patch = { [RECONNECT_KEY]: flag };
       if (!ever) patch[EVER_KEY] = { connected: true };
-      return chrome.storage.local.set(patch);
+      const why = String(reason || '');
+      const clearConnected = why === 'wrong-account' || why === 'account-unverified';
+      return chrome.storage.local.set(patch).then(() => {
+        if (!clearConnected) return null;
+        return chrome.storage.local.remove(CONNECTED_ACCOUNT_KEY);
+      });
     })
     .catch(() => {});
 }
@@ -705,7 +716,7 @@ async function prepareWrite(connectorId, input, cred) {
     };
   }
   if (connectorId === 'googleDriveSave') return i;
-  if (connectorId === 'googleDoc') {
+  if (connectorId === 'googleDoc' || connectorId === 'googleDocFull') {
     const text = params.text || i.text || plainText(params.html || i.html || '');
     const documentId = i.documentId || params.documentId || '';
     return {
@@ -864,11 +875,13 @@ function verifyUrlFor(connectorId, ref) {
     return id && r.taskListId ? 'https://tasks.googleapis.com/tasks/v1/lists/' + enc(r.taskListId) + '/tasks/' + enc(id) : '';
   }
   if (connectorId === 'gmailCompose' || connectorId === 'googleReplyDraft') {
-    const id = r.draftId;
-    return id ? 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + enc(id) + '?format=minimal' : '';
+    return '';
   }
   const fileId = r.fileId || r.documentId || r.spreadsheetId;
   if (fileId && /^google(DriveSave|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
+    return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');
+  }
+  if (connectorId === 'googleDocFull' && fileId) {
     return 'https://www.googleapis.com/drive/v3/files/' + enc(fileId) + '?fields=' + enc('id,trashed');
   }
   return '';
@@ -939,6 +952,29 @@ function onLaneMessage(msg, sender, sendResponse) {
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }
+  if (msg.type === 'flow:google-contacts-plan') {
+    const G = globalThis.FlowGoogleContacts;
+    Promise.resolve((async () => {
+      if (!G || typeof G.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(G.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      const bag = await chrome.storage.local.get(['googleGrantedScopes', 'glanceUserContextV0']);
+      const grantedRec = bag.googleGrantedScopes;
+      const grantedScopes = grantedRec && typeof grantedRec.version === 'string'
+        ? grantedRec.version.split('\n').filter(Boolean)
+        : null;
+      const account = await readConnectedAccount();
+      const ctxRoot = bag.glanceUserContextV0;
+      const byAccount = ctxRoot && ctxRoot.byAccount && typeof ctxRoot.byAccount === 'object' ? ctxRoot.byAccount : {};
+      const profile = (account && byAccount[account]) || byAccount.default || {};
+      const text = String(msg.text || '').slice(0, 4000);
+      const choiceIndex = typeof msg.choiceIndex === 'number' ? msg.choiceIndex : undefined;
+      return G.plan(
+        { flags: { [G.SWITCH]: true }, text: text, choiceIndex: choiceIndex },
+        { http: laneHttp, grantedScopes: grantedScopes, profile: profile, flags: { [G.SWITCH]: true } }
+      );
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
   if (msg.type === 'flow:google-new-file-plan') {
     // The page asks; the worker owns the switch. Off or silent: the page shows nothing.
     const W = globalThis.FlowWorkspaceFile;
@@ -947,6 +983,22 @@ function onLaneMessage(msg, sender, sendResponse) {
       if (!(await laneSwitchOn(W.SWITCH))) return { action: 'off', reason: 'switch-off' };
       const forms = await laneSwitchOn(W.FORMS_SWITCH);
       return W.plan({ flags: { [W.SWITCH]: true, [W.FORMS_SWITCH]: forms }, text: String(msg.text || '').slice(0, 4000) });
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
+  if (msg.type === 'flow:google-full-document-plan') {
+    const F = globalThis.FlowFullDocumentClose;
+    Promise.resolve((async () => {
+      if (!F || typeof F.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(F.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      return F.plan({
+        flags: { [F.SWITCH]: true },
+        text: String(msg.text || '').slice(0, 8000),
+        lang: msg.lang === 'he' ? 'he' : 'en',
+        styleSummary: msg.styleSummary || null,
+        companyTemplate: msg.companyTemplate || null,
+        template: msg.companyTemplate || msg.template || null
+      });
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }

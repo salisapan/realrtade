@@ -45,8 +45,8 @@ const REDIRECT = 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/';
     const drive = C.scopesFor(['mail', 'onedrive']);
     const driveSvc = (C.CONNECT_SERVICES || []).find((s) => s.id === 'onedrive');
     check('the OneDrive checkbox asks Files.ReadWrite only when it is checked', driveSvc && driveSvc.required !== true && (driveSvc.scopes || []).indexOf('Files.ReadWrite') !== -1 && (driveSvc.scopes || []).indexOf('Files.Read') === -1 && drive.indexOf('Files.ReadWrite') !== -1 && mailOnly.indexOf('Files.ReadWrite') === -1, { drive: driveSvc, scopes: drive });
-    check('the OneDrive checkbox starts ticked and the other optional boxes start empty; the mail-only default scope list is unchanged',
-      driveSvc && driveSvc.defaultOn === true && (C.CONNECT_SERVICES || []).filter((s) => s.defaultOn === true).map((s) => s.id).join() === 'onedrive' &&
+    check('the OneDrive checkbox starts unticked like the other optional boxes; the mail-only default scope list is unchanged',
+      driveSvc && driveSvc.defaultOn !== true && (C.CONNECT_SERVICES || []).filter((s) => s.defaultOn === true).length === 0 &&
       C.defaultConnectIds().join() === 'mail' && /Glance/.test(driveSvc.detail || ''), { drive: driveSvc, ids: C.defaultConnectIds() });
     check('mail-only sign-in does not ask Calendars.ReadWrite or Tasks.ReadWrite', mailOnly.indexOf('Calendars.ReadWrite') === -1 && mailOnly.indexOf('Tasks.ReadWrite') === -1, mailOnly);
     const calendarOnly = C.scopesFor(['mail', 'calendar']);

@@ -4,14 +4,15 @@ on:
   pull_request:
     branches:
       - claude/install-uiux-pro-max-skill-a4agox
+      - cursor/c1-connect-claude-4978-8c95
+      - cursor/d1-usercontext-on-c1-4978-8c95
   workflow_dispatch:
 
 jobs:
   e2e:
     name: e2e (${{ matrix.tz }})
     runs-on: ubuntu-latest
-    # The suite runs about 20–22 minutes per matrix leg; 25m cancelled UTC mid-run (2026-10-26).
-    timeout-minutes: 35
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -43,6 +44,7 @@ jobs:
           node test/negation-conditional-corpus.cjs
           node test/self-title-preposition-corpus.cjs
           node test/display-144-followups-corpus.cjs
+          node test/connect-ecosystem-corpus.cjs
       - name: Install Chromium
         working-directory: flow-trial-extension
         run: npx playwright install --with-deps chromium
