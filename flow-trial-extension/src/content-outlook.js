@@ -4437,6 +4437,14 @@
     pane = threadApplied.pane;
     if (suggestNote) suggestNote = pane;
 
+    const openFrom = String(pane.openSenderEmail || '').trim().toLowerCase();
+    const graphFrom = String(pane.senderEmail || '').trim().toLowerCase();
+    if (openFrom && graphFrom && openFrom !== graphFrom && !(await sameOpenSender(graphFrom, openFrom, null))) {
+      dropStuckCard(pane);
+      await pageReason('page:sender-mismatch', pane);
+      return;
+    }
+
     // Outlook item, the path, and the conversation — not a hash of the text.
     try {
       if (await remountProvedTodoReceipt(pane)) {

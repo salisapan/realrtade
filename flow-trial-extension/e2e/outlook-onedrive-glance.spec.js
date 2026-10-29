@@ -25,7 +25,7 @@ async function openSaveCard(glance, scenarioExtra, conv, msg) {
     messages: {},
     attachments: { [msg]: [{ id: 'att-nw', name: NAME, contentType: 'application/pdf', size: 3072, isInline: false }] },
     conversation: [],
-    mailboxSettings: { timeFormat: 'HH:mm' }
+    mailboxSettings: { timeFormat: 'HH:mm', timeZone: 'UTC' }
   }, scenarioExtra || {}));
   const page = await glance.openOutlook({
     confirmConversation: true,
