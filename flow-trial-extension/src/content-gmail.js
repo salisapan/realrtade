@@ -3301,8 +3301,8 @@ function glanceUiCopy(kind) {
     let plan = null;
     try {
       const manifest = chrome.runtime.getManifest();
-      const oauth = (manifest.oauth2 && manifest.oauth2.scopes) || [];
-      if (oauth.indexOf('https://www.googleapis.com/auth/contacts.readonly') < 0) return false;
+      const hosts = (manifest.host_permissions || []).concat(manifest.optional_host_permissions || []);
+      if (!hosts.some((h) => /people\.googleapis\.com/.test(String(h)))) return false;
       plan = await sendRuntime(Object.assign({
         type: 'flow:google-contacts-plan',
         text: c.text,
