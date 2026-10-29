@@ -6,7 +6,7 @@
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
 const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
-const { testIfGmailCompose } = bindV1ScopeGates(test);
+const { testIfGmailCompose, gmailComposeInManifest } = bindV1ScopeGates(test);
 
 const SELF = 'ai.local.flow@gmail.com';
 const ASK = 'Please save the attached pdf to Drive.';
@@ -89,7 +89,9 @@ test('Undo in the Hebrew UI trashes the file the upload response named', async (
   await expect(page.locator('div[role="main"]')).not.toContainText('עדיין ב-Drive');
 });
 
-testIfGmailCompose('with no reply open, the save makes the draft through the Gmail drafts API, in the thread, with the Drive link', async ({ glance }) => {
+testIfGmailCompose(
+  'with no reply open, the save makes the draft through the Gmail drafts API, in the thread, with the Drive link',
+  async ({ glance }) => {
   const page = await run(glance, 'ch-nocompose', BOARD, 'en', true);
   await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   const fileId = server.last.file;
@@ -101,7 +103,16 @@ testIfGmailCompose('with no reply open, the save makes the draft through the Gma
   expect(server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/drafts/' + draftId) >= 0)).toBe(true);
   expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
   await expect(page.locator('[aria-label="Message Body"]')).toHaveCount(0);
-});
+  },
+  async ({ glance }) => {
+    expect(gmailComposeInManifest).toBe(false);
+    const page = await run(glance, 'ch-nocompose-v1', BOARD, 'en', true);
+    await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+    expect(Object.keys(server.drafts)).toHaveLength(0);
+    expect(server.calls.some((c) => c.method === 'POST' && c.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
+    expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
+  }
+);
 
 test('Undo after a version bump with the same md5Checksum still trashes the file', async ({ glance }) => {
   const page = await run(glance, 'ch-bump', BOARD);

@@ -7,7 +7,7 @@
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
 const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
-const { testIfDriveReadonly, testIfGmailCompose } = bindV1ScopeGates(test);
+const { testIfDriveReadonly, testIfGmailCompose, driveReadonlyInManifest, gmailComposeInManifest } = bindV1ScopeGates(test);
 
 const SELF = 'ai.local.flow@gmail.com';
 const OTHER = 'sali.profile@gmail.com';
@@ -424,12 +424,24 @@ test.describe('4. copied only: no card of any kind', () => {
     await expect(main(page)).not.toContainText(/Glance|DETECTED INTENT|report\.pdf/i);
   });
 
-  testIfDriveReadonly('the same mail addressed To the account is offered the file card', async ({ glance }) => {
+  testIfDriveReadonly(
+    'the same mail addressed To the account is offered the file card',
+    async ({ glance }) => {
     await glance.seedGmail({});
     server.driveHits([{ id: 'rep-1', name: 'report.pdf', mimeType: 'application/pdf' }]);
     const page = await glance.openGmail(detailed('to-drive', 'Can you send me the report', 'en', { to: [SELF], cc: ['noa@acme.io'] }));
     await expect(chip(page)).toBeVisible({ timeout: 15000 });
-  });
+    },
+    async ({ glance }) => {
+      expect(driveReadonlyInManifest).toBe(false);
+      await glance.seedGmail({});
+      server.driveHits([{ id: 'rep-1', name: 'report.pdf', mimeType: 'application/pdf' }]);
+      const page = await glance.openGmail(detailed('to-drive-off', 'Can you send me the report', 'en', { to: [SELF], cc: ['noa@acme.io'] }));
+      await page.waitForTimeout(3000);
+      await expect(chip(page)).toHaveCount(0);
+      expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+    }
+  );
 
   test('Gmail paints the recipients after the body: Cc only still ends with no card', async ({ glance }) => {
     await glance.seedGmail({});
@@ -440,13 +452,26 @@ test.describe('4. copied only: no card of any kind', () => {
     await expect(main(page)).not.toContainText(/DETECTED INTENT/);
   });
 
-  testIfDriveReadonly('Gmail paints the recipients after the body: addressed To the account keeps its card', async ({ glance }) => {
+  testIfDriveReadonly(
+    'Gmail paints the recipients after the body: addressed To the account keeps its card',
+    async ({ glance }) => {
     await glance.seedGmail({});
     const page = await glance.openGmail(detailed('to-late', 'Can you send me the report', 'en', { lateMs: 1500, to: [SELF], cc: ['noa@acme.io'] }));
     await page.waitForTimeout(4000);
     await expect(main(page).locator('.glance-late-hdr table')).toHaveCount(1);
     await expect(chip(page)).toHaveCount(1);
-  });
+    },
+    async ({ glance }) => {
+      expect(driveReadonlyInManifest).toBe(false);
+      await glance.seedGmail({});
+      server.driveHits([{ id: 'rep-1', name: 'report.pdf', mimeType: 'application/pdf' }]);
+      const page = await glance.openGmail(detailed('to-late-off', 'Can you send me the report', 'en', { lateMs: 1500, to: [SELF], cc: ['noa@acme.io'] }));
+      await page.waitForTimeout(5000);
+      await expect(main(page).locator('.glance-late-hdr table')).toHaveCount(1);
+      await expect(chip(page)).toHaveCount(0);
+      expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+    }
+  );
 
   test('details open with a collapsed To line and Cc only: the labelled table wins and no card is shown', async ({ glance }) => {
     await glance.seedGmail({});
@@ -505,22 +530,45 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     return { page: page, chip: c };
   }
 
-  testIfGmailCompose('the thread id only on h2.hP (hex): the draft is made in that thread', async ({ glance }) => {
+  testIfGmailCompose(
+    'the thread id only on h2.hP (hex): the draft is made in that thread',
+    async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'hdr-hex', { threadIdOnHeader: true });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
     await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(1);
     expect(drafts()[Object.keys(drafts())[0]].message.threadId).toBe(HEX);
-  });
+    },
+    async ({ glance }) => {
+      expect(gmailComposeInManifest).toBe(false);
+      const { page, chip: c } = await saveChain(glance, 'hdr-hex-off', { threadIdOnHeader: true });
+      await c.click();
+      await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+      expect(Object.keys(drafts())).toHaveLength(0);
+      expect(server.calls.some((c2) => c2.method === 'POST' && c2.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
+    }
+  );
 
-  testIfGmailCompose('only the decimal data-thread-perm-id: it is converted to the hex thread id', async ({ glance }) => {
+  testIfGmailCompose(
+    'only the decimal data-thread-perm-id: it is converted to the hex thread id',
+    async ({ glance }) => {
     const dec = '1234567890123456789';
     const { page, chip: c } = await saveChain(glance, 'hdr-dec', { threadIdOnHeader: true, threadPermId: dec });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
     await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(1);
     expect(drafts()[Object.keys(drafts())[0]].message.threadId).toBe(BigInt(dec).toString(16));
-  });
+    },
+    async ({ glance }) => {
+      expect(gmailComposeInManifest).toBe(false);
+      const dec = '1234567890123456789';
+      const { page, chip: c } = await saveChain(glance, 'hdr-dec-off', { threadIdOnHeader: true, threadPermId: dec });
+      await c.click();
+      await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+      expect(Object.keys(drafts())).toHaveLength(0);
+      expect(server.calls.some((c2) => c2.method === 'POST' && c2.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
+    }
+  );
 
   test('no thread id anywhere and no reply open: the draft step is not offered up front, and nothing says it was made', async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'hdr-none', { noThreadId: true });
@@ -531,7 +579,9 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     await expect(page.locator('div[role="main"]')).not.toContainText(/could not prepare a reply draft/i);
   });
 
-  testIfGmailCompose('Undo of the Drive save also deletes the reply draft by its id', async ({ glance }) => {
+  testIfGmailCompose(
+    'Undo of the Drive save also deletes the reply draft by its id',
+    async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'undo-draft', { threadIdOnHeader: true });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
@@ -542,9 +592,24 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(0);
     expect(server.calls.some((c2) => c2.method === 'DELETE' && c2.path.indexOf('/drafts/' + draftId) >= 0)).toBe(true);
     await expect.poll(() => server.file(fileId).trashed, { timeout: 15000 }).toBe(true);
-  });
+    },
+    async ({ glance }) => {
+      expect(gmailComposeInManifest).toBe(false);
+      const { page, chip: c } = await saveChain(glance, 'undo-draft-off', { threadIdOnHeader: true });
+      await c.click();
+      await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+      expect(Object.keys(drafts())).toHaveLength(0);
+      expect(server.calls.some((c2) => c2.method === 'POST' && c2.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
+      const fileId = server.last.file;
+      await page.locator('div[role="main"] button.flow-chip-undo').click();
+      await expect.poll(() => server.file(fileId).trashed, { timeout: 15000 }).toBe(true);
+      expect(server.calls.some((c2) => c2.method === 'DELETE' && c2.path.indexOf('/drafts/') >= 0)).toBe(false);
+    }
+  );
 
-  testIfGmailCompose('the draft is in the language of the mail, whatever the UI language is', async ({ glance }) => {
+  testIfGmailCompose(
+    'the draft is in the language of the mail, whatever the UI language is',
+    async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'draft-he', { threadIdOnHeader: true, senderName: 'דנה' }, 'en', 'מצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.');
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
@@ -554,5 +619,14 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     expect(msg.body).toContain('הקובץ מוכן.');
     expect(msg.body).not.toContain('The file is ready');
     expect(msg.body).not.toContain('Hi ');
-  });
+    },
+    async ({ glance }) => {
+      expect(gmailComposeInManifest).toBe(false);
+      const { page, chip: c } = await saveChain(glance, 'draft-he-off', { threadIdOnHeader: true, senderName: 'דנה' }, 'en', 'מצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.');
+      await c.click();
+      await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+      expect(Object.keys(drafts())).toHaveLength(0);
+      expect(server.calls.some((c2) => c2.method === 'POST' && c2.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
+    }
+  );
 });

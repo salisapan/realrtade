@@ -80,29 +80,51 @@ test('v1 without gmail.compose: no drafts.create on Do It', async ({ glance }) =
   expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
 });
 
-testIfGmailCompose('A reply draft is a real drafts.create read back by id, nothing calls the people API, and Undo deletes it', async ({ glance }) => {
-  const page = await open(glance, {
-    mail: {
-      messageId: 'm-people',
-      threadId: 't-people',
-      subject: 'Transfer',
-      senderEmail: S.SENDER,
-      senderName: 'flow',
-      body: DRAFT
-    }
-  });
-  await uncheck(page, 'task');
-  await clickDoIt(page);
-  await expect.poll(() => wrote('POST', '/gmail/v1/users/me/drafts')).toBe(true);
-  const id = server.last.draft;
-  await expect.poll(() => server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
-  expect(server.calls.some((c) => c.path.indexOf('people.googleapis') >= 0 || c.path.indexOf('/v1/people') >= 0)).toBe(false);
-  expect(server.drafts[id].message.threadId).toBe('t-people');
-  expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
-  await page.locator('div[role="main"] button.flow-chip-undo').click();
-  await expect.poll(() => server.calls.some((c) => c.method === 'DELETE' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
-  expect(server.drafts[id]).toBeUndefined();
-});
+testIfGmailCompose(
+  'A reply draft is a real drafts.create read back by id, nothing calls the people API, and Undo deletes it',
+  async ({ glance }) => {
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-people',
+        threadId: 't-people',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await expect.poll(() => wrote('POST', '/gmail/v1/users/me/drafts')).toBe(true);
+    const id = server.last.draft;
+    await expect.poll(() => server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
+    expect(server.calls.some((c) => c.path.indexOf('people.googleapis') >= 0 || c.path.indexOf('/v1/people') >= 0)).toBe(false);
+    expect(server.drafts[id].message.threadId).toBe('t-people');
+    expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
+    await page.locator('div[role="main"] button.flow-chip-undo').click();
+    await expect.poll(() => server.calls.some((c) => c.method === 'DELETE' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
+    expect(server.drafts[id]).toBeUndefined();
+  },
+  async ({ glance }) => {
+    expect(gmailComposeInManifest).toBe(false);
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-people-off',
+        threadId: 't-people-off',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await page.waitForTimeout(2000);
+    expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
+    expect(server.calls.some((c) => c.path.indexOf('people.googleapis') >= 0 || c.path.indexOf('/v1/people') >= 0)).toBe(false);
+    expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
+  }
+);
 
 test('Calendar Hold It posts to the local server, reads the event back, and Undo deletes it', async ({ glance }) => {
   const page = await open(glance, {
@@ -327,7 +349,9 @@ test('Sheets Undo refuses after the row is edited and leaves it', async ({ glanc
   expect(server.sheet(id).row).toEqual(edited);
 });
 
-testIfGmailCompose('A pre-filled Reply keeps To, Subject, signature, and the quote, and the body is inserted above them', async ({ glance }) => {
+testIfGmailCompose(
+  'A pre-filled Reply keeps To, Subject, signature, and the quote, and the body is inserted above them',
+  async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-reply',
@@ -366,9 +390,35 @@ testIfGmailCompose('A pre-filled Reply keeps To, Subject, signature, and the quo
   await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   await expect(body.locator('[data-glance-draft]')).toHaveText('Typed by the person');
   await expect(body.locator('.gmail_signature')).toHaveText('Best, Ada');
-});
+  },
+  async ({ glance }) => {
+    expect(gmailComposeInManifest).toBe(false);
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-reply-off',
+        threadId: 't-reply-off',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT,
+        composeReply: true,
+        composeTo: S.SENDER,
+        composeSubject: 'Re: Transfer',
+        signature: 'Best, Ada',
+        quoted: 'Could you confirm the transfer by Friday?'
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await page.waitForTimeout(2000);
+    expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
+    await expect(page.locator('div[role="main"]')).not.toContainText('Compose filled');
+  }
+);
 
-testIfGmailCompose('Compose fill writes the Gmail window, reads it back, and Undo clears it', async ({ glance }) => {
+testIfGmailCompose(
+  'Compose fill writes the Gmail window, reads it back, and Undo clears it',
+  async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-compose',
@@ -390,9 +440,31 @@ testIfGmailCompose('Compose fill writes the Gmail window, reads it back, and Und
   await page.locator('div[role="main"] button.flow-chip-undo').click();
   await expect(page.locator('div[role="main"]')).toContainText('Nothing was sent');
   await expect(body).toHaveText('');
-});
+  },
+  async ({ glance }) => {
+    expect(gmailComposeInManifest).toBe(false);
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-compose-off',
+        threadId: 't-compose-off',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT,
+        compose: true
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await page.waitForTimeout(2000);
+    expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
+    await expect(page.locator('div[role="main"]')).not.toContainText('Compose filled');
+  }
+);
 
-testIfGmailCompose('Compose Undo refuses after the person types and leaves their text', async ({ glance }) => {
+testIfGmailCompose(
+  'Compose Undo refuses after the person types and leaves their text',
+  async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-compose-edit',
@@ -414,7 +486,27 @@ testIfGmailCompose('Compose Undo refuses after the person types and leaves their
   await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   await expect(body).toHaveText('Edited by the person');
   expect(server.calls.slice(before).filter((c) => c.method !== 'GET').length).toBe(0);
-});
+  },
+  async ({ glance }) => {
+    expect(gmailComposeInManifest).toBe(false);
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-compose-edit-off',
+        threadId: 't-compose-edit-off',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT,
+        compose: true
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await page.waitForTimeout(2000);
+    expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
+    await expect(page.locator('div[role="main"]')).not.toContainText('Compose filled');
+  }
+);
 
 test('A task card posts to the local server, reads the task back, and Undo deletes it', async ({ glance }) => {
   const page = await open(glance, {

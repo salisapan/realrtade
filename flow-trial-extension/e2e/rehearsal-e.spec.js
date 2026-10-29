@@ -40,7 +40,9 @@ test('v1 without drive.readonly: contract follow card stays off when Drive stub 
   await expect(page.locator(CARD)).toHaveCount(0);
 });
 
-testIfDriveReadonly('E1 the contract: found in Drive, not sent, done only when it is sent as a real file', async ({ glance }, testInfo) => {
+testIfDriveReadonly(
+  'E1 the contract: found in Drive, not sent, done only when it is sent as a real file',
+  async ({ glance }, testInfo) => {
   const page = await open(glance, 'contract', ASK, [CONTRACT]);
   const card = page.locator(CARD);
   await expect(card).toContainText('הסכם.pdf', { timeout: 20000 });
@@ -53,7 +55,15 @@ testIfDriveReadonly('E1 the contract: found in Drive, not sent, done only when i
   expectedMissing(testInfo, 'U3', 'the steps list says the found PDF needs a signature; the person signs on their machine; Glance does not sign');
   expectedMissing(testInfo, 'row 53, X1', 'the reply is a preview; the person approves; the close is the sent attachment, read back');
   expectedMissing(testInfo, 'X1, C1', 'a Friday follow-up event on the same steps list, with its own GET');
-});
+  },
+  async ({ glance }) => {
+    expect(driveReadonlyInManifest).toBe(false);
+    const page = await open(glance, 'contract-off', ASK, [CONTRACT]);
+    await page.waitForTimeout(7000);
+    await expect(page.locator(CARD)).toHaveCount(0);
+    expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+  }
+);
 
 test('E2 "תוציאי חשבונית מס" in the same sitting: no card, no write, nothing Handled', async ({ glance }) => {
   const page = await open(glance, 'invoice', 'תוציאי חשבונית מס על הריטיינר.', []);
@@ -65,9 +75,19 @@ test('E2 "תוציאי חשבונית מס" in the same sitting: no card, no wri
   expect(calls.some((c) => /morning|greeninvoice/i.test(c.url))).toBe(false);
 });
 
-testIfDriveReadonly('E3 Gate: the contract mail has one offer, and nothing calls a draft plus a task closed', async ({ glance }) => {
+testIfDriveReadonly(
+  'E3 Gate: the contract mail has one offer, and nothing calls a draft plus a task closed',
+  async ({ glance }) => {
   const page = await open(glance, 'one', ASK, [CONTRACT]);
   await expect(page.locator(CARD)).toContainText('הסכם.pdf', { timeout: 20000 });
   await page.waitForTimeout(2000);
   await expect(page.locator(MAIN + ' .flow-chip-host')).toHaveCount(0, { timeout: 1000 });
-});
+  },
+  async ({ glance }) => {
+    expect(driveReadonlyInManifest).toBe(false);
+    const page = await open(glance, 'one-off', ASK, [CONTRACT]);
+    await page.waitForTimeout(7000);
+    await expect(page.locator(CARD)).toHaveCount(0);
+    expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+  }
+);

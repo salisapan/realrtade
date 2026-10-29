@@ -1,4 +1,5 @@
-// v1 manifest scope gates for Playwright (drive.readonly and gmail.compose are off).
+// v1 manifest scope gates for Playwright (drive.readonly and gmail.compose are off in RC).
+// Every gated spec always runs: when the scope is off, fnOff asserts fail-closed behaviour.
 const manifest = require('../../manifest.json');
 const scopes = new Set((manifest.oauth2 && manifest.oauth2.scopes) || []);
 const DRIVE_READONLY = 'https://www.googleapis.com/auth/drive.readonly';
@@ -11,11 +12,33 @@ function bind(test) {
   return {
     driveReadonlyInManifest,
     gmailComposeInManifest,
-    testIfDriveReadonly(title, fn) {
-      (driveReadonlyInManifest ? test : test.skip)(title, fn);
+    /** @deprecated use testWhenCompose */
+    testIfGmailCompose(title, fnOn, fnOff) {
+      if (!fnOff) throw new Error('testWhenCompose requires fnOff fail-closed body');
+      test(title, async (ctx) => {
+        if (gmailComposeInManifest) return fnOn(ctx);
+        return fnOff(ctx);
+      });
     },
-    testIfGmailCompose(title, fn) {
-      (gmailComposeInManifest ? test : test.skip)(title, fn);
+    /** @deprecated use testWhenDriveReadonly */
+    testIfDriveReadonly(title, fnOn, fnOff) {
+      if (!fnOff) throw new Error('testWhenDriveReadonly requires fnOff fail-closed body');
+      test(title, async (ctx) => {
+        if (driveReadonlyInManifest) return fnOn(ctx);
+        return fnOff(ctx);
+      });
+    },
+    testWhenCompose(title, fnOn, fnOff) {
+      test(title, async (ctx) => {
+        if (gmailComposeInManifest) return fnOn(ctx);
+        return fnOff(ctx);
+      });
+    },
+    testWhenDriveReadonly(title, fnOn, fnOff) {
+      test(title, async (ctx) => {
+        if (driveReadonlyInManifest) return fnOn(ctx);
+        return fnOff(ctx);
+      });
     }
   };
 }

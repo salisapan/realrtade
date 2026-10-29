@@ -41,7 +41,9 @@ test('v1 without drive.readonly: receipt follow card stays off even when Drive s
   expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
 });
 
-testIfDriveReadonly('B1 one receipt in Drive: the card names it, the reply is drafted with it, nothing is sent or Handled', async ({ glance }, testInfo) => {
+testIfDriveReadonly(
+  'B1 one receipt in Drive: the card names it, the reply is drafted with it, nothing is sent or Handled',
+  async ({ glance }, testInfo) => {
   const page = await open(glance, 'one', ASK, [RECEIPT]);
   const card = page.locator(CARD);
   await expect(card).toContainText('קבלה 3850.pdf', { timeout: 20000 });
@@ -55,16 +57,36 @@ testIfDriveReadonly('B1 one receipt in Drive: the card names it, the reply is dr
 
   expectedMissing(testInfo, 'row 53 (Mail.Send preview), Y1', 'approve the send, read the sent message back with the receipt attached, then Handled');
   expectedMissing(testInfo, 'row 53, Y1', 'the receipt remounts after reload; Undo before approve deletes the draft');
-});
+  },
+  async ({ glance }) => {
+    expect(driveReadonlyInManifest).toBe(false);
+    const page = await open(glance, 'one-off', ASK, [RECEIPT]);
+    await page.waitForTimeout(7000);
+    await expect(page.locator(CARD)).toHaveCount(0);
+    expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+    expect(writes()).toHaveLength(0);
+  }
+);
 
-testIfDriveReadonly('B2 no file and no payment seen: the card asks whether it was paid and drafts nothing', async ({ glance }) => {
+testIfDriveReadonly(
+  'B2 no file and no payment seen: the card asks whether it was paid and drafts nothing',
+  async ({ glance }) => {
   const page = await open(glance, 'none', ASK, []);
   const card = page.locator(CARD);
   await expect(card).toContainText('האם שולם', { timeout: 20000 });
   await expect(card.getByRole('button', { name: 'כן, שולם' })).toBeVisible();
   await page.waitForTimeout(1500);
   expect(writes()).toHaveLength(0);
-});
+  },
+  async ({ glance }) => {
+    expect(driveReadonlyInManifest).toBe(false);
+    const page = await open(glance, 'none-off', ASK, []);
+    await page.waitForTimeout(7000);
+    await expect(page.locator(CARD)).toHaveCount(0);
+    expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+    expect(writes()).toHaveLength(0);
+  }
+);
 
 test('B3 asking accounting to send the receipt shows no card and writes nothing', async ({ glance }) => {
   const page = await open(glance, 'third', 'Can you ask accounting to send the receipt?', [RECEIPT]);
@@ -81,10 +103,20 @@ test('B4 Gate: two receipts with the same kind of name show no card', async ({ g
   await expect(page.locator(CARD)).toHaveCount(0, { timeout: 1000 });
 });
 
-testIfDriveReadonly('B5 Gate: a Hebrew receipt card has no English buttons', async ({ glance }) => {
+testIfDriveReadonly(
+  'B5 Gate: a Hebrew receipt card has no English buttons',
+  async ({ glance }) => {
   const page = await open(glance, 'he', ASK, [RECEIPT]);
   const card = page.locator(CARD);
   await expect(card).toContainText('קבלה 3850.pdf', { timeout: 20000 });
   const labels = await card.locator('button').allInnerTexts();
   expect(labels.filter((l) => /[A-Za-z]/.test(l))).toEqual([]);
-});
+  },
+  async ({ glance }) => {
+    expect(driveReadonlyInManifest).toBe(false);
+    const page = await open(glance, 'he-off', ASK, [RECEIPT]);
+    await page.waitForTimeout(7000);
+    await expect(page.locator(CARD)).toHaveCount(0);
+    expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+  }
+);
