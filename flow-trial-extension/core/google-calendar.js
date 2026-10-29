@@ -113,7 +113,8 @@ const FlowGoogleCalendar = (() => {
     if (needsFileLink && (!link || !name)) return null;
     const title = String(i.title || i.quote || name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!title) return null;
-    const zone = zoneName(i.timeZone) || 'UTC';
+    const zone = zoneName(i.timeZone);
+    if (!zone) return null;
     let startIso = '';
     let endIso = '';
     try {
