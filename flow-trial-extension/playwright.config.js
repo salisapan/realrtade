@@ -1,8 +1,15 @@
 const { defineConfig } = require('@playwright/test');
 
+let metaLaneSpecs = ['**/lane-register-meta.spec.js'];
+try {
+  const sw = JSON.parse(process.env.GLANCE_E2E_SWITCHES || '{}');
+  if (sw.META_CHAT_LANES === true) metaLaneSpecs = [];
+} catch (e) { /* blocking job: no META flag */ }
+
 module.exports = defineConfig({
   testDir: './e2e',
   testMatch: '**/*.spec.js',
+  testIgnore: metaLaneSpecs,
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
