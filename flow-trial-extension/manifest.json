@@ -208,31 +208,13 @@
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "optional_host_permissions": [
-    "https://web.whatsapp.com/*",
-    "https://app.slack.com/*",
-    "https://web.telegram.org/*",
     "https://graph.microsoft.com/*",
     "https://login.microsoftonline.com/*",
     "http://127.0.0.1/*",
     "http://localhost/*",
     "https://outlook.live.com/*",
     "https://outlook.office.com/*",
-    "https://outlook.office365.com/*",
-    "https://www.messenger.com/*",
-    "https://messenger.com/*",
-    "https://www.facebook.com/messages",
-    "https://www.facebook.com/messages/*",
-    "https://facebook.com/messages",
-    "https://facebook.com/messages/*",
-    "https://business.facebook.com/latest/inbox",
-    "https://business.facebook.com/latest/inbox/*",
-    "https://www.business.facebook.com/latest/inbox",
-    "https://www.business.facebook.com/latest/inbox/*",
-    "https://www.instagram.com/direct",
-    "https://www.instagram.com/direct/*",
-    "https://instagram.com/direct",
-    "https://instagram.com/direct/*",
-    "https://teams.microsoft.com/*"
+    "https://outlook.office365.com/*"
   ],
   "options_ui": {
     "page": "lane-chat/enable.html",

@@ -80,9 +80,9 @@ check('business.facebook.com is not a static content script match', scriptBlob.i
 check('no chat host is a static content script match', !/whatsapp|messenger|instagram/.test(scriptBlob));
 const required = manifest.host_permissions || [];
 const optional = manifest.optional_host_permissions || [];
-const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct/;
-check('chat hosts are optional, never required', !required.some((h) => chatHost.test(h)) && optional.some((h) => /messenger\.com/.test(h)) && optional.some((h) => /instagram\.com\/direct/.test(h)) && optional.some((h) => /web\.whatsapp\.com/.test(h)));
-check('Business Suite inbox is an optional host', !required.some((h) => /business\.facebook\.com/.test(h)) && optional.some((h) => /business\.facebook\.com\/latest\/inbox/.test(h)));
+const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct|app\.slack\.com|web\.telegram\.org|teams\.microsoft\.com/;
+check('v1 manifest keeps chat optional hosts out (Meta, WhatsApp, Slack, Telegram, Teams)', !required.some((h) => chatHost.test(h)) && !optional.some((h) => chatHost.test(h)));
+check('Business Suite inbox is not a v1 optional host', !required.some((h) => /business\.facebook\.com/.test(h)) && !optional.some((h) => /business\.facebook\.com\/latest\/inbox/.test(h)));
 function chromeHostCovers(pattern, url) {
   const u = new URL(url);
   const m = String(pattern || '').match(/^(https?):\/\/([^/]+)(\/.*)$/);
@@ -107,7 +107,7 @@ const backgroundSrc = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf
 const enableSrc = fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8');
 const messengerLaneOrigins = originsAfter(backgroundSrc, "id: 'glance-lane-messenger'");
 const enableMessengerOrigins = originsAfter(enableSrc, "id: 'messenger'");
-check('facebook.com/messages/e2ee is already covered by messages/*', e2eePages.every((url) => optional.some((h) => chromeHostCovers(h, url)) && messengerLaneOrigins.some((h) => chromeHostCovers(h, url)) && enableMessengerOrigins.some((h) => chromeHostCovers(h, url))));
+check('facebook.com/messages/e2ee is already covered by messages/*', e2eePages.every((url) => messengerLaneOrigins.some((h) => chromeHostCovers(h, url)) && enableMessengerOrigins.some((h) => chromeHostCovers(h, url))));
 const backgroundLines = backgroundSrc.split('\n');
 const nativeAt = backgroundLines.findIndex((line) => line.indexOf("import './native-edit.js'") >= 0);
 check('background.js loads the chat worker on the line after native-edit.js', nativeAt >= 0 && /import '\.\/lane-chat-worker\.js'/.test(backgroundLines[nativeAt + 1] || ''));
@@ -1291,7 +1291,8 @@ console.log('\n--- calendar evidence ---\n');
   check('English UI shows the English explanation', enCopy && enCopy.hidden === false && /Glance closes open loops/.test(enCopy.textContent) && /Nothing is ever sent automatically/.test(enCopy.textContent) && /tracks follow-ups/.test(enCopy.textContent) && /location of events/.test(enCopy.textContent) && enHeCopy && enHeCopy.hidden === true);
   enButtons[0].click();
   await new Promise((r) => setTimeout(r, 40));
-  check('one request covers every Meta host', en.asked.length === 1 && en.asked[0].join('\n') === META_ORIGINS.join('\n') && en.asked[0].every((origin) => optional.indexOf(origin) >= 0) && en.asked[0].every((origin) => origin.indexOf('<all_urls>') < 0));
+  check('one request covers every Meta host', en.asked.length === 1 && en.asked[0].join('\n') === META_ORIGINS.join('\n') && en.asked[0].every((origin) => origin.indexOf('<all_urls>') < 0));
+  check('v1 manifest does not declare Meta or chat optional hosts the enable page asks for', META_ORIGINS.every((origin) => optional.indexOf(origin) < 0));
   const scripts = en.registered[0] || [];
   const scriptIds = scripts.map((row) => row.id).slice().sort().join(',');
   check('the grant registers every Meta lane once', en.registered.length === 1 && scripts.length === 3 && scriptIds === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp');

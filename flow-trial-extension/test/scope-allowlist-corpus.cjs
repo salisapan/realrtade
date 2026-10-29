@@ -27,6 +27,25 @@ const ALLOWED_HOSTS = [
   'https://*.googleusercontent.com/*',
   'https://theflow-ai.com/*'
 ];
+const FORBIDDEN_V1_OPTIONAL_HOSTS = [
+  /messenger\.com/i,
+  /facebook\.com\/messages/i,
+  /business\.facebook\.com\/latest\/inbox/i,
+  /instagram\.com\/direct/i,
+  /web\.whatsapp\.com/i,
+  /app\.slack\.com/i,
+  /web\.telegram\.org/i,
+  /teams\.microsoft\.com/i
+];
+const ALLOWED_V1_OPTIONAL_HOSTS = [
+  'https://graph.microsoft.com/*',
+  'https://login.microsoftonline.com/*',
+  'http://127.0.0.1/*',
+  'http://localhost/*',
+  'https://outlook.live.com/*',
+  'https://outlook.office.com/*',
+  'https://outlook.office365.com/*'
+];
 const RESTRICTED = [
   /\/auth\/gmail(\.|$)/, /mail\.google\.com/, /\/auth\/drive$/, /\/auth\/drive\.(readonly|metadata|metadata\.readonly|appdata|photos\.readonly|scripts|activity|activity\.readonly)$/,
   /\/auth\/spreadsheets/, /\/auth\/documents/, /\/auth\/forms/, /\/auth\/contacts$/, /\/auth\/contacts\.readonly/, /\/auth\/calendar$/, /\/auth\/admin/, /\/auth\/cloud-platform/
@@ -60,6 +79,13 @@ check('manifest: no contacts.readonly in oauth2', manScopes.indexOf(G + 'contact
 check('manifest: no people.googleapis.com host', !(man.host_permissions || []).some((h) => /people\.googleapis/.test(h)));
 const hosts = man.host_permissions || [];
 check('manifest: host_permissions matches the allowed set exactly', JSON.stringify(hosts.slice().sort()) === JSON.stringify(ALLOWED_HOSTS.slice().sort()), { got: hosts, want: ALLOWED_HOSTS });
+const optionalHosts = man.optional_host_permissions || [];
+check('manifest: v1 optional_host_permissions matches the allowed set exactly', JSON.stringify(optionalHosts.slice().sort()) === JSON.stringify(ALLOWED_V1_OPTIONAL_HOSTS.slice().sort()), { got: optionalHosts, want: ALLOWED_V1_OPTIONAL_HOSTS });
+check('manifest: no forbidden v1 optional chat/Meta host', !optionalHosts.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))), optionalHosts);
+check('mutant messenger.com optional host is rejected by v1 optional audit', (() => {
+  const bad = optionalHosts.concat(['https://www.messenger.com/*']);
+  return bad.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))) && JSON.stringify(bad.slice().sort()) !== JSON.stringify(ALLOWED_V1_OPTIONAL_HOSTS.slice().sort());
+})());
 check('mutant contacts.readonly in manifest is rejected by audit', (() => {
   const bad = manScopes.concat([G + 'contacts.readonly']).filter((s) => !ALLOW.has(s));
   return bad.length === 1 && bad[0] === G + 'contacts.readonly';
