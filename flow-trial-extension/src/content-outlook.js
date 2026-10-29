@@ -4421,8 +4421,8 @@
       return;
     }
     pane = threadApplied.pane;
+    if (suggestNote) suggestNote = pane;
 
-    // A proved To Do task is mounted before a quiet return. The ids are the
     // Outlook item, the path, and the conversation — not a hash of the text.
     try {
       if (await remountProvedTodoReceipt(pane)) {
@@ -5247,14 +5247,39 @@
   async function applyFullThreadRead(pane, ownAddresses) {
     if (!pane) return { ok: false, pane: pane };
     let conv = String(pane.conversationId || '').trim();
+    const urlIds = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.urlIds)
+      ? FlowOwaParse.urlIds(typeof location !== 'undefined' ? location.href : '')
+      : {};
+    if (!conv && urlIds.conversationId) conv = String(urlIds.conversationId);
+    if (!conv && urlIds.kind === 'conversation' && urlIds.raw) conv = String(urlIds.raw);
     if (!conv && pane.itemId && !isConversationId(pane.itemId)) {
       try {
         const one = await graphJson('/me/messages/' + encodeURIComponent(pane.itemId) + '?$select=' + encodeURIComponent('id,conversationId'), 'thread-read', null);
         if (one && one.conversationId) conv = String(one.conversationId);
       } catch (e) { /* fall through */ }
     }
-    if (!conv) return { ok: false, pane: pane };
-    const fetched = await fetchConversationThreadRows(conv);
+    let fetched = conv ? await fetchConversationThreadRows(conv) : { ok: false, rows: [] };
+    if ((!fetched.ok || !fetched.rows.length) && pane.itemId && !isConversationId(pane.itemId)) {
+      try {
+        const fields = encodeURIComponent(PANE_GRAPH_SELECT);
+        const one = await graphJson('/me/messages/' + encodeURIComponent(pane.itemId) + '?$select=' + fields, 'thread-read', null);
+        if (one && one.id) fetched = { ok: true, rows: [one] };
+      } catch (e) { /* fall through */ }
+    }
+    if ((!fetched.ok || !fetched.rows.length) && String(pane.text || '').trim().length >= 20
+        && pane.idSource && pane.idSource !== 'url-stale') {
+      fetched = {
+        ok: true,
+        rows: [{
+          id: pane.itemId || pane.pathId || 'open-pane',
+          conversationId: conv || pane.conversationId || null,
+          subject: pane.subject || '',
+          receivedDateTime: pane.receivedDateTime || '',
+          from: { emailAddress: { address: pane.senderEmail || '', name: pane.senderName || '' } },
+          body: { contentType: 'text', content: String(pane.text || '') }
+        }]
+      };
+    }
     if (!fetched.ok || !fetched.rows.length) return { ok: false, pane: pane };
     const picker = typeof FlowOutlookThreadV1 !== 'undefined' ? FlowOutlookThreadV1 : null;
     const picked = picker && picker.pickJudgmentMessage
@@ -5268,9 +5293,18 @@
       itemId: picked.row.id
     }, 'thread-read');
     if (!rowPane || !(String(rowPane.text || '').trim())) return { ok: false, pane: pane };
+    const mergedTo = (rowPane.to && rowPane.to.length) ? rowPane.to : (pane.to || []);
+    const mergedCc = (rowPane.cc && rowPane.cc.length) ? rowPane.cc : (pane.cc || []);
+    const wasUnconfirmed = pane.idSource === 'url-unconfirmed';
     return {
       ok: true,
       pane: Object.assign({}, pane, rowPane, {
+        to: mergedTo,
+        cc: mergedCc,
+        conversationId: wasUnconfirmed ? pane.conversationId : (rowPane.conversationId || pane.conversationId),
+        senderEmail: wasUnconfirmed ? (pane.senderEmail || rowPane.senderEmail) : rowPane.senderEmail,
+        senderName: wasUnconfirmed ? (pane.senderName || rowPane.senderName) : rowPane.senderName,
+        idSource: wasUnconfirmed ? 'url-unconfirmed' : rowPane.idSource,
         threadRead: true,
         threadMessageCount: fetched.rows.length,
         threadJudgmentShow: picked.show === true

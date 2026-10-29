@@ -35,7 +35,10 @@ const FlowOutlookThreadV1 = (() => {
     });
     let i = judged.length - 1;
     while (i >= 0 && !judged[i].show) i--;
-    if (i < 0) return null;
+    if (i < 0) {
+      const last = judged[judged.length - 1];
+      return last ? { row: last.row, text: last.text, show: false, judgment: last.judgment } : null;
+    }
     return judged[i];
   }
 

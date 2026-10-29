@@ -37,6 +37,12 @@ T.setPickMode('v1');
 const picked = T.pickJudgmentMessage(rows, judgeRow);
 check('v1 picks the earlier ask when the latest line is thanks', picked && picked.row.id === 'm1' && picked.show === true, picked);
 
+const quietOnly = T.pickJudgmentMessage(
+  [{ id: 'q1', receivedDateTime: '2026-10-28T10:00:00Z', body: { contentType: 'text', content: 'Hi team, fyi only.' } }],
+  { textOf: (r) => r.body.content, judge: () => ({ show: false, reason: 'intent-null' }) }
+);
+check('v1 still returns the open row when every message is quiet', quietOnly && quietOnly.row.id === 'q1' && quietOnly.show === false, quietOnly);
+
 T.setPickMode('latest-only');
 const mutantPick = T.pickJudgmentMessage(rows, judgeRow);
 check('mutant latest-only would pick thanks instead of the ask', mutantPick && mutantPick.row.id === 'm2');
