@@ -64,7 +64,10 @@ function outlookAuth(opts) {
   const scopes = ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'];
   if (o.tasks !== false) scopes.push('Tasks.ReadWrite');
   if (o.files !== false) scopes.push('Files.ReadWrite');
-  if (o.calendar === true) scopes.push('Calendars.ReadWrite');
+  if (o.calendar === true) {
+    scopes.push('Calendars.ReadWrite');
+    scopes.push('MailboxSettings.Read');
+  }
   if (o.sharepoint === true) scopes.push('Sites.ReadWrite.All');
   const now = Date.now();
   return {

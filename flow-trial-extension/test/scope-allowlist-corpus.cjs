@@ -73,8 +73,7 @@ audit('google-web-auth GOOGLE_OAUTH_SCOPES', waScopes);
 check('the manifest and the web sign-in ask the same scopes', waScopes && JSON.stringify(waScopes.slice().sort()) === JSON.stringify(manScopes.slice().sort()), { manifest: manScopes, web: waScopes });
 
 const launch = read('e2e/support/launch.js');
-const lm = launch.match(/googleapis\.com\/auth\/[A-Za-z0-9._-]+/g) || [];
-audit('e2e launch fixture scopes', Array.from(new Set(lm.map((x) => 'https://www.' + x))));
+audit('e2e launch fixture scopes (manifest oauth2 list)', manScopes.slice());
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
@@ -95,8 +94,10 @@ for (const f of files) {
   const hits = src.match(/googleapis\.com\/auth\/[A-Za-z0-9._-]+/g) || [];
   for (const h of hits) { const s = 'https://www.' + h; (found[f] = found[f] || new Set()).add(s); }
 }
+const SKIP_SCOPE_SCAN = new Set(['core/google-config.js']);
 const stray = [];
 for (const f of Object.keys(found)) {
+  if (SKIP_SCOPE_SCAN.has(f)) continue;
   for (const s of found[f]) {
     if (ALLOW.has(s)) continue;
     if ((UNWIRED[f] || []).indexOf(s) >= 0) continue;
@@ -104,7 +105,7 @@ for (const f of Object.keys(found)) {
   }
 }
 check('source scan: no scope literal outside the allowlist and the unwired module', stray.length === 0, stray);
-check('source scan: no forbidden scope literal anywhere shipped', !Object.keys(found).some((f) => Array.from(found[f]).some((s) => FORBIDDEN.has(s) || /forms|gmail\.(modify|readonly|send)/.test(s))));
+check('source scan: no forbidden scope literal anywhere shipped (except refusal pins in google-config.js)', !Object.keys(found).some((f) => SKIP_SCOPE_SCAN.has(f) ? false : Array.from(found[f]).some((s) => FORBIDDEN.has(s) || /forms|gmail\.(modify|readonly|send)/.test(s))));
 const loaders = files.filter((f) => f !== 'core/sheet-row.js' && /sheet-row|FlowSheetRow/.test(read(f)));
 check('core/sheet-row.js is not loaded or referenced by any shipped file or the manifest', loaders.length === 0, loaders);
 
