@@ -30,7 +30,6 @@ const UNCONFIRMED_HE = 'לא הצלחתי לאמת שלא השתנה — השא�
 export const GOOGLE_OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/tasks',
-  'https://www.googleapis.com/auth/contacts.readonly',
   'https://www.googleapis.com/auth/drive.file',
   'openid',
   'https://www.googleapis.com/auth/userinfo.profile',

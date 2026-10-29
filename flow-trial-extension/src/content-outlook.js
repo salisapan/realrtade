@@ -1805,8 +1805,8 @@
       if (slot.firstChild) slot.insertBefore(line, slot.firstChild);
       else slot.appendChild(line);
     }
-    const code = String(reason || '').replace(/^quiet:/, '').split(':')[0];
-    const hideQuietAsk = code === 'intent-null' || code === 'too-short';
+    const bare = String(reason || '').replace(/^quiet:/, '');
+    const hideQuietAsk = bare === 'intent-null' || bare === 'too-short' || bare === 'page:thread-read-failed';
     const visible = whyNotText(reason);
     line.textContent = hideQuietAsk ? '' : visible;
     line.setAttribute('data-glance-why', reason || 'quiet');
@@ -4414,6 +4414,14 @@
       }
     } catch (e) { glanceError('pane hydrate', e); }
 
+    const threadApplied = await applyFullThreadRead(pane, own);
+    if (!threadApplied.ok) {
+      dropStuckCard(pane);
+      await pageReason('page:thread-read-failed', pane);
+      return;
+    }
+    pane = threadApplied.pane;
+
     // A proved To Do task is mounted before a quiet return. The ids are the
     // Outlook item, the path, and the conversation — not a hash of the text.
     try {
@@ -5184,6 +5192,92 @@
     return ut && ut.text ? String(ut.text) : '';
   }
 
+  async function fetchConversationThreadRows(convId) {
+    const conv = String(convId || '').trim();
+    if (!conv) return { ok: false, rows: [] };
+    const select = encodeURIComponent(PANE_GRAPH_SELECT);
+    const spells = idSpellings(conv);
+    for (let s = 0; s < spells.length; s++) {
+      const filter = "conversationId eq '" + odataQuote(spells[s]) + "'";
+      let path = '/me/messages?$filter=' + encodeURIComponent(filter) + '&$orderby=receivedDateTime asc&$top=50&$select=' + select;
+      const all = [];
+      let pages = 0;
+      while (path && pages < 8) {
+        pages++;
+        const body = await graphJson(path, 'thread-read', null);
+        if (!body || !Array.isArray(body.value)) return { ok: false, rows: [] };
+        all.push.apply(all, body.value);
+        const next = body && body['@odata.nextLink'];
+        path = next ? String(next).replace(/^https:\/\/graph\.microsoft\.com\/v1\.0/i, '') : null;
+      }
+      if (all.length) return { ok: true, rows: all };
+    }
+    return { ok: false, rows: [] };
+  }
+
+  function threadJudgeRow(pane, ownAddresses) {
+    return {
+      textOf: (row) => graphBodyText(row),
+      judge: (text, row) => {
+        if (typeof FlowIncomingJudge === 'undefined') return { show: false };
+        const prepared = FlowIncomingJudge.prepareForJudge(text);
+        return FlowIncomingJudge.judge({
+          systemNoticeOn: systemNoticeSwitch === true,
+          bookingNoticeOn: bookingNoticeSwitch === true,
+          paymentAskOn: paymentAskSwitch === true,
+          taskAskOn: taskAskSwitch === true,
+          text: prepared,
+          subject: (row && row.subject) || pane.subject || '',
+          sender: { name: pane.senderName, email: pane.senderEmail },
+          now: new Date(),
+          threadUrl: location.href,
+          surface: 'outlook',
+          to: pane.to || null,
+          cc: pane.cc || null,
+          ownAddresses: ownAddresses || null,
+          userName: pane.userName || null,
+          ownNames: pane.ownNames || null,
+          namesPending: namesWaitDone ? false : pane.namesPending === true,
+          namesWaitDone: namesWaitDone === true
+        });
+      }
+    };
+  }
+
+  async function applyFullThreadRead(pane, ownAddresses) {
+    if (!pane) return { ok: false, pane: pane };
+    let conv = String(pane.conversationId || '').trim();
+    if (!conv && pane.itemId && !isConversationId(pane.itemId)) {
+      try {
+        const one = await graphJson('/me/messages/' + encodeURIComponent(pane.itemId) + '?$select=' + encodeURIComponent('id,conversationId'), 'thread-read', null);
+        if (one && one.conversationId) conv = String(one.conversationId);
+      } catch (e) { /* fall through */ }
+    }
+    if (!conv) return { ok: false, pane: pane };
+    const fetched = await fetchConversationThreadRows(conv);
+    if (!fetched.ok || !fetched.rows.length) return { ok: false, pane: pane };
+    const picker = typeof FlowOutlookThreadV1 !== 'undefined' ? FlowOutlookThreadV1 : null;
+    const picked = picker && picker.pickJudgmentMessage
+      ? picker.pickJudgmentMessage(fetched.rows, threadJudgeRow(pane, ownAddresses))
+      : null;
+    if (!picked || !picked.row) return { ok: false, pane: pane };
+    const rowPane = paneFromGraphRow(picked.row, {
+      conversationId: conv,
+      kind: pane.idKind || 'conversation',
+      raw: pane.rawUrlId || pane.pathId || null,
+      itemId: picked.row.id
+    }, 'thread-read');
+    if (!rowPane || !(String(rowPane.text || '').trim())) return { ok: false, pane: pane };
+    return {
+      ok: true,
+      pane: Object.assign({}, pane, rowPane, {
+        threadRead: true,
+        threadMessageCount: fetched.rows.length,
+        threadJudgmentShow: picked.show === true
+      })
+    };
+  }
+
   function paneFromGraphRow(msg, ids, how) {
     if (!msg || !msg.id) return null;
     const fa = msg.from && msg.from.emailAddress;
@@ -5236,13 +5330,18 @@
       }
     }
     const conv = String(ids.conversationId || (ids.kind === 'conversation' ? ids.raw : '') || '').trim();
-    if (!conv) return null;
-    const spells = idSpellings(conv);
-    for (let s = 0; s < spells.length; s++) {
-      const filter = "conversationId eq '" + odataQuote(spells[s]) + "'";
-      const body = await graphJson('/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=1&$orderby=receivedDateTime desc&$select=' + fields, 'pane-graph-fallback', null);
-      const row = body && Array.isArray(body.value) && body.value[0] ? body.value[0] : null;
-      if (row && row.id) return paneFromGraphRow(row, ids, 'graph-fallback-conversation');
+    if (conv) {
+      const fetched = await fetchConversationThreadRows(conv);
+      if (fetched.ok && fetched.rows.length) {
+        const picked = (typeof FlowOutlookThreadV1 !== 'undefined' && FlowOutlookThreadV1.pickJudgmentMessage)
+          ? FlowOutlookThreadV1.pickJudgmentMessage(fetched.rows, {
+            textOf: (row) => graphBodyText(row),
+            judge: (text) => ({ show: String(text || '').trim().length >= 20 })
+          })
+          : null;
+        const row = picked && picked.row ? picked.row : fetched.rows[fetched.rows.length - 1];
+        if (row && row.id) return paneFromGraphRow(row, ids, 'graph-fallback-conversation');
+      }
     }
     return null;
   }

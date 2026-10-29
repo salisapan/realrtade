@@ -1,19 +1,20 @@
 // Scope allowlist. Every OAuth scope the extension declares or requests must be on the strict allowlist.
 // Run: node test/scope-allowlist-corpus.cjs   (plain node, no dependencies)
 //
-// FINAL ALLOWLIST (Gate RC 30/10): calendar.events, tasks, contacts.readonly, drive.file, openid,
-// userinfo.profile, userinfo.email (and short forms email, profile).
+// FINAL ALLOWLIST (Gate RC v1): calendar.events, tasks, drive.file, openid,
+// userinfo.profile, userinfo.email (and short forms email, profile). No contacts.readonly.
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const G = 'https://www.googleapis.com/auth/';
 
 const ALLOW = new Set([
-  G + 'calendar.events', G + 'tasks', G + 'contacts.readonly', G + 'drive.file',
+  G + 'calendar.events', G + 'tasks', G + 'drive.file',
   'openid', G + 'userinfo.profile', G + 'userinfo.email', 'email', 'profile'
 ]);
 const FORBIDDEN = new Set([
-  G + 'forms.body', G + 'gmail.modify', G + 'gmail.compose', G + 'drive.readonly', G + 'gmail.readonly', G + 'gmail.send'
+  G + 'forms.body', G + 'gmail.modify', G + 'gmail.compose', G + 'drive.readonly',
+  G + 'gmail.readonly', G + 'gmail.send', G + 'contacts.readonly', G + 'contacts'
 ]);
 const ALLOWED_HOSTS = [
   'https://mail.google.com/*',
@@ -23,13 +24,12 @@ const ALLOWED_HOSTS = [
   'https://www.googleapis.com/oauth2/*',
   'https://www.googleapis.com/upload/drive/*',
   'https://gmail.googleapis.com/*',
-  'https://people.googleapis.com/*',
   'https://*.googleusercontent.com/*',
   'https://theflow-ai.com/*'
 ];
 const RESTRICTED = [
   /\/auth\/gmail(\.|$)/, /mail\.google\.com/, /\/auth\/drive$/, /\/auth\/drive\.(readonly|metadata|metadata\.readonly|appdata|photos\.readonly|scripts|activity|activity\.readonly)$/,
-  /\/auth\/spreadsheets/, /\/auth\/documents/, /\/auth\/forms/, /\/auth\/contacts$/, /\/auth\/calendar$/, /\/auth\/admin/, /\/auth\/cloud-platform/
+  /\/auth\/spreadsheets/, /\/auth\/documents/, /\/auth\/forms/, /\/auth\/contacts$/, /\/auth\/contacts\.readonly/, /\/auth\/calendar$/, /\/auth\/admin/, /\/auth\/cloud-platform/
 ];
 const UNWIRED = { 'core/sheet-row.js': [G + 'spreadsheets'] };
 
@@ -56,12 +56,18 @@ const manScopes = (man.oauth2 && man.oauth2.scopes) || [];
 audit('manifest oauth2.scopes', manScopes);
 check('manifest: no Forms scope and no Forms host', !JSON.stringify(man).match(/forms\.body|auth\/forms|forms\.googleapis\.com/));
 check('manifest: no gmail OAuth scope', !manScopes.some((s) => /gmail|mail\.google/.test(s)));
+check('manifest: no contacts.readonly in oauth2', manScopes.indexOf(G + 'contacts.readonly') < 0);
+check('manifest: no people.googleapis.com host', !(man.host_permissions || []).some((h) => /people\.googleapis/.test(h)));
 const hosts = man.host_permissions || [];
 check('manifest: host_permissions matches the allowed set exactly', JSON.stringify(hosts.slice().sort()) === JSON.stringify(ALLOWED_HOSTS.slice().sort()), { got: hosts, want: ALLOWED_HOSTS });
+check('mutant contacts.readonly in manifest is rejected by audit', (() => {
+  const bad = manScopes.concat([G + 'contacts.readonly']).filter((s) => !ALLOW.has(s));
+  return bad.length === 1 && bad[0] === G + 'contacts.readonly';
+})());
 
 const { FlowGoogleConfig: Cfg } = require(path.join(ROOT, 'core', 'google-config.js'));
 audit('google-config SCOPES', Cfg.SCOPES);
-for (const s of [G + 'forms.body', G + 'gmail.modify', G + 'gmail.readonly', G + 'gmail.send', G + 'drive', G + 'spreadsheets', G + 'documents', G + 'contacts', G + 'calendar', G + 'gmail.compose', G + 'drive.readonly']) {
+for (const s of [G + 'forms.body', G + 'gmail.modify', G + 'gmail.readonly', G + 'gmail.send', G + 'drive', G + 'spreadsheets', G + 'documents', G + 'contacts', G + 'contacts.readonly', G + 'calendar', G + 'gmail.compose', G + 'drive.readonly']) {
   check('google-config refuses ' + s.replace(G, ''), Cfg.assertAllowed([s]).ok === false, Cfg.assertAllowed([s]));
 }
 check('google-config accepts the whole allowlist it carries', Cfg.assertAllowed(Cfg.SCOPES).ok === true);
@@ -71,8 +77,8 @@ const mm = wa.match(/GOOGLE_OAUTH_SCOPES\s*=\s*\[([\s\S]*?)\]/);
 const waScopes = mm ? (mm[1].match(/'[^']+'/g) || []).map((x) => x.slice(1, -1)) : null;
 audit('google-web-auth GOOGLE_OAUTH_SCOPES', waScopes);
 check('the manifest and the web sign-in ask the same scopes', waScopes && JSON.stringify(waScopes.slice().sort()) === JSON.stringify(manScopes.slice().sort()), { manifest: manScopes, web: waScopes });
+check('mutant contacts.readonly in web sign-in list is outside allowlist', waScopes && waScopes.indexOf(G + 'contacts.readonly') < 0);
 
-const launch = read('e2e/support/launch.js');
 audit('e2e launch fixture scopes (manifest oauth2 list)', manScopes.slice());
 
 function walk(dir, out) {
@@ -94,7 +100,7 @@ for (const f of files) {
   const hits = src.match(/googleapis\.com\/auth\/[A-Za-z0-9._-]+/g) || [];
   for (const h of hits) { const s = 'https://www.' + h; (found[f] = found[f] || new Set()).add(s); }
 }
-const SKIP_SCOPE_SCAN = new Set(['core/google-config.js']);
+const SKIP_SCOPE_SCAN = new Set(['core/google-config.js', 'core/google-contacts.js']);
 const stray = [];
 for (const f of Object.keys(found)) {
   if (SKIP_SCOPE_SCAN.has(f)) continue;
@@ -109,7 +115,7 @@ check('source scan: no forbidden scope literal anywhere shipped (except refusal 
 const loaders = files.filter((f) => f !== 'core/sheet-row.js' && /sheet-row|FlowSheetRow/.test(read(f)));
 check('core/sheet-row.js is not loaded or referenced by any shipped file or the manifest', loaders.length === 0, loaders);
 
-check('self-check: the allowlist has exactly 9 spellings', ALLOW.size === 9, Array.from(ALLOW));
+check('self-check: the allowlist has exactly 8 spellings', ALLOW.size === 8, Array.from(ALLOW));
 
 console.log(failures ? failures + ' failure(s)' : 'all passed');
 process.exit(failures ? 1 : 0);

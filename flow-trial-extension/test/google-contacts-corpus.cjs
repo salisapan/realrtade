@@ -303,7 +303,7 @@ function forbiddenInPayload(json) {
   const badProbe = forbiddenInPayload({ email: FIXTURE_EMAIL, displayName: FIXTURE_NAME });
   check('forbiddenInPayload catches fixture contact PII', badProbe === 'fixture-email');
 
-  check('manifest oauth2 includes contacts.readonly', /contacts\.readonly/.test(manifest));
+  check('manifest oauth2 excludes contacts.readonly (v1)', !/contacts\.readonly/.test(manifest));
 
   console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
   process.exit(failures ? 1 : 0);

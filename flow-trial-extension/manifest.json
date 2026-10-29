@@ -174,7 +174,6 @@
     "https://www.googleapis.com/oauth2/*",
     "https://www.googleapis.com/upload/drive/*",
     "https://gmail.googleapis.com/*",
-    "https://people.googleapis.com/*",
     "https://*.googleusercontent.com/*",
     "https://theflow-ai.com/*"
   ],
@@ -183,7 +182,6 @@
     "scopes": [
       "https://www.googleapis.com/auth/calendar.events",
       "https://www.googleapis.com/auth/tasks",
-      "https://www.googleapis.com/auth/contacts.readonly",
       "https://www.googleapis.com/auth/drive.file",
       "openid",
       "https://www.googleapis.com/auth/userinfo.profile",
@@ -233,7 +231,8 @@
     "https://www.instagram.com/direct",
     "https://www.instagram.com/direct/*",
     "https://instagram.com/direct",
-    "https://instagram.com/direct/*"
+    "https://instagram.com/direct/*",
+    "https://teams.microsoft.com/*"
   ],
   "options_ui": {
     "page": "lane-chat/enable.html",

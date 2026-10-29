@@ -287,7 +287,7 @@ const SURFACES = {
   outlook: {
     label: 'Outlook on the web',
     origins: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'],
-    extra: ['core/owa-parse.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
+    extra: ['core/owa-parse.js', 'core/outlook-thread-v1.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
       'core/outlook-calendar.js', 'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
     css: ['design/step-states-v1/scoped.css', 'src/chip.css']
   }

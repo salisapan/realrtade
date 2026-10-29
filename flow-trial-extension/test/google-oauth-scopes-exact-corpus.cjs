@@ -11,7 +11,6 @@ const ROOT = path.join(__dirname, '..');
 const EXACT = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/tasks',
-  'https://www.googleapis.com/auth/contacts.readonly',
   'https://www.googleapis.com/auth/drive.file',
   'openid',
   'https://www.googleapis.com/auth/userinfo.profile',
@@ -53,7 +52,7 @@ function run() {
   vm.runInContext(configSrc, cfgBox);
   const configExact = cfgBox.globalThis.FlowGoogleConfig.oauthScopeSetExact();
 
-  check('manifest has exactly seven OAuth scopes', Array.isArray(manifestScopes) && manifestScopes.length === 7 && setEqual(manifestScopes, EXACT), manifestScopes);
+  check('manifest has exactly six OAuth scopes', Array.isArray(manifestScopes) && manifestScopes.length === 6 && setEqual(manifestScopes, EXACT), manifestScopes);
   check('runtime GOOGLE_OAUTH_SCOPES matches manifest', setEqual(runtime, manifestScopes) && setEqual(runtime, EXACT), runtime);
   check('googleOAuthScopesFrom(null) matches runtime', setEqual(web.googleOAuthScopesFrom(null), runtime));
   check('FlowGoogleConfig.oauthScopeSetExact matches manifest', setEqual(configExact, EXACT), configExact);
@@ -66,8 +65,8 @@ function run() {
     !(manifest.host_permissions || []).some((h) => String(h).indexOf('forms.googleapis.com') >= 0));
 
   const { FlowGoogleConfig: Cfg } = require(path.join(ROOT, 'core', 'google-config.js'));
-  check('FlowGoogleConfig.SCOPES lists only the seven allowlisted OAuth scopes',
-    Array.isArray(Cfg.SCOPES) && Cfg.SCOPES.length === 7 && setEqual(Cfg.SCOPES, EXACT));
+  check('FlowGoogleConfig.SCOPES lists only the six allowlisted OAuth scopes',
+    Array.isArray(Cfg.SCOPES) && Cfg.SCOPES.length === 6 && setEqual(Cfg.SCOPES, EXACT));
   check('assertAllowed refuses forms.body in a scope list',
     Cfg.assertAllowed(['https://www.googleapis.com/auth/forms.body']).ok === false);
   check('assertAllowed refuses a scope outside the lane allowlist',

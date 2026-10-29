@@ -610,6 +610,16 @@
     return (token && token.grantedScopes) || [];
   }
 
+  // Reconnect pre-tick: Calendar counts as granted when Calendars.ReadWrite is already
+  // on the token; MailboxSettings.Read is added on the next Connect if missing.
+  function outlookReconnectServiceGranted(svc, granted) {
+    const list = Array.isArray(granted) ? granted : [];
+    const scopes = (svc && svc.scopes) || [];
+    if (!scopes.length) return false;
+    if (svc.id === 'calendar') return list.indexOf('Calendars.ReadWrite') >= 0;
+    return scopes.every((sc) => list.indexOf(sc) >= 0);
+  }
+
   function missingScopeSentence(scope, service) {
     if (uiLang() === 'he') return 'ההרשאה לא כלולה בכניסה. בהגדרות, סמן ' + service + '.';
     if (typeof FlowReceipt !== 'undefined' && FlowReceipt.missingScopeLine) return FlowReceipt.missingScopeLine(scope, service);
@@ -1833,7 +1843,7 @@
         box.type = 'checkbox';
         box.setAttribute('data-glance-service', svc.id);
         const required = Boolean(svc.required || svc.id === 'mail');
-        const has = (svc.scopes || []).every((sc) => grantedReconnect.indexOf(sc) >= 0);
+        const has = outlookReconnectServiceGranted(svc, grantedReconnect);
         if (required) { box.checked = true; box.disabled = true; }
         else if (has && grantedReconnect.length) box.checked = true;
         else if (svc.defaultOn === true) box.checked = true;
