@@ -6028,7 +6028,8 @@
       }
       return;
     }
-    if (pageAlreadyQuiet) return;
+    // No ask on the page (intent-null) still gets Save the file? when attachments qualify.
+    if (pageAlreadyQuiet && !(prior && /intent-null/.test(String(prior.reason || '')))) return;
     let bag = {};
     try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
     // FlowOnedriveFile is on this page (manifest content script, copied onto
