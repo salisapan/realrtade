@@ -135,6 +135,8 @@ check('e2e launch.js: mailboxSettings mock includes timeZone UTC',
   /mailboxSettings[\s\S]{0,120}timeZone:\s*'UTC'/.test(launchSrc));
 check('e2e launch.js: chat optional hosts patch only the copied extension (optionalChat), not repo manifest',
   /optionalChat/.test(launchSrc) && !read('manifest.json').match(/web\.whatsapp\.com|messenger\.com\/\*|instagram\.com\/direct/));
+check('e2e launch.js: optionalChat is merged into the copied manifest host_permissions for headless grants',
+  /manifest\.host_permissions = Array\.from\(new Set\(\(manifest\.host_permissions \|\| \[\]\)\.concat\(hostExtra, optionalChat\)\)\)/.test(launchSrc));
 check('repo manifest.json: Gmail and Outlook content_scripts are declared (v1 mail lanes)',
   (() => {
     const cs = man.content_scripts || [];
