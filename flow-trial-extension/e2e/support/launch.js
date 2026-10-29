@@ -494,12 +494,10 @@ function installE2EHooks() {
             .concat(scenario.sent || [])
             .concat(Object.values(scenario.messages || {}));
           const matched = pool.filter((row) => row && String(row.conversationId || '') === convId);
-          if (matched.length) {
-            const enriched = matched.map((row) => {
-              const full = scenario.messages && scenario.messages[row.id];
-              return full ? Object.assign({}, row, full) : row;
-            });
-            return Promise.resolve(json(200, { value: enriched }));
+          if (matched.length === 1) {
+            const row = matched[0];
+            const full = scenario.messages && scenario.messages[row.id];
+            return Promise.resolve(json(200, { value: [full ? Object.assign({}, row, full) : row] }));
           }
         }
         return Promise.resolve(json(200, { value: [] }));

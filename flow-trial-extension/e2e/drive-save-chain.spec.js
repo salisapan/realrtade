@@ -5,6 +5,8 @@
 // Headless Chromium, mocks only.
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
+const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
+const { testIfGmailCompose } = bindV1ScopeGates(test);
 
 const SELF = 'ai.local.flow@gmail.com';
 const ASK = 'Please save the attached pdf to Drive.';
@@ -87,7 +89,7 @@ test('Undo in the Hebrew UI trashes the file the upload response named', async (
   await expect(page.locator('div[role="main"]')).not.toContainText('עדיין ב-Drive');
 });
 
-test('with no reply open, the save makes the draft through the Gmail drafts API, in the thread, with the Drive link', async ({ glance }) => {
+testIfGmailCompose('with no reply open, the save makes the draft through the Gmail drafts API, in the thread, with the Drive link', async ({ glance }) => {
   const page = await run(glance, 'ch-nocompose', BOARD, 'en', true);
   await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   const fileId = server.last.file;

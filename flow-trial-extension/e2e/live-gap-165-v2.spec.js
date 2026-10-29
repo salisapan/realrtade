@@ -7,7 +7,7 @@
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
 const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
-const { testIfDriveReadonly } = bindV1ScopeGates(test);
+const { testIfDriveReadonly, testIfGmailCompose } = bindV1ScopeGates(test);
 
 const SELF = 'ai.local.flow@gmail.com';
 const OTHER = 'sali.profile@gmail.com';
@@ -505,7 +505,7 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     return { page: page, chip: c };
   }
 
-  test('the thread id only on h2.hP (hex): the draft is made in that thread', async ({ glance }) => {
+  testIfGmailCompose('the thread id only on h2.hP (hex): the draft is made in that thread', async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'hdr-hex', { threadIdOnHeader: true });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
@@ -513,7 +513,7 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     expect(drafts()[Object.keys(drafts())[0]].message.threadId).toBe(HEX);
   });
 
-  test('only the decimal data-thread-perm-id: it is converted to the hex thread id', async ({ glance }) => {
+  testIfGmailCompose('only the decimal data-thread-perm-id: it is converted to the hex thread id', async ({ glance }) => {
     const dec = '1234567890123456789';
     const { page, chip: c } = await saveChain(glance, 'hdr-dec', { threadIdOnHeader: true, threadPermId: dec });
     await c.click();
@@ -531,7 +531,7 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     await expect(page.locator('div[role="main"]')).not.toContainText(/could not prepare a reply draft/i);
   });
 
-  test('Undo of the Drive save also deletes the reply draft by its id', async ({ glance }) => {
+  testIfGmailCompose('Undo of the Drive save also deletes the reply draft by its id', async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'undo-draft', { threadIdOnHeader: true });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
@@ -544,7 +544,7 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     await expect.poll(() => server.file(fileId).trashed, { timeout: 15000 }).toBe(true);
   });
 
-  test('the draft is in the language of the mail, whatever the UI language is', async ({ glance }) => {
+  testIfGmailCompose('the draft is in the language of the mail, whatever the UI language is', async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'draft-he', { threadIdOnHeader: true, senderName: 'דנה' }, 'en', 'מצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.');
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });

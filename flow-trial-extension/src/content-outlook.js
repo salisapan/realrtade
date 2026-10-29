@@ -4606,7 +4606,7 @@
       onBehalfOf: pane.onBehalfOf || null,
       forwarded: pane.onBehalf === true
     });
-    const ownFromPane = ownSender(pane.senderEmail || headerFrom, ownAll);
+    const ownFromPane = ownSender(pane.openSenderEmail || pane.senderEmail || headerFrom, ownAll);
     const selfMail = !receiptOnly && !selfAddressed
       && (ownFromPane || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')))
       && (!pane.threadJudgmentShow || ownFromPane);
