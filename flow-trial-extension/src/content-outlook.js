@@ -4429,25 +4429,22 @@
 
     if (pane.openSenderEmail == null) pane.openSenderEmail = pane.senderEmail || pane.ownSenderEmail || '';
     const threadApplied = await applyFullThreadRead(pane, own);
-    if (!threadApplied.ok) {
-      dropStuckCard(pane);
-      await pageReason('page:thread-read-failed', pane);
-      return;
-    }
-    pane = threadApplied.pane;
-    if (suggestNote) suggestNote = pane;
+    if (threadApplied.ok) {
+      pane = threadApplied.pane;
+      if (suggestNote) suggestNote = pane;
 
-    const openFrom = String(pane.openSenderEmail || '').trim().toLowerCase();
-    const graphFrom = String(pane.senderEmail || '').trim().toLowerCase();
-    if (behalfSplit(graphFrom, pane.graphSenderEmail)) {
-      dropStuckCard(pane);
-      await pageReason('page:sender-mismatch', pane);
-      return;
-    }
-    if (openFrom && graphFrom && openFrom !== graphFrom && !(await sameOpenSender(graphFrom, openFrom, null))) {
-      dropStuckCard(pane);
-      await pageReason('page:sender-mismatch', pane);
-      return;
+      const openFrom = String(pane.openSenderEmail || '').trim().toLowerCase();
+      const graphFrom = String(pane.senderEmail || '').trim().toLowerCase();
+      if (behalfSplit(graphFrom, pane.graphSenderEmail)) {
+        dropStuckCard(pane);
+        await pageReason('page:sender-mismatch', pane);
+        return;
+      }
+      if (openFrom && graphFrom && openFrom !== graphFrom && !(await sameOpenSender(graphFrom, openFrom, null))) {
+        dropStuckCard(pane);
+        await pageReason('page:sender-mismatch', pane);
+        return;
+      }
     }
 
     // Outlook item, the path, and the conversation — not a hash of the text.
@@ -5354,7 +5351,7 @@
     const paneSubjectLen = String(pane.subject || '').trim().length;
     if ((!fetched.ok || !fetched.rows.length)
         && pane.idSource !== 'url-stale'
-        && (paneBodyLen >= 20 || paneSubjectLen >= 8)) {
+        && (paneBodyLen >= 20 || paneSubjectLen >= 8 || (pane.itemId && !isConversationId(pane.itemId)) || (pane.attachments && pane.attachments.length))) {
       fetched = {
         ok: true,
         rows: [{
@@ -5410,6 +5407,7 @@
         clockAlt: pane.clockAlt || rowPane.clockAlt || '',
         pageHour24: pane.pageHour24 === true || rowPane.pageHour24 === true,
         hourCycle: pane.hourCycle || rowPane.hourCycle || '',
+        attachments: (pane.attachments && pane.attachments.length) ? pane.attachments : (rowPane.attachments || []),
         threadRead: true,
         threadMessageCount: fetched.rows.length,
         threadJudgmentShow: picked.show === true
