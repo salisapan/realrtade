@@ -59,7 +59,7 @@ testIfDriveReadonly(
   expectedMissing(testInfo, 'row 53, Y1', 'the receipt remounts after reload; Undo before approve deletes the draft');
   },
   async ({ glance }) => {
-    expect(driveReadonlyInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
     const page = await open(glance, 'one-off', ASK, [RECEIPT]);
     await page.waitForTimeout(7000);
     await expect(page.locator(CARD)).toHaveCount(0);
@@ -79,7 +79,7 @@ testIfDriveReadonly(
   expect(writes()).toHaveLength(0);
   },
   async ({ glance }) => {
-    expect(driveReadonlyInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
     const page = await open(glance, 'none-off', ASK, []);
     await page.waitForTimeout(7000);
     await expect(page.locator(CARD)).toHaveCount(0);
@@ -113,7 +113,7 @@ testIfDriveReadonly(
   expect(labels.filter((l) => /[A-Za-z]/.test(l))).toEqual([]);
   },
   async ({ glance }) => {
-    expect(driveReadonlyInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
     const page = await open(glance, 'he-off', ASK, [RECEIPT]);
     await page.waitForTimeout(7000);
     await expect(page.locator(CARD)).toHaveCount(0);

@@ -5,40 +5,38 @@ const scopes = new Set((manifest.oauth2 && manifest.oauth2.scopes) || []);
 const DRIVE_READONLY = 'https://www.googleapis.com/auth/drive.readonly';
 const GMAIL_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose';
 
-const driveReadonlyInManifest = scopes.has(DRIVE_READONLY);
-const gmailComposeInManifest = scopes.has(GMAIL_COMPOSE);
+const v1HasDriveReadonly = scopes.has(DRIVE_READONLY);
+const v1HasGmailCompose = scopes.has(GMAIL_COMPOSE);
+
+const driveReadonlyInManifest = v1HasDriveReadonly;
+const gmailComposeInManifest = v1HasGmailCompose;
 
 function bind(test) {
+  function registerGated(title, scopeOn, fnOn, fnOff) {
+    if (!fnOff) throw new Error('v1 scope gate requires fnOff fail-closed body');
+    test(title, async ({ glance }, testInfo) => {
+      const ctx = { glance };
+      if (scopeOn) return fnOn(ctx, testInfo);
+      return fnOff(ctx, testInfo);
+    });
+  }
+
   return {
     driveReadonlyInManifest,
     gmailComposeInManifest,
     /** @deprecated use testWhenCompose */
     testIfGmailCompose(title, fnOn, fnOff) {
-      if (!fnOff) throw new Error('testWhenCompose requires fnOff fail-closed body');
-      test(title, async (ctx) => {
-        if (gmailComposeInManifest) return fnOn(ctx);
-        return fnOff(ctx);
-      });
+      registerGated(title, v1HasGmailCompose, fnOn, fnOff);
     },
     /** @deprecated use testWhenDriveReadonly */
     testIfDriveReadonly(title, fnOn, fnOff) {
-      if (!fnOff) throw new Error('testWhenDriveReadonly requires fnOff fail-closed body');
-      test(title, async (ctx) => {
-        if (driveReadonlyInManifest) return fnOn(ctx);
-        return fnOff(ctx);
-      });
+      registerGated(title, v1HasDriveReadonly, fnOn, fnOff);
     },
     testWhenCompose(title, fnOn, fnOff) {
-      test(title, async (ctx) => {
-        if (gmailComposeInManifest) return fnOn(ctx);
-        return fnOff(ctx);
-      });
+      registerGated(title, v1HasGmailCompose, fnOn, fnOff);
     },
     testWhenDriveReadonly(title, fnOn, fnOff) {
-      test(title, async (ctx) => {
-        if (driveReadonlyInManifest) return fnOn(ctx);
-        return fnOff(ctx);
-      });
+      registerGated(title, v1HasDriveReadonly, fnOn, fnOff);
     }
   };
 }

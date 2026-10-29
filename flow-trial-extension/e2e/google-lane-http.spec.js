@@ -106,7 +106,7 @@ testIfGmailCompose(
     expect(server.drafts[id]).toBeUndefined();
   },
   async ({ glance }) => {
-    expect(gmailComposeInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
     const page = await open(glance, {
       mail: {
         messageId: 'm-people-off',
@@ -392,7 +392,7 @@ testIfGmailCompose(
   await expect(body.locator('.gmail_signature')).toHaveText('Best, Ada');
   },
   async ({ glance }) => {
-    expect(gmailComposeInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
     const page = await open(glance, {
       mail: {
         messageId: 'm-reply-off',
@@ -442,7 +442,7 @@ testIfGmailCompose(
   await expect(body).toHaveText('');
   },
   async ({ glance }) => {
-    expect(gmailComposeInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
     const page = await open(glance, {
       mail: {
         messageId: 'm-compose-off',
@@ -488,7 +488,7 @@ testIfGmailCompose(
   expect(server.calls.slice(before).filter((c) => c.method !== 'GET').length).toBe(0);
   },
   async ({ glance }) => {
-    expect(gmailComposeInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
     const page = await open(glance, {
       mail: {
         messageId: 'm-compose-edit-off',

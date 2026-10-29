@@ -433,7 +433,7 @@ test.describe('4. copied only: no card of any kind', () => {
     await expect(chip(page)).toBeVisible({ timeout: 15000 });
     },
     async ({ glance }) => {
-      expect(driveReadonlyInManifest).toBe(false);
+      expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
       await glance.seedGmail({});
       server.driveHits([{ id: 'rep-1', name: 'report.pdf', mimeType: 'application/pdf' }]);
       const page = await glance.openGmail(detailed('to-drive-off', 'Can you send me the report', 'en', { to: [SELF], cc: ['noa@acme.io'] }));
@@ -462,7 +462,7 @@ test.describe('4. copied only: no card of any kind', () => {
     await expect(chip(page)).toHaveCount(1);
     },
     async ({ glance }) => {
-      expect(driveReadonlyInManifest).toBe(false);
+      expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
       await glance.seedGmail({});
       server.driveHits([{ id: 'rep-1', name: 'report.pdf', mimeType: 'application/pdf' }]);
       const page = await glance.openGmail(detailed('to-late-off', 'Can you send me the report', 'en', { lateMs: 1500, to: [SELF], cc: ['noa@acme.io'] }));
@@ -540,7 +540,7 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     expect(drafts()[Object.keys(drafts())[0]].message.threadId).toBe(HEX);
     },
     async ({ glance }) => {
-      expect(gmailComposeInManifest).toBe(false);
+      expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
       const { page, chip: c } = await saveChain(glance, 'hdr-hex-off', { threadIdOnHeader: true });
       await c.click();
       await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
@@ -560,7 +560,7 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     expect(drafts()[Object.keys(drafts())[0]].message.threadId).toBe(BigInt(dec).toString(16));
     },
     async ({ glance }) => {
-      expect(gmailComposeInManifest).toBe(false);
+      expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
       const dec = '1234567890123456789';
       const { page, chip: c } = await saveChain(glance, 'hdr-dec-off', { threadIdOnHeader: true, threadPermId: dec });
       await c.click();
@@ -594,7 +594,7 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     await expect.poll(() => server.file(fileId).trashed, { timeout: 15000 }).toBe(true);
     },
     async ({ glance }) => {
-      expect(gmailComposeInManifest).toBe(false);
+      expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
       const { page, chip: c } = await saveChain(glance, 'undo-draft-off', { threadIdOnHeader: true });
       await c.click();
       await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
@@ -621,7 +621,7 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     expect(msg.body).not.toContain('Hi ');
     },
     async ({ glance }) => {
-      expect(gmailComposeInManifest).toBe(false);
+      expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
       const { page, chip: c } = await saveChain(glance, 'draft-he-off', { threadIdOnHeader: true, senderName: 'דנה' }, 'en', 'מצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.');
       await c.click();
       await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });

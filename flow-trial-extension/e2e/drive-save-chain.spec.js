@@ -105,7 +105,7 @@ testIfGmailCompose(
   await expect(page.locator('[aria-label="Message Body"]')).toHaveCount(0);
   },
   async ({ glance }) => {
-    expect(gmailComposeInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
     const page = await run(glance, 'ch-nocompose-v1', BOARD, 'en', true);
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
     expect(Object.keys(server.drafts)).toHaveLength(0);

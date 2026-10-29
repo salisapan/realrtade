@@ -57,7 +57,7 @@ testIfDriveReadonly(
   expectedMissing(testInfo, 'X1, C1', 'a Friday follow-up event on the same steps list, with its own GET');
   },
   async ({ glance }) => {
-    expect(driveReadonlyInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
     const page = await open(glance, 'contract-off', ASK, [CONTRACT]);
     await page.waitForTimeout(7000);
     await expect(page.locator(CARD)).toHaveCount(0);
@@ -84,7 +84,7 @@ testIfDriveReadonly(
   await expect(page.locator(MAIN + ' .flow-chip-host')).toHaveCount(0, { timeout: 1000 });
   },
   async ({ glance }) => {
-    expect(driveReadonlyInManifest).toBe(false);
+    expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
     const page = await open(glance, 'one-off', ASK, [CONTRACT]);
     await page.waitForTimeout(7000);
     await expect(page.locator(CARD)).toHaveCount(0);
