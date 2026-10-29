@@ -1642,10 +1642,13 @@ function glanceUiCopy(kind) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
       if (!usingGoogle) await ensureGoogleAutoConnect();
       const found = await driveFindOne(intent.googleWait.fileTerm);
-      if (found && found.driveSearchUnavailable) return { type: null };
-      const match = found && typeof found === 'object' ? found.match : found;
-      intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match || 'unknown' }));
-      if (intent && found && found.file) intent.laneFile = found.file;
+      if (found && found.driveSearchUnavailable) {
+        intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: 'none', driveSearchUnavailable: true }));
+      } else {
+        const match = found && typeof found === 'object' ? found.match : found;
+        intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match || 'unknown' }));
+        if (intent && found && found.file) intent.laneFile = found.file;
+      }
     }
     return intent || { type: null };
   }

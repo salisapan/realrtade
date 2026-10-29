@@ -117,7 +117,7 @@ check('WhatsApp Web is not a separate surface', !/label: 'WhatsApp Web'/.test(ba
 check('background.js hands the static Google helpers to the worker', /globalThis\.__glanceGoogleAuth/.test(backgroundSrc) && /GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY/.test(backgroundSrc) && /webTokenUsable: webTokenUsable/.test(backgroundSrc));
 check('the chat worker is a static import in this branch', !fs.existsSync(path.join(ROOT, 'src/lane-chat-worker.import.patch')) && !/importScripts/.test(backgroundSrc) && !/importScripts/.test(workerSrc));
 check('the token hook is locked to the test build', /update_url/.test(workerSrc) && /installed !== true/.test(workerSrc));
-check('the service worker re-registers Business Suite when it is already allowed', /glance-lane-messenger/.test(backgroundSrc) && /business\.facebook\.com\/latest\/inbox/.test(backgroundSrc) && /whyNotShown: messenger-not-granted/.test(backgroundSrc));
+check('Meta messenger and Instagram lanes register only when META_CHAT_LANES is on', /META_CHAT_LANES/.test(backgroundSrc) && /metaChatLaneId/.test(backgroundSrc) && /metaLanesOn/.test(backgroundSrc) && /business\.facebook\.com\/latest\/inbox/.test(backgroundSrc));
 check('the service worker pings a tab before injecting the lane', /window\.__glanceLaneChat/.test(backgroundSrc));
 const messengerSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');
 check('Messenger logs a quiet reason and retries an empty thread', /whyNotShown/.test(messengerSrc) && /RETRY_LIMIT/.test(messengerSrc) && /time\[datetime\]/.test(messengerSrc));
@@ -1374,9 +1374,9 @@ console.log('\n--- calendar evidence ---\n');
   check('signup can call the Meta consent opener', sent && sent.type === 'flow:open-meta-chats' && opened.ok === true && opened.page === 'lane-chat/enable.html' && pop.window.FlowMetaConsent.ORIGINS.join('\n') === META_ORIGINS.join('\n'));
   pop.window.close();
 
-  function loadLanes(granted) {
+  function loadLanes(granted, switches) {
     const registered = [];
-    const stored = { surfaces: {} };
+    const stored = { surfaces: {}, glanceSwitches: switches || {} };
     const sandbox = {
       console: { log() {}, info() {}, warn() {}, error() {} },
       URLSearchParams, URL, TextEncoder, Uint8Array,
@@ -1407,11 +1407,15 @@ console.log('\n--- calendar evidence ---\n');
   }
   const waOnly = loadLanes(['https://web.whatsapp.com/*']);
   await waOnly.settle();
-  check('a WhatsApp-only grant registers no lane', waOnly.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).length === 0, waOnly.registered.map((row) => row.id));
-  const full = loadLanes(META_ORIGINS.slice());
-  await full.settle();
-  const fullIds = full.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).sort();
-  check('a full Meta grant registers three lanes', fullIds.join(',') === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp', fullIds);
+  check('a WhatsApp-only grant registers the WhatsApp lane only', waOnly.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).join(',') === 'glance-lane-whatsapp', waOnly.registered.map((row) => row.id));
+  const fullOff = loadLanes(META_ORIGINS.slice());
+  await fullOff.settle();
+  const offIds = fullOff.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).sort();
+  check('a full Meta host grant registers WhatsApp only while META_CHAT_LANES is off', offIds.join(',') === 'glance-lane-whatsapp', offIds);
+  const fullOn = loadLanes(META_ORIGINS.slice(), { META_CHAT_LANES: true });
+  await fullOn.settle();
+  const fullIds = fullOn.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).sort();
+  check('a full Meta grant with META_CHAT_LANES on registers three lanes', fullIds.join(',') === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp', fullIds);
 
   const fixtureHtml = fs.readFileSync(path.join(ROOT, 'dev/messenger-fixture.html'), 'utf8');
   const fixtureClock = fs.readFileSync(path.join(ROOT, 'dev/fixture-clock.js'), 'utf8');

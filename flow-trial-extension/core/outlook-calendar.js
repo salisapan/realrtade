@@ -270,6 +270,7 @@ const FlowOutlookCalendar = (() => {
       senderName: i.senderName || null,
       subject: i.subject || '',
       fileMatch: i.fileMatch || null,
+      driveSearchUnavailable: i.driveSearchUnavailable === true,
       attachmentCount: 0,
       now: now
     });

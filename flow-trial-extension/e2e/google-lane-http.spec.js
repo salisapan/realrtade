@@ -31,10 +31,12 @@ test.afterAll(async () => {
 
 test.beforeEach(async ({ glance }) => {
   server.reset();
-  server.setAccount('me@x.com');
-  await glance.evaluateWorker((origin) => {
+  server.setAccount(S.GMAIL_ME);
+  await glance.evaluateWorker(({ origin, account }) => {
     globalThis.__glanceE2e.httpOrigin = origin;
-  }, server.origin);
+    globalThis.__glanceE2e.tokenAccounts = globalThis.__glanceE2e.tokenAccounts || {};
+    globalThis.__glanceE2e.tokenAccounts['ya29.e2e'] = account;
+  }, { origin: server.origin, account: S.GMAIL_ME });
 });
 
 function wrote(method, part) {
@@ -58,8 +60,11 @@ async function uncheck(page, id) {
 }
 
 async function open(glance, opts) {
-  await glance.seedGmail(opts.seed || {});
-  return glance.openGmail(opts.mail);
+  await glance.seedGmail(Object.assign({
+    googleConnectedAccount: { email: S.GMAIL_ME, at: Date.now(), source: 'web' }
+  }, opts.seed || {}));
+  const mail = Object.assign({ senderEmail: S.SENDER, senderName: 'flow' }, opts.mail || {});
+  return glance.openGmail(mail);
 }
 
 test('v1 without gmail.compose: no drafts.create on Do It', async ({ glance }) => {

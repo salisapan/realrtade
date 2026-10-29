@@ -656,16 +656,24 @@ async function clearLaneChats() {
   }
 }
 
+function metaChatLaneId(lane) {
+  return lane && (lane.id === 'glance-lane-messenger' || lane.id === 'glance-lane-instagram');
+}
+
 async function restoreLaneChats() {
   if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
   const metaOrigins = (typeof FlowMetaConsent !== 'undefined' && Array.isArray(FlowMetaConsent.ORIGINS)) ? FlowMetaConsent.ORIGINS.slice() : [];
-  let on = false;
+  const waOrigins = (LANE_CHAT.find((lane) => lane.id === 'glance-lane-whatsapp') || {}).origins || ['https://web.whatsapp.com/*'];
+  let metaGranted = false;
+  let waGranted = false;
   let known = false;
   try {
-    on = metaOrigins.length > 0 && await chrome.permissions.contains({ origins: metaOrigins });
+    metaGranted = metaOrigins.length > 0 && await chrome.permissions.contains({ origins: metaOrigins });
+    waGranted = waOrigins.length > 0 && await chrome.permissions.contains({ origins: waOrigins });
     known = true;
-  } catch (e) { on = false; known = false; }
-  if (!on) {
+  } catch (e) { metaGranted = false; waGranted = false; known = false; }
+  const metaLanesOn = await glanceSwitchOn('META_CHAT_LANES');
+  if (!metaGranted && !waGranted) {
     if (known) await clearLaneChats();
     if (chrome.tabs && chrome.tabs.query) {
       const messenger = LANE_CHAT.find((lane) => lane.id === 'glance-lane-messenger');
@@ -677,6 +685,12 @@ async function restoreLaneChats() {
     return;
   }
   for (const lane of LANE_CHAT) {
+    const isMeta = metaChatLaneId(lane);
+    const granted = isMeta ? metaGranted : waGranted;
+    if (!granted || (isMeta && !metaLanesOn)) {
+      try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered */ }
+      continue;
+    }
     try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
     try {
       await chrome.scripting.registerContentScripts([{
@@ -3131,9 +3145,14 @@ async function googleCalendarWrite(p) {
   if (paramsFile) {
     const found = await driveFindOneByName(paramsFile);
     if (!found || found.match !== 'one' || !found.file || !found.file.url) {
-      return { ok: false, reason: 'unclear', error: 'No single file to put on the event.' };
+      if (found && found.driveSearchUnavailable) {
+        linkedFile = null;
+      } else {
+        return { ok: false, reason: 'unclear', error: 'No single file to put on the event.' };
+      }
+    } else {
+      linkedFile = found.file;
     }
-    linkedFile = found.file;
   }
 
   const timeZone = localTimeZone();

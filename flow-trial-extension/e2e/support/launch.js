@@ -731,6 +731,13 @@ async function boot() {
 
   const hooked = await evalWorker(installE2EHooks);
   harness.identityHook = hooked;
+  let e2eDefaultSwitches = {};
+  try { e2eDefaultSwitches = JSON.parse(String(process.env.GLANCE_E2E_SWITCHES || '{}')); } catch (err) { e2eDefaultSwitches = {}; }
+  if (Object.keys(e2eDefaultSwitches).length) {
+    await evalWorker(async (sw) => {
+      await chrome.storage.local.set({ glanceSwitches: sw });
+    }, e2eDefaultSwitches);
+  }
   await evalWorker(() => { globalThis.__glanceE2e.authCalls = []; globalThis.__glanceE2e.calls = []; });
 
   const extensionId = worker.url().split('/')[2];
@@ -815,9 +822,12 @@ async function boot() {
     }
     await Promise.all(closing);
     harness.page = null;
+    let e2eDefaultSwitches = {};
+    try { e2eDefaultSwitches = JSON.parse(String(process.env.GLANCE_E2E_SWITCHES || '{}')); } catch (err) { e2eDefaultSwitches = {}; }
     await evalWorker(installE2EHooks);
-    await evalWorker(async () => {
+    await evalWorker(async (sw) => {
       await chrome.storage.local.clear();
+      if (sw && Object.keys(sw).length) await chrome.storage.local.set({ glanceSwitches: sw });
       const e = globalThis.__glanceE2e;
       e.calls = [];
       e.authCalls = [];
@@ -833,7 +843,7 @@ async function boot() {
       e.seq = 1;
       delete e.httpOrigin;
       if (globalThis.FlowGoogleLaneAccount && globalThis.FlowGoogleLaneAccount.forget) globalThis.FlowGoogleLaneAccount.forget();
-    });
+    }, e2eDefaultSwitches);
   };
 
   async function openDocument(url, html) {

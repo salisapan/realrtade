@@ -120,3 +120,33 @@ jobs:
           path: flow-trial-extension/e2e-report/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Meta Messenger / Business Suite / Instagram chat lanes are out of the v1
+  # product path (META_CHAT_LANES defaults off). Specs stay unchanged; this job
+  # proves them with the lane switch on and does not block merge.
+  e2e-meta-lanes-future:
+    name: e2e Meta chat lanes (non-blocking, META_CHAT_LANES on)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    continue-on-error: true
+    env:
+      TZ: UTC
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: flow-trial-extension/package-lock.json
+      - name: Install dependencies
+        working-directory: flow-trial-extension
+        run: npm ci
+      - name: Install Chromium
+        working-directory: flow-trial-extension
+        run: npx playwright install --with-deps chromium
+      - name: Run Meta lane specs with META_CHAT_LANES on
+        working-directory: flow-trial-extension
+        run: |
+          xvfb-run -a env GLANCE_E2E_SWITCHES='{"META_CHAT_LANES":true,"CHAT_TASK_CARD":true}' \
+            npx playwright test e2e/chat-whatsapp-card.spec.js e2e/chat-meta-lanes.spec.js e2e/lane-chat-draft.spec.js

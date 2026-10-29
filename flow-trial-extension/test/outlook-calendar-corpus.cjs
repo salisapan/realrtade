@@ -60,6 +60,7 @@ console.log('\n--- the gate sentence is a calendar hold, or silence ---\n');
   check('Hebrew ביומן is the same hold', he.move === 'hold' && he.fileTerm === 'glance-pricing-q4.pdf' && he.params && he.params.dateIso === TOMORROW, he);
   check('a hedge stays silent', decide('Maybe put the glance-pricing-q4.pdf file on my calendar tomorrow (' + EN_WHEN + ') at 10:00.', { fileMatch: 'one' }).move === 'silent');
   check('zero files stay silent', decide(EN, { fileMatch: 'none' }).move === 'silent');
+  check('zero files with no Drive search scope is still a calendar hold', decide(EN, { fileMatch: 'none', driveSearchUnavailable: true }).move === 'hold', decide(EN, { fileMatch: 'none', driveSearchUnavailable: true }));
   check('two files stay silent', decide(EN, { fileMatch: 'many' }).move === 'silent');
   check('a generic file stays silent', decide('Put the file on my calendar tomorrow (' + EN_WHEN + ') at 10:00.', { fileMatch: 'one' }).move !== 'hold');
   const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

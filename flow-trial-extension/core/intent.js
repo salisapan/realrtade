@@ -1918,6 +1918,7 @@ const FlowIntent = (() => {
         hasClock: Boolean(clock),
         template: ctx.companyTemplate || null,
         fileMatch: ctx.fileMatch || null,
+        driveSearchUnavailable: ctx.driveSearchUnavailable === true,
         attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount
       });
       if (google && google.wait) {

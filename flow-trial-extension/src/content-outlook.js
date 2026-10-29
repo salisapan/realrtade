@@ -982,7 +982,8 @@
   }
 
   // undefined: not loaded. null: /me failed, so compare the two addresses
-  // exactly. A Set is the user's mail, userPrincipalName, smtp: proxies, and otherMails.
+  // exactly. Own-sender identity is mail, UPN and smtp: proxies from Graph /me
+  // on the same message id — not otherMails (external addresses there are not you).
   let userAddressCache;
   let userAddressFlight = null;
 
@@ -995,7 +996,6 @@
     const p = body || {};
     add(p.mail);
     add(p.userPrincipalName);
-    (Array.isArray(p.otherMails) ? p.otherMails : []).forEach(add);
     (Array.isArray(p.proxyAddresses) ? p.proxyAddresses : []).forEach((raw) => {
       const m = String(raw || '').match(/^smtp:(.+)$/i);
       if (m) add(m[1]);
@@ -1003,7 +1003,7 @@
     return set;
   }
 
-  // Stored own addresses plus /me mail, UPN, smtp proxies, and otherMails.
+  // Stored own addresses plus /me mail, UPN and smtp proxies (not otherMails).
   // A failed /me read leaves the stored list, so the exact compare stays.
   async function ownWithAliases(own) {
     const list = [];
@@ -1023,7 +1023,7 @@
     if (userAddressFlight) return userAddressFlight;
     userAddressFlight = (async () => {
       try {
-        const body = await graphJson('/me?$select=mail,userPrincipalName,proxyAddresses,otherMails', 'own-addresses', null);
+        const body = await graphJson('/me?$select=mail,userPrincipalName,proxyAddresses', 'own-addresses', null);
         userAddressCache = body ? profileAddressSet(body) : null;
       } catch (e) {
         userAddressCache = null;
@@ -4559,8 +4559,8 @@
     dbg('matched', m ? { how: m.how, messageId: entry.messageId, label: entry.intent && entry.intent.label, candidates: candidates.length } : { how: 'none', candidates: candidates.length });
     if (entry && pane.senderEmail) {
       const entryFrom = String((entry.sender && entry.sender.email) || (entry.base && entry.base.sender && entry.base.sender.email) || (entry.base && entry.base.counterpart && entry.base.counterpart.email) || '').toLowerCase();
-      const openFrom = String(pane.senderEmail).toLowerCase();
-      if (entryFrom && openFrom && entryFrom !== openFrom) {
+      const openFrom = String(pane.openSenderEmail || pane.senderEmail).toLowerCase();
+      if (entryFrom && openFrom && entryFrom !== openFrom && !(await sameOpenSender(entryFrom, openFrom, null))) {
         dbg('sender-mismatch', { how: m && m.how, from: entryFrom, open: openFrom });
         entry = null;
       }

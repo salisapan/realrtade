@@ -131,6 +131,26 @@ test('a case-only sender difference still shows the card', async ({ glance }) =>
   await expect(page.locator('#ReadingPaneContainerId .flow-chip-host button.flow-chip')).toBeVisible();
 });
 
+test('external otherMails does not count as own-sender on Graph from', async ({ glance }) => {
+  await glance.seedOutlook();
+  const scenario = conversationScenario('AQQkGlanceE2EExtOtherConv', 'AQMkGlanceE2EExtOtherHit', 'dana@acme.com');
+  scenario.me = {
+    mail: S.ME,
+    userPrincipalName: S.ME,
+    proxyAddresses: ['SMTP:' + S.ME],
+    otherMails: ['external@gmail.com']
+  };
+  await glance.setScenario(scenario);
+  const page = await glance.openOutlook({
+    id: 'AQQkGlanceE2EExtOtherConv',
+    subject: 'Transfer',
+    senderEmail: 'dana@acme.com',
+    senderName: 'Dana',
+    body: S.SHOW
+  });
+  await expect(page.locator('#ReadingPaneContainerId .flow-chip-host button.flow-chip')).toBeVisible();
+});
+
 test('the user alias agrees with Graph and shows the card', async ({ glance }) => {
   await glance.seedOutlook();
   const scenario = conversationScenario('AQQkGlanceE2EAliasConv', 'AQMkGlanceE2EAliasHit', S.ME);
