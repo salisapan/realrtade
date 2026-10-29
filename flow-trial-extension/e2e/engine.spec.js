@@ -153,12 +153,11 @@ test('external otherMails does not count as own-sender on Graph from', async ({ 
 
 test('the user alias agrees with Graph and shows the card', async ({ glance }) => {
   await glance.seedOutlook();
-  const scenario = conversationScenario('AQQkGlanceE2EAliasConv', 'AQMkGlanceE2EAliasHit', S.ME);
+  const scenario = conversationScenario('AQQkGlanceE2EAliasConv', 'AQMkGlanceE2EAliasHit', 'sali.alias@glance.test');
   scenario.me = {
     mail: S.ME,
     userPrincipalName: S.ME,
-    proxyAddresses: ['SMTP:' + S.ME, 'smtp:sali.alias@glance.test'],
-    otherMails: ['sali.alias@glance.test']
+    proxyAddresses: ['SMTP:' + S.ME, 'smtp:sali.alias@glance.test']
   };
   await glance.setScenario(scenario);
   const page = await glance.openOutlook({
@@ -384,7 +383,7 @@ test('Outlook self-sent save and Hebrew meeting get a card', async ({ glance }) 
     subject: 'פגישה',
     senderEmail: 'sali.alias@glance.test',
     senderName: 'Sali',
-    to: ['sali.other@glance.test'],
+    to: [S.ME],
     body: SELF_HOLD
   });
   await expect(alias.locator('#ReadingPaneContainerId .flow-chip-host')).toHaveCount(1);

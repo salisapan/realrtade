@@ -1024,9 +1024,10 @@
     userAddressFlight = (async () => {
       try {
         const body = await graphJson('/me?$select=mail,userPrincipalName,proxyAddresses', 'own-addresses', null);
-        userAddressCache = body ? profileAddressSet(body) : null;
+        if (body) userAddressCache = profileAddressSet(body);
+        else userAddressCache = undefined;
       } catch (e) {
-        userAddressCache = null;
+        userAddressCache = undefined;
       }
       userAddressFlight = null;
       return userAddressCache;
@@ -4608,14 +4609,9 @@
     const ownFromPane = ownSender(pane.openSenderEmail || pane.senderEmail || headerFrom, ownAll);
     const fromAddr = String(pane.openSenderEmail || pane.senderEmail || pane.ownSenderEmail || headerFrom || '').toLowerCase();
     const inboundMail = fromAddr ? ownAll.indexOf(fromAddr) < 0 : true;
-    if (!inboundMail && fromAddr && (pane.to || []).some((addr) => ownAll.indexOf(String(addr || '').toLowerCase()) < 0)) {
-      dropStuckCard(pane);
-      await pageReason('note-to-self', pane);
-      return;
-    }
     // A file placed on the calendar is judged before note-to-self. The gate
-    // mail is a note addressed only to yourself. A reply you sent to someone
-    // else does not match this place pattern and still stays quiet above.
+    // mail is a note addressed only to yourself. A hold to someone else still
+    // offers when the body names a calendar time.
     if (typeof FlowOutlookCalendar !== 'undefined') {
       const probe = FlowOutlookCalendar.decide({
         text: holdTextOf(pane),
@@ -4627,6 +4623,11 @@
       if (probe && probe.move !== 'ignore') {
         if (await settleCalendarHold(pane, probe, st)) return;
       }
+    }
+    if (!inboundMail && fromAddr && (pane.to || []).some((addr) => ownAll.indexOf(String(addr || '').toLowerCase()) < 0)) {
+      dropStuckCard(pane);
+      await pageReason('note-to-self', pane);
+      return;
     }
     const selfMail = !receiptOnly && !selfAddressed
       && (ownFromPane || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')))

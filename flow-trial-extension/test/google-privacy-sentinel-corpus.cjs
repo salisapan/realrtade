@@ -802,7 +802,7 @@ function activityLogRefBehaviour(ref) {
     });
     await wD3.__glanceGmailPage.rescan();
     await sleep(800);
-    check('D3: drive-find-one unavailable keeps the page quiet (no chip)', !wD3.document.querySelector('.flow-chip-host'), findOneCalls);
+    check('D3: drive-find-one unavailable still offers a calendar hold chip', Boolean(wD3.document.querySelector('.flow-chip-host')), findOneCalls);
     check('D3: googleWait path called drive-find-one', findOneCalls >= 1, findOneCalls);
     wD3.close();
 
@@ -870,13 +870,13 @@ function activityLogRefBehaviour(ref) {
     const gmail = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
     const cal = fs.readFileSync(path.join(ROOT, 'core', 'google-calendar.js'), 'utf8');
     const waitSlice = gmail.slice(gmail.indexOf('intent.googleWait.fileTerm'), gmail.indexOf('intent.googleWait.fileTerm') + 900);
-    check('D3all: driveSearchUnavailable on googleWait stays quiet', /driveSearchUnavailable\) return \{ type: null \}/.test(waitSlice));
-    check('D3all: no fake replan when mailbox search is off', !/fileMatch: 'one'/.test(waitSlice) && !/fileMatch: 'none'/.test(waitSlice));
+    check('D3all: driveSearchUnavailable replans with fileMatch none (no fake one)', /driveSearchUnavailable\)[\s\S]*fileMatch: 'none'/.test(waitSlice) && !/fileMatch: 'one'/.test(waitSlice));
+    check('D3all: no silent return before replan when mailbox search is off', !/driveSearchUnavailable\) return \{ type: null \}/.test(waitSlice));
     check('UNK: unknown match is not re-planned as a found file', !/unresolved/.test(waitSlice));
     check('U1: no unresolved bypass flag', !/unresolved = false/.test(gmail));
-    check('U2/U3: no one-then-none replan ladder', !/fileMatch: 'none'/.test(waitSlice));
+    check('U2/U3: no one-then-none replan ladder in the wait slice', !/fileMatch: 'one'[\s\S]*fileMatch: 'none'/.test(waitSlice));
     check('GC: googleClose intents skip the file-attach chain', /!intent\.googleClose/.test(gmail));
-    check('CAL: file holds need a link and a name', /wantsFile && \(!link \|\| !name\)/.test(cal));
+    check('CAL: a resolved file URL needs a link and a name', /needsFileLink && \(!link \|\| !name\)/.test(cal));
     check('I1 product: unavailable Drive search does not fake ok', !/searched = \{ ok: true, files: \[\] \}/.test(gmail));
   }
 

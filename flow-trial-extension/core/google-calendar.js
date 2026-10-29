@@ -109,7 +109,7 @@ const FlowGoogleCalendar = (() => {
     if (!date || hour == null || minute == null) return null;
     const link = fileLink(i.fileUrl);
     const name = String(i.fileName || i.fileTerm || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
-    const needsFileLink = Boolean(String(i.fileUrl || i.fileName || '').trim());
+    const needsFileLink = Boolean(String(i.fileUrl || '').trim());
     if (needsFileLink && (!link || !name)) return null;
     const title = String(i.title || i.quote || name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!title) return null;
