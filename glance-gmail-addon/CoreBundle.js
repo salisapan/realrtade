@@ -2255,6 +2255,30 @@ const FlowGoogleCloses = (() => {
       const match = fileMatchOf(input);
       if (!match) return { wait: term };
       if (match !== 'one') {
+        if (match === 'none' && input.driveSearchUnavailable && destination === 'calendar' && input.dateIso && input.hasClock) {
+          const lang = hebrewText(text) ? 'he' : 'en';
+          const close = {
+            family: 'B',
+            personalClose: 'file-on-hold',
+            artifact: null,
+            kind: null,
+            copyAttachment: false,
+            destination: 'calendar',
+            fileTerm: term,
+            slots: [],
+            filled: {},
+            missing: [],
+            chat: false,
+            lang: lang,
+            templateName: null,
+            logo: null,
+            intro: null,
+            what: whatFrom(text)
+          };
+          close.cardLine = 'Putting ' + term + ' on the calendar.';
+          close.cardLineHe = 'שם את ' + term + ' ביומן.';
+          return { close: close };
+        }
         const creatable = artifactForTerm(term);
         if (match === 'none' && creatable && destination) {
           if (destination === 'calendar' && (!input.dateIso || !input.hasClock)) return { silence: true };
@@ -6524,6 +6548,7 @@ const FlowIntent = (() => {
         hasClock: Boolean(clock),
         template: ctx.companyTemplate || null,
         fileMatch: ctx.fileMatch || null,
+        driveSearchUnavailable: ctx.driveSearchUnavailable === true,
         attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount
       });
       if (google && google.wait) {
