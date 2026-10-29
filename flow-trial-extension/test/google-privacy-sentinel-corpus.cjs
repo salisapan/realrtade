@@ -26,7 +26,6 @@ const SENTINELS = [SENT_CAL_TITLE, SENT_CAL_NOTE, SENT_TASK_TITLE, SENT_TASK_NOT
 const OAUTH_SCOPES_EXACT = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/tasks',
-  'https://www.googleapis.com/auth/contacts.readonly',
   'https://www.googleapis.com/auth/drive.file',
   'openid',
   'https://www.googleapis.com/auth/userinfo.profile',
@@ -552,31 +551,14 @@ function activityLogRefBehaviour(ref) {
       sender: { name: 'Vendor', email: 'vendor@example.com' }, subject: 'Billing', text: contactAsk,
       intent: { label: 'Contact lookup', type: 'request', signals: { score: 80 } }
     });
-    check('contacts chip painted from page plan path', Boolean(card), null);
-    check('contacts plan reached flow:google-contacts-plan', pageSent.some((m) => m.type === 'flow:google-contacts-plan'), pageSent.map((m) => m.type));
-    await clickDo(card);
-    check('contacts Do It reached compose write',
-      pageSent.some((m) => m.type === 'flow:gmail-compose' || m.type === 'flow:google-write'),
-      pageSent.map((m) => m.type));
-    assertLaneTraffic('contacts path', outbound, googleReads);
-    check('CT3: seeded contact email stays off assist/execute payloads', !JSON.stringify(outbound).includes(SENT_CONTACT_EMAIL), outbound.length);
-    assertNoSentinels('contacts path', outbound.map((o) => o.body));
-    check('CT2 mutant: sentinel contact email in outbound would fail', !outbound.some((o) => JSON.stringify(o.body || {}).indexOf(SENT_CONTACT_EMAIL) >= 0), outbound[0]);
-    check('J:M3: contact display name stays off page runtime messages', !JSON.stringify(pageSent).includes(SENT_CONTACT_NAME), pageSent.length);
-    check('J:M6: People API read does not leak sentinel into background fetch bodies',
-      !outbound.filter((o) => o.kind === 'google-api' || o.kind === 'fetch').some((o) => JSON.stringify(o.body || {}).includes(SENT_CONTACT_EMAIL)),
-      outbound.length);
-    const writtenRows = activityLogRows.filter((r) => r && r.kind === 'written');
-    check('J:P1: activity log rows omit contact email', !activityLogRows.some((r) => JSON.stringify(r).includes(SENT_CONTACT_EMAIL)), activityLogRows);
-    check('P3c: activity log written ref strips ref.to from compose response',
-      writtenRows.length > 0 && writtenRows.every((r) => !r.ref || !r.ref.to),
-      writtenRows[0]);
-    check('R-subj: written ref carries no to/subject/body keys',
-      writtenRows.length > 0 && writtenRows.every((r) => !r.ref || !['to', 'subject', 'body'].some((k) => k in r.ref)),
-      writtenRows.map((r) => r.ref));
-    check('R-subj/R-before: activity log omits seeded subject and prefilled To',
-      !activityLogRows.some((r) => JSON.stringify(r).includes(SENT_TASK_TITLE) || JSON.stringify(r).includes(SENT_CONTACT_EMAIL)),
-      activityLogRows);
+    check('v1 without contacts.readonly: contacts chip is not painted', !card, null);
+    check('v1 without contacts.readonly: flow:google-contacts-plan is not sent', !pageSent.some((m) => m.type === 'flow:google-contacts-plan'), pageSent.map((m) => m.type));
+    if (card) {
+      await clickDo(card);
+    }
+    check('v1 without contacts.readonly: compose write is not reached from contacts', !pageSent.some((m) => m.type === 'flow:gmail-compose' || m.type === 'flow:google-write'), pageSent.map((m) => m.type));
+    check('v1 without contacts.readonly: People API is not read', !googleReads.some((r) => /people\.googleapis/.test(r.url)), googleReads.map((r) => r.url));
+    assertNoSentinels('contacts path (v1 off)', outbound.map((o) => o.body));
     assertNoSentinels('contacts activity log (all rows)', activityLogRows);
     w.close();
   }
@@ -609,16 +591,18 @@ function activityLogRefBehaviour(ref) {
       sender: { name: 'Vendor', email: 'vendor@example.com' }, subject: 'Billing', text: contactAsk,
       intent: { label: 'Contact lookup', type: 'request', signals: { score: 80 } }
     });
-    check('R-merge: contacts chip painted', Boolean(card), null);
-    await clickDo(card);
-    const undoBtn = w.document.querySelector('.flow-chip-undo');
-    check('R-merge: compose receipt offers Undo', Boolean(undoBtn), null);
-    if (undoBtn) undoBtn.click();
-    await sleep(600);
-    check('R-merge: Undo restores prefilled To', toEl && readComposeValue(toEl) === vendorTo, toEl && readComposeValue(toEl));
-    const bodyEl = w.document.querySelector('[aria-label="Message Body"]');
-    check('R-merge: Undo cleared the filled body', bodyEl && bodyEl.textContent === '', bodyEl && bodyEl.textContent);
-    check('R-merge: Undo restores prefilled Subject', subEl && readComposeValue(subEl) === vendorSub, subEl && readComposeValue(subEl));
+    check('R-merge v1: contacts chip is not painted', !card, null);
+    if (card) {
+      await clickDo(card);
+      const undoBtn = w.document.querySelector('.flow-chip-undo');
+      check('R-merge: compose receipt offers Undo', Boolean(undoBtn), null);
+      if (undoBtn) undoBtn.click();
+      await sleep(600);
+      check('R-merge: Undo restores prefilled To', toEl && readComposeValue(toEl) === vendorTo, toEl && readComposeValue(toEl));
+      const bodyEl = w.document.querySelector('[aria-label="Message Body"]');
+      check('R-merge: Undo cleared the filled body', bodyEl && bodyEl.textContent === '', bodyEl && bodyEl.textContent);
+      check('R-merge: Undo restores prefilled Subject', subEl && readComposeValue(subEl) === vendorSub, subEl && readComposeValue(subEl));
+    }
     w.close();
   }
 
@@ -671,14 +655,15 @@ function activityLogRefBehaviour(ref) {
       type: 'flow:google-contacts-plan',
       text: "What's Dana's email for the vendor billing setup this week?"
     });
-    check('contacts plan during classify row touches People API', googleReads.some((r) => /people\.googleapis/.test(r.url)), googleReads.map((r) => r.url));
+    check('v1 contacts plan returns missing-scope without People read', contactPlan && contactPlan.action === 'silence' && contactPlan.reason === 'missing-scope', contactPlan);
+    check('contacts plan without v1 scope does not touch People API', !googleReads.some((r) => /people\.googleapis/.test(r.url)), googleReads.map((r) => r.url));
     check('CT2: calendar sentinel stays off cloud outbound', !JSON.stringify(outbound).includes(SENT_CAL_TITLE), outbound.length);
     check('CT3: contact email and display name stay off cloud outbound',
       !JSON.stringify(outbound).includes(SENT_CONTACT_EMAIL) && !JSON.stringify(outbound).includes(SENT_CONTACT_NAME),
       outbound.length);
     check('J:M5: runtime relay does not carry contact sentinel', !bg.runtimeMessages.some((m) => JSON.stringify(m).includes(SENT_CONTACT_EMAIL)), bg.runtimeMessages.length);
     assertNoSentinels('classify path', outbound.map((o) => o.body));
-    check('contacts plan returns a chip offer without echoing the seeded email off-device', contactPlan && contactPlan.action === 'offer', contactPlan);
+    check('v1 contacts plan stays silent (missing-scope), never offers a chip off-device', contactPlan && contactPlan.action === 'silence' && contactPlan.reason === 'missing-scope', contactPlan);
   }
 
   console.log('\n--- G1: missing invoice needs-you only when gmail.compose is granted ---\n');

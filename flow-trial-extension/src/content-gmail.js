@@ -3300,6 +3300,9 @@ function glanceUiCopy(kind) {
   async function showGoogleContactsChip(message, c) {
     let plan = null;
     try {
+      const manifest = chrome.runtime.getManifest();
+      const oauth = (manifest.oauth2 && manifest.oauth2.scopes) || [];
+      if (oauth.indexOf('https://www.googleapis.com/auth/contacts.readonly') < 0) return false;
       plan = await sendRuntime(Object.assign({
         type: 'flow:google-contacts-plan',
         text: c.text,

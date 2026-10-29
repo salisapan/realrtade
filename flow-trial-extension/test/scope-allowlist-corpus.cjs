@@ -79,7 +79,17 @@ audit('google-web-auth GOOGLE_OAUTH_SCOPES', waScopes);
 check('the manifest and the web sign-in ask the same scopes', waScopes && JSON.stringify(waScopes.slice().sort()) === JSON.stringify(manScopes.slice().sort()), { manifest: manScopes, web: waScopes });
 check('mutant contacts.readonly in web sign-in list is outside allowlist', waScopes && waScopes.indexOf(G + 'contacts.readonly') < 0);
 
-audit('e2e launch fixture scopes (manifest oauth2 list)', manScopes.slice());
+audit('e2e launch fixture google scopes (manifest oauth2 list)', manScopes.slice());
+
+const launchSrc = read('e2e/support/launch.js');
+const launchGoogleAuth = launchSrc.match(/googleapis\.com\/auth\/[A-Za-z0-9._-]+/g) || [];
+const launchGoogleScopes = launchGoogleAuth.map((h) => 'https://www.' + h);
+const launchBad = launchGoogleScopes.filter((s) => !ALLOW.has(s) && !FORBIDDEN.has(s));
+check('e2e launch.js: no Google OAuth scope literal outside allowlist/forbidden pins', launchBad.length === 0, launchBad);
+check('e2e launch.js: outlook calendar mock requests MailboxSettings.Read with Calendars.ReadWrite',
+  /Calendars\.ReadWrite/.test(launchSrc) && /MailboxSettings\.Read/.test(launchSrc));
+check('e2e launch.js: mailboxSettings mock includes timeZone UTC',
+  /mailboxSettings[\s\S]{0,120}timeZone:\s*'UTC'/.test(launchSrc));
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {

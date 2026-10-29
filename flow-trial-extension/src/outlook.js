@@ -350,6 +350,9 @@ const FlowOutlook = (() => {
         scopeSources = (E && typeof E.mergeMicrosoftScopes === 'function')
           ? E.mergeMicrosoftScopes(base, keptOptional)
           : base.concat(keptOptional);
+        if (E && typeof E.ensureCalendarMailboxScopes === 'function') {
+          scopeSources = E.ensureCalendarMailboxScopes(scopeSources);
+        }
       } else {
         scopeSources = (chosen || []).concat(cfg.SCOPES || []);
       }

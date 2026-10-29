@@ -109,7 +109,7 @@ function forbiddenInPayload(json) {
   check('not-found shows a line, not a card', /flow-chip-contact-miss/.test(gmail));
   check('compose steps map to gmailCompose', /googleContactAnswer: 'gmailCompose'/.test(gmail) && /contactCompose/.test(gmail));
   check('receipt can offer Copy', /flow-chip-copy/.test(gmail));
-  check('manifest loads core module on Gmail', /core\/google-contacts\.js/.test(manifest));
+  check('manifest does not load google-contacts on Gmail (v1 contacts out)', !/core\/google-contacts\.js/.test(JSON.stringify(manifest.content_scripts || [])));
   check('draft reply path does not call contacts plan', !/gmailDraft[\s\S]{0,200}flow:google-contacts/.test(gmail));
   check('activity log stores contactHash not email', /contactLogHash/.test(gmail) && /contactHash: hash/.test(gmail) && !/appendLog[\s\S]{0,800}params:\s*\{[^}]*email:/.test(gmail.slice(gmail.indexOf('showGoogleContactsChip'), gmail.indexOf('showGoogleContactsChip') + 1200)));
   check('P1: written activity row strips ref.to and target via activityLogRef', /function activityLogRef/.test(gmail) && /ref: activityLogRef\(r\.response\.ref\)/.test(gmail));

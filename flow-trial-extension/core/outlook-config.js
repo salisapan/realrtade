@@ -86,12 +86,14 @@ FlowOutlookConfig.connectServiceUi = function connectServiceUi(svc, ctx) {
   const required = Boolean(svc && (svc.required || svc.id === 'mail'));
   const scopes = (svc && svc.scopes) || [];
   const has = scopes.length > 0 && scopes.every((sc) => granted.indexOf(sc) >= 0);
-  if (required) return { checked: true, disabled: true, granted: has || true };
+  const calendarGranted = svc && svc.id === 'calendar' && granted.indexOf('Calendars.ReadWrite') >= 0;
+  const serviceGranted = calendarGranted || has;
+  if (required) return { checked: true, disabled: true, granted: serviceGranted || true };
   if (tokenStatus === 'valid' || tokenStatus === 'expired' || tokenStatus === 'missing-scope') {
-    return { checked: false, disabled: false, granted: has };
+    return { checked: false, disabled: false, granted: serviceGranted };
   }
   const checked = svc && svc.defaultOn === true;
-  return { checked: Boolean(checked), disabled: false, granted: has };
+  return { checked: Boolean(checked), disabled: false, granted: serviceGranted };
 };
 
 FlowOutlookConfig.connectIdsFromChecked = function connectIdsFromChecked(services, isChecked) {

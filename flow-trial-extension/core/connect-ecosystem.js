@@ -113,6 +113,15 @@ const FlowConnectEcosystem = (() => {
     return microsoftScopes();
   }
 
+  // Calendar connect always requests timezone read with write (Hold fail-closed).
+  function ensureCalendarMailboxScopes(scopes) {
+    const out = (scopes || []).slice();
+    if (out.indexOf('Calendars.ReadWrite') >= 0 && out.indexOf('MailboxSettings.Read') < 0) {
+      out.push('MailboxSettings.Read');
+    }
+    return out;
+  }
+
   function decodeJwtPayload(idToken) {
     const parts = String(idToken || '').split('.');
     if (parts.length < 2 || !parts[1]) return null;
@@ -449,6 +458,7 @@ const FlowConnectEcosystem = (() => {
     statusSnapshot: statusSnapshot,
     disconnectTargets: disconnectTargets,
     microsoftRequiredScopes: microsoftRequiredScopes,
+    ensureCalendarMailboxScopes: ensureCalendarMailboxScopes,
     microsoftConsentScopes: microsoftConsentScopes,
     optionalScopesForAccount: optionalScopesForAccount,
     isWorkMicrosoftAccount: isWorkMicrosoftAccount,

@@ -1805,8 +1805,12 @@
       if (slot.firstChild) slot.insertBefore(line, slot.firstChild);
       else slot.appendChild(line);
     }
-    const bare = String(reason || '').replace(/^quiet:/, '');
-    const hideQuietAsk = bare === 'intent-null' || bare === 'too-short' || bare === 'page:thread-read-failed';
+    const raw = String(reason || '');
+    let code = raw;
+    if (raw.indexOf('page:') === 0) code = raw.slice(5);
+    else if (raw.indexOf('quiet:') === 0) code = raw.slice(6);
+    code = code.split(':')[0];
+    const hideQuietAsk = code === 'intent-null' || code === 'too-short' || code === 'thread-read-failed';
     const visible = whyNotText(reason);
     line.textContent = hideQuietAsk ? '' : visible;
     line.setAttribute('data-glance-why', reason || 'quiet');

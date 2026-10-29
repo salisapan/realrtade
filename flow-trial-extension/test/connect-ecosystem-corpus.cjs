@@ -739,8 +739,8 @@ await ok('ecosystem checkbox scopesFor path ends subset of base ecosystem scopes
     store: { outlookAuth: { ecosystem: true, requestedScopes: MS_EXPECTED, token: { accessToken: 'old' }, account: { address: 'me@contoso.com' } } }
   });
   await inst.connect({ scopes: scopes });
-  const allowed = new Set(MS_EXPECTED.concat(['Calendars.ReadWrite', 'Sites.ReadWrite.All']));
-  const expectedReconnect = MS_EXPECTED.concat(['Calendars.ReadWrite', 'Sites.ReadWrite.All']);
+  const allowed = new Set(MS_EXPECTED.concat(['Calendars.ReadWrite', 'MailboxSettings.Read', 'Sites.ReadWrite.All']));
+  const expectedReconnect = MS_EXPECTED.concat(['Calendars.ReadWrite', 'MailboxSettings.Read', 'Sites.ReadWrite.All']);
   assert.ok(w.signInScopes.every((s) => allowed.has(s)));
   assert.ok(!w.signInScopes.some((s) => /^Group\./i.test(s)));
   assert.ok(w.signInScopes.indexOf('Chat.Read') < 0, 'Chat.Read is optional teamsChat only');
@@ -1319,6 +1319,22 @@ await ok('K2b: Labs TEAMS_MEETING flip via renderLabs click calls flow:microsoft
   assert.ok(sent.some((m) => m.type === 'flow:microsoft-optional-scopes' && m.bucket === 'teamsChat'), sent);
 });
 
+await ok('ecosystem calendar reconnect adds MailboxSettings.Read with Calendars.ReadWrite', async () => {
+  const { w, inst } = outlookConnectWorld({
+    store: {
+      outlookAuth: {
+        ecosystem: true,
+        requestedScopes: MS_EXPECTED.concat(['Calendars.ReadWrite', 'MailboxSettings.Read']),
+        token: { accessToken: 'old', grantedScopes: MS_EXPECTED.concat(['Calendars.ReadWrite']) },
+        account: { address: 'me@contoso.com' }
+      }
+    }
+  });
+  await inst.connect({ scopes: MS_EXPECTED.concat(['Calendars.ReadWrite']) });
+  assert.ok(w.signInScopes.indexOf('Calendars.ReadWrite') >= 0, w.signInScopes);
+  assert.ok(w.signInScopes.indexOf('MailboxSettings.Read') >= 0, w.signInScopes);
+});
+
 await ok('R4/R5: ecosystem reconnect keeps ticked Calendar (Calendars.ReadWrite)', async () => {
   const withCal = MS_EXPECTED.concat(['Calendars.ReadWrite']);
   const { w, inst } = outlookConnectWorld({
@@ -1336,7 +1352,7 @@ await ok('R4/R5: ecosystem reconnect keeps ticked Calendar (Calendars.ReadWrite)
   assert.ok(w.signInScopes.indexOf('Calendars.ReadWrite') >= 0, w.signInScopes);
   assert.ok(w.signInScopes.indexOf('Mail.Read') < 0, w.signInScopes);
   assert.ok(w.signInScopes.indexOf('Chat.Read') < 0, w.signInScopes);
-  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(MS_EXPECTED.concat(['Calendars.ReadWrite'])));
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(MS_EXPECTED.concat(['Calendars.ReadWrite', 'MailboxSettings.Read'])));
 });
 
 await ok('R4 popup: expired ecosystem reconnect pre-ticks Calendar and Connect sends Calendars.ReadWrite', async () => {

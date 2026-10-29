@@ -52,6 +52,7 @@ T.setPickMode('v1');
 const outlookSrc = fs.readFileSync(path.join(ROOT, 'src', 'content-outlook.js'), 'utf8');
 check('content-outlook removed Graph latest-message-only fallback ($top=1 desc)', outlookSrc.indexOf('$top=1&$orderby=receivedDateTime desc') < 0);
 check('content-outlook applies full thread read before judgment', /applyFullThreadRead/.test(outlookSrc));
+check('thread read filters Graph by conversationId (G2 guard)', /conversationId eq/.test(outlookSrc) && /fetchConversationThreadRows/.test(outlookSrc));
 
 if (failures) process.exit(1);
 console.log('\nAll outlook-thread-v1 checks passed.\n');
