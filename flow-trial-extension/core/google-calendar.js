@@ -109,12 +109,11 @@ const FlowGoogleCalendar = (() => {
     if (!date || hour == null || minute == null) return null;
     const link = fileLink(i.fileUrl);
     const name = String(i.fileName || i.fileTerm || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
-    const wantsFile = Boolean(String(i.fileUrl || i.fileName || i.fileTerm || '').trim());
-    if (wantsFile && (!link || !name)) return null;
+    const needsFileLink = Boolean(String(i.fileUrl || i.fileName || '').trim());
+    if (needsFileLink && (!link || !name)) return null;
     const title = String(i.title || i.quote || name || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     if (!title) return null;
-    const zone = zoneName(i.timeZone);
-    if (!zone) return null;
+    const zone = zoneName(i.timeZone) || 'UTC';
     let startIso = '';
     let endIso = '';
     try {
