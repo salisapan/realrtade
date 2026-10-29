@@ -781,7 +781,7 @@
       ? FlowIncomingJudge.prepareForJudge(textForJudge)
       : textForJudge;
     const own = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(prepared) : prepared;
-    const from = String(pane.senderEmail || '').toLowerCase();
+    const from = String(pane.senderEmail || pane.ownSenderEmail || pane.openSenderEmail || '').toLowerCase();
     // A save-shaped sentence is the only one that asks how many files are
     // on the message. Every other sentence stays at zero, as before.
     // The address often carries only a conversation id. Counting files on that
@@ -4427,7 +4427,7 @@
       }
     } catch (e) { glanceError('pane hydrate', e); }
 
-    if (pane.senderEmail && pane.openSenderEmail == null) pane.openSenderEmail = pane.senderEmail;
+    if (pane.openSenderEmail == null) pane.openSenderEmail = pane.senderEmail || pane.ownSenderEmail || '';
     const threadApplied = await applyFullThreadRead(pane, own);
     if (!threadApplied.ok) {
       dropStuckCard(pane);
@@ -4526,6 +4526,29 @@
       }
     } catch (e) {
       glanceError('new file', e);
+    }
+
+    // A Hebrew hold or save note you sent to someone else is not a calendar
+    // close on their thread. Quiet before the calendar probe runs.
+    const ownAllHold = await ownWithAliases(own);
+    const holdHeaderFrom = String(pane.senderEmail || pane.ownSenderEmail || '').trim().toLowerCase();
+    if ((!pane.to || !pane.to.length) && pane.rawToLine) {
+      const fromLine = String(pane.rawToLine).toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g);
+      if (fromLine && fromLine.length) pane.to = fromLine.slice();
+    }
+    const holdSelfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
+      senderEmail: pane.senderEmail || holdHeaderFrom,
+      to: pane.to,
+      cc: pane.cc,
+      ownAddresses: ownAllHold,
+      onBehalfOf: pane.onBehalfOf || null,
+      forwarded: pane.onBehalf === true
+    });
+    const holdOwnFrom = ownSender(pane.openSenderEmail || pane.senderEmail || holdHeaderFrom, ownAllHold);
+    if (holdOwnFrom && !holdSelfAddressed) {
+      dropStuckCard(pane);
+      await pageReason('note-to-self', pane);
+      return;
     }
 
     // A file placed on the calendar is judged before note-to-self. The gate
@@ -5270,7 +5293,7 @@
       judge: (text, row) => {
         if (typeof FlowIncomingJudge === 'undefined') return { show: false };
         const prepared = FlowIncomingJudge.prepareForJudge(text);
-        const from = String(pane.senderEmail || '').toLowerCase();
+        const from = String(pane.senderEmail || pane.ownSenderEmail || pane.openSenderEmail || '').toLowerCase();
         const selfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
           senderEmail: pane.senderEmail,
           to: pane.to || null,
@@ -5339,7 +5362,7 @@
           conversationId: conv || pane.conversationId || null,
           subject: pane.subject || '',
           receivedDateTime: pane.receivedDateTime || '',
-          from: { emailAddress: { address: pane.senderEmail || pane.openSenderEmail || '', name: pane.senderName || '' } },
+          from: { emailAddress: { address: pane.senderEmail || pane.openSenderEmail || pane.ownSenderEmail || '', name: pane.senderName || '' } },
           toRecipients: (pane.to || []).map((address) => ({ emailAddress: { address: address } })),
           ccRecipients: (pane.cc || []).map((address) => ({ emailAddress: { address: address } })),
           body: { contentType: 'text', content: String(pane.text || '') }
@@ -5368,7 +5391,7 @@
     const mergedTo = (rowPane.to && rowPane.to.length) ? rowPane.to : (pane.to || []);
     const mergedCc = (rowPane.cc && rowPane.cc.length) ? rowPane.cc : (pane.cc || []);
     const wasUnconfirmed = pane.idSource === 'url-unconfirmed';
-    const openSender = pane.openSenderEmail || pane.senderEmail || '';
+    const openSender = pane.openSenderEmail || pane.senderEmail || pane.ownSenderEmail || '';
     return {
       ok: true,
       pane: Object.assign({}, pane, rowPane, {
@@ -5379,7 +5402,14 @@
         conversationId: wasUnconfirmed ? pane.conversationId : (rowPane.conversationId || pane.conversationId),
         senderEmail: wasUnconfirmed ? (pane.senderEmail || rowPane.senderEmail) : rowPane.senderEmail,
         senderName: wasUnconfirmed ? (pane.senderName || rowPane.senderName) : rowPane.senderName,
+        ownSenderEmail: pane.ownSenderEmail || rowPane.ownSenderEmail || '',
         idSource: wasUnconfirmed ? 'url-unconfirmed' : rowPane.idSource,
+        receivedDateTime: pane.receivedDateTime || rowPane.receivedDateTime,
+        clockAmbiguous: pane.clockAmbiguous === true,
+        clockUnread: pane.clockUnread === true,
+        clockAlt: pane.clockAlt || rowPane.clockAlt || '',
+        pageHour24: pane.pageHour24 === true || rowPane.pageHour24 === true,
+        hourCycle: pane.hourCycle || rowPane.hourCycle || '',
         threadRead: true,
         threadMessageCount: fetched.rows.length,
         threadJudgmentShow: picked.show === true
@@ -5949,6 +5979,9 @@
     const pane = suggestNote;
     suggestNote = null;
     if (!pane || typeof FlowSuggestSave === 'undefined' || typeof FlowSuggestSave.suggestSave !== 'function') return;
+    const decidedId = decisionIdFrom(pane);
+    const prior = decisionFor(decidedId);
+    const pageAlreadyQuiet = prior && prior.epoch === renderEpoch && prior.verdict === 'quiet';
     const sameChip = chipForThisPane(pane);
     if (sameChip && sameChip.classList.contains('flow-chip-settled') && sameChip.getAttribute('data-glance-chain') === 'task-proof') return;
     if (typeof FlowProofOfClose !== 'undefined' && typeof FlowProofOfClose.savedFileReceipt === 'function') {
@@ -5998,11 +6031,12 @@
     } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
     if (stageReason && !showed) {
       await appendSuggestLog({ messageId: messageId, reason: stageReason, detail: (read && read.detail) || '', surface: 'outlook' });
-      if (!pageAlreadyDecided(pane) || genericTextQuiet(pane)) {
+      if (!pageAlreadyQuiet && (!pageAlreadyDecided(pane) || genericTextQuiet(pane))) {
         await pageReason(stageReason, pane, { detail: (read && read.detail) || '' });
       }
       return;
     }
+    if (pageAlreadyQuiet) return;
     let bag = {};
     try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
     // FlowOnedriveFile is on this page (manifest content script, copied onto
@@ -6012,7 +6046,7 @@
       ? FlowOnedriveFile.hasWriteScope(calendarScopes(bag))
       : null;
     const own = ownAddressesOf(bag);
-    const from = String(pane.senderEmail || '').toLowerCase();
+    const from = String(pane.senderEmail || pane.ownSenderEmail || pane.openSenderEmail || '').toLowerCase();
     const decision = FlowSuggestSave.suggestSave({
       surface: 'outlook',
       inbound: from ? own.indexOf(from) < 0 : true,
