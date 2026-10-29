@@ -3507,6 +3507,8 @@ function glanceUiCopy(kind) {
   function injectChip(messageNode, ctx) {
     void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
+    ctx = chipContextWithoutClosedCompose(ctx);
+    if (!ctx) return;
     clearGmailWhy(messageNode);
 
     const lang = glanceUiLang();
@@ -4221,16 +4223,33 @@ function glanceUiCopy(kind) {
     return { tabAccount: ownEmailFromThread() || lastOwnEmail || '', lang: glanceUiHebrew() ? 'he' : 'en' };
   }
 
-  async function gmailComposeApiAllowedFromStorage() {
+  function gmailComposeAllowedFromGrantedRecord(rec) {
     const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
     if (!C || typeof C.gmailDraftApiAllowed !== 'function') return false;
+    const raw = rec && rec.version;
+    if (raw == null) return false;
+    const scopes = String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
+    return C.gmailDraftApiAllowed(scopes);
+  }
+
+  async function gmailComposeApiAllowedFromStorage() {
     try {
       const bag = await chrome.storage.local.get('googleGrantedScopes');
-      const rec = bag && bag.googleGrantedScopes;
-      const raw = rec && rec.version;
-      const scopes = raw == null ? null : String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
-      return C.gmailDraftApiAllowed(scopes);
+      return gmailComposeAllowedFromGrantedRecord(bag && bag.googleGrantedScopes);
     } catch (e) { return false; }
+  }
+
+  function gmailComposeAllowedFromState() {
+    return gmailComposeAllowedFromGrantedRecord(state && state.googleGrantedScopes);
+  }
+
+  function chipContextWithoutClosedCompose(ctx) {
+    if (!ctx || !ctx.process || !Array.isArray(ctx.process.steps)) return ctx;
+    if (gmailComposeAllowedFromState()) return ctx;
+    const kept = ctx.process.steps.filter((step) => !(step && step.kind === 'gmailDraft'));
+    if (kept.length === ctx.process.steps.length) return ctx;
+    if (!kept.length) return null;
+    return Object.assign({}, ctx, { process: Object.assign({}, ctx.process, { steps: kept }) });
   }
 
   function activityLogRef(ref) {

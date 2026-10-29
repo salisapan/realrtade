@@ -483,26 +483,29 @@ function installE2EHooks() {
       // on conversationId is. A mailbox subject query selects conversationId
       // and must fall through to the subject filter below.
       if (path.indexOf('/me/messages') >= 0 && /conversationId/i.test(graphFilterValue(parsed.search))) {
-        const convRows = scenario.conversation || [];
-        if (convRows.length) return Promise.resolve(json(200, { value: convRows }));
         const filter = graphFilterValue(parsed.search);
         const convMatch = filter.match(/conversationId\s+eq\s+'([^']+)'/i);
         const convId = convMatch ? convMatch[1] : '';
-        if (convId) {
-          const pool = []
-            .concat(scenario.inbox || [])
-            .concat(scenario.sent || [])
-            .concat(Object.values(scenario.messages || {}));
-          const matched = pool.filter((row) => row && String(row.conversationId || '') === convId);
-          if (matched.length) {
-            const value = matched.map((row) => {
-              const full = scenario.messages && scenario.messages[row.id];
-              return full ? Object.assign({}, row, full) : row;
-            });
-            return Promise.resolve(json(200, { value: value }));
-          }
+        const enrich = (row) => {
+          if (!row || !row.id) return row;
+          const full = scenario.messages && scenario.messages[row.id];
+          return full ? Object.assign({}, row, full) : row;
+        };
+        const pool = []
+          .concat(scenario.conversation || [])
+          .concat(scenario.inbox || [])
+          .concat(scenario.sent || [])
+          .concat(Object.values(scenario.messages || {}));
+        const seen = new Set();
+        const matched = [];
+        for (let i = 0; i < pool.length; i++) {
+          const row = pool[i];
+          if (!row || !row.id || seen.has(row.id)) continue;
+          if (convId && String(row.conversationId || '') !== convId) continue;
+          seen.add(row.id);
+          matched.push(enrich(row));
         }
-        return Promise.resolve(json(200, { value: [] }));
+        return Promise.resolve(json(200, { value: matched }));
       }
       if (path.indexOf('/me/mailboxSettings') >= 0) {
         return Promise.resolve(json(200, scenario.mailboxSettings || { timeFormat: 'h:mm tt', timeZone: 'UTC' }));
@@ -849,10 +852,32 @@ async function boot() {
     if (!id) return;
     await evalWorker((m) => {
       const e = globalThis.__glanceE2e;
-      const sc = Object.assign({ inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] }, e.scenario || {});
-      const msgId = String(m.id || '');
-      if (!msgId) return;
-      const convId = m.convId ? String(m.convId) : (/^A[AQ]Qk/i.test(msgId) ? msgId : ('conv-' + msgId));
+      const prev = e.scenario || {};
+      const sc = Object.assign({ inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] }, prev);
+      if (prev.me) sc.me = prev.me;
+      if (prev.meFail) sc.meFail = prev.meFail;
+      if (prev.attachments) sc.attachments = Object.assign({}, prev.attachments, sc.attachments);
+      const urlId = String(m.id || '');
+      if (!urlId) return;
+      const isConvUrl = /^AQQk/i.test(urlId);
+      let convId = m.convId ? String(m.convId) : (isConvUrl ? urlId : '');
+      let msgId = m.graphMessageId ? String(m.graphMessageId) : (isConvUrl ? '' : urlId);
+      if (isConvUrl && !msgId) {
+        const pool = (sc.conversation || [])
+          .concat(sc.inbox || [])
+          .concat(sc.sent || [])
+          .concat(Object.values(sc.messages || {}));
+        const peers = pool.filter((peer) => peer && String(peer.conversationId || '') === convId);
+        const hit = peers.find((peer) => /^AQMk/i.test(String(peer.id || ''))) || peers[0];
+        if (hit && hit.id) msgId = String(hit.id);
+      }
+      if (isConvUrl && !msgId) {
+        const peers = (sc.conversation || []).filter((peer) => peer && String(peer.conversationId || '') === convId);
+        const hit = peers.find((peer) => /^AQMk/i.test(String(peer.id || ''))) || peers[0];
+        if (hit && hit.id) msgId = String(hit.id);
+      }
+      if (!msgId) msgId = isConvUrl ? (urlId + '-open') : urlId;
+      if (!convId) convId = 'conv-' + msgId;
       const toList = Array.isArray(m.to) ? m.to : ['ai.local.flow@gmail.com'];
       const ccList = Array.isArray(m.cc) ? m.cc : [];
       const row = {
@@ -867,6 +892,20 @@ async function boot() {
         body: { contentType: 'text', content: String(m.body || '') },
         bodyPreview: String(m.body || '').slice(0, 255)
       };
+      const existing = sc.messages[msgId] || (sc.conversation || []).find((peer) => peer && peer.id === msgId);
+      if (existing) {
+        if (existing.from) row.from = existing.from;
+        if (existing.sender) row.sender = existing.sender;
+        if (existing.subject) row.subject = existing.subject;
+        if (existing.conversationId) row.conversationId = existing.conversationId;
+        if (existing.hasAttachments != null) row.hasAttachments = existing.hasAttachments;
+        if (existing.body && existing.body.content && (!m.body || !String(m.body).trim())) {
+          row.body = existing.body;
+          row.bodyPreview = existing.bodyPreview || row.bodyPreview;
+        }
+      }
+      const atts = sc.attachments && sc.attachments[msgId];
+      if (atts && atts.length) row.hasAttachments = true;
       sc.messages[msgId] = row;
       const convPeers = (sc.conversation || []).filter((peer) => peer && peer.id !== msgId);
       const sameConv = convPeers.filter((peer) => String(peer.conversationId || '') === convId);
@@ -877,6 +916,9 @@ async function boot() {
 
   harness.openOutlook = async function openOutlook(opts) {
     const o = opts || {};
+    if (!o.convId && o.id && /^AQMk/i.test(String(o.id))) {
+      o.convId = 'conv-' + String(o.id);
+    }
     await registerOutlookGraphMessage(o);
     const id = o.id;
     const url = outlookUrl(id);

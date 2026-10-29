@@ -9,10 +9,15 @@ module.exports = defineConfig({
   retries: 0,
   timeout: 90000,
   expect: { timeout: 20000 },
-  reporter: [
-    ['list'],
-    ['html', { open: 'never', outputFolder: 'e2e-report' }]
-  ],
+  reporter: process.env.CI
+    ? [
+      ['list'],
+      ['blob', { outputDir: 'blob-report' }]
+    ]
+    : [
+      ['list'],
+      ['html', { open: 'never', outputFolder: 'e2e-report' }]
+    ],
   outputDir: 'test-results',
   use: {
     trace: 'retain-on-failure',
