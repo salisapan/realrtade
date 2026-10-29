@@ -4427,24 +4427,41 @@
       }
     } catch (e) { glanceError('pane hydrate', e); }
 
-    if (pane.openSenderEmail == null) pane.openSenderEmail = pane.senderEmail || pane.ownSenderEmail || '';
+    if (pane.senderEmail && pane.openSenderEmail == null) pane.openSenderEmail = pane.senderEmail;
     const threadApplied = await applyFullThreadRead(pane, own);
-    if (threadApplied.ok) {
-      pane = threadApplied.pane;
-      if (suggestNote) suggestNote = pane;
+    if (!threadApplied.ok) {
+      const ownAllEarly = await ownWithAliases(own);
+      const headerEarly = String(pane.senderEmail || pane.ownSenderEmail || '').trim().toLowerCase();
+      if ((!pane.to || !pane.to.length) && pane.rawToLine) {
+        const fromLine = String(pane.rawToLine).toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g);
+        if (fromLine && fromLine.length) pane.to = fromLine.slice();
+      }
+      if (pane.openSenderEmail == null) pane.openSenderEmail = pane.senderEmail || pane.ownSenderEmail || '';
+      const ownFromEarly = ownSender(pane.openSenderEmail || pane.senderEmail || headerEarly, ownAllEarly);
+      if ((ownFromEarly || personaOwnSender(ownAllEarly)) && (pane.to || []).some((addr) => ownAllEarly.indexOf(String(addr || '').toLowerCase()) < 0)) {
+        dropStuckCard(pane);
+        await pageReason('note-to-self', pane);
+        return;
+      }
+      dropStuckCard(pane);
+      await pageReason('page:thread-read-failed', pane);
+      return;
+    }
+    pane = threadApplied.pane;
+    if (pane.openSenderEmail == null) pane.openSenderEmail = pane.senderEmail || pane.ownSenderEmail || '';
+    if (suggestNote) suggestNote = pane;
 
-      const openFrom = String(pane.openSenderEmail || '').trim().toLowerCase();
-      const graphFrom = String(pane.senderEmail || '').trim().toLowerCase();
-      if (behalfSplit(graphFrom, pane.graphSenderEmail)) {
-        dropStuckCard(pane);
-        await pageReason('page:sender-mismatch', pane);
-        return;
-      }
-      if (openFrom && graphFrom && openFrom !== graphFrom && !(await sameOpenSender(graphFrom, openFrom, null))) {
-        dropStuckCard(pane);
-        await pageReason('page:sender-mismatch', pane);
-        return;
-      }
+    const openFrom = String(pane.openSenderEmail || '').trim().toLowerCase();
+    const graphFrom = String(pane.senderEmail || '').trim().toLowerCase();
+    if (behalfSplit(graphFrom, pane.graphSenderEmail)) {
+      dropStuckCard(pane);
+      await pageReason('page:sender-mismatch', pane);
+      return;
+    }
+    if (openFrom && graphFrom && openFrom !== graphFrom && !(await sameOpenSender(graphFrom, openFrom, null))) {
+      dropStuckCard(pane);
+      await pageReason('page:sender-mismatch', pane);
+      return;
     }
 
     // Outlook item, the path, and the conversation — not a hash of the text.
@@ -4525,46 +4542,6 @@
       glanceError('new file', e);
     }
 
-    // A Hebrew hold or save note you sent to someone else is not a calendar
-    // close on their thread. Quiet before the calendar probe runs.
-    const ownAllHold = await ownWithAliases(own);
-    const holdHeaderFrom = String(pane.senderEmail || pane.ownSenderEmail || '').trim().toLowerCase();
-    if ((!pane.to || !pane.to.length) && pane.rawToLine) {
-      const fromLine = String(pane.rawToLine).toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g);
-      if (fromLine && fromLine.length) pane.to = fromLine.slice();
-    }
-    const holdSelfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
-      senderEmail: pane.senderEmail || holdHeaderFrom,
-      to: pane.to,
-      cc: pane.cc,
-      ownAddresses: ownAllHold,
-      onBehalfOf: pane.onBehalfOf || null,
-      forwarded: pane.onBehalf === true
-    });
-    const holdOwnFrom = ownSender(pane.openSenderEmail || pane.senderEmail || holdHeaderFrom, ownAllHold);
-    if (holdOwnFrom && !holdSelfAddressed) {
-      dropStuckCard(pane);
-      await pageReason('note-to-self', pane);
-      return;
-    }
-
-    // A file placed on the calendar is judged before note-to-self. The gate
-    // mail is a note addressed only to yourself. A reply you sent to someone
-    // else does not match this place pattern and still stays quiet below.
-    if (typeof FlowOutlookCalendar !== 'undefined') {
-      const probe = FlowOutlookCalendar.decide({
-        text: holdTextOf(pane),
-        subject: pane.subject || '',
-        senderEmail: pane.senderEmail || null,
-        senderName: pane.senderName || null,
-        now: new Date()
-      });
-      if (probe && probe.move !== 'ignore') {
-        await settleCalendarHold(pane, probe, st);
-        return;
-      }
-    }
-
     let candidates = await outlookCandidates();
     let m = FlowOwaParse.matchEntryHow(pane, candidates);
     // Not judged yet (new mail, or the panel has not been opened): run one check from here, then look again.
@@ -4627,15 +4604,30 @@
       forwarded: pane.onBehalf === true
     });
     const ownFromPane = ownSender(pane.openSenderEmail || pane.senderEmail || headerFrom, ownAll);
-    const selfMail = !receiptOnly && !selfAddressed
-      && (ownFromPane || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')))
-      && (!pane.threadJudgmentShow || ownFromPane);
-    const selfNoteText = String(pane.text || '').trim() || String(pane.subject || '').trim();
-    if (selfMail && ownFromPane && !selfAddressed) {
+    if ((ownFromPane || personaOwnSender(ownAll)) && (pane.to || []).some((addr) => ownAll.indexOf(String(addr || '').toLowerCase()) < 0)) {
       dropStuckCard(pane);
       await pageReason('note-to-self', pane);
       return;
     }
+    // A file placed on the calendar is judged before note-to-self. The gate
+    // mail is a note addressed only to yourself. A reply you sent to someone
+    // else does not match this place pattern and still stays quiet above.
+    if (typeof FlowOutlookCalendar !== 'undefined') {
+      const probe = FlowOutlookCalendar.decide({
+        text: holdTextOf(pane),
+        subject: pane.subject || '',
+        senderEmail: pane.senderEmail || null,
+        senderName: pane.senderName || null,
+        now: new Date()
+      });
+      if (probe && probe.move !== 'ignore') {
+        if (await settleCalendarHold(pane, probe, st)) return;
+      }
+    }
+    const selfMail = !receiptOnly && !selfAddressed
+      && (ownFromPane || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')))
+      && (!pane.threadJudgmentShow || ownFromPane);
+    const selfNoteText = String(pane.text || '').trim() || String(pane.subject || '').trim();
     if (selfMail && selfNoteText.length < 12) {
       dropStuckCard(pane);
       await pageReason('note-to-self', pane);
@@ -5351,7 +5343,7 @@
     const paneSubjectLen = String(pane.subject || '').trim().length;
     if ((!fetched.ok || !fetched.rows.length)
         && pane.idSource !== 'url-stale'
-        && (paneBodyLen >= 20 || paneSubjectLen >= 8 || (pane.itemId && !isConversationId(pane.itemId)) || (pane.attachments && pane.attachments.length))) {
+        && (paneBodyLen >= 20 || paneSubjectLen >= 8 || (pane.attachments && pane.attachments.length))) {
       fetched = {
         ok: true,
         rows: [{
@@ -5359,7 +5351,7 @@
           conversationId: conv || pane.conversationId || null,
           subject: pane.subject || '',
           receivedDateTime: pane.receivedDateTime || '',
-          from: { emailAddress: { address: pane.senderEmail || pane.openSenderEmail || pane.ownSenderEmail || '', name: pane.senderName || '' } },
+          from: { emailAddress: { address: pane.senderEmail || pane.openSenderEmail || '', name: pane.senderName || '' } },
           toRecipients: (pane.to || []).map((address) => ({ emailAddress: { address: address } })),
           ccRecipients: (pane.cc || []).map((address) => ({ emailAddress: { address: address } })),
           body: { contentType: 'text', content: String(pane.text || '') }
@@ -5388,7 +5380,7 @@
     const mergedTo = (rowPane.to && rowPane.to.length) ? rowPane.to : (pane.to || []);
     const mergedCc = (rowPane.cc && rowPane.cc.length) ? rowPane.cc : (pane.cc || []);
     const wasUnconfirmed = pane.idSource === 'url-unconfirmed';
-    const openSender = pane.openSenderEmail || pane.senderEmail || pane.ownSenderEmail || '';
+    const openSender = pane.openSenderEmail || pane.senderEmail || '';
     return {
       ok: true,
       pane: Object.assign({}, pane, rowPane, {
@@ -5399,7 +5391,6 @@
         conversationId: wasUnconfirmed ? pane.conversationId : (rowPane.conversationId || pane.conversationId),
         senderEmail: wasUnconfirmed ? (pane.senderEmail || rowPane.senderEmail) : rowPane.senderEmail,
         senderName: wasUnconfirmed ? (pane.senderName || rowPane.senderName) : rowPane.senderName,
-        ownSenderEmail: pane.ownSenderEmail || rowPane.ownSenderEmail || '',
         idSource: wasUnconfirmed ? 'url-unconfirmed' : rowPane.idSource,
         receivedDateTime: pane.receivedDateTime || rowPane.receivedDateTime,
         clockAmbiguous: pane.clockAmbiguous === true,
