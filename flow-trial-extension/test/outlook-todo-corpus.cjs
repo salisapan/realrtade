@@ -438,12 +438,87 @@ console.log('\n--- a late To Do read-back still counts, and the fields have to m
     missed.ok === false && missed.fetchedBack === false && missed.written === "Created, couldn't verify", missed);
 }
 
+console.log('\n--- process TZ America/New_York, mailbox Israel Standard Time (worker) ---\n');
+{
+  const prevTz = process.env.TZ;
+  process.env.TZ = 'America/New_York';
+  const mailboxIl = 'Israel Standard Time';
+  const FIXED = '2026-10-22';
+  const calScopes = ['Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite', 'Calendars.ReadWrite', 'offline_access'];
+  const eventJson = (id, body) => ({
+    id,
+    subject: body.subject,
+    body: body.body,
+    start: body.start,
+    end: body.end,
+    attendees: body.attendees || []
+  });
+  const shared = [
+    { method: 'GET', test: /\/me\/mailboxSettings/, reply: () => ({ ok: true, status: 200, json: async () => ({ timeZone: mailboxIl }), text: async () => '' }) },
+    { method: 'POST', test: /\/me\/events$/, reply: (body) => ({ ok: true, status: 201, json: async () => eventJson('EVT-IL', body), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/events\/EVT-IL/, reply: () => ({ ok: true, status: 200, json: async () => eventJson('EVT-IL', {
+      subject: 'Review',
+      body: { contentType: 'Text', content: 'Review' },
+      start: { dateTime: FIXED + 'T10:00:00', timeZone: mailboxIl },
+      end: { dateTime: FIXED + 'T10:30:00', timeZone: mailboxIl },
+      attendees: []
+    }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/events\/EVT-FILE/, reply: () => ({ ok: true, status: 200, json: async () => eventJson('EVT-FILE', {
+      subject: 'deck.pdf',
+      body: { contentType: 'Text', content: 'File: deck.pdf' },
+      start: { dateTime: FIXED + 'T10:00:00', timeZone: mailboxIl },
+      end: { dateTime: FIXED + 'T10:30:00', timeZone: mailboxIl },
+      attendees: []
+    }), text: async () => '' }) }
+  ];
+  const meet = background({ scopes: calScopes, routes: shared });
+  const meetOut = await meet.fn('outlookMeetingWrite')({
+    params: { meeting: true, dateIso: FIXED, hour: 10, minute: 0, title: 'Review', quote: 'Review' }
+  });
+  const meetPost = meet.calls.find((c) => c.method === 'POST' && /\/me\/events$/.test(c.url));
+  check('meeting path: POST 10:00 with Israel Standard Time and Prefer outlook.timezone (not browser NY)',
+    meetOut && meetOut.ok === true &&
+    meetPost && meetPost.body.start.dateTime === FIXED + 'T10:00:00' &&
+    meetPost.body.start.timeZone === mailboxIl &&
+    meetPost.body.start.timeZone !== 'America/New_York' &&
+    meetPost.headers && String(meetPost.headers.Prefer).indexOf(mailboxIl) >= 0,
+    meetPost && { start: meetPost.body.start, prefer: meetPost.headers && meetPost.headers.Prefer });
+  const fileRoutes = shared.map((r) => {
+    if (r.method === 'POST') {
+      return { method: 'POST', test: /\/me\/events$/, reply: (body) => ({ ok: true, status: 201, json: async () => eventJson('EVT-FILE', body), text: async () => '' }) };
+    }
+    return r;
+  });
+  const file = background({ scopes: calScopes, routes: fileRoutes });
+  const fileOut = await file.fn('outlookCalendarWrite')({
+    params: { dateIso: FIXED, hour: 10, minute: 0, fileName: 'deck.pdf', fileUrl: 'https://x/deck.pdf', quote: 'lunch' }
+  });
+  const filePost = file.calls.find((c) => c.method === 'POST' && /\/me\/events$/.test(c.url));
+  check('file-hold path: POST 10:00 with Israel Standard Time and Prefer outlook.timezone',
+    fileOut && fileOut.ok === true &&
+    filePost && filePost.body.start.dateTime === FIXED + 'T10:00:00' &&
+    filePost.body.start.timeZone === mailboxIl &&
+    filePost.headers && String(filePost.headers.Prefer).indexOf(mailboxIl) >= 0,
+    filePost && { start: filePost.body.start, prefer: filePost.headers && filePost.headers.Prefer });
+  const broken = background({
+    scopes: calScopes,
+    routes: [{ method: 'GET', test: /\/me\/mailboxSettings/, reply: () => ({ ok: false, status: 500, json: async () => ({}), text: async () => '' }) }]
+  });
+  const refused = await broken.fn('outlookMeetingWrite')({
+    params: { meeting: true, dateIso: FIXED, hour: 10, minute: 0, title: 'Review' }
+  });
+  check('mailboxSettings 500: nothing posted and write refused',
+    refused && refused.ok === false && broken.calls.filter((c) => c.method === 'POST').length === 0, refused);
+  if (prevTz !== undefined) process.env.TZ = prevTz;
+  else delete process.env.TZ;
+}
+
 console.log('\n--- a Jerusalem hold is one event at local 14:00 ---\n');
 {
   const posted = background({
     scopes: ['Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite', 'Calendars.ReadWrite', 'offline_access'],
-    store: { glanceTimeZone: 'Asia/Jerusalem' },
     routes: [
+      { method: 'GET', test: /\/me\/mailboxSettings/, reply: () => ({ ok: true, status: 200, json: async () => ({ timeZone: 'Asia/Jerusalem' }), text: async () => '' }) },
       { method: 'POST', test: /\/me\/events$/, reply: (body) => ({ ok: true, status: 201, json: async () => Object.assign({ id: 'EVT1', webLink: 'https://outlook.office.com/calendar/item/EVT1' }, body), text: async () => '' }) },
       { method: 'GET', test: /\/me\/events\/EVT1/, reply: () => ({ ok: true, status: 200, json: async () => ({
         id: 'EVT1',

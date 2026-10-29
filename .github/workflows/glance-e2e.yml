@@ -10,8 +10,8 @@ jobs:
   e2e:
     name: e2e (${{ matrix.tz }})
     runs-on: ubuntu-latest
-    # The suite runs about 15 minutes on a hosted runner, so 15 cancelled it mid-run.
-    timeout-minutes: 25
+    # The suite runs about 20–22 minutes per matrix leg; 25m cancelled UTC mid-run (2026-10-26).
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:

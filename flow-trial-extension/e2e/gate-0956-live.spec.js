@@ -68,7 +68,8 @@ test('connected settings show granted scopes and can add one', async ({ glance }
   const todo = popup.locator('[data-glance-service="todo"]');
   await expect(calendar.first()).toBeVisible();
   await expect(calendar.first()).not.toBeChecked();
-  await expect(todo.first()).toBeChecked();
+  await expect(todo.first()).not.toBeChecked();
+  await expect(popup.locator('label[data-glance-granted] [data-glance-service="todo"]').first()).toBeVisible();
   await expect(popup.getByText('שמירת זמן ביומן').first()).toBeVisible();
   await expect(popup.locator('[data-glance-add-scope="1"]')).toBeVisible();
   await expect(popup.locator('#statusPill')).toHaveText('מחובר');

@@ -77,6 +77,32 @@ FlowOutlookConfig.defaultConnectIds = function defaultConnectIds() {
   return ['mail'];
 };
 
+// Connect UI: selection (what the person ticks before sign-in) vs granted
+// (what the token's scp already includes). Never pre-tick optional boxes from
+// stale grants on a new sign-in; after connect, show granted only.
+FlowOutlookConfig.connectServiceUi = function connectServiceUi(svc, ctx) {
+  const granted = Array.isArray(ctx && ctx.granted) ? ctx.granted : [];
+  const tokenStatus = ctx && ctx.tokenStatus ? String(ctx.tokenStatus) : 'missing';
+  const required = Boolean(svc && (svc.required || svc.id === 'mail'));
+  const scopes = (svc && svc.scopes) || [];
+  const has = scopes.length > 0 && scopes.every((sc) => granted.indexOf(sc) >= 0);
+  if (required) return { checked: true, disabled: true, granted: has || true };
+  if (tokenStatus === 'valid' || tokenStatus === 'expired' || tokenStatus === 'missing-scope') {
+    return { checked: false, disabled: false, granted: has };
+  }
+  const checked = svc && svc.defaultOn === true;
+  return { checked: Boolean(checked), disabled: false, granted: has };
+};
+
+FlowOutlookConfig.connectIdsFromChecked = function connectIdsFromChecked(services, isChecked) {
+  const fn = typeof isChecked === 'function' ? isChecked : () => false;
+  return (services || []).filter((svc) => {
+    if (!svc) return false;
+    if (svc.required || svc.id === 'mail') return true;
+    return fn(svc.id) === true;
+  }).map((svc) => svc.id);
+};
+
 // Incremental consent for Hold. The only new scope is Calendars.ReadWrite.
 // Scopes already granted stay on the request so Mail is not dropped.
 // Mail.Send and any Shared scope are never added.

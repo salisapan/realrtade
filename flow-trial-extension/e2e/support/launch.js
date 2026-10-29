@@ -460,7 +460,7 @@ function installE2EHooks() {
         return Promise.resolve(json(200, { value: scenario.conversation || [] }));
       }
       if (path.indexOf('/me/mailboxSettings') >= 0) {
-        return Promise.resolve(json(200, scenario.mailboxSettings || { timeFormat: 'h:mm tt' }));
+        return Promise.resolve(json(200, scenario.mailboxSettings || { timeFormat: 'h:mm tt', timeZone: 'UTC' }));
       }
       if (path.indexOf('/me/messages') >= 0 && (parsed.search.indexOf('$filter=') >= 0 || parsed.search.indexOf('%24filter') >= 0 || parsed.search.indexOf('$skip=') >= 0 || parsed.search.indexOf('$skiptoken') >= 0)) {
         if (scenario.mailboxOverflow) {

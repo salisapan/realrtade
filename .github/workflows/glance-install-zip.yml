@@ -14,5 +14,16 @@ jobs:
           node-version: "20"
       - name: Package the extension and serve it through the download function
         run: python3 scripts/verify_trial_install.py
+<<<<<<< HEAD
       - name: Scope allowlist (fails on forms.body, gmail.modify or any scope off the final list)
         run: node flow-trial-extension/test/scope-allowlist-corpus.cjs
+=======
+      - name: Gmail add-on bundle and corpora
+        run: |
+          node glance-gmail-addon/scripts/check-core-bundle.cjs
+          node glance-gmail-addon/test/v1.test.cjs
+          node glance-gmail-addon/test/card-titles-corpus.cjs
+          node glance-gmail-addon/test/build-stamp.test.cjs
+          node flow-trial-extension/test/name-match-corpus.cjs
+          node flow-trial-extension/test/docs-consistency-corpus.cjs
+>>>>>>> fce113d2
