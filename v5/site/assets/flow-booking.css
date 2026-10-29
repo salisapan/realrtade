@@ -1,0 +1,44 @@
+/* Flow booking flow (front-end mock) — v13r34. Modal on desktop, bottom card on mobile. */
+.fb{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(10,14,24,.38);opacity:0;visibility:hidden;transition:opacity .2s ease,visibility 0s .2s;font-family:'Inter Tight','Heebo',-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+html[lang="he"] .fb{font-family:'Heebo','Inter Tight',-apple-system,system-ui,sans-serif}
+.fb.is-open{opacity:1;visibility:visible;transition-delay:0s}
+.fb-card{position:relative;width:100%;max-width:440px;padding:30px 28px 26px;border-radius:20px;background:var(--card,#fff);color:var(--ink,#1d1d1f);border:1px solid var(--hair,rgba(0,0,0,.08));box-shadow:0 20px 48px -16px rgba(15,22,45,.28);transform:translateY(8px);transition:transform .22s cubic-bezier(.22,1,.36,1)}
+.fb.is-open .fb-card{transform:none}
+.fb-x{position:absolute;top:14px;inset-inline-end:14px;width:30px;height:30px;border-radius:50%;border:0;background:transparent;color:var(--ink2,#6e6e73);cursor:pointer;display:grid;place-items:center}
+.fb-x:hover{background:var(--field,rgba(0,0,0,.05));color:var(--ink,#1d1d1f)}
+.fb-x svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.5;fill:none;stroke-linecap:round}
+.fb-steps{display:flex;gap:6px;margin-bottom:18px}
+.fb-steps i{width:22px;height:3px;border-radius:2px;background:var(--hair,rgba(0,0,0,.1))}
+.fb-steps i.on{background:#2D5EFF}
+.fb h2{margin:0;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.015em;color:var(--ink,#1d1d1f)}
+.fb p.fb-sub{margin:8px 0 0;font-size:14px;line-height:1.5;color:var(--ink2,#6e6e73)}
+.fb form{margin-top:20px;display:flex;flex-direction:column;gap:14px}
+.fb label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink2,#6e6e73)}
+.fb input{height:46px;padding:0 14px;border-radius:12px;border:1px solid var(--hair,rgba(0,0,0,.14));background:var(--bg0,#fff);color:var(--ink,#1d1d1f);font:500 15px/1 inherit;font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s}
+.fb input::placeholder{color:var(--ink3,#86868b);font-weight:400}
+.fb input:focus{border-color:#2D5EFF;box-shadow:0 0 0 3px rgba(45,94,255,.14)}
+.fb input[dir=ltr]{text-align:start}
+.fb-err{min-height:16px;margin:-6px 0 0;font-size:12px;color:#B42318}
+.fb-hint{margin:-4px 0 0;font-size:12px;color:var(--ink3,#86868b)}
+.fb-btn{appearance:none;border:0;cursor:pointer;height:48px;border-radius:999px;background:#2D5EFF;color:#fff;font:600 15px/1 inherit;font-family:inherit;padding:0 22px;transition:background .15s;width:100%}
+.fb-btn:hover{background:#1F46D6}
+.fb-btn:focus-visible,.fb-x:focus-visible,.fb-link:focus-visible{outline:2px solid #2D5EFF;outline-offset:2px}
+.fb-link{appearance:none;border:0;background:none;cursor:pointer;margin-top:12px;font:500 13px/1 inherit;font-family:inherit;color:var(--ink2,#6e6e73);text-decoration:underline;text-underline-offset:3px;align-self:center}
+.fb-sum{margin-top:18px;padding:14px 16px;border-radius:12px;background:var(--field,rgba(0,0,0,.04));display:flex;flex-direction:column;gap:3px}
+.fb-sum b{font-size:15px;font-weight:600}
+.fb-sum span{font-size:13px;color:var(--ink2,#6e6e73);direction:ltr;text-align:start}
+.fb-act{margin-top:18px;display:flex;flex-direction:column}
+@media (max-width:559px){
+  .fb{align-items:flex-end;padding:0}
+  .fb-card{max-width:none;border-radius:20px 20px 0 0;padding:26px 20px calc(22px + env(safe-area-inset-bottom));transform:translateY(24px)}
+}
+@media (prefers-reduced-motion:reduce){.fb,.fb-card{transition:none}}
+
+/* v13r34 · neutral SSO buttons (white, thin border, official marks) + quiet divider */
+.fb-sso{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.fb-oauth{appearance:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:46px;padding:0 16px;border-radius:999px;background:#fff;color:#1f1f1f;border:1px solid #dadce0;font:500 14.5px/1 inherit;font-family:inherit;transition:background .15s,border-color .15s}
+.fb-oauth:hover{background:#f8f9fa;border-color:#c6c9ce}
+.fb-oauth:focus-visible{outline:2px solid #2D5EFF;outline-offset:2px}
+.fb-oauth svg{flex:none}
+.fb-or{display:flex;align-items:center;gap:12px;margin:16px 0 4px;color:var(--ink3,#86868b);font-size:12px}
+.fb-or::before,.fb-or::after{content:"";flex:1;height:1px;background:var(--hair,rgba(0,0,0,.1))}

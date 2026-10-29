@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<base href="../site/">
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-On-Prem.">
+<meta name="theme-color" content="#07090F">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<title>Pricing — Flow (v5 sample)</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Security &amp; Architecture — Flow">
+<meta property="og:description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-On-Prem.">
+<meta property="og:url" content="https://theflow-ai.com/security.html">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Security &amp; Architecture — Flow">
+<meta name="twitter:description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-On-Prem.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat — which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+</style>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';d.dataset.ui=l;var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
+</script>
+<link rel="stylesheet" href="assets/flow-header.css">
+<link rel="stylesheet" href="assets/flow-booking.css">
+<link rel="stylesheet" href="assets/flow-inner.css">
+<link rel="stylesheet" href="assets/flow-rich.css">
+<link rel="stylesheet" href="../samples/hero-samples.css">
+<link rel="stylesheet" href="../samples/v3.css">
+<link rel="stylesheet" href="../samples/v4.css">
+<link rel="stylesheet" href="../samples/v5.css">
+<noscript><style>.rich .rv{opacity:1!important;transform:none!important}.rich .w>span{transform:none!important}.rich .tier{opacity:1!important;transform:none!important}.rich .sf .sw{opacity:1}</style></noscript>
+
+<script>document.documentElement.classList.add("rich")</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="ctl" id="ctl">
+  <div class="lang">
+    <button type="button" id="langBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu" aria-label="Language">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"/></svg>
+      <span class="sr-only" id="langName">English</span>
+    </button>
+    <div class="menu" id="langMenu" role="menu" aria-labelledby="langBtn"></div>
+  </div>
+  <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Night mode">
+    <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"/></svg>
+    <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
+  </button>
+</div>
+<flow-header data-base=""></flow-header>
+<main id="main" class="rc hs hs-pr hs2 v3"><section class="hs-sec"><div class="hs-in"><h1>One subscription.<span class="g">Your whole office.</span></h1><p class="hs-sub">Flow is an annual subscription, tailored to each office.</p><div class="hs2-stage"><div class="hs2-ctl"><div class="hs-segc" role="radiogroup" aria-label="Where Flow runs" data-i="0"><i><span class="doit hs-do" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="cloud">Cloud<small>Default</small></button><button type="button" role="radio" aria-checked="false" data-m="edge">Edge<small></small></button><button type="button" role="radio" aria-checked="false" data-m="onprem">On-Prem<small></small></button></div></div></div><p class="hs-segnote" aria-live="polite"><b>Flow’s dedicated secure cloud.</b> All sensitive data is masked before any processing.</p></div></section><section class="rc-ch v3-intro " data-bg="w"><div class="rc-in n"><p class="rc-lead rv" data-he="Flow ו-Glance הם שני מוצרים נפרדים. Flow מיועד למשרדים עם מידע רגיש. Glance מיועד ליחידים וחינמי.">Flow and Glance are two separate products. Flow is for offices with sensitive data. Glance is for individuals and is free.</p></div></section>
+<section class="rc-ch rc-state" data-bg="g"><div class="rc-in n"><p class="v3-st rv" data-he="מנוי שנתי אחד. בלי תשלום נפרד על פיילוט, הטמעה או שעות."><span class="ln" style="--li:0"><span>One annual subscription.</span></span><span class="ln" style="--li:1"><span>No separate pilot, implementation or hourly fee.</span></span></p></div></section>
+<section class="rc-ch" data-bg="w"><div class="rc-in"><div class="mm-wrap two">
+<div class="head" style="align-content:center"><h2 class="rc-h2 rv" data-he="למשרדים עם מידע רגיש">For offices with sensitive data</h2>
+<p class="rc-lead rv" data-he="Flow הוא מנוי שנתי מותאם לכל משרד, כולל הפלטפורמה ומהנדסי ה-AI.">Flow is an annual subscription tailored to each office, including the platform and the AI engineers.</p>
+</div>
+<div class="mm gl rv sc" data-st="idle"><div class="mh"><i></i><span data-he="בקשת לקוח">Client request</span><em data-he="דוגמה">Sample</em></div><div class="msg"><small data-he="מלקוח · 14:05">From a client · 14:05</small><span data-he="אפשר לשלוח שוב &lt;mark&gt;את החשבונית מהחודש שעבר&lt;/mark&gt;? אני צריך אותה להנהלת החשבונות.">Could you resend <mark>the invoice from last month</mark>? I need it for our books.</span></div><div class="acts"><div class="act"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><div><span data-he="איתור החשבונית">Find the invoice</span><small data-he="זוהתה לפי הלקוח">Matched to the client</small></div></div><div class="act"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><div><span data-he="הכנת התשובה">Prepare the reply</span><small data-he="נכתבת בקול שלך, כטיוטה">Written in your voice, as a draft</small></div></div><div class="act"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><div><span data-he="תיעוד">Record it</span><small data-he="שום דבר לא נשלח בשמך">Nothing is sent in your name</small></div></div></div><div class="foot"><div class="bw"><button type="button" class="doit" aria-label="Do It" data-ga="pricing_moment"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></button><span class="okr"><svg viewBox="0 0 54 54" aria-hidden="true"><circle cx="27" cy="27" r="25"/><path d="M17 28l7 7 13-14"/></svg></span></div><div class="state" aria-live="polite"><span class="sl s-idle" data-he="Flow מקשיבה…">Flow is watching…</span><span class="sl s-not" data-he="<b>Flow זיהתה בקשה.</b>"><b>Flow noticed a request.</b></span><span class="sl s-prep" data-he="<b>מוכן.</b> מחכה לך.">Prepared. <b>Waiting for you.</b></span><span class="sl s-done" data-he="<b>סגור.</b> ביטול בנגיעה אחת.">Closed. <b>Undo is one tap.</b></span></div><button type="button" class="undo" data-he="ביטול">Undo</button></div><div class="tl" data-he="Do It מכין ומתעד. Flow אף פעם לא שולחת בשמך.">Do It prepares and records. Flow never sends in your name.</div></div></div></div></section>
+
+<section class="rc-ch" data-bg="g" data-zone-scope><div class="rc-in"><div class="head">
+<h2 class="rc-h2 rv" data-he="בחרו איך Flow תרוץ <em>במשרד שלכם</em>">Choose how Flow runs <em>in your office</em></h2></div>
+<div class="gts"><div class="gt gl rv" data-m="cloud"><span class="hl"></span><span class="bd" data-he="נבחר">Selected</span><div><h3 data-he="ענן">Cloud</h3></div><p data-he="כל המידע הרגיש ממוסך לפני כל עיבוד.">All sensitive data is masked before any processing.</p><ul class="gl2"><li data-he="הענן המאובטח הייעודי של Flow"><span class="v5-nm v5-nm-w">Flow\'s dedicated secure cloud</span></li><li data-he="ממוסך לפני עיבוד">Masked before it is processed</li></ul></div><div class="gt gl rv" data-m="edge"><span class="hl"></span><span class="bd" data-he="נבחר">Selected</span><div><h3 data-he="Edge">Edge</h3></div><p data-he="המידע נשמר רק במחשב של העובד ולא עוזב אותו.">Data is stored only on the employee's own computer and never leaves it.</p><ul class="gl2"><li data-he="Flow-Edge, במחשב העובד"><span class="v5-nm">Flow-Edge</span>, on the employee's computer</li><li data-he="למחשבים עם חומרה מתאימה">For computers with suitable hardware</li></ul></div><div class="gt gl rv" data-m="onprem"><span class="hl"></span><span class="bd" data-he="נבחר">Selected</span><div><h3 data-he="On-Prem">On-Prem</h3></div><p data-he="שרת ייעודי ברשת הפנימית של המשרד. המידע לא עובר לענן חיצוני.">A dedicated server inside the office's internal network. Data never goes to an external cloud.</p><ul class="gl2"><li data-he="Flow-On-Prem, שרת ייעודי"><span class="v5-nm">Flow-On-Prem</span>, a dedicated server</li><li data-he="בתוך רשת המשרד">Inside the office network</li></ul></div></div></div></section>
+
+<section class="rc-ch" data-bg="w"><div class="rc-in"><div class="om-wrap"><div class="head" style="align-content:center">
+<h2 class="rc-h2 rv" data-he="<em>מכפיל כוח</em> למשרד">A <em>force multiplier</em> for your office</h2>
+<p class="rc-lead rv" data-he="לא רק חיסכון. אותם אנשים סוגרים יותר. בחרו את גודל המשרד וראו כמה יותר הוא יכול לסגור.">Not only savings. The same people close more. Choose your office size and see how much more it can close.</p></div>
+<div class="rc-loss gl rv" style="margin-top:clamp(16px,3vw,24px)"><i></i><span data-he="כל משימה פתוחה היא סיכון — לקוח שלא נענה, מועד שנפסח.">Every open task is a risk — an unanswered client, a missed deadline.</span></div></div>
+<div class="omap rv"><div class="om gl" style="--k:0"><h3 data-he="שותף">Partner</h3><div><span class="kk" data-he="נשאר אצלם">Stays with them</span><p data-he="שיקול דעת, אישור סופי">Judgment, final approval</p></div><div><span class="kk f" data-he="Flow לוקחת">Flow takes</span><div class="tgs"><span class="tg "><span data-he="מרדף אחרי תשובות">Chasing replies</span></span><span class="tg "><span data-he="בדיקת מועדים">Deadline checks</span></span></div></div></div><div class="om gl" style="--k:1"><h3 data-he="עוזר/ת">Assistant</h3><div><span class="kk" data-he="נשאר אצלם">Stays with them</span><p data-he="קשר עם לקוחות">Client relationships</p></div><div><span class="kk f" data-he="Flow לוקחת">Flow takes</span><div class="tgs"><span class="tg "><span data-he="טיוטות מעקב">Drafting follow-ups</span></span><span class="tg "><span data-he="תיוק מסמכים">Filing documents</span></span></div></div></div><div class="om gl" style="--k:2"><h3 data-he="הנהלת חשבונות">Bookkeeping</h3><div><span class="kk" data-he="נשאר אצלם">Stays with them</span><p data-he="בדיקה וחתימה">Review and sign-off</p></div><div><span class="kk f" data-he="Flow לוקחת">Flow takes</span><div class="tgs"><span class="tg "><span data-he="תזכורות למסמכים חסרים">Missing-document reminders</span></span><span class="tg "><span data-he="התאמת רשומות">Matching records</span></span></div></div></div><div class="omf"><span class="fl-i">F</span><div><b>Flow</b><small data-he="סוגרת את הלולאות הפתוחות. אתם לוחצים Do It.">Closes the open loops. You press Do It.</small></div></div></div></div>
+<div class="rc-in" style="margin-top:clamp(40px,7vw,72px)"><div class="cx"><div class="card1 gl rv"><span class="live"><i></i><span data-he="המשרד שלך">Your office</span></span>
+<div class="fld"><div class="fl"><label for="cx-emp" data-he="עובדים">Employees</label><output id="v-emp" for="cx-emp">10</output></div><input id="cx-emp" type="range" min="1" max="200" step="1" value="10"></div><div class="fld"><div class="fl"><label for="cx-proc" data-he="תהליכים לכל עובד">Processes each employee runs</label><output id="v-proc" for="cx-proc">5</output></div><input id="cx-proc" type="range" min="1" max="12" step="1" value="5"></div>
+<div class="as"><h3 data-he="ההנחות — ערכו אותן">Assumptions — edit them</h3><p data-he="אלה הערכות, לא הבטחות. כוונו אותן למשרד שלכם.">These are estimates, not promises. Tune them to your office.</p>
+<div class="fld sm"><div class="fl"><label for="cx-tpw" data-he="משימות לתהליך בשבוע">Tasks per process, per week</label><output id="v-tpw" for="cx-tpw">6</output></div><input id="cx-tpw" type="range" min="1" max="20" step="1" value="6"></div><div class="fld sm"><div class="fl"><label for="cx-min" data-he="דקות שנחסכות למשימה">Minutes freed per closed task</label><output id="v-min" for="cx-min">15</output></div><input id="cx-min" type="range" min="2" max="45" step="1" value="15"></div></div></div>
+<div class="card2 gl rv"><span class="live"><i></i><span data-he="מה Flow מוסיפה">What Flow adds</span></span>
+<div class="big"><span class="n" id="o-tasks">0</span><span class="u" data-he="משימות פתוחות שנסגרות בחודש">open tasks closed per month</span></div>
+<div class="kp"><div><b id="o-hrs">0</b><span data-he="שעות פנויות בחודש">hours freed per month</span></div><div><b id="o-per">0</b><span data-he="שעות לעובד בחודש">hours per employee</span></div><div><b id="o-ppl">0</b><span data-he="משרות מלאות של קיבולת נוספת">full-time people of extra capacity</span></div><div><b id="o-mult">×1</b><span data-he="קיבולת המשרד">office capacity</span></div></div>
+<div class="cap2"><div class="r"><span data-he="היום">Today</span><div class="tr t0"><i></i></div></div><div class="r"><span data-he="עם Flow">With Flow</span><div class="tr t1"><i></i><i class="base"></i><span class="mx" id="o-mx">×1</span></div></div></div>
+<div class="est"><b data-he="הערכה">Estimate</b><span data-he="החישוב מבוסס על ההנחות שלכם. הוא לא מבטיח תוצאה.">Based on your own assumptions. It does not promise an outcome.</span></div>
+<div class="dpl"><span data-he="אופן הפעלה:">Runs as:</span><b class="nm"></b><span class="pill" data-he="ברירת מחדל">Default</span></div>
+
+</div></div></div></div></section>
+
+<section class="rc-ch" data-bg="g"><div class="rc-in"><div class="head"><h2 class="rc-h2 rv" data-he="משימות פתוחות, <em>נסגרות</em>">Open tasks, <span class="v4-gw">closing</span></h2></div></div>
+<div class="rc-in"><div class="rc-story" data-n="4" data-s="0" data-kind="board"><div class="pin"><div class="stg gl gl-b"><div class="bdg"><div class="bh"><b data-he="משימות פתוחות · לדוגמה">Open loops · sample</b><span>6</span></div>
+<div class="grid"><div class="ch"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><span data-he="תשובה ללקוח">Client reply</span></div><div class="ch"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><span data-he="העתק חשבונית">Invoice copy</span></div><div class="ch"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><span data-he="סיכום פגישה">Meeting follow-up</span></div><div class="ch"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><span data-he="עדכון חוזה">Contract update</span></div><div class="ch"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><span data-he="תזכורת">Reminder</span></div><div class="ch"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><span data-he="דוח סטטוס">Status report</span></div></div><div class="bf"><div class="bt"><i></i></div><div class="bn"></div></div></div></div>
+<div class="cw"><div class="caps"><div class="cap"><span class="k">1</span><h3 data-he="משימות פתוחות מצטברות.">Open loops pile up.</h3><p data-he="כל משימה פתוחה היא סיכון: לקוח שלא נענה, מועד שנפסח.">Every open task is a risk: an unanswered client, a missed deadline.</p></div><div class="cap"><span class="k">2</span><h3 data-he="Flow מכינה אותן.">Flow prepares them.</h3><p data-he="כל אחת מוכנה לבדיקה שלך.">Each one is ready for you to review.</p></div><div class="cap"><span class="k">3</span><h3 data-he="אתם לוחצים Do It.">You press Do It.</h3><p data-he="נגיעה אחת סוגרת משימה אחת. תמיד אפשר לבטל.">One tap closes one task. Undo is always there.</p></div><div class="cap"><span class="k">4</span><h3 data-he="סגור.">Closed.</h3><p data-he="אותם אנשים, עם הזמן בחזרה.">The same people, with their time back.</p></div></div><div class="bar"><i></i></div></div></div></div></div></section>
+
+<section class="rc-ch v4-ch v4-cta" data-bg="w"><div class="rc-in"><div class="rc-cta"><div class="gl rv sc"><h2 class="rc-h2" data-he="מוכנים לדבר על Flow?">Ready to talk about Flow?</h2>
+<p class="rc-p" data-he="קבעו שיחה ונתאים אותה למשרד שלכם.">Book a call and we will scope it for your office.</p>
+<span class="magnetic"><a class="doit" href="https://calendar.app.google/96Z1x4KntqhnXHCt5" data-ga="pricing_flow_call" data-cta-label="book" target="_blank" rel="noopener"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Book a call</span></a></span>
+<p class="rc-sm" data-he="או כתבו אל <a href=&quot;mailto:info@theflow-ai.com&quot;>info@theflow-ai.com</a>">Or write to <a href="mailto:info@theflow-ai.com">info@theflow-ai.com</a></p></div></div></div></section>
+
+<section class="rc-ch v4-glance" data-bg="g"><div class="rc-in"><div class="rc-prod rv"><h2 class="rc-h2" data-he="לא עוזר. סוגר.">Not an assistant. <span class="v4-gw">A closer.</span></h2>
+<p class="rc-p" data-he="Glance חינמי, בלי כרטיס אשראי.">Glance is free, with no credit card.</p>
+<span class="magnetic"><a class="doit" href="/trial.html" data-ga="pricing_free"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-he="קבלו את Glance">Get Glance</span></a></span></div></div></section>
+</main>
+<footer class="site-foot" id="footer" lang="en" dir="ltr">
+  <div class="foot-in">
+    <div class="foot-cols">
+      <div class="foot-col foot-brand">
+        <img loading="lazy" src="assets/flow-logo-200.webp" alt="Flow" width="64" height="28">
+        <a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+      </div>
+      <nav class="foot-col" aria-label="Product">
+        <h3 data-k="ft.hFlow">Product</h3>
+        <a href="./trial.html" data-k="ft.glance">Glance</a>
+        <a href="./#product" data-k="ft.flow">Flow</a>
+        <a href="./security.html" data-k="ft.sec">Security</a>
+        <a href="./pricing.html" data-k="ft.pricing">Pricing</a>
+        <a href="./solutions/" data-k="ft.solutions">Solutions</a>
+      </nav>
+      <nav class="foot-col" aria-label="Company">
+        <h3 data-k="ft.hCo">Company</h3>
+        <a href="./about.html" data-k="ft.about">About</a>
+        <a href="./blog/" data-k="ft.blog">Insights</a>
+        <a href="./contact.html" data-k="ft.contact">Contact</a>
+      </nav>
+    </div>
+    <div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav class="foot-legal" aria-label="Legal"><a href="./privacy.html" data-k="ft.privacy">Privacy</a><a href="./terms.html" data-k="ft.terms">Terms</a></nav></div>
+  </div>
+</footer>
+<script src="assets/flow-header.js"></script>
+<script src="assets/flow-inner.js"></script>
+<script src="../samples/vendor/lenis.min.js"></script>
+<script src="../samples/flow-rich-v5.js"></script>
+<script src="../samples/hero-samples-v5.js"></script>
+<script src="../samples/v3.js"></script>
+<script src="../samples/v4.js"></script>
+<script src="../samples/v5.js"></script>
+</body></html>

@@ -1,0 +1,55 @@
+/* Flow shared header (reusable) — v13r34
+   Usage on any page:
+     <link rel="stylesheet" href="/assets/flow-header.css">
+     <flow-header data-brand="auto"></flow-header>
+     <script src="/assets/flow-header.js"></script>
+   Uses page tokens when present (--bg0 --ink --ink2 --ink3 --hair --card --accent) with safe fallbacks.
+   Primary CTA is always Flow blue #2D5EFF. Opens the booking flow (assets/flow-booking.js) via [data-book]. */
+flow-header{display:block;height:0}
+.fh{--fh-h:56px;--fh-bg:var(--bg0,#fff);--fh-ink:var(--ink,#1d1d1f);--fh-ink2:var(--ink2,#6e6e73);--fh-hair:var(--hair,rgba(0,0,0,.08));
+  position:fixed;inset:0 0 auto 0;z-index:80;height:var(--fh-h);font-family:'Inter Tight','Heebo',-apple-system,system-ui,sans-serif;color:var(--fh-ink);-webkit-font-smoothing:antialiased}
+html[lang="he"] .fh{font-family:'Heebo','Inter Tight',-apple-system,system-ui,sans-serif}
+.fh::before{content:"";position:absolute;inset:0;background:color-mix(in srgb,var(--fh-bg) 82%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);border-bottom:1px solid transparent;opacity:0;transition:opacity .25s ease;pointer-events:none}
+.fh.is-scrolled::before,.fh.is-open::before{opacity:1;border-bottom-color:var(--fh-hair)}
+.fh-in{position:relative;z-index:1;height:100%;max-width:1200px;margin:0 auto;padding:0 24px;display:flex;align-items:center;gap:28px}
+.fh-brand{display:flex;align-items:center;flex:none;height:32px;transition:opacity .25s ease}
+.fh-brand img{height:28px;width:auto;display:block}
+.fh[data-brand-auto="1"]:not(.is-scrolled):not(.is-open) .fh-brand{opacity:0;pointer-events:none}
+.fh-links{display:flex;align-items:center;gap:22px;margin-inline-start:4px}
+.fh-links a{font-size:13.5px;font-weight:500;color:var(--fh-ink2);text-decoration:none;white-space:nowrap;padding:6px 0;transition:color .15s}
+.fh-links a:hover,.fh-links a:focus-visible{color:var(--fh-ink);outline:none}
+.fh-end{margin-inline-start:auto;display:flex;align-items:center;gap:10px}
+.fh-end .ctl{position:static!important;inset:auto!important;z-index:auto}
+.fh-end .ctl .menu{right:auto;left:0}
+.fh-menu{appearance:none;width:32px;height:32px;border-radius:999px;border:.5px solid var(--ctl-line,rgba(0,0,0,.12));background:var(--ctl-bg,rgba(255,255,255,.72));color:var(--fh-ink2);display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;transition:border-color .15s,color .15s}
+.fh-menu:hover{border-color:var(--ink3,#86868b);color:var(--fh-ink)}
+.fh-menu svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.4;fill:none;stroke-linecap:round}
+.fh-menu .x{display:none}.fh.is-open .fh-menu .x{display:block}.fh.is-open .fh-menu .b{display:none}
+.fh-cta{appearance:none;border:0;cursor:pointer;height:34px;padding:0 16px;border-radius:999px;background:#2D5EFF;color:#fff;font:600 13.5px/1 inherit;font-family:inherit;white-space:nowrap;transition:background .15s}
+.fh-cta:hover{background:#1F46D6}
+.fh-cta:focus-visible,.fh-menu:focus-visible,.fh-panel a:focus-visible{outline:2px solid #2D5EFF;outline-offset:2px}
+.fh-panel{position:absolute;top:calc(var(--fh-h) - 6px);inset-inline-end:max(24px,calc((100vw - 1200px)/2 + 24px));width:260px;padding:8px;border-radius:16px;background:var(--card,#fff);border:1px solid var(--fh-hair);box-shadow:0 12px 32px -12px rgba(15,22,45,.18);opacity:0;transform:translateY(-4px);pointer-events:none;visibility:hidden;transition:opacity .18s ease,transform .18s ease,visibility 0s .18s;z-index:2}
+.fh.is-open .fh-panel{opacity:1;transform:none;pointer-events:auto;visibility:visible;transition-delay:0s}
+.fh-panel nav{display:flex;flex-direction:column}
+.fh-panel a{display:block;padding:9px 12px;border-radius:9px;font-size:14px;font-weight:500;color:var(--fh-ink);text-decoration:none}
+.fh-panel a:hover{background:var(--field,rgba(0,0,0,.05))}
+.fh-panel .sep{height:1px;margin:6px 8px;background:var(--fh-hair)}
+.fh-panel .fh-cta-m{display:none}
+@media (max-width:979px){.fh-links{display:none}}
+@media (max-width:759px){
+  .fh{--fh-h:52px}
+  .fh-in{padding:0 14px;gap:10px}
+  .fh-brand img{height:24px}
+  .fh-end{gap:7px}
+  .fh-cta{height:32px;padding:0 13px;font-size:13px}
+  .fh-panel{position:fixed;inset:0;width:auto;padding:calc(var(--fh-h) + 18px) 28px 28px;border:0;border-radius:0;box-shadow:none;background:var(--fh-bg);transform:none;overflow-y:auto;transition:opacity .2s ease,visibility 0s .2s}
+  .fh-panel nav{max-width:520px;margin:0 auto}
+  .fh-panel a{padding:11px 2px;border-radius:0;font-size:22px;font-weight:500;letter-spacing:-.01em;border-bottom:1px solid var(--fh-hair)}
+  .fh-panel a:hover{background:none}
+  .fh-panel .sep{display:none}
+  .fh-in{z-index:3}
+  .fh-panel{z-index:1}
+  .fh-panel .fh-cta-m{display:block;margin:22px auto 0;flex:none;max-width:520px;width:100%;height:50px;font-size:16px}
+  .fh-cta-d{display:none}
+}
+@media (prefers-reduced-motion:reduce){.fh *,.fh::before{transition:none!important}}

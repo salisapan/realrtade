@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<base href="../site/">
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-On-Prem.">
+<meta name="theme-color" content="#07090F">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<title>AI automation for law firms — Flow (v5 sample)</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Security &amp; Architecture — Flow">
+<meta property="og:description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-On-Prem.">
+<meta property="og:url" content="https://theflow-ai.com/security.html">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Security &amp; Architecture — Flow">
+<meta name="twitter:description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-On-Prem.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat — which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+</style>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';d.dataset.ui=l;var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
+</script>
+<link rel="stylesheet" href="assets/flow-header.css">
+<link rel="stylesheet" href="assets/flow-booking.css">
+<link rel="stylesheet" href="assets/flow-inner.css">
+<link rel="stylesheet" href="assets/flow-rich.css">
+<link rel="stylesheet" href="../samples/hero-samples.css">
+<link rel="stylesheet" href="../samples/v3.css">
+<link rel="stylesheet" href="../samples/v4.css">
+<link rel="stylesheet" href="../samples/v5.css">
+<noscript><style>.rich .rv{opacity:1!important;transform:none!important}.rich .w>span{transform:none!important}.rich .tier{opacity:1!important;transform:none!important}.rich .sf .sw{opacity:1}</style></noscript>
+
+<script>document.documentElement.classList.add("rich")</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="ctl" id="ctl">
+  <div class="lang">
+    <button type="button" id="langBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu" aria-label="Language">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"/></svg>
+      <span class="sr-only" id="langName">English</span>
+    </button>
+    <div class="menu" id="langMenu" role="menu" aria-labelledby="langBtn"></div>
+  </div>
+  <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Night mode">
+    <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"/></svg>
+    <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
+  </button>
+</div>
+<flow-header data-base=""></flow-header>
+<main id="main" class="rc hs v3"><section class="hs-sec hs-c7 hs-lg"><div class="hs-in"><h1 data-he="אוטומציית AI <span class=&quot;g&quot;>למשרדי עורכי דין.</span>">AI automation <span class="g">for law firms.</span></h1><p class="hs-sub" data-he="לחומר מוגן חסיון יש פרופיל סיכון שונה מ״מידע רגיש״. להעלות אותו לענן של מישהו אחר, או להדביק אותו בחלון צ׳אט, זה כשל שמשרד חייב להיות מסוגל לסרב לו.">Privileged material has a different risk profile than “sensitive data.” Putting that material in someone else’s cloud, or pasting it into a chat window, is the failure mode a firm has to be able to refuse.</p></div>
+<div class="hs-tile hs-c6 hs-lgt"><div class="lgm" role="img" aria-label="Sample client matter: document arrived, update prepared, approval by a lawyer. Nothing written until approved.">
+<div class="lgm-h"><b>Client matter</b><small>Sample</small></div>
+<div class="lgm-r"><span><em>Document</em><b>Arrived</b></span><span><em>Update</em><b>Prepared</b></span><span><em>Approval</em><b>Lawyer</b></span></div>
+<div class="lgm-f"><span class="doit hs-do" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span><span>Nothing written until approved</span></div></div>
+<ul class="hs-spec n3"><li>A lawyer approves</li><li>A record you can defend</li><li>Your firm’s chosen setup</li></ul></div></section><section class="rc-ch" data-bg="g"><div class="rc-in"><div class="head"><h2 class="rc-h2 rv" data-he="לקוח כותב. <em>Flow כבר יודעת מה פתוח.</em>">A client writes. <em>Flow already knows what&rsquo;s open.</em></h2><p class="rc-lead rv" data-he="כל מייל חדש נקרא כדי למצוא את הלולאה שהוא פותח: שאלה, מועד, מסמך חסר. אתם מחליטים. שום דבר לא יוצא בלעדיכם.">Every new email is read for the loop it opens: a question, a deadline, a missing document. You decide. Nothing leaves without you.</p></div><div class="ibx" data-st="idle" data-th=".3"><div class="mail gl rv"><div class="mhd"><b style="font:inherit" data-he="תיבת דואר">Inbox</b><span><i></i><span data-he="חי">Live</span></span></div>
+<div class="rw nw"><span class="av">C</span><div><b data-he="לקוח · בנוגע לתוספת">Client · Re: the amendment</b><p data-he="אפשר לאשר את תקופת ההודעה לפני יום חמישי?">Can you confirm the notice period before Thursday?</p>
+<div class="tgw"><div class="tgs"><span class="tg "><i></i><span data-he="שאלה">Question</span></span><span class="tg "><i></i><span data-he="מועד · יום חמישי">Deadline · Thursday</span></span><span class="tg "><i></i><span data-he="לולאה פתוחה">Open loop</span></span></div></div></div><time>09:12</time></div>
+<div class="rw"><span class="av">O</span><div><b data-he="הצד שמנגד">Opposing counsel</b><p data-he="הנוסח החתום מצורף.">The signed version is attached.</p></div><time>08:40</time></div>
+<div class="rw"><span class="av">K</span><div><b data-he="מזכירות בית המשפט">Court clerk</b><p data-he="מועד הדיון אושר.">Hearing date confirmed.</p></div><time data-he="אתמול">Yesterday</time></div></div>
+<div class="pnl gl rv"><div class="steps"><span><i>1</i><span data-he="מגיע">Arrives</span></span><span><i>2</i><span data-he="Flow מסמנת">Flow marks it</span></span><span><i>3</i><span data-he="אתם מחליטים">You decide</span></span></div>
+<div class="pre"><div class="bw"><button type="button" class="doit" aria-label="Do It" data-ga="legal_inbox"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></button><span class="okr"><svg viewBox="0 0 54 54" aria-hidden="true"><circle cx="27" cy="27" r="25"/><path d="M17 28l7 7 13-14"/></svg></span></div>
+<span class="tx" aria-live="polite"><span class="sl s-idle" data-he="Flow מקשיבה…">Flow is watching…</span><span class="sl s-not" data-he="<b>Flow זיהתה שאלה ומועד.</b>"><b>Flow noticed a question and a deadline.</b></span><span class="sl s-prep" data-he="<b>מוכן.</b> מחכה לך.">Prepared. <b>Waiting for you.</b></span><span class="sl s-done" data-he="<b>סגור.</b> ביטול בנגיעה אחת."><b>Closed.</b> Undo is one tap away.</span></span></div>
+<div class="rdy"><div><div class="bx"><div class="t"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></i><span data-he="התשובה מוכנה">Reply ready</span></div>
+<div class="dr" data-he="שלום, קיבלתי את ההודעה. אחזור אליך בנושא תקופת ההודעה לפני יום חמישי.">Hi, got your message. I will come back to you on the notice period before Thursday.</div>
+<p data-he="טיוטה מחכה בטיוטות שלך. <b>שום דבר לא נשלח</b> עד שתשלחו.">A draft is waiting in your Drafts. <b>Nothing is sent</b> until you send it.</p>
+<div class="ac"><button type="button" class="undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7L4.5 11.5 9 16M5 11.5h9a5.5 5.5 0 0 1 0 11"/></svg><span data-he="ביטול">Undo</span></button></div></div></div></div></div></div>
+<p class="rc-sm rv" style="margin-top:14px" data-he="תוכן לדוגמה, לצורך עיצוב בלבד.">Sample content, for layout only.</p></div></section><section class="rc-ch rc-state" data-bg="w"><div class="rc-in n"><p class="v3-st rv" data-he="שום דבר לא נכתב עד שעורך דין מאשר."><span class="ln" style="--li:0"><span>Nothing is written until a lawyer <span class="v4-gw">approves it.</span></span></span></p></div></section><section class="rc-ch v4-ch " data-bg="g"><div class="rc-in v4-in"><h2 class="rc-h2 rv"  data-he="האילוץ">The constraint</h2><p class="v4-lead  rv">Firms and in-house teams face a specific version of the problem: the duty of confidentiality and the duty of technology competence point in opposite directions when the only available tooling requires uploading client material to a third party.</p><div class="v4-tiles two"><div class="tile gl v4-t  rv"><h3 class="v4-th">Add the defensibility standard in e-discovery, and &quot;the model produced this&quot; is not a process you can put in front of a court.</h3></div><div class="tile gl v4-t  rv"><p class="v4-tp v4-loss">Every open task on a matter is a risk — an unanswered client, a missed deadline.</p></div></div></div></section><section class="rc-ch v4-ch v4-b" data-bg="w"><div class="rc-in v4-in"><h2 class="rc-h2 rv"  data-he="ChatGPT ו-Copilot הם לא תהליך עבודה לתיק">ChatGPT and Copilot are not a matter workflow</h2><p class="v4-lead  rv">ChatGPT and Microsoft Copilot help people draft and research in a separate window.</p><div class="v4-tiles two"><div class="tile gl v4-t  rv"><p class="v4-tp">A lawyer pastes confidential text into a chat to get a draft; the chain of custody of that text is unclear, and a later write back into the document system, the file, or the mail goes out with no approval on the write itself.</p></div><div class="tile gl v4-t  rv"><h3 class="v4-th">The chat was useful. It was not a controlled close.</h3></div></div></div></section><section class="rc-ch v4-ch v4-cont" data-bg="g"><div class="rc-in v4-in"><p class="v4-lead v4-lead-m rv">Whether Copilot is safer than a consumer ChatGPT account depends on the tenant controls and on the firm's own policy. Neither is a blank check to paste matter content.</p><div class="v4-tiles one"><div class="tile gl v4-t  rv"><h3 class="v4-th">The alternative is to watch the work in the systems the firm already uses, show the proposed write, and execute only after a lawyer approves it, in the deployment setup the firm's policy calls for.</h3></div></div></div></section><section class="rc-ch" data-bg="w"><div class="rc-in"><div class="head"><h2 class="rc-h2 rv" data-he="איך Flow <em>עונה על זה</em>">How Flow <em>addresses it</em></h2></div></div>
+<div class="rc-in"><div class="rc-story" data-n="4" data-s="0" data-kind="fields"><div class="pin"><div class="stg gl gl-b"><div class="dfs">
+<div class="dd"><div class="dt"><b>Signed amendment.pdf</b><small data-he="מסמך לדוגמה">Sample document</small></div>
+<div class="sk" style="width:92%"></div><div class="hln"><i style="width:28%"></i><i class="h" style="width:34%"></i><i style="width:22%"></i></div>
+<div class="sk" style="width:76%"></div><div class="hln"><i class="h" style="width:26%"></i><i style="width:36%"></i><i class="h" style="width:22%"></i></div></div>
+<div class="fg"><div class="fc"><span class="tg" data-he="צד">Party</span><small data-he="צדדים">Parties</small><b data-he="לקוח · משרד">Client · Firm</b><span class="ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></span></div><div class="fc"><span class="tg" data-he="תאריך">Date</span><small data-he="תאריך תחולה">Effective date</small><b data-he="1 במרץ">1 March</b><span class="ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></span></div><div class="fc"><span class="tg" data-he="תקופה">Term</span><small data-he="תקופת הודעה">Notice period</small><b data-he="60 יום">60 days</b><span class="ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></span></div><div class="fc"><span class="tg" data-he="סכום">Amount</span><small data-he="שכר טרחה">Fee</small><b data-he="חודשי">Monthly</b><span class="ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></span></div></div><div class="gr ga"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8l7-2 7 2M5 8l-2.5 6a3 3 0 0 0 5 0zM19 8l-2.5 6a3 3 0 0 0 5 0z"/></svg></i><div><b data-he="אישור עורך דין">Lawyer approval</b><small data-he="נדרש לפני כל כתיבה">Required before any write</small></div><em data-he="אושר">Approved</em></div><div class="gr gb2"><i><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg></i><div><b data-he="רשומת ביקורת">Audit record</b><small data-he="נבדק · הוצע · אושר · בוצע">Reviewed · proposed · approved · executed</small></div><em data-he="נרשם">Recorded</em></div></div></div>
+<div class="cw"><div class="caps"><div class="cap"><span class="k">1</span><h3 data-he="מסמך מגיע.">A document lands.</h3><p data-he="הוא מגיע למערכות שהמשרד כבר עובד איתן.">It arrives in the systems the firm already uses.</p></div><div class="cap"><span class="k">2</span><h3 data-he="Flow מכינה את העדכון.">Flow prepares the update.</h3><p data-he="התיק, ההצהרה או המייל הבא, מוכנים לבדיקה.">The file, the statement, or the next mail, ready for review.</p></div><div class="cap"><span class="k">3</span><h3 data-he="עורך דין מאשר.">A lawyer approves.</h3><p data-he="שום דבר לא נכתב עד שאדם מאשר.">Nothing is written until a person approves it.</p></div><div class="cap"><span class="k">4</span><h3 data-he="תיעוד שאפשר להגן עליו.">A record you can defend.</h3><p data-he="מה נבדק, הוצע, אושר ובוצע.">What was reviewed, proposed, approved and executed.</p></div></div><div class="bar"><i></i></div></div></div></div>
+<ul class="bl eo" style="margin-top:clamp(24px,5vw,48px)"><li><b>Human approval gates.</b> Flow prepares the update and a lawyer approves it. Judgment calls surface for a lawyer rather than executing silently.</li><li><b>Deterministic execution.</b> Workflow steps run under a strict runtime rather than free-form model output.</li><li><b>A record you can defend.</b> What was reviewed, what was proposed, who approved it and what was executed. The scope of the audit log is set with your security team in the engagement, so the process can be reconstructed when it is challenged.</li><li><b>Does not replace your document system.</b> Flow works across the systems the firm already uses, after a person approves the write. It does not become the system of record.</li></ul></div></section><section class="rc-ch" data-bg="g"><div class="rc-in"><div class="mm-wrap two">
+<div class="head" style="align-content:center"><h2 class="rc-h2 rv" data-he="יומן <em>שמתמלא לבד</em>">A calendar that <em>fills itself</em></h2>
+<p class="rc-lead rv" data-he="מועדים שמסתתרים במיילים פתוחים הופכים להצעות ביומן. אתם מחליטים מה נשאר.">Deadlines hiding in open emails become proposed entries. You decide what stays.</p></div>
+<div class="cal gl rv"><div class="ct"><b data-he="השבוע">This week</b><span data-he="הוצע ממיילים פתוחים">Proposed from open emails</span></div>
+<div class="dh"><span></span><span data-he="א׳">Sun</span><span data-he="ב׳">Mon</span><span data-he="ג׳">Tue</span><span data-he="ד׳">Wed</span><span data-he="ה׳">Thu</span></div>
+<div class="gr"><div class="hs"><span style="top:0">9</span><span style="top:25%">11</span><span style="top:50%">13</span><span style="top:75%">15</span><span style="top:100%">17</span></div><div class="bd"><div class="ev" style="--d:0;--t:1;--h:1.5;--dl:0"><span data-he="ישיבת צוות">Team meeting</span><small data-he="קיים">Existing</small></div><div class="ev" style="--d:2;--t:0.5;--h:1.5;--dl:0"><span data-he="שיחה עם לקוח">Client call</span><small data-he="קיים">Existing</small></div><div class="ev" style="--d:4;--t:4;--h:1.5;--dl:0"><span data-he="הכנה לדיון">Hearing prep</span><small data-he="קיים">Existing</small></div><div class="ev p" style="--d:1;--t:1.5;--h:1.5;--dl:0"><span data-he="מועד תשובה">Reply due</span><small data-he="שאלת לקוח">Client question</small></div><div class="ev p" style="--d:2;--t:5;--h:2;--dl:1"><span data-he="שליחת נוסח מתוקן">Send revised version</span><small data-he="טיוטת הסכם">Agreement draft</small></div><div class="ev p" style="--d:3;--t:4;--h:1.5;--dl:2"><span data-he="מועד תשלום">Payment due</span><small data-he="מעקב חשבונית">Invoice follow-up</small></div><div class="ev p" style="--d:4;--t:1;--h:1.5;--dl:3"><span data-he="חתימה חסרה">Missing signature</span><small data-he="ממתינים ללקוח">Waiting on the client</small></div></div></div>
+<div class="cf"><span class="s1" data-he="4 מועדים הוצעו ממיילים פתוחים.">4 deadlines proposed from open emails.</span><span class="s2" data-he="ההצעות הוסרו.">Proposals removed.</span><button type="button" class="undo" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7L4.5 11.5 9 16M5 11.5h9a5.5 5.5 0 0 1 0 11"/></svg><span class="u1" data-he="ביטול">Undo</span><span class="u2" data-he="להוסיף שוב">Add again</span></button></div></div></div>
+</div></section><section class="rc-ch v4-ch " data-bg="w"><div class="rc-in v4-in"><h2 class="rc-h2 rv"  data-he="איפה העבודה רצה: <em>המשרד בוחר</em>">Where the work runs: <em>your firm chooses</em></h2><div class="hs2 v4-sw rv"><div class="hs-segc" role="radiogroup" aria-label="Where the work runs" data-i="0"><i><span class="doit hs-do" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="cloud">Cloud<small>Default</small></button><button type="button" role="radio" aria-checked="false" data-m="edge">Edge<small></small></button><button type="button" role="radio" aria-checked="false" data-m="onprem">On-Prem<small></small></button></div><p class="hs-segnote" aria-live="polite"><b>Flow&rsquo;s dedicated secure cloud.</b> All sensitive data is masked before any processing.</p></div><p class="v4-rel rv v4-swfoot">The policy decides which of the three fits a given matter. <a href="/solutions/deployment.html">The deployment page</a> describes each setup.</p></div></section><section class="rc-ch v4-ch " data-bg="g"><div class="rc-in v4-in"><h2 class="rc-h2 rv"  data-he="שותפות עיצוב, <em>לא הורדה</em>">A design partnership, <em>not a download</em></h2><p class="v4-lead  rv">Flow's legal and real-estate work in Israel is a design partnership with the practice lead who feels the friction, not a CIO-first rollout and not a self-serve install.</p><p class="v4-sub rv">A document lands, the file, the statement, or the next mail is prepared, and nothing is written until a person approves it. <a href="/blog/human-in-the-loop-ai-agents.html">What that approval has to show</a>.</p></div></section><section class="rc-ch v4-ch v4-b" data-bg="w"><div class="rc-in v4-in"><h2 class="rc-h2 rv v4-h2s"  data-he="מחקר על פריסה משפטית">Research on legal deployment</h2><ul class="readlist v4-read eo rv"><li><a href="/blog/legal-ai-workflow-automation.html">Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility</a></li>
+<li><a href="/blog/ediscovery-tar-generative-ai.html">Technology-Assisted Review Meets Generative AI: Defensibility in e-Discovery Automation</a></li>
+<li><a href="/blog/title-escrow-ai-wire-fraud.html">AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard</a></li>
+<li><a href="/blog/auditability-by-design-ai-systems.html">Auditability by Design: Logging, Provenance, and Human Oversight</a></li>
+<li><a href="/blog/prompt-injection-ai-threat-modeling.html">Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation</a></li></ul></div></section><section class="rc-ch" data-bg="g"><div class="rc-in"><div class="head"><h2 class="rc-h2 rv" data-he="בכל יום, <em>עוד כמה לולאות נסגרות</em>">Every day, a few more loops <span class="v4-gw">closed</span></h2></div><div class="cls gl rv"><div class="gh"><b data-he="היום">Today</b><span data-he="נסגר על ידיכם עם Do It">Closed by you with Do It</span></div><div class="cr" style="--k:0"><span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></span><div><b data-he="תשובה לשאלת הלקוח">Reply to the client question</b><small data-he="טיוטה שאושרה על ידיכם">Draft approved by you</small></div><span class="st"><span class="a" data-he="נסגר…">Closing…</span><span class="b" data-he="נסגר">Closed</span></span></div><div class="cr" style="--k:1"><span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></span><div><b data-he="מועד הודעת חידוש">Renewal notice date</b><small data-he="נוסף ליומן">Added to the calendar</small></div><span class="st"><span class="a" data-he="נסגר…">Closing…</span><span class="b" data-he="נסגר">Closed</span></span></div><div class="cr pend" style="--k:2"><span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></span><div><b data-he="חתימה חסרה">Missing signature</b><small data-he="תזכורת הוכנה עבורכם">Reminder prepared for you</small></div><span class="st"><span class="a" data-he="נסגר…">Closing…</span><span class="b" data-he="נסגר">Closed</span></span></div><div class="gh e"><b data-he="אתמול">Yesterday</b><span></span></div><div class="cr" style="--k:3"><span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></span><div><b data-he="בקשת מסמך">Document request</b><small data-he="התקבל ותויק בתיק">Received and filed to the matter</small></div><span class="st"><span class="a" data-he="נסגר…">Closing…</span><span class="b" data-he="נסגר">Closed</span></span></div><div class="cr" style="--k:4"><span class="ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4 4 9-9.5"/></svg></span><div><b data-he="שאלה על תנאי תשלום">Payment terms question</b><small data-he="נענתה">Answered</small></div><span class="st"><span class="a" data-he="נסגר…">Closing…</span><span class="b" data-he="נסגר">Closed</span></span></div></div>
+<p class="rc-sm rv" style="margin-top:14px" data-he="תוכן לדוגמה, לצורך עיצוב בלבד.">Sample content, for layout only.</p>
+</div></section><section class="rc-ch v4-ch v4-cta" data-bg="w"><div class="rc-in">
+<div class="rc-cta"><div class="gl rv sc"><h2 class="rc-h2" data-he="אוטומציה ששורדת ערעור על הגנה">Automation that survives a defensibility challenge</h2>
+<p class="rc-p" data-he="הטופס בעמוד הבית מבקש מייל עבודה וחוזר עם תוכנית פריסה.">The homepage form asks for a work email and comes back with a deployment plan.</p>
+<a class="doit" href="/#book" data-book data-ga="sol_legal_waitlist"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-he="קבלו תוכנית פריסה">Get a deployment plan</span></a>
+<p class="rc-sm" data-he="מעדיפים לדבר? <a href=&quot;/contact.html&quot;>צרו קשר</a> או <a href=&quot;/solutions/deployment.html&quot;>ראו את שלוש אפשרויות הפריסה</a>.">Prefer to talk it through? <a href="/contact.html">Contact us</a> or <a href="/solutions/deployment.html">see the three deployment setups</a>.</p></div></div>
+</div></section>
+</main>
+<footer class="site-foot" id="footer" lang="en" dir="ltr">
+  <div class="foot-in">
+    <div class="foot-cols">
+      <div class="foot-col foot-brand">
+        <img loading="lazy" src="assets/flow-logo-200.webp" alt="Flow" width="64" height="28">
+        <a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+      </div>
+      <nav class="foot-col" aria-label="Product">
+        <h3 data-k="ft.hFlow">Product</h3>
+        <a href="./trial.html" data-k="ft.glance">Glance</a>
+        <a href="./#product" data-k="ft.flow">Flow</a>
+        <a href="./security.html" data-k="ft.sec">Security</a>
+        <a href="./pricing.html" data-k="ft.pricing">Pricing</a>
+        <a href="./solutions/" data-k="ft.solutions">Solutions</a>
+      </nav>
+      <nav class="foot-col" aria-label="Company">
+        <h3 data-k="ft.hCo">Company</h3>
+        <a href="./about.html" data-k="ft.about">About</a>
+        <a href="./blog/" data-k="ft.blog">Insights</a>
+        <a href="./contact.html" data-k="ft.contact">Contact</a>
+      </nav>
+    </div>
+    <div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav class="foot-legal" aria-label="Legal"><a href="./privacy.html" data-k="ft.privacy">Privacy</a><a href="./terms.html" data-k="ft.terms">Terms</a></nav></div>
+  </div>
+</footer>
+<script src="assets/flow-header.js"></script>
+<script src="assets/flow-inner.js"></script>
+<script src="../samples/vendor/lenis.min.js"></script>
+<script src="../samples/flow-rich-v5.js"></script>
+<script src="../samples/hero-samples-v5.js"></script>
+<script src="../samples/v3.js"></script>
+<script src="../samples/v4.js"></script>
+<script src="../samples/v5.js"></script>
+</body></html>
