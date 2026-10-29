@@ -675,7 +675,7 @@
     const services = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [
       { id: 'mail', label: 'Mail', required: true },
       { id: 'todo', label: 'To Do', scopes: ['Tasks.ReadWrite'] },
-      { id: 'calendar', label: 'Calendar', scopes: ['Calendars.ReadWrite'] }
+      { id: 'calendar', label: 'Calendar', scopes: ['Calendars.ReadWrite', 'MailboxSettings.Read'] }
     ];
     const granted = grantedOutlookScopes();
     const connectCtx = { granted: granted, tokenStatus: tokenStatus };

@@ -37,7 +37,7 @@ const FlowOutlookConfig = {
     { id: 'todo', label: 'To Do', detail: 'Add one task on a task-only Do It. Glance reads it back before it is handled. Undo deletes that task.', scopes: ['Tasks.ReadWrite'], required: false },
     // Write one event for a named file at a clock. Not added to the default
     // mail sign-in. Never Mail.Send, never Calendars.ReadWrite.Shared.
-    { id: 'calendar', label: 'Calendar', detail: 'Place one named file on the calendar. Undo removes that event. Never invites anyone.', scopes: ['Calendars.ReadWrite'], required: false },
+    { id: 'calendar', label: 'Calendar', detail: 'Place one named file on the calendar. Undo removes that event. Never invites anyone.', scopes: ['Calendars.ReadWrite', 'MailboxSettings.Read'], required: false },
     // defaultOn pre-ticks the box on a new connection. It does not change
     // defaultConnectIds() or the scopes of an existing sign-in: the person can
     // untick it, and an account that never ticked it is asked only when they do.
@@ -120,6 +120,7 @@ FlowOutlookConfig.incrementalConsentScopes = function incrementalConsentScopes(e
     if (out.indexOf(name) < 0) out.push(name);
   });
   if (out.indexOf(add) < 0) out.push(add);
+  if (add === 'Calendars.ReadWrite' && out.indexOf('MailboxSettings.Read') < 0) out.push('MailboxSettings.Read');
   return out;
 };
 

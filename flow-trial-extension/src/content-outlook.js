@@ -1805,8 +1805,13 @@
       if (slot.firstChild) slot.insertBefore(line, slot.firstChild);
       else slot.appendChild(line);
     }
-    line.textContent = whyNotText(reason);
+    const code = String(reason || '').replace(/^quiet:/, '').split(':')[0];
+    const hideQuietAsk = code === 'intent-null' || code === 'too-short';
+    const visible = whyNotText(reason);
+    line.textContent = hideQuietAsk ? '' : visible;
     line.setAttribute('data-glance-why', reason || 'quiet');
+    if (hideQuietAsk) line.setAttribute('aria-hidden', 'true');
+    else line.removeAttribute('aria-hidden');
     return line;
   }
 
@@ -4310,7 +4315,24 @@
     const st = await FlowStorage.get();
     if (!mailTokenLive(token)) return;
     const own = ownAddressesOf(st);
+    const ids = FlowOwaParse.urlIds(location.href);
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
+    let domBodyUnreadable = Boolean(pane && !(String(pane.text || '').trim()));
+    if ((!pane || domBodyUnreadable) && ids.kind && st && st.outlookAuth && st.outlookAuth.token) {
+      try {
+        const fromGraph = await paneFromGraphWhenUnreadable(ids);
+        if (fromGraph && String(fromGraph.text || '').trim()) {
+          pane = keepSender(fromGraph);
+          domBodyUnreadable = false;
+          if (pane) {
+            pane.ownNames = ownNamesOf(st);
+            pane.namesPending = outlookNamesNotCached(st, userNameOf(st));
+          }
+        } else if (domBodyUnreadable) {
+          pane = null;
+        }
+      } catch (e) { glanceError('pane graph fallback', e); if (domBodyUnreadable) pane = null; }
+    }
     if (pane) pane.ownNames = ownNamesOf(st);
     if (pane) pane.namesPending = outlookNamesNotCached(st, userNameOf(st));
     if (pane && pane.namesPending === true) armNamesHold(() => { scan().catch(() => {}); });
@@ -4319,7 +4341,6 @@
       pane.__epoch = mailEpoch;
     }
     bindMailToken(pane, token);
-    const ids = FlowOwaParse.urlIds(location.href);
     const earlyPlanned = plannedRow(st, pane);
     const fileSig = pane && Array.isArray(pane.attachments)
       ? pane.attachments.map((a) => (a && a.name || '') + ':' + (a && a.size != null ? a.size : (a && a.sizeLabel || ''))).join(',')
@@ -5151,6 +5172,77 @@
 
   function minuteOf(value) {
     return (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.minuteKey) ? (FlowOwaParse.minuteKey(value) || '') : '';
+  }
+
+  const PANE_GRAPH_SELECT = 'id,conversationId,subject,from,sender,toRecipients,ccRecipients,receivedDateTime,body,bodyPreview';
+
+  function graphBodyText(msg) {
+    if (!msg || typeof FlowGraphMail === 'undefined' || typeof FlowGraphMail.toUtterance !== 'function') return '';
+    const ut = FlowGraphMail.toUtterance(msg, null);
+    return ut && ut.text ? String(ut.text) : '';
+  }
+
+  function paneFromGraphRow(msg, ids, how) {
+    if (!msg || !msg.id) return null;
+    const fa = msg.from && msg.from.emailAddress;
+    const from = fa && fa.address ? String(fa.address).toLowerCase() : '';
+    const name = fa && fa.name ? String(fa.name).slice(0, 80) : '';
+    const gto = (msg.toRecipients || []).map(graphAddress).filter(Boolean);
+    const gcc = (msg.ccRecipients || []).map(graphAddress).filter(Boolean);
+    let text = graphBodyText(msg);
+    if (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.stripReadingChrome === 'function') {
+      text = FlowOwaParse.stripReadingChrome(text);
+    }
+    if (!text && !msg.subject) return null;
+    return {
+      itemId: String(msg.id),
+      conversationId: msg.conversationId || ids.conversationId || null,
+      pathId: ids.raw || null,
+      idKind: ids.kind || 'message',
+      idSource: how || 'graph-fallback',
+      rawUrlId: ids.raw || null,
+      subject: String(msg.subject || ''),
+      senderEmail: from,
+      ownSenderEmail: '',
+      senderName: name,
+      text: text,
+      to: gto,
+      cc: gcc,
+      rawToLine: '',
+      receivedDateTime: msg.receivedDateTime || '',
+      clockUnread: false,
+      clockAmbiguous: false,
+      clockAlt: '',
+      pageHour24: false,
+      hourCycle: '',
+      attachments: []
+    };
+  }
+
+  // When the live reading pane moved and no body anchor matches, still read the open mail from Graph.
+  async function paneFromGraphWhenUnreadable(ids) {
+    const fields = encodeURIComponent(PANE_GRAPH_SELECT);
+    const prefers = [null, GRAPH_IMMUTABLE];
+    const pathId = ids.itemId || (ids.kind === 'message' ? ids.raw : null);
+    if (pathId && !isConversationId(pathId)) {
+      const spells = idSpellings(pathId);
+      for (let p = 0; p < prefers.length; p++) {
+        for (let i = 0; i < spells.length; i++) {
+          const msg = await graphJson('/me/messages/' + encodeURIComponent(spells[i]) + '?$select=' + fields, 'pane-graph-fallback', prefers[p]);
+          if (msg && msg.id && !Array.isArray(msg.value)) return paneFromGraphRow(msg, ids, 'graph-fallback');
+        }
+      }
+    }
+    const conv = String(ids.conversationId || (ids.kind === 'conversation' ? ids.raw : '') || '').trim();
+    if (!conv) return null;
+    const spells = idSpellings(conv);
+    for (let s = 0; s < spells.length; s++) {
+      const filter = "conversationId eq '" + odataQuote(spells[s]) + "'";
+      const body = await graphJson('/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=1&$orderby=receivedDateTime desc&$select=' + fields, 'pane-graph-fallback', null);
+      const row = body && Array.isArray(body.value) && body.value[0] ? body.value[0] : null;
+      if (row && row.id) return paneFromGraphRow(row, ids, 'graph-fallback-conversation');
+    }
+    return null;
   }
 
   // The reading pane often shows a name and hides the address until hover.

@@ -73,21 +73,20 @@ check('Mon (+2) Thu 5/11 with no clock is 5 November', iso('ביום חמישי 
 check('Hebrew within ±48 of 01/11 with meeting word is 1 November',
   iso('פגישה 01/11 בשעה 11:00', '2026-10-25T11:00:00+02:00') === '2026-11-01');
 
-// Boundary: Hebrew letter 30 chars before the slash needs the full ±48 window (±20 mutant dies).
+// D5 boundary pins (verify-ca1-r10 R1/R2/R3): kill ±20, ±3, and ±400 window mutants.
 {
-  const pad = '.'.repeat(24);
-  const text = 'פגישה ' + pad + '5/11 בשעה 14:00';
-  check('Hebrew meeting word 30 chars before 5/11 is 5 November (needs ±48, not ±20)',
-    iso(text, '2026-10-26T09:00:00+02:00') === '2026-11-05');
+  const r1 = 'פגישה ' + '.'.repeat(24) + '5/11 at 14:00';
+  check('R1: Hebrew meeting word 24 dots before 5/11 is 5 November (±20 mutant dies)',
+    iso(r1, '2026-10-26T09:00:00+02:00') === '2026-11-05');
 }
-// Boundary: Hebrew 6 chars before the slash needs more than ±3 (±3 mutant dies).
-check('Hebrew ב beside 5/11 with meeting context is 5 November (needs ±48, not ±3)',
-  iso('פגישה ב-5/11 בשעה 14:00', '2026-10-26T09:00:00+02:00') === '2026-11-05');
-// Boundary: far Hebrew must not flip US 12/4 when the window is not widened to ±400.
 {
-  const farHe = ('ש '.repeat(55)) + 'Call on Friday 12/4 at 10:00';
-  check('distant Hebrew does not turn US 12/4 into day-first (±400 mutant dies)',
-    iso(farHe, '2026-12-01T12:00:00Z') === '2026-12-04');
+  const r2 = 'פגישה ' + '.'.repeat(10) + '5/11 at 14:00';
+  check('R2: Hebrew meeting word 10 dots before 5/11 is 5 November (±3 mutant dies)',
+    iso(r2, '2026-10-26T09:00:00+02:00') === '2026-11-05');
+}
+{
+  const r3 = ('ש '.repeat(55)) + 'x'.repeat(100) + ' Meeting 5/11 at 14:00';
+  check('R3: far Hebrew does not resolve US 5/11 (±400 mutant dies)', iso(r3, '2026-10-26T09:00:00+02:00') == null);
 }
 
 // D5: "find us N minutes" is quiet in intent.js (rehearsal D5).
