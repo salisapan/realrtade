@@ -6,6 +6,7 @@
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
 const { expectedMissing, SEND_URL } = require('./support/rehearsal');
+const { testIfDriveReadonly, driveReadonlyInManifest } = require('./support/v1-scope-gates');
 const S = require('./support/sentences');
 
 const ASK = 'שלחי לי בבקשה את ההסכם החתום.';
@@ -31,7 +32,14 @@ async function open(glance, id, body, hits) {
   return glance.openGmail({ messageId: 'm-e-' + id, threadId: 't-e-' + id, subject: 'הסכם', senderEmail: S.SENDER, senderName: 'Dana', body: body });
 }
 
-test('E1 the contract: found in Drive, not sent, done only when it is sent as a real file', async ({ glance }, testInfo) => {
+test('v1 without drive.readonly: contract follow card stays off when Drive stub has the PDF', async ({ glance }) => {
+  expect(driveReadonlyInManifest).toBe(false);
+  const page = await open(glance, 'v1-off', ASK, [CONTRACT]);
+  await page.waitForTimeout(7000);
+  await expect(page.locator(CARD)).toHaveCount(0);
+});
+
+testIfDriveReadonly('E1 the contract: found in Drive, not sent, done only when it is sent as a real file', async ({ glance }, testInfo) => {
   const page = await open(glance, 'contract', ASK, [CONTRACT]);
   const card = page.locator(CARD);
   await expect(card).toContainText('הסכם.pdf', { timeout: 20000 });
@@ -56,7 +64,7 @@ test('E2 "תוציאי חשבונית מס" in the same sitting: no card, no wri
   expect(calls.some((c) => /morning|greeninvoice/i.test(c.url))).toBe(false);
 });
 
-test('E3 Gate: the contract mail has one offer, and nothing calls a draft plus a task closed', async ({ glance }) => {
+testIfDriveReadonly('E3 Gate: the contract mail has one offer, and nothing calls a draft plus a task closed', async ({ glance }) => {
   const page = await open(glance, 'one', ASK, [CONTRACT]);
   await expect(page.locator(CARD)).toContainText('הסכם.pdf', { timeout: 20000 });
   await page.waitForTimeout(2000);

@@ -2,6 +2,7 @@
 // HTTP server. The service worker's fetch stand-in is not the proof.
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
+const { testIfGmailCompose, testIfDriveReadonly, gmailComposeInManifest, driveReadonlyInManifest } = require('./support/v1-scope-gates');
 const S = require('./support/sentences');
 
 const QUOTE = 'Please prepare a quote for Dana Cole at $3,900, titled "14th floor".';
@@ -60,7 +61,25 @@ async function open(glance, opts) {
   return glance.openGmail(opts.mail);
 }
 
-test('A reply draft is a real drafts.create read back by id, nothing calls the people API, and Undo deletes it', async ({ glance }) => {
+test('v1 without gmail.compose: no drafts.create on Do It', async ({ glance }) => {
+  expect(gmailComposeInManifest).toBe(false);
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-no-compose',
+      threadId: 't-no-compose',
+      subject: 'Transfer',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: DRAFT
+    }
+  });
+  await uncheck(page, 'task');
+  await clickDoIt(page);
+  await page.waitForTimeout(2000);
+  expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
+});
+
+testIfGmailCompose('A reply draft is a real drafts.create read back by id, nothing calls the people API, and Undo deletes it', async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-people',
@@ -307,7 +326,7 @@ test('Sheets Undo refuses after the row is edited and leaves it', async ({ glanc
   expect(server.sheet(id).row).toEqual(edited);
 });
 
-test('A pre-filled Reply keeps To, Subject, signature, and the quote, and the body is inserted above them', async ({ glance }) => {
+testIfGmailCompose('A pre-filled Reply keeps To, Subject, signature, and the quote, and the body is inserted above them', async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-reply',
@@ -348,7 +367,7 @@ test('A pre-filled Reply keeps To, Subject, signature, and the quote, and the bo
   await expect(body.locator('.gmail_signature')).toHaveText('Best, Ada');
 });
 
-test('Compose fill writes the Gmail window, reads it back, and Undo clears it', async ({ glance }) => {
+testIfGmailCompose('Compose fill writes the Gmail window, reads it back, and Undo clears it', async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-compose',
@@ -372,7 +391,7 @@ test('Compose fill writes the Gmail window, reads it back, and Undo clears it', 
   await expect(body).toHaveText('');
 });
 
-test('Compose Undo refuses after the person types and leaves their text', async ({ glance }) => {
+testIfGmailCompose('Compose Undo refuses after the person types and leaves their text', async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-compose-edit',

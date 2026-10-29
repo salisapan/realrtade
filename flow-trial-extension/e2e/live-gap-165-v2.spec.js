@@ -6,6 +6,7 @@
 // server that behaves like the API, fixtures only.
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
+const { testIfDriveReadonly } = require('./support/v1-scope-gates');
 
 const SELF = 'ai.local.flow@gmail.com';
 const OTHER = 'sali.profile@gmail.com';
@@ -422,7 +423,7 @@ test.describe('4. copied only: no card of any kind', () => {
     await expect(main(page)).not.toContainText(/Glance|DETECTED INTENT|report\.pdf/i);
   });
 
-  test('the same mail addressed To the account is offered the file card', async ({ glance }) => {
+  testIfDriveReadonly('the same mail addressed To the account is offered the file card', async ({ glance }) => {
     await glance.seedGmail({});
     server.driveHits([{ id: 'rep-1', name: 'report.pdf', mimeType: 'application/pdf' }]);
     const page = await glance.openGmail(detailed('to-drive', 'Can you send me the report', 'en', { to: [SELF], cc: ['noa@acme.io'] }));
@@ -438,7 +439,7 @@ test.describe('4. copied only: no card of any kind', () => {
     await expect(main(page)).not.toContainText(/DETECTED INTENT/);
   });
 
-  test('Gmail paints the recipients after the body: addressed To the account keeps its card', async ({ glance }) => {
+  testIfDriveReadonly('Gmail paints the recipients after the body: addressed To the account keeps its card', async ({ glance }) => {
     await glance.seedGmail({});
     const page = await glance.openGmail(detailed('to-late', 'Can you send me the report', 'en', { lateMs: 1500, to: [SELF], cc: ['noa@acme.io'] }));
     await page.waitForTimeout(4000);

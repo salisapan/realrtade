@@ -767,12 +767,19 @@
 
   // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
   // A stored process does not win. The page and the mailbox check agree, and a file ask runs the chain.
+  function openSenderEmail(pane) {
+    return String((pane && (pane.openSenderEmail || pane.senderEmail)) || '').trim();
+  }
+
   async function decideFromText(pane, ownAddresses, mailbox) {
     if (typeof FlowIncomingJudge === 'undefined') return null;
     // The message's own words, as Gmail judges them: quoted history ("From: … Sent: …", "On … wrote:") cut off.
+    const rawBody = String(pane.text || '').trim();
+    const rawSubject = String(pane.subject || '').trim();
+    const textForJudge = rawBody || rawSubject;
     const prepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)
-      ? FlowIncomingJudge.prepareForJudge(pane.text || '')
-      : (pane.text || '');
+      ? FlowIncomingJudge.prepareForJudge(textForJudge)
+      : textForJudge;
     const own = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(prepared) : prepared;
     const from = String(pane.senderEmail || '').toLowerCase();
     // A save-shaped sentence is the only one that asks how many files are
@@ -783,7 +790,7 @@
     if (typeof FlowGoogleCloses !== 'undefined' && typeof FlowGoogleCloses.needsOneAttachment === 'function' && FlowGoogleCloses.needsOneAttachment(own)) {
       let id = pane.itemId || null;
       if (!id) {
-        const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
+        const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, openSenderEmail(pane));
         if (found && found.unread) return { none: true, reason: found.reason };
         id = found && found.id;
       }
@@ -4323,11 +4330,13 @@
     const anchorReport = FlowOwaParse.rootsReport ? FlowOwaParse.rootsReport(document) : {};
     const bodyAnchorMissing = anchorReport.document === 0;
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
-    let domBodyUnreadable = bodyAnchorMissing || Boolean(pane && !(String(pane.text || '').trim()));
+    const paneText = pane && String(pane.text || '').trim();
+    const paneSubject = pane && String(pane.subject || '').trim();
+    let domBodyUnreadable = bodyAnchorMissing || Boolean(pane && !paneText && !paneSubject);
     if ((!pane || domBodyUnreadable) && ids.kind && st && st.outlookAuth && st.outlookAuth.token) {
       try {
         const fromGraph = await paneFromGraphWhenUnreadable(ids);
-        if (fromGraph && String(fromGraph.text || '').trim()) {
+        if (fromGraph && (String(fromGraph.text || '').trim() || String(fromGraph.subject || '').trim())) {
           pane = keepSender(fromGraph);
           domBodyUnreadable = false;
           if (pane) {
@@ -4418,6 +4427,7 @@
       }
     } catch (e) { glanceError('pane hydrate', e); }
 
+    if (pane.senderEmail && pane.openSenderEmail == null) pane.openSenderEmail = pane.senderEmail;
     const threadApplied = await applyFullThreadRead(pane, own);
     if (!threadApplied.ok) {
       dropStuckCard(pane);
@@ -4553,11 +4563,20 @@
     const selfPlanned = planned || unconfirmedSyncRow(bag, pane);
     const receiptOnly = Boolean(entry && entry.outlookReceipt && entry.ref && !entry.process);
     const ownAll = await ownWithAliases(own);
+    if (pane.idSource === 'url-unconfirmed' && selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')) {
+      dropStuckCard(pane);
+      await pageReason('note-to-self', pane);
+      return;
+    }
     // The header walk leaves the person's own address off the pane so it is
     // never the counterpart. A mail addressed to that same person still has
     // the address on the persona. Put it back only then, so the judge sees
     // an incoming ask and a mail to someone else stays quiet.
     const headerFrom = String(pane.senderEmail || pane.ownSenderEmail || '').trim().toLowerCase();
+    if ((!pane.to || !pane.to.length) && pane.rawToLine) {
+      const fromLine = String(pane.rawToLine).toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g);
+      if (fromLine && fromLine.length) pane.to = fromLine.slice();
+    }
     if (!pane.senderEmail && headerFrom && typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
       senderEmail: headerFrom,
       to: pane.to,
@@ -4574,8 +4593,10 @@
       onBehalfOf: pane.onBehalfOf || null,
       forwarded: pane.onBehalf === true
     });
-    const selfMail = !receiptOnly && !selfAddressed && (ownSender(pane.senderEmail || headerFrom, ownAll) || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')));
-    if (selfMail) {
+    const selfMail = !receiptOnly && !selfAddressed && pane.threadJudgmentShow !== true
+      && (ownSender(pane.senderEmail || headerFrom, ownAll) || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')));
+    const selfNoteText = String(pane.text || '').trim() || String(pane.subject || '').trim();
+    if (selfMail && selfNoteText.length < 12) {
       dropStuckCard(pane);
       await pageReason('note-to-self', pane);
       return;
@@ -4624,7 +4645,7 @@
             let msgImmutable = false;
             msgIdHow = msgId ? 'url' : null;
             if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && (pane.pathId || pane.conversationId)) {
-              const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
+              const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, openSenderEmail(pane));
               if (found && found.unread) msgIdHow = 'sender-mismatch';
               else if (found && found.id) { msgId = found.id; msgIdHow = found.how; msgImmutable = found.immutable === true; }
               else msgIdHow = 'none';
@@ -4707,7 +4728,7 @@
         // createReply needs a Graph message id. The address gives one, or the conversation it belongs to.
         let msgId = pane.itemId || null;
         if (!msgId && (pane.pathId || pane.conversationId)) {
-          const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
+          const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, openSenderEmail(pane));
           if (found && found.unread) {
             dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, mismatch: true, from: found.from || null });
             dropStuckCard(pane);
@@ -5221,10 +5242,23 @@
 
   function threadJudgeRow(pane, ownAddresses) {
     return {
-      textOf: (row) => graphBodyText(row),
+      textOf: (row) => {
+        const body = graphBodyText(row);
+        if (String(body || '').trim()) return body;
+        return String((row && row.subject) || pane.subject || '').trim();
+      },
       judge: (text, row) => {
         if (typeof FlowIncomingJudge === 'undefined') return { show: false };
         const prepared = FlowIncomingJudge.prepareForJudge(text);
+        const from = String(pane.senderEmail || '').toLowerCase();
+        const selfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
+          senderEmail: pane.senderEmail,
+          to: pane.to || null,
+          cc: pane.cc || null,
+          ownAddresses: ownAddresses || null,
+          onBehalfOf: pane.onBehalfOf || null,
+          forwarded: pane.onBehalf === true
+        });
         return FlowIncomingJudge.judge({
           systemNoticeOn: systemNoticeSwitch === true,
           bookingNoticeOn: bookingNoticeSwitch === true,
@@ -5242,7 +5276,10 @@
           userName: pane.userName || null,
           ownNames: pane.ownNames || null,
           namesPending: namesWaitDone ? false : pane.namesPending === true,
-          namesWaitDone: namesWaitDone === true
+          namesWaitDone: namesWaitDone === true,
+          onBehalfOf: pane.onBehalfOf || null,
+          forwarded: pane.onBehalf === true,
+          inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
         });
       }
     };
@@ -5270,8 +5307,11 @@
         if (one && one.id) fetched = { ok: true, rows: [one] };
       } catch (e) { /* fall through */ }
     }
-    if ((!fetched.ok || !fetched.rows.length) && String(pane.text || '').trim().length >= 20
-        && pane.idSource && pane.idSource !== 'url-stale') {
+    const paneBodyLen = String(pane.text || '').trim().length;
+    const paneSubjectLen = String(pane.subject || '').trim().length;
+    if ((!fetched.ok || !fetched.rows.length)
+        && pane.idSource !== 'url-stale'
+        && (paneBodyLen >= 20 || (paneBodyLen === 0 && paneSubjectLen >= 8))) {
       fetched = {
         ok: true,
         rows: [{
@@ -5279,7 +5319,9 @@
           conversationId: conv || pane.conversationId || null,
           subject: pane.subject || '',
           receivedDateTime: pane.receivedDateTime || '',
-          from: { emailAddress: { address: pane.senderEmail || '', name: pane.senderName || '' } },
+          from: { emailAddress: { address: pane.senderEmail || pane.openSenderEmail || '', name: pane.senderName || '' } },
+          toRecipients: (pane.to || []).map((address) => ({ emailAddress: { address: address } })),
+          ccRecipients: (pane.cc || []).map((address) => ({ emailAddress: { address: address } })),
           body: { contentType: 'text', content: String(pane.text || '') }
         }]
       };
@@ -5296,15 +5338,24 @@
       raw: pane.rawUrlId || pane.pathId || null,
       itemId: picked.row.id
     }, 'thread-read');
-    if (!rowPane || !(String(rowPane.text || '').trim())) return { ok: false, pane: pane };
+    const paneTextBefore = String(pane.text || '').trim();
+    const graphBody = String(rowPane.text || '').trim();
+    const graphSubject = String(rowPane.subject || '').trim();
+    let mergedText = graphBody;
+    if (!mergedText || (paneTextBefore.length > mergedText.length + 8)) mergedText = paneTextBefore || mergedText;
+    if (!mergedText) mergedText = graphSubject || String(pane.subject || '').trim();
+    if (!mergedText) return { ok: false, pane: pane };
     const mergedTo = (rowPane.to && rowPane.to.length) ? rowPane.to : (pane.to || []);
     const mergedCc = (rowPane.cc && rowPane.cc.length) ? rowPane.cc : (pane.cc || []);
     const wasUnconfirmed = pane.idSource === 'url-unconfirmed';
+    const openSender = pane.openSenderEmail || pane.senderEmail || '';
     return {
       ok: true,
       pane: Object.assign({}, pane, rowPane, {
+        text: mergedText,
         to: mergedTo,
         cc: mergedCc,
+        openSenderEmail: openSender,
         conversationId: wasUnconfirmed ? pane.conversationId : (rowPane.conversationId || pane.conversationId),
         senderEmail: wasUnconfirmed ? (pane.senderEmail || rowPane.senderEmail) : rowPane.senderEmail,
         senderName: wasUnconfirmed ? (pane.senderName || rowPane.senderName) : rowPane.senderName,
