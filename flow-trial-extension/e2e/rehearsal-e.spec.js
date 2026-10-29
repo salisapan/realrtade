@@ -6,7 +6,8 @@
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
 const { expectedMissing, SEND_URL } = require('./support/rehearsal');
-const { testIfDriveReadonly, driveReadonlyInManifest } = require('./support/v1-scope-gates');
+const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
+const { testIfDriveReadonly, driveReadonlyInManifest } = bindV1ScopeGates(test);
 const S = require('./support/sentences');
 
 const ASK = 'שלחי לי בבקשה את ההסכם החתום.';

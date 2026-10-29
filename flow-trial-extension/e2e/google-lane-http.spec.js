@@ -2,7 +2,8 @@
 // HTTP server. The service worker's fetch stand-in is not the proof.
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
-const { testIfGmailCompose, testIfDriveReadonly, gmailComposeInManifest, driveReadonlyInManifest } = require('./support/v1-scope-gates');
+const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
+const { testIfGmailCompose, testIfDriveReadonly, gmailComposeInManifest, driveReadonlyInManifest } = bindV1ScopeGates(test);
 const S = require('./support/sentences');
 
 const QUOTE = 'Please prepare a quote for Dana Cole at $3,900, titled "14th floor".';

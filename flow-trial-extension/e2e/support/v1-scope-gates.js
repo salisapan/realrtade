@@ -7,17 +7,21 @@ const GMAIL_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose';
 const driveReadonlyInManifest = scopes.has(DRIVE_READONLY);
 const gmailComposeInManifest = scopes.has(GMAIL_COMPOSE);
 
-function testIfDriveReadonly(title, fn) {
-  (driveReadonlyInManifest ? test : test.skip)(title, fn);
-}
-
-function testIfGmailCompose(title, fn) {
-  (gmailComposeInManifest ? test : test.skip)(title, fn);
+function bind(test) {
+  return {
+    driveReadonlyInManifest,
+    gmailComposeInManifest,
+    testIfDriveReadonly(title, fn) {
+      (driveReadonlyInManifest ? test : test.skip)(title, fn);
+    },
+    testIfGmailCompose(title, fn) {
+      (gmailComposeInManifest ? test : test.skip)(title, fn);
+    }
+  };
 }
 
 module.exports = {
+  bind,
   driveReadonlyInManifest,
-  gmailComposeInManifest,
-  testIfDriveReadonly,
-  testIfGmailCompose
+  gmailComposeInManifest
 };

@@ -6,7 +6,8 @@
 // server that behaves like the API, fixtures only.
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
-const { testIfDriveReadonly } = require('./support/v1-scope-gates');
+const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
+const { testIfDriveReadonly } = bindV1ScopeGates(test);
 
 const SELF = 'ai.local.flow@gmail.com';
 const OTHER = 'sali.profile@gmail.com';
