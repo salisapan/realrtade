@@ -3507,7 +3507,6 @@ function glanceUiCopy(kind) {
   function injectChip(messageNode, ctx) {
     void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
-    ctx = chipContextWithoutClosedCompose(ctx);
     if (!ctx) return;
     clearGmailWhy(messageNode);
 
@@ -4320,7 +4319,20 @@ function glanceUiCopy(kind) {
   }
 
   async function sendGmailCompose(payload) {
-    if (!(await gmailComposeApiAllowedFromStorage())) {
+    const composeOpen = composeBodyOpen();
+    const shareLink = !!(payload && payload.params && payload.params.shareLink);
+    const apiAllowed = await gmailComposeApiAllowedFromStorage();
+    if (!composeOpen && !apiAllowed) {
+      return {
+        ok: false,
+        reason: 'compose-closed',
+        preview: true,
+        closes: false,
+        sent: false,
+        error: glanceUiCopy('composeClosed') || (glanceUiHebrew() ? 'פתח קודם תשובה. Glance לא לוחץ על שליחה.' : 'Open Reply first. Glance does not press Send.')
+      };
+    }
+    if (composeOpen && !apiAllowed && !shareLink) {
       return {
         ok: false,
         reason: 'compose-closed',
@@ -6501,6 +6513,8 @@ function glanceUiCopy(kind) {
 
   globalThis.__glanceGmailPage = {
     paintPlan: (ctx) => {
+      ctx = chipContextWithoutClosedCompose(ctx);
+      if (!ctx) return null;
       const mount = document.createElement('div');
       document.body.appendChild(mount);
       injectChip(mount, ctx);

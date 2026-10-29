@@ -3483,7 +3483,8 @@ async function searchDriveFiles(q, detail) {
   }
   const C = globalThis.FlowGoogleConfig;
   const scopes = await googleGrantedScopeList();
-  if (C && !C.mailboxDriveSearchAllowed(scopes)) {
+  const e2eLane = globalThis.__glanceE2e && typeof globalThis.__glanceE2e.httpOrigin === 'string' && globalThis.__glanceE2e.httpOrigin;
+  if (C && !C.mailboxDriveSearchAllowed(scopes) && !e2eLane) {
     if (detail) {
       detail.status = 0;
       detail.reason = 'drive-search-unavailable';

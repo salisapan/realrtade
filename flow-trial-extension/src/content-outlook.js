@@ -4459,6 +4459,7 @@
       await pageReason('page:sender-mismatch', pane);
       return;
     }
+    await loadUserAddresses();
     if (openFrom && graphFrom && openFrom !== graphFrom && !(await sameOpenSender(graphFrom, openFrom, null))) {
       dropStuckCard(pane);
       await pageReason('page:sender-mismatch', pane);
@@ -6051,8 +6052,7 @@
       }
       return;
     }
-    // No ask on the page (intent-null) still gets Save the file? when attachments qualify.
-    if (pageAlreadyQuiet && !(prior && /intent-null/.test(String(prior.reason || '')))) return;
+    const blockSuggestCard = pageAlreadyQuiet && !(prior && /intent-null/.test(String(prior.reason || '')));
     let bag = {};
     try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
     // FlowOnedriveFile is on this page (manifest content script, copied onto
@@ -6063,13 +6063,15 @@
       : null;
     const own = ownAddressesOf(bag);
     const from = String(pane.senderEmail || pane.ownSenderEmail || pane.openSenderEmail || '').toLowerCase();
+    const attachmentsRead = Array.isArray(files);
     const decision = FlowSuggestSave.suggestSave({
       surface: 'outlook',
       inbound: from ? own.indexOf(from) < 0 : true,
       text: pane.text || '',
       body: pane.text || '',
       messageId: messageId,
-      attachments: files,
+      attachments: attachmentsRead ? files : [],
+      attachmentsRead: attachmentsRead,
       consent: consent,
       otherCard: false,
       noise: /noise|marketing/.test(String(lastLoggedReason || '')),
@@ -6108,7 +6110,7 @@
       messageId: messageId, reason: decision.reason, surface: 'outlook',
       fileCount: decision.fileCount, target: decision.target
     });
-    if (decision.step && decision.eligible) {
+    if (decision.step && decision.eligible && !blockSuggestCard) {
       const host = paintIfCurrent(pane.__mailToken, function () { return paintSuggestCard(Object.assign({}, pane, { graphMessageId: graphMessageId }), decision, files); });
       if (host) {
         lastOutcome = 'card';
@@ -6117,13 +6119,15 @@
       }
     }
     const skipped = decision.skipped || [];
-    if (!decision.eligible && skipped.length && paintIfCurrent(pane.__mailToken, function () { return paintSkippedOnly(pane, skipped); })) {
+    if (!decision.eligible && skipped.length && !blockSuggestCard && paintIfCurrent(pane.__mailToken, function () { return paintSkippedOnly(pane, skipped); })) {
       lastOutcome = 'card';
       await clearReason(pane);
       return;
     }
     const fileGap = decision.reason === 'suggest:no-consent' && Array.isArray(files) && files.length > 0;
-    if (!pageAlreadyDecided(pane) || (fileGap && genericTextQuiet(pane))) await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
+    if (!blockSuggestCard && (!pageAlreadyDecided(pane) || (fileGap && genericTextQuiet(pane)))) {
+      await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
+    }
   }
 
   function paintRemove(el) {

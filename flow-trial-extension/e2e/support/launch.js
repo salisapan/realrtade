@@ -937,7 +937,7 @@ async function boot() {
       }
       if (!msgId) msgId = isConvUrl ? (urlId + '-open') : urlId;
       if (!convId) convId = 'conv-' + msgId;
-      const toList = Array.isArray(m.to) ? m.to : ['ai.local.flow@gmail.com'];
+      const toList = Array.isArray(m.to) ? m.to : ['glance.salisapan@outlook.com'];
       const ccList = Array.isArray(m.cc) ? m.cc : [];
       const row = {
         id: msgId,
