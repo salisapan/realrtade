@@ -99,7 +99,7 @@ function calendar(opts) {
   check('the card kind, payload and lane connector exist', /kind: 'calendarRecurring'/.test(gm) && /action\.kind === 'calendarRecurring'/.test(gm) && /calendarRecurring: 'googleRecurringReminder'/.test(gm));
   check('a meeting stays the Hold It card', /c\.intent\.type === 'event'\) return false/.test(gm));
   const manifest = JSON.parse(read('manifest.json'));
-  check('the manifest has no forms.body scope or forms.googleapis.com host (v1 six scopes)', manifest.oauth2.scopes.length === 6 && !manifest.oauth2.scopes.includes('https://www.googleapis.com/auth/forms.body') && manifest.host_permissions.filter((h) => /googleapis/.test(h)).length === 7 && !manifest.host_permissions.some((h) => /forms\.googleapis/.test(h)));
+  check('the manifest has no forms.body scope or forms.googleapis.com host (v1 six scopes)', manifest.oauth2.scopes.length === 6 && !manifest.oauth2.scopes.includes('https://www.googleapis.com/auth/forms.body') && manifest.host_permissions.filter((h) => /googleapis/.test(h)).length === 6 && !manifest.host_permissions.some((h) => /forms\.googleapis/.test(h)));
 
   console.log(failures ? failures + ' failure(s)' : 'all passed');
   process.exit(failures ? 1 : 0);
