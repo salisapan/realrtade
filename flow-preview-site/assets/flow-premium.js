@@ -1,0 +1,184 @@
+/* Shared premium behaviour for every page except the homepage, which carries
+   its own richer version of the same ideas.
+
+   Three things, all cheap: an ambient particle field, a reading-progress bar,
+   and reveal-on-scroll. Everything degrades to "the page just sits there",
+   never to a broken layout, and everything is skipped under reduced motion. */
+(function () {
+  var root = document.documentElement;
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------------------------------------------------- reading progress */
+  var bar = document.createElement('div');
+  bar.className = 'p-progress';
+  document.body.appendChild(bar);
+  function progress() {
+    var h = document.documentElement.scrollHeight - innerHeight;
+    bar.style.width = (h > 0 ? Math.min(100, (scrollY / h) * 100) : 0) + '%';
+  }
+  addEventListener('scroll', progress, { passive: true });
+  addEventListener('resize', progress);
+  progress();
+
+  /* ------------------------------------------------------------- reveals */
+  // Anything that reads as a block of content gets revealed, except content
+  // already inside the first viewport. Selecting by role rather than by
+  // hand-tagging each element keeps this working on all 40-odd pages without
+  // touching their markup. Above-the-fold text must paint at opacity 1:
+  // adding .p-reveal (opacity 0) and waiting out the fade was the mobile LCP
+  // on pricing and Glance.
+  var targets = document.querySelectorAll(
+    'main .eyebrow, main h1.title, main .updated, main .lead, main article > p, main article > h2,' +
+    'main article > ul, main article > ol, main article > blockquote, main article > table,' +
+    'main .card, main .cta, main .note, main .readlist, main .stepcard, main .choicepanel,' +
+    'main .specimen, main .installbox, main .formcard, main .faq details'
+  );
+  if (!reduced && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        e.target.classList.add('p-in');
+        io.unobserve(e.target);
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.02 });
+
+    Array.prototype.forEach.call(targets, function (el) {
+      // Already in the first viewport: leave it painted. Do not add .p-reveal.
+      if (el.getBoundingClientRect().top < innerHeight) return;
+      el.classList.add('p-reveal');
+      // Stagger only within a group of siblings, so a long article does not
+      // accumulate a delay that leaves the last paragraph waiting a second.
+      var sibs = el.parentNode ? Array.prototype.indexOf.call(el.parentNode.children, el) : 0;
+      el.setAttribute('data-d', String((sibs % 4) + 1));
+      io.observe(el);
+    });
+  }
+
+  /* ------------------------------------------------- ambient particle net */
+  // Some pages (trial.html) carry their own ambient canvas already. Two
+  // full-viewport canvases on one page is the layer count the zoom fix exists
+  // to avoid, so defer to whichever is already there.
+  if (reduced || document.getElementById('bgcanvas')) return;
+  // Narrow viewports paint one static frame. The looping O(n²) pass stays on
+  // desktop, and pauses while the tab is hidden. Redesigns should keep this cap.
+  var narrow = window.matchMedia('(max-width: 640px)').matches;
+  var cv = document.createElement('canvas');
+  cv.id = 'p-net';
+  cv.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(cv);
+  var g = cv.getContext('2d');
+  if (!g) return;
+
+  // Capped backing store: a full-viewport canvas at a phone's native 3x is
+  // ~12MB of GPU memory and the first layer dropped under pressure.
+  var DPR = 1, W = 0, H = 0, pts = [], raf = null, NET = '52,104,230', NA = 0.42;
+
+  function colors() {
+    var cs = getComputedStyle(root);
+    NET = (cs.getPropertyValue('--p-net') || NET).trim();
+    NA = parseFloat(cs.getPropertyValue('--p-net-a')) || NA;
+  }
+  function size() {
+    DPR = Math.min(devicePixelRatio || 1, 1.75);
+    W = cv.width = Math.round(innerWidth * DPR);
+    H = cv.height = Math.round(innerHeight * DPR);
+  }
+  function init() {
+    size();
+    var n = narrow ? Math.min(16, Math.floor(innerWidth / 40)) : Math.min(48, Math.floor(innerWidth / 30));
+    pts = [];
+    for (var i = 0; i < n; i++) {
+      pts.push({
+        x: Math.random() * W, y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.12 * DPR, vy: (Math.random() - 0.5) * 0.12 * DPR
+      });
+    }
+  }
+  function draw() {
+    g.clearRect(0, 0, W, H);
+    var R = 140 * DPR;
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+      for (var j = i + 1; j < pts.length; j++) {
+        var q = pts[j], dx = p.x - q.x, dy = p.y - q.y, d2 = dx * dx + dy * dy;
+        if (d2 < R * R) {
+          g.strokeStyle = 'rgba(' + NET + ',' + ((1 - Math.sqrt(d2) / R) * 0.16).toFixed(3) + ')';
+          g.lineWidth = DPR;
+          g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(q.x, q.y); g.stroke();
+        }
+      }
+      g.fillStyle = 'rgba(' + NET + ',' + NA + ')';
+      g.beginPath(); g.arc(p.x, p.y, 1.2 * DPR, 0, 6.283); g.fill();
+    }
+    if (!narrow && !document.hidden) raf = requestAnimationFrame(draw);
+    else raf = null;
+  }
+  function stop() { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+  function start() { if (narrow) { draw(); return; } if (!raf) draw(); }
+
+  colors(); init(); start();
+  addEventListener('resize', function () {
+    narrow = window.matchMedia('(max-width: 640px)').matches;
+    stop(); init(); start();
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) stop();
+    else if (!narrow) start();
+  });
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (!e.isIntersecting) stop();
+        else if (!document.hidden && !narrow) start();
+      });
+    }, { threshold: 0 }).observe(cv);
+  }
+  // The theme toggle swaps the palette tokens; the canvas has to follow.
+  new MutationObserver(colors).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+})();
+
+/* ------------------------------------------------------ funnel analytics */
+// Before this, GA4 was loaded on all 43 pages but only three custom events
+// existed site-wide — so the funnel was measurable up to the email box and
+// completely dark after it. There was no way to answer which page produced a
+// lead, or which of the two products a visitor chose.
+//
+// Rather than hand-wiring a listener per button, anything carrying data-ga
+// reports itself. Adding a tracked CTA is then a markup attribute, which is
+// what keeps instrumentation from rotting the moment someone adds a button.
+(function () {
+  function send(name, params) {
+    if (typeof window.gtag === 'function') window.gtag('event', name, params || {});
+  }
+
+  document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-ga]') : null;
+    if (!el) return;
+    send('cta_click', {
+      cta: el.getAttribute('data-ga'),
+      page: location.pathname,
+      // Which product the click was heading for. The two are separate products,
+      // so blending their conversion numbers would hide which one is working.
+      destination: el.getAttribute('href') || ''
+    });
+  }, { passive: true });
+
+  // Reaching the pricing table is a real intent signal and was previously
+  // invisible: pricing.html fired no events at all.
+  var tiers = document.querySelector('.tiers, .tier-solo');
+  if (tiers && 'IntersectionObserver' in window) {
+    var seen = false;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting || seen) return;
+        seen = true;
+        send('pricing_view', { page: location.pathname });
+        io.disconnect();
+      });
+    }, { threshold: 0.3 });
+    io.observe(tiers);
+  }
+})();

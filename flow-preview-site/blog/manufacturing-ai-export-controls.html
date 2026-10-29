@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.">
+<meta name="theme-color" content="#07090F">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="canonical" href="https://theflow-ai.com/blog/manufacturing-ai-export-controls.html">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<meta property="og:type" content="article">
+<meta property="og:title" content="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing — Flow">
+<meta property="og:description" content="Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.">
+<meta property="og:url" content="https://theflow-ai.com/blog/manufacturing-ai-export-controls.html">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing — Flow">
+<meta name="twitter:description" content="Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<title>AI and Export Controls in Manufacturing &mdash; Flow</title>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing",
+  "description": "Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.",
+  "author": { "@type": "Organization", "name": "Flow" },
+  "publisher": { "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/" },
+  "mainEntityOfPage": "https://theflow-ai.com/blog/manufacturing-ai-export-controls.html",
+  "image": "https://theflow-ai.com/og.jpg",
+  "datePublished": "2026-08-31"
+}
+</script>
+<link rel="stylesheet" href="../assets/blog-article.css">
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';d.dataset.ui=l;var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'data:text/javascript,';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
+</script>
+<link rel="alternate" type="application/rss+xml" title="Flow Insights" href="../blog/rss.xml">
+<link rel="stylesheet" href="../assets/flow-header.css">
+<link rel="stylesheet" href="../assets/flow-booking.css">
+<link rel="stylesheet" href="../assets/flow-inner.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="ctl" id="ctl">
+  <div class="lang">
+    <button type="button" id="langBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu" aria-label="Language">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"/></svg>
+      <span class="sr-only" id="langName">English</span>
+    </button>
+    <div class="menu" id="langMenu" role="menu" aria-labelledby="langBtn"></div>
+  </div>
+  <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Night mode">
+    <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"/></svg>
+    <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
+  </button>
+</div>
+<flow-header data-base="../"></flow-header>
+<div id="progress"></div>
+<div class="ish-hero"><div class="ish-scene"><div class="ish-space"><a class="ish-card ish-r" href="../blog/manufacturing-ai-export-controls.html" style="animation-delay:0.000s" aria-label="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing"><picture><source srcset="../blog/img/manufacturing-ai-export-controls.webp" type="image/webp"><img src="../blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/manufacturing-ai-export-controls.html" style="animation-delay:0.000s" aria-label="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing"><picture><source srcset="../blog/img/manufacturing-ai-export-controls.webp" type="image/webp"><img src="../blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/pharma-life-sciences-ai-21-cfr-part-11.html" style="animation-delay:-2.000s" aria-label="AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records"><picture><source srcset="../blog/img/pharma-life-sciences-ai-21-cfr-part-11.webp" type="image/webp"><img src="../blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/pharma-life-sciences-ai-21-cfr-part-11.html" style="animation-delay:-2.000s" aria-label="AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records"><picture><source srcset="../blog/img/pharma-life-sciences-ai-21-cfr-part-11.webp" type="image/webp"><img src="../blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/prompt-injection-ai-threat-modeling.html" style="animation-delay:-4.000s" aria-label="Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation"><picture><source srcset="../blog/img/prompt-injection-ai-threat-modeling.webp" type="image/webp"><img src="../blog/img/prompt-injection-ai-threat-modeling.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/prompt-injection-ai-threat-modeling.html" style="animation-delay:-4.000s" aria-label="Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation"><picture><source srcset="../blog/img/prompt-injection-ai-threat-modeling.webp" type="image/webp"><img src="../blog/img/prompt-injection-ai-threat-modeling.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/retail-ecommerce-ai-ccpa-cpra.html" style="animation-delay:-6.000s" aria-label="AI Automation in Retail: CCPA/CPRA and the New Consumer Data Rulebook"><picture><source srcset="../blog/img/retail-ecommerce-ai-ccpa-cpra.webp" type="image/webp"><img src="../blog/img/retail-ecommerce-ai-ccpa-cpra.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/retail-ecommerce-ai-ccpa-cpra.html" style="animation-delay:-6.000s" aria-label="AI Automation in Retail: CCPA/CPRA and the New Consumer Data Rulebook"><picture><source srcset="../blog/img/retail-ecommerce-ai-ccpa-cpra.webp" type="image/webp"><img src="../blog/img/retail-ecommerce-ai-ccpa-cpra.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/state-local-government-ai-public-records.html" style="animation-delay:-8.000s" aria-label="AI in State and Local Government: Public Records Law and the Transparency Paradox"><picture><source srcset="../blog/img/state-local-government-ai-public-records.webp" type="image/webp"><img src="../blog/img/state-local-government-ai-public-records.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/state-local-government-ai-public-records.html" style="animation-delay:-8.000s" aria-label="AI in State and Local Government: Public Records Law and the Transparency Paradox"><picture><source srcset="../blog/img/state-local-government-ai-public-records.webp" type="image/webp"><img src="../blog/img/state-local-government-ai-public-records.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/telecom-ai-cpni-fcc.html" style="animation-delay:-10.000s" aria-label="AI and Customer Data in Telecom: CPNI Rules and FCC Enforcement"><picture><source srcset="../blog/img/telecom-ai-cpni-fcc.webp" type="image/webp"><img src="../blog/img/telecom-ai-cpni-fcc.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/telecom-ai-cpni-fcc.html" style="animation-delay:-10.000s" aria-label="AI and Customer Data in Telecom: CPNI Rules and FCC Enforcement"><picture><source srcset="../blog/img/telecom-ai-cpni-fcc.webp" type="image/webp"><img src="../blog/img/telecom-ai-cpni-fcc.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/telehealth-ai-licensure-hipaa.html" style="animation-delay:-12.000s" aria-label="AI Automation in Telehealth: Cross-State Licensure, HIPAA, and the Post-Emergency Landscape"><picture><source srcset="../blog/img/telehealth-ai-licensure-hipaa.webp" type="image/webp"><img src="../blog/img/telehealth-ai-licensure-hipaa.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/telehealth-ai-licensure-hipaa.html" style="animation-delay:-12.000s" aria-label="AI Automation in Telehealth: Cross-State Licensure, HIPAA, and the Post-Emergency Landscape"><picture><source srcset="../blog/img/telehealth-ai-licensure-hipaa.webp" type="image/webp"><img src="../blog/img/telehealth-ai-licensure-hipaa.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/title-escrow-ai-wire-fraud.html" style="animation-delay:-14.000s" aria-label="AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard"><picture><source srcset="../blog/img/title-escrow-ai-wire-fraud.webp" type="image/webp"><img src="../blog/img/title-escrow-ai-wire-fraud.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/title-escrow-ai-wire-fraud.html" style="animation-delay:-14.000s" aria-label="AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard"><picture><source srcset="../blog/img/title-escrow-ai-wire-fraud.webp" type="image/webp"><img src="../blog/img/title-escrow-ai-wire-fraud.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/what-is-data-masking-technical-guide.html" style="animation-delay:-16.000s" aria-label="What Is Data Masking? A Technical Guide to De-Identifying Data Before It Reaches an AI Model"><picture><source srcset="../blog/img/what-is-data-masking-technical-guide.webp" type="image/webp"><img src="../blog/img/what-is-data-masking-technical-guide.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/what-is-data-masking-technical-guide.html" style="animation-delay:-16.000s" aria-label="What Is Data Masking? A Technical Guide to De-Identifying Data Before It Reaches an AI Model"><picture><source srcset="../blog/img/what-is-data-masking-technical-guide.webp" type="image/webp"><img src="../blog/img/what-is-data-masking-technical-guide.jpg" alt="" loading="lazy"></picture></a></div></div><div class="ish-scrim"></div><div class="ish-overlay"><span class="eyebrow">Manufacturing &amp; Supply Chain</span><h1 class="ish-title">AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing</h1><p class="ish-lead">Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.</p></div></div>
+<main id="main">
+  <div class="wrap">
+    <div class="meta"><span class="dot"></span>Flow Research · 10 min read</div>
+    <article class="post">
+
+<p>Ask a plant manager what keeps them up at night about a new software tool, and data breach is rarely the first answer — it is usually somewhere further down the list, behind downtime, behind a supplier missing a quality spec, behind a customer audit. That instinct is not wrong, exactly, but it misses something specific to manufacturing that does not apply in most other industries: a meaningful share of the documentation flowing through an ordinary engineering department is not merely confidential in the commercial sense. It is legally controlled technical data, and moving it carelessly can constitute a regulatory violation entirely independent of whether any competitor or adversary ever actually benefits from the exposure. The violation exists the moment the data crosses a line the statute drew, regardless of consequence.</p>
+
+<h2>1. Export-Controlled Technical Data</h2>
+<p>The International Traffic in Arms Regulations, commonly abbreviated ITAR, govern technical data related to defense articles — not just the physical hardware itself, but the drawings, specifications, and technical know-how that would allow someone to design, build, or modify it. The Export Administration Regulations, or EAR, cover a broader and in some ways more common category: dual-use items with both civilian and military applications, which describes an enormous share of ordinary industrial and electronic components that manufacturers handle every day without necessarily thinking of them as "controlled" in any special sense.</p>
+<p>Both regimes restrict not just the physical export of an item across a border but the transmission of associated technical data by any means — including electronic transmission to systems or personnel located outside the United States, or even to foreign nationals physically present inside the United States, a category the regulations treat, for these purposes, as equivalent to an export to their home country. This is the detail that most engineers, trained to think about export control in terms of shipping manifests and customs declarations, simply have not internalized: an email attachment can be an export. A cloud upload can be an export. The physical location of the recipient's body is, in many cases, entirely beside the point.</p>
+
+<h2>2. The Cloud Jurisdiction Problem</h2>
+<p>This creates a distinct and frequently underappreciated risk: routing export-controlled technical data through a general-purpose cloud AI service can itself constitute an unauthorized export, if the service's infrastructure, support personnel, or model-training pipeline touches foreign persons or foreign-located servers at any point in the chain — regardless of whether any human being downstream ever actually reads, uses, or acts on the output the AI system produced. This is the concept of a "deemed export," and it can occur through data access alone. The regulatory violation is complete the moment a foreign person gains the technical capability to access the controlled data, whether or not they exercise it.</p>
+<p>Most cloud AI vendors, understandably, do not publish a detailed map of exactly which support engineers in which countries could theoretically access customer data during a troubleshooting session, or exactly where model-training infrastructure is physically located and staffed. That opacity is not evidence of bad faith on the vendor's part — it reflects how modern cloud infrastructure is actually built, distributed and redundant by design — but it is precisely the opacity that makes it very difficult for a manufacturer to make an informed export-control judgment about whether a given cloud service is safe to use with a specific category of controlled technical data. Absent that visibility, the only defensible assumption is a conservative one.</p>
+
+<h2>3. Controlled Unclassified Information in the Civilian Supply Chain</h2>
+<p>Even manufacturers with no direct defense contract of their own increasingly inherit NIST SP 800-171 obligations through customer flow-down clauses, as controlled information moves down multi-tier supply chains from a prime contractor through several layers of subcontractors and suppliers, each one bound by the same contractual language as the one above it. A workflow automation tool touching supplier correspondence, bill-of-materials data, or engineering change orders may be squarely in scope for these obligations without the manufacturer having a direct government contract at all — the obligation flowed down through a commercial customer relationship that may not have felt, at the time it was signed, like a defense-adjacent contract in any meaningful sense.</p>
+<p>This tends to catch smaller suppliers by surprise more than larger primes, precisely because smaller suppliers are less likely to have a dedicated compliance function tracking which of their customer contracts carry CUI flow-down language buried in the terms and conditions. A supplier making a component that ends up, several tiers removed, in a piece of defense equipment may not think of itself as part of the defense industrial base at all — and yet the flow-down clause in its purchase order says otherwise, and that clause governs regardless of the supplier's own self-perception.</p>
+
+<h2>4. Architecture as the Practical Answer</h2>
+<p>A fully <a href="../security.html">on-premises</a> or edge deployment keeps technical data inside the facility's own network boundary entirely, which avoids the export-jurisdiction question at the architecture level rather than attempting to manage it after the fact through downstream access controls, employee attestations, and periodic monitoring that depends on catching a violation after it has already occurred. If the data never leaves the facility's network, and the processing infrastructure is staffed and physically located entirely within the United States, the "deemed export through cloud access" problem simply does not have the opportunity to arise for that workflow.</p>
+<p>For non-controlled, lower-sensitivity workflows — general supplier correspondence that contains no technical specifications, non-technical scheduling, routine administrative communication — a masked secure-cloud deployment remains entirely appropriate and considerably faster and cheaper to stand up than building or expanding local infrastructure for every use case. The discipline required is not "avoid the cloud everywhere," which would sacrifice real efficiency gains for no corresponding benefit on genuinely non-sensitive workflows — it is classifying each workflow's data honestly before choosing its deployment path, and being willing to revisit that classification as a workflow's scope expands.</p>
+
+<h2>5. Building the Classification Habit on the Factory Floor</h2>
+<p>The practical challenge in manufacturing is less about understanding the regulations in the abstract — export-control officers generally understand ITAR and EAR quite well — and more about getting that understanding embedded into the daily habits of engineers and program managers who are not export-control specialists and are not thinking about jurisdiction when they are trying to close out a design review by end of day. The engineer uploading a drawing to get a quick AI-generated summary is not weighing deemed-export risk in that moment; they are trying to hit a deadline.</p>
+<p>This is exactly the argument for building the compliant boundary into the tooling itself, rather than into a training program that depends on every engineer remembering an export-control rule in the middle of an unrelated task. If the sanctioned workflow automation tool for engineering documentation runs entirely on-premises by default, the engineer does not need to make an export-control judgment call at all in order to use it safely — the safe choice and the convenient choice are the same choice, which is the only version of a compliance program that reliably survives contact with a real production schedule.</p>
+
+<h2>6. Conclusion</h2>
+<p>For manufacturers, the deployment-model decision is not primarily a data-breach question in the way it might be for a retailer or a consumer app — it is an export-control question, governed by an entirely different body of statute, with entirely different consequences that do not require any data breach to occur at all. Matching architecture to data classification, workflow by workflow, and building that match into the default behavior of the tools engineers actually use, is the only approach that scales safely across a supply chain of genuinely mixed sensitivity.</p>
+
+    </article>
+    <div class="refs">
+      <h2>References</h2>
+      <ol>
+
+<li>International Traffic in Arms Regulations (ITAR), 22 CFR Parts 120–130.</li>
+<li>Export Administration Regulations (EAR), 15 CFR Parts 730–774.</li>
+<li>National Institute of Standards and Technology, SP 800-171 Rev. 2, Protecting Controlled Unclassified Information.</li>
+<li>International Organization for Standardization, ISO/IEC 27001:2022.</li>
+<li>U.S. Department of Commerce, Bureau of Industry and Security, Guidance on Deemed Exports.</li>
+
+      </ol>
+    </div>
+    <div class="related">
+      <h2>Related Reading</h2>
+      <div class="related-list">
+        <a href="../blog/pharma-life-sciences-ai-21-cfr-part-11.html"><span class="rcat">Pharma &amp; Life Sciences</span><span class="rtitle">AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records</span></a>
+        <a href="../blog/retail-ecommerce-ai-ccpa-cpra.html"><span class="rcat">Retail &amp; E-Commerce</span><span class="rtitle">AI Automation in Retail: CCPA/CPRA and the New Consumer Data Rulebook</span></a>
+        <a href="../blog/state-local-government-ai-public-records.html"><span class="rcat">State &amp; Local Government</span><span class="rtitle">AI in State and Local Government: Public Records Law and the Transparency Paradox</span></a>
+      </div>
+    </div>
+    <div class="cta">
+      <p>See how Flow applies this in practice — in Flow's dedicated secure cloud with masking, on your own computers with Flow-Edge, or on a dedicated server in your network with Flow-Onprem.</p>
+      <a class="doit" href="../index.html#book" data-book data-ga="blog_waitlist"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Get a deployment plan</span></a>
+    </div>
+  </div>
+</main>
+<footer class="site-foot" id="footer" lang="en" dir="ltr">
+  <div class="foot-in">
+    <div class="foot-cols">
+      <div class="foot-col foot-brand">
+        <img loading="lazy" src="../assets/flow-logo-200.webp" alt="Flow" width="64" height="28">
+        <a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+      </div>
+      <nav class="foot-col" aria-label="Product">
+        <h3 data-k="ft.hFlow">Product</h3>
+        <a href="../trial.html" data-k="ft.glance">Glance</a>
+        <a href="../index.html#product" data-k="ft.flow">Flow</a>
+        <a href="../security.html" data-k="ft.sec">Security</a>
+        <a href="../pricing.html" data-k="ft.pricing">Pricing</a>
+        <a href="../solutions/index.html" data-k="ft.solutions">Solutions</a>
+      </nav>
+      <nav class="foot-col" aria-label="Company">
+        <h3 data-k="ft.hCo">Company</h3>
+        <a href="../about.html" data-k="ft.about">About</a>
+        <a href="../blog/index.html" data-k="ft.blog">Insights</a>
+        <a href="../contact.html" data-k="ft.contact">Contact</a>
+      </nav>
+    </div>
+    <div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav class="foot-legal" aria-label="Legal"><a href="../privacy.html" data-k="ft.privacy">Privacy</a><a href="../terms.html" data-k="ft.terms">Terms</a></nav></div>
+  </div>
+</footer>
+<script>document.addEventListener("visibilitychange",function(){document.documentElement.classList.toggle("ish-tab-hidden",document.hidden);});document.addEventListener("click",function(ev){var a=ev.target.closest(".ish-card"); if(a && typeof gtag==="function") gtag("event","ish_card_click",{article_path:a.getAttribute("href")});});</script>
+<script src="../assets/flow-header.js"></script>
+<script src="../assets/flow-inner.js"></script>
+<script defer src="../assets/flow-booking.js"></script>
+</body>
+</html>

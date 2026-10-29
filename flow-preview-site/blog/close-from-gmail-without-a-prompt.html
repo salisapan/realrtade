@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="One Do It when a real close is clear. Writes into personal destinations already connected for that close. Stays quiet when unsure. Not inbox AI.">
+<meta name="theme-color" content="#07090F">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="canonical" href="https://theflow-ai.com/blog/close-from-gmail-without-a-prompt.html">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Close What You Meant From Gmail: One Do It, No Prompt, No Auto-Send — Flow">
+<meta property="og:description" content="One Do It when a real close is clear. Writes into personal destinations already connected for that close. Stays quiet when unsure. Not inbox AI.">
+<meta property="og:url" content="https://theflow-ai.com/blog/close-from-gmail-without-a-prompt.html">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Close What You Meant From Gmail: One Do It, No Prompt, No Auto-Send — Flow">
+<meta name="twitter:description" content="One Do It when a real close is clear. Writes into personal destinations already connected for that close. Stays quiet when unsure. Not inbox AI.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<title>Close What You Meant From Gmail: One Do It, No Prompt, No Auto-Send &mdash; Glance</title>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Close What You Meant From Gmail: One Do It, No Prompt, No Auto-Send",
+  "description": "One Do It when a real close is clear. Writes into personal destinations already connected for that close. Stays quiet when unsure. Not inbox AI.",
+  "author": { "@type": "Organization", "name": "Flow" },
+  "publisher": { "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/" },
+  "mainEntityOfPage": "https://theflow-ai.com/blog/close-from-gmail-without-a-prompt.html",
+  "image": "https://theflow-ai.com/og.jpg",
+  "datePublished": "2026-10-28"
+}
+</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does the Chrome extension upload all my mail to your cloud?", "acceptedAnswer": {"@type": "Answer", "text": "No. The decision to show Do It runs on your device, on the message you have open, and that scoring does not send the email text to Flow. A write leaves the browser only when you click Do It, and it goes to the personal destination already connected for that close. Anonymous usage events contain no message text. The privacy policy lists them."}}, {"@type": "Question", "name": "Will it send email by itself?", "acceptedAnswer": {"@type": "Answer", "text": "No. Auto-send is not the close. If the close is a reply, Do It prepares a Gmail draft. You send it, or you do not."}}, {"@type": "Question", "name": "Is Glance a free trial of Flow?", "acceptedAnswer": {"@type": "Answer", "text": "No. Glance is a separate personal product. It does not include Flow's deployment options, and it is not for regulated matter data."}}, {"@type": "Question", "name": "Is this an inbox-zero tool or a task manager?", "acceptedAnswer": {"@type": "Answer", "text": "No. Both are out of scope. Glance does not try to empty the inbox, and it does not run a task list for you. It offers one Do It when a personal close is clear, and it stays quiet otherwise."}}]}</script>
+<link rel="stylesheet" href="../assets/fonts.css">
+<link rel="stylesheet" href="../assets/flow-premium.css">
+<link rel="stylesheet" href="../assets/blog-article.css">
+<script>
+(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
+</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'data:text/javascript,';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
+</script>
+<link rel="alternate" type="application/rss+xml" title="Flow Insights" href="../blog/rss.xml">
+<link rel="stylesheet" href="../assets/site-nav.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div id="progress"></div>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><img src="../logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async"></a>
+    <nav class="site-bar">
+      <div class="site-links">
+        <a href="../trial.html" data-nav="glance">Glance</a>
+        <a href="../index.html#product" data-nav="flow">Flow</a>
+        <a href="../pricing.html" data-nav="pricing">Pricing</a>
+        <a href="../security.html" data-nav="security">Security</a>
+        <a href="../contact.html" data-nav="contact">Contact</a>
+      </div>
+      <a class="doit sm nav-get" href="../trial.html" data-ga="nav_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-nav="cta">Get Glance</span></a>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+      </button>
+      
+      <button class="lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<div class="mobile-nav" id="mobileNav" hidden>
+  <a href="../index.html">Home</a><a href="../index.html#product">Product</a><a href="../solutions/index.html">Solutions</a><a href="../security.html">Security</a><a href="../pricing.html">Pricing</a><a href="../contact.html">Contact</a>
+  <div class="mobile-nav-legal"><a href="../trial.html">Glance</a><a href="../about.html">About</a><a href="../blog/index.html">Insights</a><a href="../privacy.html">Privacy</a><a href="../glance-privacy.html">Glance Privacy</a><a href="../terms.html">Terms</a></div>
+</div>
+<div class="ish-hero"><div class="ish-scene"><div class="ish-space"><a class="ish-card ish-r" href="../blog/close-from-gmail-without-a-prompt.html" style="animation-delay:0.000s" aria-label="Close What You Meant From Gmail: One Do It, No Prompt, No Auto-Send"><picture><source srcset="../blog/img/close-from-gmail-without-a-prompt.webp" type="image/webp"><img src="../blog/img/close-from-gmail-without-a-prompt.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/close-from-gmail-without-a-prompt.html" style="animation-delay:0.000s" aria-label="Close What You Meant From Gmail: One Do It, No Prompt, No Auto-Send"><picture><source srcset="../blog/img/close-from-gmail-without-a-prompt.webp" type="image/webp"><img src="../blog/img/close-from-gmail-without-a-prompt.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/hr-hiring-ai-bias-fcra.html" style="animation-delay:-2.000s" aria-label="AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook"><picture><source srcset="../blog/img/hr-hiring-ai-bias-fcra.webp" type="image/webp"><img src="../blog/img/hr-hiring-ai-bias-fcra.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/hr-hiring-ai-bias-fcra.html" style="animation-delay:-2.000s" aria-label="AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook"><picture><source srcset="../blog/img/hr-hiring-ai-bias-fcra.webp" type="image/webp"><img src="../blog/img/hr-hiring-ai-bias-fcra.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/human-in-the-loop-ai-system-design.html" style="animation-delay:-4.000s" aria-label="Designing Human-in-the-Loop Systems People Actually Use"><picture><source srcset="../blog/img/human-in-the-loop-ai-system-design.webp" type="image/webp"><img src="../blog/img/human-in-the-loop-ai-system-design.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/human-in-the-loop-ai-system-design.html" style="animation-delay:-4.000s" aria-label="Designing Human-in-the-Loop Systems People Actually Use"><picture><source srcset="../blog/img/human-in-the-loop-ai-system-design.webp" type="image/webp"><img src="../blog/img/human-in-the-loop-ai-system-design.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/insurance-claims-ai-automation.html" style="animation-delay:-6.000s" aria-label="AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight"><picture><source srcset="../blog/img/insurance-claims-ai-automation.webp" type="image/webp"><img src="../blog/img/insurance-claims-ai-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/insurance-claims-ai-automation.html" style="animation-delay:-6.000s" aria-label="AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight"><picture><source srcset="../blog/img/insurance-claims-ai-automation.webp" type="image/webp"><img src="../blog/img/insurance-claims-ai-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/insurance-underwriting-ai-rate-filing.html" style="animation-delay:-8.000s" aria-label="AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard"><picture><source srcset="../blog/img/insurance-underwriting-ai-rate-filing.webp" type="image/webp"><img src="../blog/img/insurance-underwriting-ai-rate-filing.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/insurance-underwriting-ai-rate-filing.html" style="animation-delay:-8.000s" aria-label="AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard"><picture><source srcset="../blog/img/insurance-underwriting-ai-rate-filing.webp" type="image/webp"><img src="../blog/img/insurance-underwriting-ai-rate-filing.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/legal-ai-workflow-automation.html" style="animation-delay:-10.000s" aria-label="Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility"><picture><source srcset="../blog/img/legal-ai-workflow-automation.webp" type="image/webp"><img src="../blog/img/legal-ai-workflow-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/legal-ai-workflow-automation.html" style="animation-delay:-10.000s" aria-label="Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility"><picture><source srcset="../blog/img/legal-ai-workflow-automation.webp" type="image/webp"><img src="../blog/img/legal-ai-workflow-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/manufacturing-ai-export-controls.html" style="animation-delay:-12.000s" aria-label="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing"><picture><source srcset="../blog/img/manufacturing-ai-export-controls.webp" type="image/webp"><img src="../blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/manufacturing-ai-export-controls.html" style="animation-delay:-12.000s" aria-label="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing"><picture><source srcset="../blog/img/manufacturing-ai-export-controls.webp" type="image/webp"><img src="../blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/pharma-life-sciences-ai-21-cfr-part-11.html" style="animation-delay:-14.000s" aria-label="AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records"><picture><source srcset="../blog/img/pharma-life-sciences-ai-21-cfr-part-11.webp" type="image/webp"><img src="../blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/pharma-life-sciences-ai-21-cfr-part-11.html" style="animation-delay:-14.000s" aria-label="AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records"><picture><source srcset="../blog/img/pharma-life-sciences-ai-21-cfr-part-11.webp" type="image/webp"><img src="../blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="../blog/prompt-injection-ai-threat-modeling.html" style="animation-delay:-16.000s" aria-label="Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation"><picture><source srcset="../blog/img/prompt-injection-ai-threat-modeling.webp" type="image/webp"><img src="../blog/img/prompt-injection-ai-threat-modeling.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="../blog/prompt-injection-ai-threat-modeling.html" style="animation-delay:-16.000s" aria-label="Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation"><picture><source srcset="../blog/img/prompt-injection-ai-threat-modeling.webp" type="image/webp"><img src="../blog/img/prompt-injection-ai-threat-modeling.jpg" alt="" loading="lazy"></picture></a></div></div><div class="ish-scrim"></div><div class="ish-overlay"><span class="eyebrow">Glance</span><h1 class="ish-title">Close What You Meant From Gmail: One Do It, No Prompt, No Auto-Send</h1><p class="ish-lead">One Do It when a real close is clear. Writes into personal destinations already connected for that close. Stays quiet when unsure. Not inbox AI.</p></div></div>
+<main id="main">
+  <div class="wrap">
+    <div class="meta"><span class="dot"></span>Glance · 5 min read</div>
+    <article class="post">
+
+<p class="lead">Glance watches the thread you have open. When a real personal close is clear, it shows one Do It. You click, and it writes into the personal destinations already connected for that close (Google or Notion, where those are live). It does not ask for a prompt. It does not send mail by itself. When it is not sure, it stays quiet.</p>
+
+      <h2>Not an inbox product</h2>
+      <p>Glance is not an email helper, not inbox AI, not an inbox-zero tool, and not a smarter inbox. It is also not a task manager. The point is trust that a clear intent actually closes. Most threads produce nothing on screen. Silence is the product working.</p>
+
+      <h2>What the write actually is</h2>
+      <p>A Do It writes only into destinations already connected for that close. It does not fan out to every system. The sign-in a new install shows is Google. Notion is a live write path in the product when that database is the destination connected for the close.</p>
+      <p>On the live Google path, the write matches the close:</p>
+      <ul>
+        <li>an item in Google Tasks, when that is the close</li>
+        <li>a Calendar event, created with Calendar's events.insert, when the close is a meeting or a named time</li>
+        <li>a Gmail draft, prepared and not sent, when the close is a reply</li>
+        <li>Drive is read-only (drive.readonly), and only when that close needs a file already in Drive</li>
+      </ul>
+      <p>One close does not write to Tasks, Calendar, Gmail, Drive, and Notion all at once. HubSpot, Salesforce, Slack, and Monday.com are not live Glance connectors.</p>
+
+      <h2>A drafted reply is not the close</h2>
+      <p>An extension that only drafts a reply still leaves the intent sitting in the thread. Glance's Do It writes the close into the personal destination already connected for it. When the close is a reply, the result is a draft. You send it yourself.</p>
+
+      <h2>What stays on the machine</h2>
+      <p>The decision to show Do It is made on your device. Email text is not uploaded to Flow to make that judgment. A write happens only when you click, and it goes to the destination already connected: Google's APIs with your own sign-in, or Notion when that destination is connected. Glance also sends a small set of anonymous usage events with no message content. The <a href="../privacy.html">privacy policy</a> lists them. Uninstalling the extension removes what it stored on the device.</p>
+
+      <h2>Separate from Flow</h2>
+      <p>Glance is its own product. It is not Flow Lite, and it is not a step toward an organization deployment. Closing from email is the entry, not the ceiling: the same personal loop can grow beyond email. It does not become an organization runtime, and it does not contain Flow. <a href="../blog/human-in-the-loop-ai-agents.html">Flow</a> is the other product, for regulated teams.</p>
+      <p><b>What this page will not call Glance.</b> Not an email helper. Not inbox AI. Not inbox-zero. Not a task manager. Not a trial of Flow. Do It, when a personal close is clear, and silence when it is not.</p>
+
+      <h2 id="faq">Common questions</h2>
+      <h3>Does the Chrome extension upload all my mail to your cloud?</h3>
+<p>No. The decision to show Do It runs on your device, on the message you have open, and that scoring does not send the email text to Flow. A write leaves the browser only when you click Do It, and it goes to the personal destination already connected for that close. Anonymous usage events contain no message text. The privacy policy lists them.</p>
+<h3>Will it send email by itself?</h3>
+<p>No. Auto-send is not the close. If the close is a reply, Do It prepares a Gmail draft. You send it, or you do not.</p>
+<h3>Is Glance a free trial of Flow?</h3>
+<p>No. Glance is a separate personal product. It does not include Flow's deployment options, and it is not for regulated matter data.</p>
+<h3>Is this an inbox-zero tool or a task manager?</h3>
+<p>No. Both are out of scope. Glance does not try to empty the inbox, and it does not run a task list for you. It offers one Do It when a personal close is clear, and it stays quiet otherwise.</p>
+
+
+    </article>
+    <div class="related">
+      <h2>Related Reading</h2>
+      <div class="related-list">
+        <a href="../blog/human-in-the-loop-ai-system-design.html"><span class="rcat">AI Architecture</span><span class="rtitle">Designing Human-in-the-Loop Systems People Actually Use</span></a>
+        <a href="../blog/prompt-injection-ai-threat-modeling.html"><span class="rcat">Architecture & Security</span><span class="rtitle">Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation</span></a>
+        <a href="../blog/auditability-by-design-ai-systems.html"><span class="rcat">Architecture & Security</span><span class="rtitle">Auditability by Design: Logging, Provenance, and Human Oversight in Regulated AI Systems</span></a>
+      </div>
+    </div>
+    <div class="cta">
+      <p>Glance is free, with no credit card. It is a separate product from Flow.</p>
+      <a class="doit" href="../trial.html" data-ga="blog_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get Glance</a>
+    </div>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">&copy; 2026 Flow. <a href="../index.html">theflow-ai.com</a> · <a href="../privacy.html">Privacy</a> · <a href="../glance-privacy.html">Glance Privacy</a> · <a href="../terms.html">Terms</a> · <a href="../blog/rss.xml">RSS</a></div>
+</footer>
+<script>
+(function(){
+  var bar = document.getElementById('progress');
+  var art = document.querySelector('article');
+  function update(){
+    var rect = art.getBoundingClientRect();
+    var total = rect.height - innerHeight * 0.5;
+    var seen = Math.min(Math.max(-rect.top, 0), total);
+    bar.style.width = (total > 0 ? (seen / total) * 100 : 0) + '%';
+  }
+  addEventListener('scroll', update, {passive:true});
+  addEventListener('resize', update);
+  update();
+  var tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try{localStorage.setItem('flow_theme', next);}catch(e){}
+  });
+})();
+</script>
+<script>document.addEventListener("visibilitychange",function(){document.documentElement.classList.toggle("ish-tab-hidden",document.hidden);});document.addEventListener("click",function(ev){var a=ev.target.closest(".ish-card"); if(a && typeof gtag==="function") gtag("event","ish_card_click",{article_path:a.getAttribute("href")});});</script>
+<script>
+(function(){
+  var mb=document.getElementById('menuBtn'), mn=document.getElementById('mobileNav');
+  if(!mb||!mn) return;
+  function close(){ mn.classList.remove('open'); mb.setAttribute('aria-expanded','false'); setTimeout(function(){ mn.hidden=true; },250); }
+  function open(){ mn.hidden=false; requestAnimationFrame(function(){ mn.classList.add('open'); }); mb.setAttribute('aria-expanded','true'); }
+  mb.addEventListener('click',function(){ mn.hidden ? open() : close(); });
+  mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
+  mn.addEventListener('click',function(e){ if(e.target===mn) close(); });
+  document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && !mn.hidden) close(); });
+})();
+</script>
+<script src="../assets/flow-premium.js" defer></script>
+<script src="../assets/site-nav.js" defer></script>
+</body>
+</html>

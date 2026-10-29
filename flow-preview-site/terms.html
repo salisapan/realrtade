@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="The terms covering use of theflow-ai.com, the Glance Chrome extension, and the material we publish. Flow deployments are governed by their own agreement.">
+<meta name="theme-color" content="#07090F">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="canonical" href="https://theflow-ai.com/terms.html">
+<title>Terms of Service — Flow</title>
+<style>
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat,var(--accent-ink,#6E9BFF)))}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans,sans-serif); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+</style>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';d.dataset.ui=l;var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'data:text/javascript,';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
+</script>
+<link rel="stylesheet" href="assets/flow-header.css">
+<link rel="stylesheet" href="assets/flow-booking.css">
+<link rel="stylesheet" href="assets/flow-inner.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="ctl" id="ctl">
+  <div class="lang">
+    <button type="button" id="langBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu" aria-label="Language">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"/></svg>
+      <span class="sr-only" id="langName">English</span>
+    </button>
+    <div class="menu" id="langMenu" role="menu" aria-labelledby="langBtn"></div>
+  </div>
+  <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Night mode">
+    <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"/></svg>
+    <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
+  </button>
+</div>
+<flow-header data-base=""></flow-header>
+<main id="main">
+  <div class="wrap">
+    <span class="eyebrow">Legal</span>
+    <h1 class="title">Terms of Service</h1>
+    <div class="updated">Last updated: September 7, 2026</div>
+    <article>
+
+<p>These Terms of Service ("Terms") govern your access to and use of theflow-ai.com, the Flow waitlist, and the Glance Chrome extension (together, the "Service"), operated by Flow ("Flow", "we", "us"). By joining the waitlist, installing Glance, or otherwise using the Service, you agree to these Terms. If you don't agree, please don't use the Service.</p>
+
+<h2>1. Who Can Use the Service</h2>
+<p>The Service is intended for business use. You must be at least 18 years old, and if you're signing up on behalf of an organization, you confirm you have the authority to do so and that "you" includes that organization.</p>
+
+<h2>2. Changes to the Service</h2>
+<p>Features, pricing and availability described on the site may change. Joining the waitlist or booking a call does not by itself create a commitment by either party to provide or purchase the service.</p>
+
+<h2>3. The Waitlist</h2>
+<p>When you join the waitlist, you agree to provide accurate information (your email, company, role, and company website). We use this to manage the waitlist and to send you related communications, including a confirmation email you must act on before we send further material — see our <a href="about.html">About</a> &middot; <a href="security.html">Security</a> &middot; <a href="contact.html">Contact</a> &middot; <a href="privacy.html">Privacy Policy</a> for details on how that information is handled.</p>
+
+<h2>4. Glance (the Chrome extension)</h2>
+<p>Glance is a separate, free product from Flow (the enterprise deployment). It closes open loops, starting in Gmail, and today it runs as a browser extension that reads Gmail locally and, only when you click Do It on a specific message, writes a short record to a connector you have personally authorized (today: your own Google Calendar, Google Tasks, or a Gmail draft). How Glance handles your data is described in full in our <a href="privacy.html">Privacy Policy</a>; these Terms cover your use of it.</p>
+<ul>
+<li><b>You are responsible for what you connect.</b> You must have the right to authorize Glance to write into any workspace, board, channel, or CRM you connect it to. Connecting an account you don't have authority over is a violation of these Terms.</li>
+<li><b>Every write is your own action.</b> Glance never writes anything automatically — each write is triggered by your own click on a specific message. You are responsible for reviewing what it extracted before relying on it, especially for anything financial, legal, or otherwise consequential.</li>
+<li><b>Not built for regulated or sensitive material.</b> Glance is intended for general business use. It carries none of the compliance guarantees, audit controls, or deployment options described on our <a href="security.html">Security</a> page — those apply only to Flow, the enterprise product.</li>
+<li><b>Undo has limits.</b> Most writes can be undone from Glance's own interface, but we cannot undo anything a third-party system, or another person with access to it, has already acted on before you undo it.</li>
+<li><b>Glance Pro is a paid subscription.</b> Pro adds Draft-It reply drafts and attachment summaries to the free product. The price, billing interval and any free-trial length are shown at checkout before you pay. A subscription renews automatically each month or year until you cancel. If it begins with a free trial, you are charged when the trial ends unless you cancel first.</li>
+<li><b>Cancelling.</b> Cancel at any time from the Glance panel (Manage billing) or by replying to your licence email; access continues until the end of the period you have paid for. If you are charged and did not mean to be, contact us within 14 days and we will refund your most recent charge. Nothing in this section limits rights you have under the law where you live.</li>
+<li><b>Your licence key is personal.</b> It is for you and your own devices; please do not publish or resell it. We may disable a key that is shared widely or whose payment fails or is reversed.</li>
+<li><b>Uninstalling ends the license.</b> Uninstalling the extension terminates your right to use it and removes the data it stored locally, as described in our Privacy Policy.</li>
+</ul>
+
+<h2>5. Acceptable Use</h2>
+<p>You agree not to: misuse the Service to submit false or another person's information without authorization; attempt to interfere with, disrupt, or gain unauthorized access to the Service or its underlying systems; scrape or harvest data from the site beyond normal browsing; or use the Service in violation of applicable law.</p>
+
+<h2>6. Intellectual Property</h2>
+<p>The Service, including its content, design, and the Flow name and logo, is owned by Flow or its licensors and is protected by intellectual-property law. These Terms don't grant you any rights to use Flow's trademarks or branding without our prior written consent.</p>
+
+<h2>7. Third-Party Services</h2>
+<p>The Service relies on third-party infrastructure (including Supabase, Resend, Netlify, and Google Analytics) to operate. We're not responsible for the availability or performance of those third-party services, though we choose providers we consider reputable.</p>
+
+<h2>8. Disclaimer of Warranties</h2>
+<p>The Service is provided "as is" and "as available," without warranties of any kind, express or implied, including — to the extent permitted by law — implied warranties of merchantability, fitness for a particular purpose, and non-infringement. We do not warrant that the Service will be uninterrupted, error-free, or secure.</p>
+
+<h2>9. Limitation of Liability</h2>
+<p>To the maximum extent permitted by law, Flow will not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of data, revenue, or goodwill, arising from your use of the Service, even if advised of the possibility of such damages.</p>
+
+<h2>10. Termination</h2>
+<p>We may suspend or terminate your access to the Service, including removing you from the waitlist, at any time, for any reason, including if we reasonably believe you've violated these Terms.</p>
+
+<h2>11. Governing Law</h2>
+<p>These Terms are governed by the laws of the State of Delaware, United States, without regard to its conflict-of-laws principles, unless a mandatory law of your country of residence provides otherwise.</p>
+
+<h2>12. Changes to These Terms</h2>
+<p>We may update these Terms as the product evolves. We'll update the "Last updated" date above when we do; continued use of the Service after changes take effect constitutes acceptance of the revised Terms.</p>
+
+<h2>13. Contact</h2>
+<p>Questions about these Terms? Email <a href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>.</p>
+
+    </article>
+  </div>
+</main>
+<footer class="site-foot" id="footer" lang="en" dir="ltr">
+  <div class="foot-in">
+    <div class="foot-cols">
+      <div class="foot-col foot-brand">
+        <img loading="lazy" src="assets/flow-logo-200.webp" alt="Flow" width="64" height="28">
+        <a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+      </div>
+      <nav class="foot-col" aria-label="Product">
+        <h3 data-k="ft.hFlow">Product</h3>
+        <a href="trial.html" data-k="ft.glance">Glance</a>
+        <a href="index.html#product" data-k="ft.flow">Flow</a>
+        <a href="security.html" data-k="ft.sec">Security</a>
+        <a href="pricing.html" data-k="ft.pricing">Pricing</a>
+        <a href="solutions/index.html" data-k="ft.solutions">Solutions</a>
+      </nav>
+      <nav class="foot-col" aria-label="Company">
+        <h3 data-k="ft.hCo">Company</h3>
+        <a href="about.html" data-k="ft.about">About</a>
+        <a href="blog/index.html" data-k="ft.blog">Insights</a>
+        <a href="contact.html" data-k="ft.contact">Contact</a>
+      </nav>
+    </div>
+    <div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav class="foot-legal" aria-label="Legal"><a href="privacy.html" data-k="ft.privacy">Privacy</a><a href="terms.html" data-k="ft.terms">Terms</a></nav></div>
+  </div>
+</footer>
+<script src="assets/flow-header.js"></script>
+<script src="assets/flow-inner.js"></script>
+<script defer src="assets/flow-booking.js"></script>
+</body>
+</html>

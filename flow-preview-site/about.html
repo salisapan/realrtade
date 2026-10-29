@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="About Flow and its founders, Sali Sapan (CEO) and Tomer Steinmetz (CTO): why we are building an AI workflow engine for organizations that cannot send raw sensitive data to a third-party model.">
+<meta name="theme-color" content="#07090F">
+<link rel="canonical" href="https://theflow-ai.com/about.html">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<title>About Flow — founded by Sali Sapan and Tomer Steinmetz</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="About Flow — founded by Sali Sapan and Tomer Steinmetz">
+<meta property="og:description" content="About Flow and its founders, Sali Sapan (CEO) and Tomer Steinmetz (CTO): why we are building an AI workflow engine for organizations that cannot send raw sensitive data to a third-party model.">
+<meta property="og:url" content="https://theflow-ai.com/about.html">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="About Flow — founded by Sali Sapan and Tomer Steinmetz">
+<meta name="twitter:description" content="About Flow and its founders, Sali Sapan (CEO) and Tomer Steinmetz (CTO): why we are building an AI workflow engine for organizations that cannot send raw sensitive data to a third-party model.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://theflow-ai.com/#org", "name": "Flow", "alternateName": ["Flow", "The Flow AI", "theflow-ai.com"], "url": "https://theflow-ai.com/", "logo": "https://theflow-ai.com/logo.png", "description": "Flow is a cognitive workflow engine for teams with sensitive data. It watches for what happened, proposes the update across your files and stack, and writes it when you approve.", "founder": [{"@id": "https://theflow-ai.com/about.html#sali-sapan"}, {"@id": "https://theflow-ai.com/about.html#tomer-steinmetz"}], "foundingLocation": {"@type": "Place", "name": "Israel"}, "disambiguatingDescription": "Flow (theflow-ai.com) is an independent cognitive workflow engine for teams with sensitive data, founded by Sali Sapan and Tomer Steinmetz. Not affiliated with Google Flow, flow-ai.com or The Flow."}, {"@type": "Person", "@id": "https://theflow-ai.com/about.html#sali-sapan", "name": "Sali Sapan", "jobTitle": "CEO & Co-Founder", "image": "https://theflow-ai.com/founder-sali.webp", "url": "https://theflow-ai.com/about.html#sali-sapan", "worksFor": {"@id": "https://theflow-ai.com/#org"}}, {"@type": "Person", "@id": "https://theflow-ai.com/about.html#tomer-steinmetz", "name": "Tomer Steinmetz", "jobTitle": "CTO & Co-Founder", "image": "https://theflow-ai.com/founder-tomer.webp", "url": "https://theflow-ai.com/about.html#tomer-steinmetz", "worksFor": {"@id": "https://theflow-ai.com/#org"}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"About","item":"https://theflow-ai.com/about.html"}]}</script>
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:clamp(56px,8vw,88px) 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
+h1.title{font-family:var(--disp); font-weight:600; font-size:clamp(2.1rem,4.4vw,2.7rem); line-height:1.14; letter-spacing:-.02em; color:var(--txt-hi); margin:16px 0 10px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:clamp(32px,5vw,44px); padding-bottom:24px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+/* article h2's own accent border was dropped — flow-premium.css already
+   draws a glow marker via ::before at the same inset; padding-inline-start
+   is kept so that marker still has room to sit in. */
+article h2{font-family:var(--disp); font-weight:600; font-size:clamp(1.25rem,2.2vw,1.42rem); line-height:1.3; letter-spacing:-.01em; color:var(--txt-hi); margin:clamp(44px,6vw,60px) 0 14px; padding-inline-start:14px}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat — which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; font-weight:400; color:var(--muted); line-height:1.55; margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:clamp(40px,6vw,56px) 0 10px; padding:clamp(28px,4vw,36px) 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
+/* Founders keep the site's signature blue-glow "AI frontier" identity
+   (orbit ring, radial hover glow) — the Apple pass here is typography
+   and breathing room only, not a monochrome palette swap. */
+.founders{display:flex; flex-direction:column; margin:clamp(28px,4vw,36px) 0 clamp(40px,6vw,56px); border-radius:22px; overflow:hidden; border:1px solid var(--line); background:var(--bg2); box-shadow:0 30px 60px -35px rgba(10,20,50,.35)}
+:root[data-theme="light"] .founders{box-shadow:0 30px 60px -35px rgba(20,44,100,.18)}
+.founder{position:relative; display:grid; grid-template-columns:112px 1fr; gap:28px; padding:clamp(30px,4vw,40px) clamp(26px,4vw,36px); font-family:var(--sans); isolation:isolate; transition:background .25s}
+.founder + .founder{border-top:1px solid var(--line)}
+.founder::before{content:''; position:absolute; inset:0; z-index:-1; opacity:0; background:radial-gradient(720px 260px at 0% 0%, rgba(45,94,255,.10), transparent 65%); transition:opacity .35s}
+.founder:hover::before{opacity:1}
+.founder:hover{background:rgba(45,94,255,.03)}
+.founder-visual{position:relative; width:96px; height:96px; flex:none}
+.founder-orbit{position:absolute; inset:-16px; border-radius:50%; border:1px solid rgba(45,94,255,.28); opacity:.7}
+.founder-orbit::after{content:''; position:absolute; inset:-8px; border-radius:50%; background:radial-gradient(circle, rgba(45,94,255,.24), transparent 72%); filter:blur(3px)}
+.founder-index{position:absolute; top:-6px; left:-6px; z-index:2; font-family:var(--sans); font-size:.62rem; font-weight:700; letter-spacing:.06em; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:999px; width:24px; height:24px; display:grid; place-items:center}
+.founder-photo{position:relative; z-index:1; width:96px; height:96px; border-radius:50%; object-fit:cover; display:block; box-shadow:0 0 0 4px var(--bg)}
+.founder-name{font-family:var(--disp); font-weight:600; font-size:1.3rem; color:var(--txt-hi); margin:0 0 4px; letter-spacing:-.015em}
+.founder-role{font-size:.74rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 17px; display:flex; align-items:center; gap:10px}
+.founder-role::after{content:''; height:1px; flex:1; background:linear-gradient(90deg, var(--line), transparent)}
+.founder-facts{list-style:none; margin:0; padding:0; font-size:.93rem; color:var(--txt); line-height:1.65; display:grid; gap:10px}
+.founder-facts li{position:relative; padding-inline-start:18px}
+.founder-facts li::before{content:''; position:absolute; inset-inline-start:1px; top:.6em; width:5px; height:5px; border-radius:50%; background:var(--cat)}
+@media (max-width:560px){
+  .founder{grid-template-columns:1fr; text-align:center; padding:30px 22px}
+  .founder-visual{margin:0 auto}
+  .founder-role{justify-content:center}
+  .founder-role::after{display:none}
+  .founder-facts{text-align:start}
+}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+</style>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';d.dataset.ui=l;var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'data:text/javascript,';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
+</script>
+<link rel="stylesheet" href="assets/flow-header.css">
+<link rel="stylesheet" href="assets/flow-booking.css">
+<link rel="stylesheet" href="assets/flow-inner.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="ctl" id="ctl">
+  <div class="lang">
+    <button type="button" id="langBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu" aria-label="Language">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"/></svg>
+      <span class="sr-only" id="langName">English</span>
+    </button>
+    <div class="menu" id="langMenu" role="menu" aria-labelledby="langBtn"></div>
+  </div>
+  <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Night mode">
+    <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"/></svg>
+    <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
+  </button>
+</div>
+<flow-header data-base=""></flow-header>
+<main id="main">
+  <div class="wrap">
+    <span class="eyebrow">About</span>
+    <h1 class="title">Why Flow exists.</h1>
+    
+    <article>
+<p class="lead">Most AI automation assumes it may read everything. In regulated work, that assumption is the entire problem.</p>
+<p>Flow was founded by <b>Sali Sapan</b> (CEO) and <b>Tomer Steinmetz</b> (CTO).</p>
+
+<h2>The founding team</h2>
+<div class="founders">
+  <div class="founder" id="sali-sapan">
+    <div class="founder-visual">
+      <span class="founder-orbit" aria-hidden="true"></span>
+      <span class="founder-index" aria-hidden="true">01</span>
+      <img class="founder-photo" src="founder-sali.webp" width="96" height="96" alt="Sali Sapan" loading="lazy" decoding="async">
+    </div>
+    <div class="founder-body">
+      <p class="founder-name">Sali Sapan</p>
+      <p class="founder-role">CEO &amp; Co-Founder</p>
+      <ul class="founder-facts">
+        <li>LL.B. and B.A. in Government, Strategy &amp; Political Science, Reichman University; M.Sc. in Data Science &amp; Machine Learning, Bar-Ilan University</li>
+        <li>Reserve officer, elite IDF special forces unit</li>
+        <li>Attorney at Fischer Behar Chen (FBC), one of Israel's leading law firms</li>
+        <li>Entrepreneur with prior ventures in hightech and real estate</li>
+      </ul>
+    </div>
+  </div>
+  <div class="founder" id="tomer-steinmetz">
+    <div class="founder-visual">
+      <span class="founder-orbit" aria-hidden="true"></span>
+      <span class="founder-index" aria-hidden="true">02</span>
+      <img class="founder-photo" src="founder-tomer.webp" width="96" height="96" alt="Tomer Steinmetz" loading="lazy" decoding="async">
+    </div>
+    <div class="founder-body">
+      <p class="founder-name">Tomer Steinmetz</p>
+      <p class="founder-role">CTO &amp; Co-Founder</p>
+      <ul class="founder-facts">
+        <li>B.Sc. in Computer Science, Reichman University</li>
+        <li>AI Engineer at Amazon, building and shipping applied AI systems at scale</li>
+        <li>Previously Team Lead at Hypernative, a cybersecurity and Web3 threat-prevention startup</li>
+        <li>3+ years as a backend engineer at Skai and CorrActions, shipping large-scale, Kafka-based data infrastructure</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2>The problem we started from</h2>
+<p>A law firm, a hospital, a bank, and a utility all have the same complaint about AI tooling: the demo is impressive, and the deployment is impossible. The blocker is rarely capability. It is that the workflow requires handing privileged, protected, or export-controlled material to a system whose data handling cannot be fully accounted for &mdash; and the person signing off on that has personal exposure if it goes wrong.</p>
+<p>So the work stays manual. Not because automation would not help, but because no one can defend the deployment.</p>
+
+<h2>What we built instead</h2>
+<p>Flow starts from the deployment constraint rather than treating it as a later integration problem:</p>
+<ul>
+<li><b>Where processing happens is a choice, not a default.</b> The office chooses between Flow's dedicated secure cloud, which masks all sensitive data before any processing; Flow-Edge, where data is stored only on the employee's own computer; and Flow-Onprem, a dedicated server inside the office's internal network.</li>
+<li><b>Sensitive fields are masked before processing</b>, not filtered out of logs afterward.</li>
+<li><b>Every write is reversible,</b> because "we think it did the right thing" is not an answer to an auditor. For regulated deployments, the scope of the audit log is agreed with your security team in the engagement.</li>
+<li><b>High-risk actions wait for a human.</b> Autonomy is bounded by policy you set.</li>
+</ul>
+<p>The technical detail is on the <a href="security.html">security page</a>.</p>
+
+<h2>How we write</h2>
+<p>We publish our research openly &mdash; <a href="blog/index.html">thirty articles</a> on deploying AI under HIPAA, GDPR, FCRA, 21 CFR Part 11, NERC CIP, CCPA, export controls, and the professional-responsibility rules that govern legal work. Much of it explains where automation is a bad idea, including for us. We would rather be useful to someone who does not buy from us than be persuasive to someone who should not have bought.</p>
+
+<h2>Where we are</h2>
+<p>Flow works with offices in regulated professions as design partners. If your workflows are blocked by exactly the constraint above, that is the conversation we want to have.</p>
+
+<div class="cta">
+  <h2>Work in a regulated environment?</h2>
+  <p>Tell us what is blocking your team, and we will tell you honestly whether Flow solves it.</p>
+  <a class="doit" href="contact.html" data-ga="about_contact"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Get in touch</span></a>
+</div>
+    </article>
+  </div>
+</main>
+<footer class="site-foot" id="footer" lang="en" dir="ltr">
+  <div class="foot-in">
+    <div class="foot-cols">
+      <div class="foot-col foot-brand">
+        <img loading="lazy" src="assets/flow-logo-200.webp" alt="Flow" width="64" height="28">
+        <a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+      </div>
+      <nav class="foot-col" aria-label="Product">
+        <h3 data-k="ft.hFlow">Product</h3>
+        <a href="trial.html" data-k="ft.glance">Glance</a>
+        <a href="index.html#product" data-k="ft.flow">Flow</a>
+        <a href="security.html" data-k="ft.sec">Security</a>
+        <a href="pricing.html" data-k="ft.pricing">Pricing</a>
+        <a href="solutions/index.html" data-k="ft.solutions">Solutions</a>
+      </nav>
+      <nav class="foot-col" aria-label="Company">
+        <h3 data-k="ft.hCo">Company</h3>
+        <a href="about.html" data-k="ft.about">About</a>
+        <a href="blog/index.html" data-k="ft.blog">Insights</a>
+        <a href="contact.html" data-k="ft.contact">Contact</a>
+      </nav>
+    </div>
+    <div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav class="foot-legal" aria-label="Legal"><a href="privacy.html" data-k="ft.privacy">Privacy</a><a href="terms.html" data-k="ft.terms">Terms</a></nav></div>
+  </div>
+</footer>
+<script src="assets/flow-header.js"></script>
+<script src="assets/flow-inner.js"></script>
+<script defer src="assets/flow-booking.js"></script>
+</body>
+</html>
