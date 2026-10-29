@@ -1034,12 +1034,30 @@ function onLaneMessage(msg, sender, sendResponse) {
   }
   if (msg.type === 'flow:gmail-compose') {
     const Compose = typeof FlowGoogleCompose !== 'undefined' ? FlowGoogleCompose : globalThis.FlowGoogleCompose;
+    const Config = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : globalThis.FlowGoogleConfig;
     const input = msg.input || msg.payload || {};
-    if (!Compose || typeof Compose.fill !== 'function') {
-      sendResponse({ ok: false, reason: 'unavailable', preview: true, closes: false, sent: false });
-      return true;
-    }
-    sendResponse(Compose.fill(input, input.state || { to: '', subject: '', body: '', sendClicks: 0 }));
+    Promise.resolve((async () => {
+      if (!Compose || typeof Compose.fill !== 'function') {
+        return { ok: false, reason: 'unavailable', preview: true, closes: false, sent: false };
+      }
+      let scopes = null;
+      try {
+        const bag = await chrome.storage.local.get('googleGrantedScopes');
+        const rec = bag && bag.googleGrantedScopes;
+        scopes = rec && rec.version != null ? String(rec.version).split('\n').map((s) => s.trim()).filter(Boolean) : null;
+      } catch (e) { scopes = null; }
+      if (!Config || typeof Config.gmailDraftApiAllowed !== 'function' || !Config.gmailDraftApiAllowed(scopes)) {
+        return {
+          ok: false,
+          reason: 'compose-closed',
+          preview: true,
+          closes: false,
+          sent: false,
+          error: 'Open Reply first. Glance does not press Send.'
+        };
+      }
+      return Compose.fill(input, input.state || { to: '', subject: '', body: '', sendClicks: 0 });
+    })()).then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable', preview: true, closes: false, sent: false }));
     return true;
   }
   return undefined;

@@ -494,10 +494,12 @@ function installE2EHooks() {
             .concat(scenario.sent || [])
             .concat(Object.values(scenario.messages || {}));
           const matched = pool.filter((row) => row && String(row.conversationId || '') === convId);
-          if (matched.length === 1) {
-            const row = matched[0];
-            const full = scenario.messages && scenario.messages[row.id];
-            return Promise.resolve(json(200, { value: [full ? Object.assign({}, row, full) : row] }));
+          if (matched.length) {
+            const value = matched.map((row) => {
+              const full = scenario.messages && scenario.messages[row.id];
+              return full ? Object.assign({}, row, full) : row;
+            });
+            return Promise.resolve(json(200, { value: value }));
           }
         }
         return Promise.resolve(json(200, { value: [] }));
@@ -841,8 +843,41 @@ async function boot() {
     return page;
   }
 
+  async function registerOutlookGraphMessage(o) {
+    const mail = o || {};
+    const id = mail.id;
+    if (!id) return;
+    await evalWorker((m) => {
+      const e = globalThis.__glanceE2e;
+      const sc = Object.assign({ inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] }, e.scenario || {});
+      const msgId = String(m.id || '');
+      if (!msgId) return;
+      const convId = m.convId ? String(m.convId) : (/^A[AQ]Qk/i.test(msgId) ? msgId : ('conv-' + msgId));
+      const toList = Array.isArray(m.to) ? m.to : ['ai.local.flow@gmail.com'];
+      const ccList = Array.isArray(m.cc) ? m.cc : [];
+      const row = {
+        id: msgId,
+        conversationId: convId,
+        subject: m.subject || 'Hello',
+        receivedDateTime: m.receivedDateTime || new Date().toISOString(),
+        from: { emailAddress: { address: String(m.senderEmail || 'ai.local.flow@gmail.com').toLowerCase(), name: m.senderName || '' } },
+        sender: { emailAddress: { address: String(m.senderEmail || 'ai.local.flow@gmail.com').toLowerCase(), name: m.senderName || '' } },
+        toRecipients: toList.map((address) => ({ emailAddress: { address: String(address || '').toLowerCase() } })),
+        ccRecipients: ccList.map((address) => ({ emailAddress: { address: String(address || '').toLowerCase() } })),
+        body: { contentType: 'text', content: String(m.body || '') },
+        bodyPreview: String(m.body || '').slice(0, 255)
+      };
+      sc.messages[msgId] = row;
+      const convPeers = (sc.conversation || []).filter((peer) => peer && peer.id !== msgId);
+      const sameConv = convPeers.filter((peer) => String(peer.conversationId || '') === convId);
+      sc.conversation = sameConv.concat([row]);
+      e.scenario = sc;
+    }, mail);
+  }
+
   harness.openOutlook = async function openOutlook(opts) {
     const o = opts || {};
+    await registerOutlookGraphMessage(o);
     const id = o.id;
     const url = outlookUrl(id);
     return openDocument(url, outlookHtml(o));

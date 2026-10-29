@@ -4301,6 +4301,16 @@ function glanceUiCopy(kind) {
   }
 
   async function sendGmailCompose(payload) {
+    if (!(await gmailComposeApiAllowedFromStorage())) {
+      return {
+        ok: false,
+        reason: 'compose-closed',
+        preview: true,
+        closes: false,
+        sent: false,
+        error: glanceUiCopy('composeClosed') || (glanceUiHebrew() ? 'פתח קודם תשובה. Glance לא לוחץ על שליחה.' : 'Open Reply first. Glance does not press Send.')
+      };
+    }
     if (payload && payload.contactCompose) {
       const composeIn = Object.assign({ useDraft: false }, payload.contactCompose);
       if (!composeBodyOpen()) {
