@@ -301,8 +301,12 @@ def check_profiles() -> None:
         package.FUNCTION_RESPONSE_BUDGET = real_budget
 
 
-def run(cmd: list[str]) -> None:
-    result = subprocess.run(cmd, cwd=REPO_ROOT)
+def run(cmd: list[str], env: dict[str, str] | None = None) -> None:
+    import os
+    merged = os.environ.copy()
+    if env:
+        merged.update(env)
+    result = subprocess.run(cmd, cwd=REPO_ROOT, env=merged)
     if result.returncode != 0:
         raise SystemExit(result.returncode)
 
@@ -358,11 +362,33 @@ def run_corpus_sweep() -> None:
         run(["node", str(path)])
 
 
+def check_packaged_manifest_scope_allowlist() -> None:
+    """Scope/host lint on the lite install zip manifest (what signup download serves)."""
+    if not package.ZIP_PATH.is_file():
+        die("packaged scope check: lite zip missing")
+    with zipfile.ZipFile(package.ZIP_PATH) as archive:
+        try:
+            raw = archive.read("manifest.json")
+        except KeyError:
+            die("packaged scope check: manifest.json missing from lite zip")
+    with tempfile.NamedTemporaryFile(mode="wb", suffix="-manifest.json", delete=False) as tmp:
+        tmp.write(raw)
+        tmp_path = tmp.name
+    try:
+        import os
+        env = os.environ.copy()
+        env["GLANCE_PACKAGED_MANIFEST"] = tmp_path
+        run(["node", str(REPO_ROOT / "flow-trial-extension" / "test" / "scope-allowlist-corpus.cjs")], env=env)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+
 def main() -> None:
     check_apis_google_script_guard()
     check_profiles()
     package.main([])
     check_zip()
+    check_packaged_manifest_scope_allowlist()
     check_cws_zip()
     run(["node", "--input-type=module", "-e", NODE_PUBLIC_CLIENT_ID_CHECK])
     run(["node", str(REPO_ROOT / "scripts" / "verify_download_handler.cjs")])

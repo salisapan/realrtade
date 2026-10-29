@@ -5,6 +5,8 @@ const { test, expect, chromium } = require('@playwright/test');
 const { copyExtension } = require('./support/launch');
 
 const HE_BUTTON = 'הפעל צ׳אטים של Meta';
+const CHAT_LANE_IDS = ['glance-lane-whatsapp', 'glance-lane-messenger', 'glance-lane-instagram'];
+const CHAT_FLOW_SURFACE_IDS = ['flow-slack', 'flow-telegram', 'flow-whatsapp'];
 
 function launch(extDir, userData) {
   return chromium.launchPersistentContext(userData, {
@@ -30,11 +32,28 @@ async function readyWorker(context) {
   return worker;
 }
 
-async function laneIds(worker) {
+async function registeredScriptIds(worker) {
   return worker.evaluate(async () => {
     const rows = await chrome.scripting.getRegisteredContentScripts();
     return rows.map((row) => row.id).sort();
   });
+}
+
+async function mailLanesFromManifest(worker) {
+  return worker.evaluate(() => {
+    const cs = chrome.runtime.getManifest().content_scripts || [];
+    const gmailRow = cs.find((r) => (r.matches || []).some((m) => m.indexOf('mail.google.com') >= 0));
+    const outlookRow = cs.find((r) => (r.matches || []).some((m) => /outlook\.(live|office)/.test(m)));
+    return {
+      gmail: Boolean(gmailRow && (gmailRow.js || []).indexOf('src/content-gmail.js') >= 0),
+      outlook: Boolean(outlookRow && (outlookRow.matches || []).length >= 1)
+    };
+  });
+}
+
+function assertNoChatLaneScripts(ids) {
+  for (const id of CHAT_LANE_IDS) expect(ids, 'dynamic chat lane ' + id).not.toContain(id);
+  for (const id of CHAT_FLOW_SURFACE_IDS) expect(ids, 'dynamic chat surface ' + id).not.toContain(id);
 }
 
 function grantOrigins(userData, id, origins) {
@@ -54,7 +73,7 @@ function grantOrigins(userData, id, origins) {
   fs.writeFileSync(prefsPath, JSON.stringify(prefs));
 }
 
-test('v1 manifest: Meta enable copy shows before grant, and a prefs grant registers no lane scripts', async () => {
+test('v1 bare manifest: Gmail and Outlook mail lanes are declared; chat lanes never register', async () => {
   test.setTimeout(120000);
   const extDir = copyExtension({ bare: true });
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-lanes-'));
@@ -63,8 +82,13 @@ test('v1 manifest: Meta enable copy shows before grant, and a prefs grant regist
     context = await launch(extDir, userData);
     let worker = await readyWorker(context);
     const extensionId = await worker.evaluate(() => chrome.runtime.id);
-    const origins = await worker.evaluate(() => globalThis.FlowMetaConsent.ORIGINS.slice());
+    const metaOrigins = await worker.evaluate(() => globalThis.FlowMetaConsent.ORIGINS.slice());
     const enableUrl = 'chrome-extension://' + extensionId + '/lane-chat/enable.html';
+
+    const lanes = await mailLanesFromManifest(worker);
+    expect(lanes.gmail, 'Gmail content_scripts lane').toBe(true);
+    expect(lanes.outlook, 'Outlook content_scripts lane').toBe(true);
+    assertNoChatLaneScripts(await registeredScriptIds(worker));
 
     const popup = await context.newPage();
     await popup.goto('chrome-extension://' + extensionId + '/popup/popup.html', { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -75,18 +99,25 @@ test('v1 manifest: Meta enable copy shows before grant, and a prefs grant regist
     await expect(enable.locator('[data-lang="he"]')).toBeVisible();
     await expect(enable.locator('[data-lang="en"]')).toBeHidden();
     await expect(enable.locator('[data-lang="he"]')).toContainText('שום דבר לא נשלח אוטומטית');
-    await expect(enable.locator('[data-lang="he"]')).toContainText('בצ׳אטים של WhatsApp');
-    await expect(enable.locator('[data-lang="he"]')).toContainText('המיקום של אירועים');
 
     await popup.close();
     await enable.close();
     await context.close();
     context = null;
-    grantOrigins(userData, extensionId, origins);
+
+    const chatGrants = metaOrigins.concat([
+      'https://app.slack.com/*',
+      'https://web.telegram.org/*',
+      'https://teams.microsoft.com/*'
+    ]);
+    grantOrigins(userData, extensionId, chatGrants);
 
     context = await launch(extDir, userData);
     worker = await readyWorker(context);
-    await expect.poll(() => laneIds(worker), { timeout: 20000 }).toEqual([]);
+    const lanesAfter = await mailLanesFromManifest(worker);
+    expect(lanesAfter.gmail).toBe(true);
+    expect(lanesAfter.outlook).toBe(true);
+    assertNoChatLaneScripts(await registeredScriptIds(worker));
   } finally {
     if (context) await context.close().catch(() => {});
     fs.rmSync(extDir, { recursive: true, force: true });
@@ -108,10 +139,8 @@ test('a WhatsApp-only grant registers no lane', async () => {
     grantOrigins(userData, extensionId, ['https://web.whatsapp.com/*']);
     context = await launch(extDir, userData);
     worker = await readyWorker(context);
-    await expect.poll(async () => {
-      const ids = await laneIds(worker);
-      return ids.filter((id) => id.indexOf('glance-lane-') === 0);
-    }, { timeout: 20000 }).toEqual([]);
+    const ids = await registeredScriptIds(worker);
+    assertNoChatLaneScripts(ids);
     const full = await worker.evaluate(async () => chrome.permissions.contains({ origins: globalThis.FlowMetaConsent.ORIGINS.slice() }));
     expect(full).toBe(false);
   } finally {

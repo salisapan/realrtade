@@ -70,26 +70,43 @@ function audit(name, list) {
   check(name + ': no duplicate scope', new Set(list).size === list.length, list);
 }
 
+function auditShippedManifest(man, label) {
+  const tag = label || 'manifest';
+  const manScopes = (man.oauth2 && man.oauth2.scopes) || [];
+  audit(tag + ' oauth2.scopes', manScopes);
+  check(tag + ': no Forms scope and no Forms host', !JSON.stringify(man).match(/forms\.body|auth\/forms|forms\.googleapis\.com/));
+  check(tag + ': no gmail OAuth scope', !manScopes.some((s) => /gmail|mail\.google/.test(s)));
+  check(tag + ': no contacts.readonly in oauth2', manScopes.indexOf(G + 'contacts.readonly') < 0);
+  check(tag + ': no people.googleapis.com host', !(man.host_permissions || []).some((h) => /people\.googleapis/.test(h)));
+  const hosts = man.host_permissions || [];
+  check(tag + ': host_permissions matches the allowed set exactly', JSON.stringify(hosts.slice().sort()) === JSON.stringify(ALLOWED_HOSTS.slice().sort()), { got: hosts, want: ALLOWED_HOSTS });
+  const optionalHosts = man.optional_host_permissions || [];
+  check(tag + ': v1 optional_host_permissions matches the allowed set exactly', JSON.stringify(optionalHosts.slice().sort()) === JSON.stringify(ALLOWED_V1_OPTIONAL_HOSTS.slice().sort()), { got: optionalHosts, want: ALLOWED_V1_OPTIONAL_HOSTS });
+  check(tag + ': no forbidden v1 optional chat/Meta host', !optionalHosts.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))), optionalHosts);
+  if (label === 'repo manifest') {
+    check('mutant messenger.com optional host is rejected by v1 optional audit', (() => {
+      const bad = optionalHosts.concat(['https://www.messenger.com/*']);
+      return bad.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))) && JSON.stringify(bad.slice().sort()) !== JSON.stringify(ALLOWED_V1_OPTIONAL_HOSTS.slice().sort());
+    })());
+    check('mutant contacts.readonly in manifest is rejected by audit', (() => {
+      const bad = manScopes.concat([G + 'contacts.readonly']).filter((s) => !ALLOW.has(s));
+      return bad.length === 1 && bad[0] === G + 'contacts.readonly';
+    })());
+  }
+}
+
 const man = JSON.parse(read('manifest.json'));
+auditShippedManifest(man, 'repo manifest');
 const manScopes = (man.oauth2 && man.oauth2.scopes) || [];
-audit('manifest oauth2.scopes', manScopes);
-check('manifest: no Forms scope and no Forms host', !JSON.stringify(man).match(/forms\.body|auth\/forms|forms\.googleapis\.com/));
-check('manifest: no gmail OAuth scope', !manScopes.some((s) => /gmail|mail\.google/.test(s)));
-check('manifest: no contacts.readonly in oauth2', manScopes.indexOf(G + 'contacts.readonly') < 0);
-check('manifest: no people.googleapis.com host', !(man.host_permissions || []).some((h) => /people\.googleapis/.test(h)));
-const hosts = man.host_permissions || [];
-check('manifest: host_permissions matches the allowed set exactly', JSON.stringify(hosts.slice().sort()) === JSON.stringify(ALLOWED_HOSTS.slice().sort()), { got: hosts, want: ALLOWED_HOSTS });
-const optionalHosts = man.optional_host_permissions || [];
-check('manifest: v1 optional_host_permissions matches the allowed set exactly', JSON.stringify(optionalHosts.slice().sort()) === JSON.stringify(ALLOWED_V1_OPTIONAL_HOSTS.slice().sort()), { got: optionalHosts, want: ALLOWED_V1_OPTIONAL_HOSTS });
-check('manifest: no forbidden v1 optional chat/Meta host', !optionalHosts.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))), optionalHosts);
-check('mutant messenger.com optional host is rejected by v1 optional audit', (() => {
-  const bad = optionalHosts.concat(['https://www.messenger.com/*']);
-  return bad.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))) && JSON.stringify(bad.slice().sort()) !== JSON.stringify(ALLOWED_V1_OPTIONAL_HOSTS.slice().sort());
-})());
-check('mutant contacts.readonly in manifest is rejected by audit', (() => {
-  const bad = manScopes.concat([G + 'contacts.readonly']).filter((s) => !ALLOW.has(s));
-  return bad.length === 1 && bad[0] === G + 'contacts.readonly';
-})());
+const packagedManifestPath = process.env.GLANCE_PACKAGED_MANIFEST;
+if (packagedManifestPath) {
+  if (!fs.existsSync(packagedManifestPath)) {
+    check('packaged manifest path exists', false, packagedManifestPath);
+  } else {
+    const packed = JSON.parse(fs.readFileSync(packagedManifestPath, 'utf8'));
+    auditShippedManifest(packed, 'packaged zip manifest');
+  }
+}
 
 const { FlowGoogleConfig: Cfg } = require(path.join(ROOT, 'core', 'google-config.js'));
 audit('google-config SCOPES', Cfg.SCOPES);
@@ -116,6 +133,15 @@ check('e2e launch.js: outlook calendar mock requests MailboxSettings.Read with C
   /Calendars\.ReadWrite/.test(launchSrc) && /MailboxSettings\.Read/.test(launchSrc));
 check('e2e launch.js: mailboxSettings mock includes timeZone UTC',
   /mailboxSettings[\s\S]{0,120}timeZone:\s*'UTC'/.test(launchSrc));
+check('e2e launch.js: chat optional hosts patch only the copied extension (optionalChat), not repo manifest',
+  /optionalChat/.test(launchSrc) && !read('manifest.json').match(/web\.whatsapp\.com|messenger\.com\/\*|instagram\.com\/direct/));
+check('repo manifest.json: Gmail and Outlook content_scripts are declared (v1 mail lanes)',
+  (() => {
+    const cs = man.content_scripts || [];
+    const gmail = cs.some((r) => (r.matches || []).some((m) => m.indexOf('mail.google.com') >= 0) && (r.js || []).indexOf('src/content-gmail.js') >= 0);
+    const outlook = cs.some((r) => (r.matches || []).some((m) => /outlook\.(live|office)/.test(m)));
+    return gmail && outlook;
+  })());
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
