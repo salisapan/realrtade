@@ -4437,8 +4437,9 @@
         if (fromLine && fromLine.length) pane.to = fromLine.slice();
       }
       if (pane.openSenderEmail == null) pane.openSenderEmail = pane.senderEmail || pane.ownSenderEmail || '';
-      const ownFromEarly = ownSender(pane.openSenderEmail || pane.senderEmail || headerEarly, ownAllEarly);
-      if ((ownFromEarly || personaOwnSender(ownAllEarly)) && (pane.to || []).some((addr) => ownAllEarly.indexOf(String(addr || '').toLowerCase()) < 0)) {
+      const fromEarly = String(pane.openSenderEmail || pane.senderEmail || pane.ownSenderEmail || headerEarly || '').toLowerCase();
+      const inboundEarly = fromEarly ? ownAllEarly.indexOf(fromEarly) < 0 : true;
+      if (!inboundEarly && fromEarly && (pane.to || []).some((addr) => ownAllEarly.indexOf(String(addr || '').toLowerCase()) < 0)) {
         dropStuckCard(pane);
         await pageReason('note-to-self', pane);
         return;
@@ -4604,7 +4605,9 @@
       forwarded: pane.onBehalf === true
     });
     const ownFromPane = ownSender(pane.openSenderEmail || pane.senderEmail || headerFrom, ownAll);
-    if ((ownFromPane || personaOwnSender(ownAll)) && (pane.to || []).some((addr) => ownAll.indexOf(String(addr || '').toLowerCase()) < 0)) {
+    const fromAddr = String(pane.openSenderEmail || pane.senderEmail || pane.ownSenderEmail || headerFrom || '').toLowerCase();
+    const inboundMail = fromAddr ? ownAll.indexOf(fromAddr) < 0 : true;
+    if (!inboundMail && fromAddr && (pane.to || []).some((addr) => ownAll.indexOf(String(addr || '').toLowerCase()) < 0)) {
       dropStuckCard(pane);
       await pageReason('note-to-self', pane);
       return;
