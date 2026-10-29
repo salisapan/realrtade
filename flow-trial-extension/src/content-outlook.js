@@ -4439,6 +4439,11 @@
 
     const openFrom = String(pane.openSenderEmail || '').trim().toLowerCase();
     const graphFrom = String(pane.senderEmail || '').trim().toLowerCase();
+    if (behalfSplit(graphFrom, pane.graphSenderEmail)) {
+      dropStuckCard(pane);
+      await pageReason('page:sender-mismatch', pane);
+      return;
+    }
     if (openFrom && graphFrom && openFrom !== graphFrom && !(await sameOpenSender(graphFrom, openFrom, null))) {
       dropStuckCard(pane);
       await pageReason('page:sender-mismatch', pane);
@@ -4601,9 +4606,16 @@
       onBehalfOf: pane.onBehalfOf || null,
       forwarded: pane.onBehalf === true
     });
-    const selfMail = !receiptOnly && !selfAddressed && pane.threadJudgmentShow !== true
-      && (ownSender(pane.senderEmail || headerFrom, ownAll) || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')));
+    const ownFromPane = ownSender(pane.senderEmail || headerFrom, ownAll);
+    const selfMail = !receiptOnly && !selfAddressed
+      && (ownFromPane || personaOwnSender(ownAll) || (selfPlanned && (selfPlanned.reason === 'note-to-self' || selfPlanned.reason === 'own-sender')))
+      && (!pane.threadJudgmentShow || ownFromPane);
     const selfNoteText = String(pane.text || '').trim() || String(pane.subject || '').trim();
+    if (selfMail && ownFromPane && !selfAddressed) {
+      dropStuckCard(pane);
+      await pageReason('note-to-self', pane);
+      return;
+    }
     if (selfMail && selfNoteText.length < 12) {
       dropStuckCard(pane);
       await pageReason('note-to-self', pane);
@@ -5319,7 +5331,7 @@
     const paneSubjectLen = String(pane.subject || '').trim().length;
     if ((!fetched.ok || !fetched.rows.length)
         && pane.idSource !== 'url-stale'
-        && (paneBodyLen >= 20 || (paneBodyLen === 0 && paneSubjectLen >= 8))) {
+        && (paneBodyLen >= 20 || paneSubjectLen >= 8)) {
       fetched = {
         ok: true,
         rows: [{
@@ -5408,6 +5420,7 @@
       clockAlt: '',
       pageHour24: false,
       hourCycle: '',
+      graphSenderEmail: senderAddress(msg),
       attachments: []
     };
   }

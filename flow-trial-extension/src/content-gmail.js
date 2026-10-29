@@ -4276,6 +4276,16 @@ function glanceUiCopy(kind) {
 
   // No compose window open: write through the lane (gmail.compose is enforced in core/google-drafts.js).
   async function saveReplyDraft(payload, input) {
+    if (!(await gmailComposeApiAllowedFromStorage())) {
+      return {
+        ok: false,
+        reason: 'compose-closed',
+        preview: true,
+        closes: false,
+        sent: false,
+        error: glanceUiCopy('composeClosed') || (glanceUiHebrew() ? 'פתח קודם תשובה. Glance לא לוחץ על שליחה.' : 'Open Reply first. Glance does not press Send.')
+      };
+    }
     const planned = typeof FlowGoogleCompose !== 'undefined' && typeof FlowGoogleCompose.plan === 'function'
       ? FlowGoogleCompose.plan(input)
       : { ok: false };

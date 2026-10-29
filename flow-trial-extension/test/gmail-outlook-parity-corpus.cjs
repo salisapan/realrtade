@@ -52,6 +52,19 @@ function background() {
   const calls = [];
   const stored = {
     googleTasksAuth: { taskListId: 'LIST_A' },
+    googleGrantedScopes: {
+      version: [
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/tasks',
+        'https://www.googleapis.com/auth/drive.file',
+        'openid',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/userinfo.email'
+      ].sort().join('\n'),
+      status: 'granted',
+      source: 'chrome',
+      at: Date.now()
+    },
     outlookAuth: { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600 * 1000, rtIssuedAt: Date.now() }, account: { address: 'glance.salisapan@outlook.com', name: 'Glance' } },
     outlookSync: {}
   };
@@ -250,8 +263,6 @@ const CASES = [
     const bg = background();
     const gOut = await bg.fn('gmailDraftWrite')(gp);
     const gCall = bg.calls.find((c) => c.method === 'POST' && /\/drafts$/.test(c.url));
-    const gmailText = gCall ? mimeBody(gCall.body.message.raw) : null;
-
     // The Outlook-on-the-web card's Do It (src/content-outlook.js) -> background outlookDraftWrite.
     const sender = entry.sender || { name: entry.base.counterpart.name, email: entry.base.counterpart.email };
     const op = Object.assign(J.draftPayload(entry.process, { sender, subject: m.subject }), { connectorId: 'outlookDraft', outlookIncomingId: entry.messageId, messageId: entry.messageId, text: m.text });
@@ -261,9 +272,8 @@ const CASES = [
     // The panel's Do It text (popup.js -> src/outlook.js createReplyDraft).
     const panelText = J.draftText(entry.process, { sender, subject: m.subject }, FlowDraftReply);
 
-    check(m.name + ': both writers made a draft, neither sent', gOut.ok && oOut.ok && !bg.calls.some((c) => /\/send\b|sendMail/.test(c.url)), { gOut, oOut });
-    check(m.name + ': the Outlook draft is word for word the Gmail draft', gmailText && outlookText === gmailText, { gmail: gmailText, outlook: outlookText });
-    check(m.name + ': the panel writes the same text too', panelText === gmailText, { panel: panelText, gmail: gmailText });
+    check(m.name + ': v1 Gmail compose off: Outlook drafts, Gmail refuses API draft', gOut.ok === false && gOut.reason === 'compose-closed' && oOut.ok && !gCall && !bg.calls.some((c) => /\/send\b|sendMail/.test(c.url)), { gOut, oOut });
+    check(m.name + ': the Outlook draft matches the panel text', outlookText && panelText === outlookText, { panel: panelText, outlook: outlookText });
     check(m.name + ': the Outlook draft replies to the message that was read', /\/me\/messages\/msg\d+\/createReply$/.test(oCall.url) && oCall.url.includes(entry.messageId), oCall.url);
   }
   check('the comparison is not empty: at least four asks were shown on both', shownBoth >= 4, shownBoth);

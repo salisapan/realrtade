@@ -462,6 +462,19 @@ async function storedTaskListId() {
   }
 }
 
+async function storedGrantedScopes() {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return null;
+    const bag = await chrome.storage.local.get('googleGrantedScopes');
+    const rec = bag && bag.googleGrantedScopes;
+    const raw = rec && rec.version;
+    if (raw == null) return null;
+    return String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
+  } catch (e) {
+    return null;
+  }
+}
+
 // The one list Glance writes to is titled Glance. It is looked up by title
 // first and made only when the account has none, once: concurrent callers
 // share one flight, and a failed read never leads to a create. The title is
@@ -551,7 +564,11 @@ async function seriesWanted(connectorId, msgInput, first) {
 }
 
 async function writeWithListRecovery(connectorId, msgInput, cred) {
-  const first = await prepareWrite(connectorId, msgInput, cred);
+  let first = await prepareWrite(connectorId, msgInput, cred);
+  if (connectorId === 'googleReplyDraft') {
+    const scopes = await storedGrantedScopes();
+    if (scopes) first = Object.assign({}, first, { grantedScopes: scopes });
+  }
   const rule = await seriesWanted(connectorId, msgInput, first);
   const meet = await meetWanted(connectorId, msgInput);
   if (rule || meet) {

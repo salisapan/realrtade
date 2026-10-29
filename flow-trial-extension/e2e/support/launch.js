@@ -483,7 +483,26 @@ function installE2EHooks() {
       // on conversationId is. A mailbox subject query selects conversationId
       // and must fall through to the subject filter below.
       if (path.indexOf('/me/messages') >= 0 && /conversationId/i.test(graphFilterValue(parsed.search))) {
-        return Promise.resolve(json(200, { value: scenario.conversation || [] }));
+        const convRows = scenario.conversation || [];
+        if (convRows.length) return Promise.resolve(json(200, { value: convRows }));
+        const filter = graphFilterValue(parsed.search);
+        const convMatch = filter.match(/conversationId\s+eq\s+'([^']+)'/i);
+        const convId = convMatch ? convMatch[1] : '';
+        if (convId) {
+          const pool = []
+            .concat(scenario.inbox || [])
+            .concat(scenario.sent || [])
+            .concat(Object.values(scenario.messages || {}));
+          const matched = pool.filter((row) => row && String(row.conversationId || '') === convId);
+          if (matched.length) {
+            const enriched = matched.map((row) => {
+              const full = scenario.messages && scenario.messages[row.id];
+              return full ? Object.assign({}, row, full) : row;
+            });
+            return Promise.resolve(json(200, { value: enriched }));
+          }
+        }
+        return Promise.resolve(json(200, { value: [] }));
       }
       if (path.indexOf('/me/mailboxSettings') >= 0) {
         return Promise.resolve(json(200, scenario.mailboxSettings || { timeFormat: 'h:mm tt', timeZone: 'UTC' }));
