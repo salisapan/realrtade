@@ -3651,7 +3651,7 @@ async function gmailDraftWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
   const C = globalThis.FlowGoogleConfig;
   const scopes = await googleGrantedScopeList();
-  if (C && !C.gmailDraftApiAllowed(scopes)) {
+  if (!C || !C.gmailDraftApiAllowed(scopes)) {
     return {
       ok: false,
       reason: 'compose-closed',
