@@ -28,33 +28,35 @@ function copyExtension(opts) {
   const manifestPath = path.join(dest, 'manifest.json');
   if (opts && opts.bare) return dest;
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  const extra = [
+  const hostExtra = [
     'https://outlook.live.com/*',
     'https://outlook.office.com/*',
     'https://outlook.office365.com/*',
     'https://graph.microsoft.com/*',
     'https://login.microsoftonline.com/*',
     'http://127.0.0.1/*',
-    'http://localhost/*',
-    // This copy only. The repo manifest does not list Messenger. The lane
-    // spec registers the chat scripts against a fixture on this host.
+    'http://localhost/*'
+  ];
+  const optionalChat = [
+    // E2E copy only. v1 product manifest omits chat optional hosts; Meta lane specs patch them in.
     'https://www.messenger.com/*',
     'https://messenger.com/*',
-    // This copy only. The repo manifest lists WhatsApp Web as an optional host;
-    // the scenario rehearsal registers the WhatsApp lane against a fixture here.
     'https://web.whatsapp.com/*',
-    // This copy only. The repo manifest already lists these as optional hosts.
+    'https://www.facebook.com/messages',
+    'https://www.facebook.com/messages/*',
+    'https://facebook.com/messages',
+    'https://facebook.com/messages/*',
     'https://business.facebook.com/latest/inbox',
     'https://business.facebook.com/latest/inbox/*',
     'https://www.business.facebook.com/latest/inbox',
     'https://www.business.facebook.com/latest/inbox/*',
-    // This copy only: the Instagram lane against a fixture on this host.
     'https://www.instagram.com/direct',
     'https://www.instagram.com/direct/*',
     'https://instagram.com/direct',
     'https://instagram.com/direct/*'
   ];
-  manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(extra)));
+  manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(hostExtra)));
+  manifest.optional_host_permissions = Array.from(new Set((manifest.optional_host_permissions || []).concat(optionalChat)));
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return dest;
 }

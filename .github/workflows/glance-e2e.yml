@@ -149,4 +149,4 @@ jobs:
         working-directory: flow-trial-extension
         run: |
           xvfb-run -a env GLANCE_E2E_SWITCHES='{"META_CHAT_LANES":true,"CHAT_TASK_CARD":true}' \
-            npx playwright test e2e/chat-whatsapp-card.spec.js e2e/chat-meta-lanes.spec.js e2e/lane-chat-draft.spec.js
+            npx playwright test e2e/chat-whatsapp-card.spec.js e2e/chat-meta-lanes.spec.js e2e/lane-chat-draft.spec.js e2e/lane-register-meta.spec.js

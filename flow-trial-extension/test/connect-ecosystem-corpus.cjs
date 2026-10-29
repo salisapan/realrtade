@@ -333,8 +333,13 @@ await ok('incremental optional scopes merge on Labs Teams or Outlook contacts', 
   assert.ok(merged.indexOf('Chat.Read') >= 0);
   assert.ok(merged.indexOf('Contacts.Read') >= 0);
   assert.ok(E.TEAMS_OPTIONAL_HOST_ORIGINS.indexOf('https://teams.microsoft.com/*') >= 0);
-  const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
-  assert.ok(/teams\.microsoft\.com/.test(manifest));
+  const manifestRaw = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
+  const manifest = JSON.parse(manifestRaw);
+  const optionalHosts = manifest.optional_host_permissions || [];
+  assert.ok(
+    !optionalHosts.some((h) => /teams\.microsoft\.com/i.test(String(h))),
+    'v1 manifest must not list Teams as optional_host_permissions (Labs requests it only after connect)'
+  );
   const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
   assert.ok(/flow:microsoft-optional-scopes/.test(bg) && /requestMicrosoftOptionalScopes/.test(bg));
 });

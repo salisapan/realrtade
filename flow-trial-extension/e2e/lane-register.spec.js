@@ -4,9 +4,7 @@ const path = require('path');
 const { test, expect, chromium } = require('@playwright/test');
 const { copyExtension } = require('./support/launch');
 
-const EXACT = ['glance-lane-instagram', 'glance-lane-messenger', 'glance-lane-whatsapp'];
 const HE_BUTTON = 'הפעל צ׳אטים של Meta';
-const HE_ON = 'צ׳אטים של Meta פועלים';
 
 function launch(extDir, userData) {
   return chromium.launchPersistentContext(userData, {
@@ -56,7 +54,7 @@ function grantOrigins(userData, id, origins) {
   fs.writeFileSync(prefsPath, JSON.stringify(prefs));
 }
 
-test('a full Meta grant registers exactly three lanes, and a revoke clears them', async () => {
+test('v1 manifest: Meta enable copy shows before grant, and a prefs grant registers no lane scripts', async () => {
   test.setTimeout(120000);
   const extDir = copyExtension({ bare: true });
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-lanes-'));
@@ -66,11 +64,10 @@ test('a full Meta grant registers exactly three lanes, and a revoke clears them'
     let worker = await readyWorker(context);
     const extensionId = await worker.evaluate(() => chrome.runtime.id);
     const origins = await worker.evaluate(() => globalThis.FlowMetaConsent.ORIGINS.slice());
-    const popupUrl = 'chrome-extension://' + extensionId + '/popup/popup.html';
     const enableUrl = 'chrome-extension://' + extensionId + '/lane-chat/enable.html';
 
     const popup = await context.newPage();
-    await popup.goto(popupUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await popup.goto('chrome-extension://' + extensionId + '/popup/popup.html', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await expect(popup.locator('#meta-chats-link .btn-label')).toHaveText(HE_BUTTON);
     const enable = await context.newPage();
     await enable.goto(enableUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -89,31 +86,7 @@ test('a full Meta grant registers exactly three lanes, and a revoke clears them'
 
     context = await launch(extDir, userData);
     worker = await readyWorker(context);
-    await expect.poll(() => laneIds(worker), { timeout: 20000 }).toEqual(EXACT);
-
-    // Stop the extension process and start it again on the same profile.
-    // That starts a new service worker. chrome.runtime.reload() does not
-    // surface a new worker in this headless Chrome, so the restart is this
-    // new process. The grant is still in the profile.
-    await context.close();
-    context = await launch(extDir, userData);
-    worker = await readyWorker(context);
-    await expect.poll(() => laneIds(worker), { timeout: 20000 }).toEqual(EXACT);
-
-    const grantedPopup = await context.newPage();
-    await grantedPopup.goto(popupUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await expect(grantedPopup.locator('#meta-chats-on')).toHaveText(HE_ON);
-
-    const removed = await worker.evaluate(async (list) => {
-      let ok = false;
-      try { ok = await chrome.permissions.remove({ origins: list }); } catch (e) { return { ok: false, error: String(e) }; }
-      let contains = null;
-      try { contains = await chrome.permissions.contains({ origins: list }); } catch (e) { contains = String(e); }
-      return { ok: ok, contains: contains };
-    }, origins);
-    expect(removed).toEqual({ ok: true, contains: false });
     await expect.poll(() => laneIds(worker), { timeout: 20000 }).toEqual([]);
-    await expect(grantedPopup.locator('#meta-chats-link .btn-label')).toHaveText(HE_BUTTON);
   } finally {
     if (context) await context.close().catch(() => {});
     fs.rmSync(extDir, { recursive: true, force: true });
