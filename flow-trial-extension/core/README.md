@@ -155,6 +155,7 @@ it, not touching the module.
 | `outlook-state-migrate.js` | One-shot upgrade: merge leftover HANDLED+UNDONE Outlook draft rows and scrub false-close counts for prepared-draft undos. |
 | `draft-reply.js` | Shared reply-draft body for Gmail and Outlook (never sent): rich ack of concrete asks (facts when known; placeholders only when needed), same shape on both surfaces. |
 | `owa-parse.js` | Outlook on the web reading-pane helpers (URL item id, subject/sender/body, match to sync entries). Selectors are best-effort against OWA markup. |
+| `outlook-thread-v1.js` | Full-conversation judgment for Outlook v1: walk thread rows newest-first for the first message that passes incoming judgment; never the latest message alone. Portable; no network. |
 | `outside-signals.js` | Loops that close without the other person replying |
 | `bill-paid.js` | A bill the person owes is closed only when it is paid: the payee's receipt, a bank or card debit naming the payee, or the person's own "I paid" to the payee, with the message as proof; lists bills past due (off: `opts.enabled`; not wired yet) |
 | `labs-switches.js` | The closes that ship behind an off switch, in one list, for the popup's Labs rows |
