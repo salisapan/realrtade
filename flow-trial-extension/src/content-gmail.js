@@ -967,7 +967,6 @@ function glanceUiCopy(kind) {
       const email = String(n.getAttribute('email') || '').trim().toLowerCase();
       if (email && email !== from && !inMessageBody(n)) found.add(email);
     });
-    if (found.size === 1 && found.has(own)) return false;
     return found.size > 0 && (from !== own || !found.has(own) || found.size > 1);
   }
 

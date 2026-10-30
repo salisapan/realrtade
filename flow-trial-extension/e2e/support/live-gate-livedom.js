@@ -13,7 +13,7 @@ function parseDomFile(name) {
   const html = raw.split('=== (1) outerHTML ===')[1].split('=== (2) aria-label ===')[0].trim();
   const aria = raw.split('=== (2) aria-label ===')[1].split('=== (3)')[0].trim();
   const cleaned = html
-    .replace(/<div class="flow-chip-host"[\s\S]*?<\/div>/gi, '')
+    .replace(/<div class="flow-chip-host"[\s\S]*?<\/div>\s*<\/div>/gi, '')
     .replace(/\sdata-glance-[a-z-]+="[^"]*"/gi, '');
   let detailsTable = '';
   const ajB = cleaned.match(/<div class="ajB">[\s\S]*?<\/div>\s*<\/div>/i);

@@ -14,6 +14,16 @@ function manifestGoogleGrantedVersion() {
   return scopes.slice().sort().join('\n');
 }
 
+// Headless lane tests exercise mailbox Drive search (live gate report ask,
+// file chains). Production v1 OAuth stays compose-only; E2E pretends readonly
+// was granted so search runs against the lane server instead of file silence.
+function e2eGoogleGrantedScopes() {
+  const base = manifestGoogleGrantedVersion();
+  const readonly = 'https://www.googleapis.com/auth/drive.readonly';
+  if (base.split('\n').indexOf(readonly) >= 0) return base;
+  return base + '\n' + readonly;
+}
+
 function copyExtension(opts) {
   const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-ext-'));
   fs.cpSync(EXT_ROOT, dest, {
@@ -1102,7 +1112,7 @@ async function boot() {
       googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
       googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' },
       googleGrantedScopes: {
-        version: manifestGoogleGrantedVersion(),
+        version: e2eGoogleGrantedScopes(),
         status: 'granted',
         source: 'chrome',
         at: Date.now()
