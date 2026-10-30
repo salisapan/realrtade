@@ -26,7 +26,12 @@ const SHOW = [
   'Please add your availability to the shared calendar by Thursday',
   'Please refund the duplicate charge by Friday',
   'בבקשה בצע את התשלום לפני סוף החודש',
-  'בבקשה תוסיפי את הזמינות שלך ליומן המשותף עד יום חמישי'
+  'בבקשה תוסיפי את הזמינות שלך ליומן המשותף עד יום חמישי',
+  'בבקשה שלח לי את פרטי החשבון להעברה עד יום חמישי',
+  'תעביר לי בבקשה את שם המשתמש של המערכת עד סוף היום',
+  'בבקשה תצרף אותי לקבוצת הווטסאפ של הפרויקט',
+  'תרשום אותי בבקשה לכנס ביום חמישי',
+  'תבדוק בבקשה את הדוח ותחזור אליי עד מחר בצהריים'
 ];
 const QUIET = [
   'Access to the shared folder has been granted',
@@ -43,7 +48,10 @@ const QUIET = [
   'Please add your availability when you are free, no rush',
   'You can make the payment online',
   'Your refund of the duplicate charge was issued',
-  'אפשר לבצע את התשלום באתר'
+  'אפשר לבצע את התשלום באתר',
+  'שלחתי את פרטי החשבון אתמול',
+  'המערכת תבדוק את הדוח ותחזור אליך',
+  'אפשר להירשם לכנס באתר שלנו'
 ];
 for (const t of SHOW) check('asks: ' + t, ask(t));
 for (const t of QUIET) check('stays quiet: ' + t, !ask(t));
