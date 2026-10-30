@@ -31,7 +31,12 @@ const SHOW = [
   'תעביר לי בבקשה את שם המשתמש של המערכת עד סוף היום',
   'בבקשה תצרף אותי לקבוצת הווטסאפ של הפרויקט',
   'תרשום אותי בבקשה לכנס ביום חמישי',
-  'תבדוק בבקשה את הדוח ותחזור אליי עד מחר בצהריים'
+  'תבדוק בבקשה את הדוח ותחזור אליי עד מחר בצהריים',
+  'hey can u send me the address for tomorrow',
+  'Could you walk Dana through the onboarding steps this week?',
+  'Please test the new build and report any bugs by Thursday',
+  'Please draft a reply to the customer complaint by end of day',
+  'Please add the invoice to the shared tracker by Wednesday'
 ];
 const QUIET = [
   'Access to the shared folder has been granted',
@@ -51,7 +56,12 @@ const QUIET = [
   'אפשר לבצע את התשלום באתר',
   'שלחתי את פרטי החשבון אתמול',
   'המערכת תבדוק את הדוח ותחזור אליך',
-  'אפשר להירשם לכנס באתר שלנו'
+  'אפשר להירשם לכנס באתר שלנו',
+  'Please test results are attached',
+  'pls note the new address',
+  'Can you believe it, the build is done',
+  'I will draft a reply by end of day',
+  'Please walk-in only on Friday'
 ];
 for (const t of SHOW) check('asks: ' + t, ask(t));
 for (const t of QUIET) check('stays quiet: ' + t, !ask(t));
