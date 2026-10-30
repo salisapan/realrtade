@@ -2,6 +2,7 @@
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
 const { liveGmailPage, loadCases } = require('./support/live-gate-livedom');
+const { e2eGoogleGrantedScopes } = require('./support/launch');
 
 let server;
 
@@ -18,7 +19,17 @@ const cases = loadCases();
 for (const row of cases) {
   test(row.id, async ({ glance }) => {
     const pageOpts = row.page || {};
-    const seed = Object.assign({ onboarded: true, connectorId: 'googleTasks', glanceUiLanguage: row.ui || 'he' }, row.seed || {});
+    const seed = Object.assign({
+      onboarded: true,
+      connectorId: 'googleTasks',
+      glanceUiLanguage: row.ui || 'he',
+      googleGrantedScopes: {
+        version: e2eGoogleGrantedScopes(),
+        status: 'granted',
+        source: 'chrome',
+        at: Date.now()
+      }
+    }, row.seed || {});
     await glance.seedGmail(seed);
     const html = liveGmailPage(pageOpts);
     const url = 'https://mail.google.com/mail/u/0/#all/' + (pageOpts.messageId || 'fixture');

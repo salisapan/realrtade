@@ -1112,7 +1112,7 @@ async function boot() {
       googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
       googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' },
       googleGrantedScopes: {
-        version: e2eGoogleGrantedScopes(),
+        version: manifestGoogleGrantedVersion(),
         status: 'granted',
         source: 'chrome',
         at: Date.now()
@@ -1160,4 +1160,4 @@ async function boot() {
   return harness;
 }
 
-module.exports = { boot, outlookAuth, copyExtension };
+module.exports = { boot, outlookAuth, copyExtension, e2eGoogleGrantedScopes, manifestGoogleGrantedVersion };

@@ -178,7 +178,8 @@ test('WhatsApp, CHAT_TASK_CARD on: a plain chat line shows nothing', async ({ gl
 // Meta Business Suite shares the Messenger lane (same files, the business inbox addresses): a customer writing to the person's page.
 const fs = require('fs');
 const path = require('path');
-const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8');
+const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8')
+  .replace(/2026-10-14/g, '2026-10-27');
 const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
 test('Business Suite, CHAT_TASK_CARD on: a customer\'s payment ask on the page inbox is one To Do task, nothing is sent', async ({ glance }) => {
