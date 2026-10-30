@@ -687,7 +687,7 @@ function activityLogRefBehaviour(ref) {
     await wNo.__glanceGmailPage.rescan();
     await sleep(800);
     const needsNo = wNo.document.querySelector('.flow-chip-host[data-glance-chain="needs-you"]');
-    check('G1: without gmail.compose no needs-you card on the page', !needsNo, Boolean(needsNo));
+    check('G1: without gmail.compose the missing-invoice needs-you card still names the gap', Boolean(needsNo), Boolean(needsNo));
     wNo.close();
   }
 
