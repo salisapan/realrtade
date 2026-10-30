@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('./support/harness');
+const { e2eGoogleGrantedScopes } = require('./support/launch');
 const { sameDayIso } = require('./support/frozen-date');
 
 const SHOTS = '/opt/cursor/artifacts/screenshots';
@@ -173,6 +174,16 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
 
   // After the names read. A second Gmail tab with no account button writes
   // glanceNamesDiag source none, and that must not land before the assertion.
+  // v1 OAuth is compose-only; the deck needs-you card runs the file chain after
+  // mailbox Drive search (same E2E grant as live-gate file asks).
+  await glance.seed({
+    googleGrantedScopes: {
+      version: e2eGoogleGrantedScopes(),
+      status: 'granted',
+      source: 'chrome',
+      at: Date.now()
+    }
+  });
   const deck = await glance.openGmail({
     lang: 'he',
     messageId: 'm-he-deck',
