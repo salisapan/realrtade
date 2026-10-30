@@ -11,6 +11,12 @@ const FlowChatPaymentClaim = (() => {
   // "I sent you the contract" is a document, not money: the document claim (core/chat-sent-claim.js) owns it. Money is named by an amount or by a
   // payment word; "I sent it" with nothing named stays a possible payment claim.
   const DOC_SENT = /\b(?:sent|emailed|e-?mailed|uploaded|shared|forwarded)\s+(?:you\s+)?(?:over\s+)?(?:the\s+|my\s+|your\s+|our\s+|a\s+|an\s+)?(?:signed\s+|updated\s+|final\s+|new\s+)?(?:contract|agreement|file|files|document|documents|doc|docs|invoice|pdf|quote|report|link|photos?|pictures?|email|mail|message|form|details|proposal|offer|receipt|screenshot|presentation|deck|sheet|photo)\b|שלחתי\s+(?:לך\s+)?את\s+(?:ה)?(?:חוזה|קובץ|קבצים|מסמך|חשבונית|הצעה|דוח|קישור|תמונה|תמונות|טופס|מצגת)/i;
+  // Red team 2026-10-30 (docs/glance-ai/red-team.md): a part of the money is not the payment («העברתי, את השאר בשבוע הבא», "I paid the
+  // deposit"), and paying somebody else is not paying you («שילמתי לספק», "I paid the plumber"). Both used to read as a claim and, with one
+  // open payment task in the chat, offered "Paid?".
+  const PART = /\b(?:rest|remainder|remaining|half|part\s+of|partial(?:ly)?|deposit|down\s*payment|advance|first\s+(?:installment|payment|part)|installments?)\b|(?:השאר|היתרה|יתרה|חצי|חלק\s*(?:מ|מה)?|מקדמה|תשלום\s+ראשון|בתשלומים)/i;
+  const OTHER_PAYEE_EN = /\b(?:paid|transferred|sent|wired)\s+(?:it\s+|the\s+money\s+|the\s+payment\s+)?(?:to\s+)?(?:the|my|our|his|her|their)\s+(?!payment|money|transfer|invoice|bill|balance|amount|fee|full|whole|total|\d)[a-z]+/i;
+  const OTHER_PAYEE_HE = /(?:שילמתי|שילמנו|העברתי|העברנו)\s+(?:את\s+(?:ה)?(?:תשלום|כסף)\s+)?ל(?:עורך|עורכת|עו\"ד|עוה\"ד|רואה|רואת|רו\"ח|מנהל|מנהלת|ספק|ספקים|בנק|לקוח|לקוחה|משרד|הנהלת|מחלקת|אחראי|צוות|שליח|חברה|חברת|אינסטלטור|חשמלאי|קבלן|מתווך|מתווכת|בעל|בעלת|יועץ|יועצת)(?![\u0590-\u05FF])/;
   const QUESTION = /[?؟]/;
   const AMOUNT = /(?:(?:[$€£₪])\s?(\d[\d,]*(?:\.\d{1,2})?))|(?:(\d[\d,]*(?:\.\d{1,2})?)\s?(?:₪|\$|€|£|nis|ils|usd|eur|gbp|shekels?|shekel|dollars?|euros?|ש"ח|ש״ח|שח|שקל(?:ים)?|דולר(?:ים)?|אירו))/i;
   const CUR = [[/(?:₪|nis|ils|shekel|ש"ח|ש״ח|שח|שקל)/i, 'NIS'], [/(?:\$|usd|dollar|דולר)/i, 'USD'], [/(?:€|eur|euro|אירו)/i, 'EUR'], [/(?:£|gbp)/i, 'GBP']];
@@ -34,6 +40,8 @@ const FlowChatPaymentClaim = (() => {
     if (raw.length > 160) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-a-payment-made' };
+    if (PART.test(raw)) return { kind: 'none', reason: 'a-part-not-the-payment' };
+    if (OTHER_PAYEE_EN.test(raw) || OTHER_PAYEE_HE.test(raw)) return { kind: 'none', reason: 'paid-someone-else' };
     if (!CLAIM_EN.test(raw) && !CLAIM_HE.test(raw)) return { kind: 'none', reason: 'no-claim' };
     if (DOC_SENT.test(raw) && !AMOUNT.test(raw) && !/\b(?:payment|transfer|money|paid)\b|תשלום|כסף/i.test(raw)) return { kind: 'none', reason: 'a-document-not-a-payment' };
     const a = amountOf(raw);

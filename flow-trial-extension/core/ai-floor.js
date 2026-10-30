@@ -73,8 +73,26 @@ const FlowAiFloor = (() => {
     return null;
   }
   function offerAcceptance(t) { return OFFER_EN.test(t) || OFFER_HE.test(t); }
+  // Red team 2026-10-30 (docs/glance-ai/red-team.md): an injection written to slip past the patterns above. A zero-width or soft hyphen inside
+  // a word ("Ig​nore"), full-width letters ("Ｉｇｎｏｒｅ"), a Cyrillic or Greek letter that looks Latin ("Ignоre"), spaced-out letters
+  // ("I g n o r e"), or the same order in other words ("forget everything above", «תתעלם מכל מה שנאמר לך קודם»). The text is folded first,
+  // then read by the same patterns plus the paraphrases.
+  const LOOKALIKE = { 'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x', 'і': 'i', 'ј': 'j', 'ѕ': 's', 'ԁ': 'd', 'ӏ': 'l', 'һ': 'h', 'к': 'k', 'м': 'm', 'н': 'h', 'т': 't', 'в': 'b',
+    'А': 'A', 'Е': 'E', 'О': 'O', 'Р': 'P', 'С': 'C', 'Т': 'T', 'Х': 'X', 'І': 'I', 'К': 'K', 'М': 'M', 'Н': 'H', 'В': 'B',
+    'ο': 'o', 'α': 'a', 'ε': 'e', 'ι': 'i', 'κ': 'k', 'ν': 'v', 'ρ': 'p', 'τ': 't', 'υ': 'u', 'Ο': 'O', 'Α': 'A', 'Ε': 'E', 'Ι': 'I', 'Κ': 'K', 'Ν': 'N', 'Ρ': 'P', 'Τ': 'T' };
+  function fold(x) {
+    let t = String(x == null ? '' : x);
+    try { t = t.normalize('NFKC'); } catch (e) { /* keep as is */ }
+    t = t.replace(/[­᠎​-‏⁠-⁤﻿‪-‮⁦-⁩]/g, '');
+    t = t.replace(/[Ͱ-ϿЀ-ӿ]/g, (ch) => LOOKALIKE[ch] || ch);
+    t = t.replace(/(?:\b[A-Za-z][  ]){3,}[A-Za-z]\b/g, (m) => m.replace(/[  ]/g, ''));
+    return t;
+  }
+  const INJECT_PARA_EN = /\b(?:forget|disregard|ignore|drop)\s+(?:about\s+)?(?:everything|all(?:\s+of)?(?:\s+(?:that|this|the\s+above))?|anything)\s+(?:(?:written\s+|said\s+|stated\s+)?(?:above|before|prior|previously|earlier)|you\s+(?:were|have\s+been)\s+(?:told|given|instructed))\b|\b(?:disregard|ignore|forget)\s+what\s+you\s+(?:were|have\s+been)\s+(?:told|instructed|asked|given)\b/i;
+  const INJECT_PARA_HE = /(?:התעלם|תתעלם|התעלמי|תתעלמי|התעלמו|תתעלמו|שכח|תשכח|שכחי|תשכחי)\s+(?:מ|מכל|ממה|מכל\s+מה|את\s+כל\s+מה)\s*(?:מה\s+)?ש(?:נאמר|נכתב|אמרו|קיבלת|ביקשו|הוגדר|כתוב)/;
   function textVeto(full, own) {
-    if (INJECT_EN.test(full) || INJECT_HE.test(full)) return 'injection';
+    const ff = fold(full);
+    if (INJECT_EN.test(full) || INJECT_HE.test(full) || INJECT_EN.test(ff) || INJECT_HE.test(ff) || INJECT_PARA_EN.test(ff) || INJECT_PARA_HE.test(ff)) return 'injection';
     if (FRAUD_EN.test(own) || FRAUD_HE.test(own)) return 'payment-fraud';
     return null;
   }
@@ -123,7 +141,10 @@ const FlowAiFloor = (() => {
   // floorFor(mail) -> the { gate, veto } pair Router v2 takes as deps, bound to this mail.
   function floorFor(mail) { return { gate: (p) => gate(p, mail), veto: (p) => veto(p, mail) }; }
 
-  return { gate, veto, floorFor, hasDeadline, unsupportedKind, offerAcceptance, moneyMovement };
+  // The injection read alone, for close paths that are not a model proposal (core/bill-paid.js): folded text, the same patterns.
+  function injected(text) { const t = clean(text), ff = fold(t); return INJECT_EN.test(t) || INJECT_HE.test(t) || INJECT_EN.test(ff) || INJECT_HE.test(ff) || INJECT_PARA_EN.test(ff) || INJECT_PARA_HE.test(ff); }
+
+  return { gate, veto, floorFor, hasDeadline, unsupportedKind, offerAcceptance, moneyMovement, fold, injected };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowAiFloor };

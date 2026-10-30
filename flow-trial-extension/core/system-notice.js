@@ -53,6 +53,32 @@ const FlowSystemNotice = (() => {
     /\byou(?:'| a)?re receiving this\b/i, /\byou are receiving this\b/i, /\byou received this email because\b/i,
     /להסרה מרשימת/, /קיבלת מייל זה/, /ניוזלטר/, /וובינר/, /מבצע/
   ];
+  // Red team 2026-10-23 (docs/glance-ai/red-team.md). A known domain also relays words anyone can write: a shared document's title
+  // (drive-shares-noreply@google.com), an issue comment (notifications@github.com), an invoice a stranger sends (service@paypal.com),
+  // a calendar invitation. "Your account will be suspended on October 28 unless you verify it at <link>" arrived that way and became a
+  // task titled with the provider's name, which reads as Glance vouching for a phishing mail. Two things now keep it quiet:
+  //   - the mail says someone else wrote or sent it (shared with you, commented, invited you, sent you an invoice, שיתף, הזמין אותך);
+  //   - a link in the mail points outside the sending service (a real notice links to its own domain).
+  const RELAY = [
+    /\b(?:shared|has shared|is sharing)\s+(?:a|an|the|this)?\s*(?:document|doc|file|folder|spreadsheet|sheet|presentation|form|link|item)s?\b/i,
+    /\bshared\s+(?:with you|.{0,40}\bwith you)\b/i, /\b(?:invited|has invited) you\b/i, /\binvitation:/i,
+    /\b(?:commented|replied|mentioned you|left a comment|wrote a comment|opened (?:an|this) issue|assigned you)\b/i,
+    /\bsent you (?:a|an) (?:invoice|money request|request|payment request|file|message)\b/i, /\brequested (?:money|a payment|payment)\b/i,
+    /\bvia (?:google (?:docs|drive|forms|sheets|calendar)|dropbox|docusign|github)\b/i,
+    /(?:שיתפ?ה?\s+(?:איתך|אתך|את)|הזמינ?ה?\s+אותך|הגיב(?:ה)?\s+על|שלח(?:ה)?\s+לך\s+(?:חשבונית|בקשת\s+תשלום|בקשה))/
+  ];
+  const URL_HOST = /\bhttps?:\/\/([a-z0-9.-]+)/gi;
+  const FIRST_PARTY_LINK = ['aka.ms', 'g.co', 'goo.gle', 'amzn.to', 'fb.me', 'youtu.be'];
+  function foreignLink(blob, known, extra) {
+    const pool = KNOWN_DOMAINS.concat(FIRST_PARTY_LINK, (extra || []).map((d) => String(d || '').toLowerCase().replace(/^@/, '')).filter((d) => d && d.indexOf('@') < 0));
+    let m;
+    URL_HOST.lastIndex = 0;
+    while ((m = URL_HOST.exec(blob))) {
+      const host = m[1].toLowerCase().replace(/\.$/, '');
+      if (!pool.some((k) => host === k || host.endsWith('.' + k))) return host;
+    }
+    return null;
+  }
   const BULK_LOCAL = /^(?:newsletter|news|marketing|mailer|promo|promotions|deals|offers|digest|updates?)(?:[-_.+]|$)/i;
 
   function domainOf(email) {
@@ -152,7 +178,8 @@ const FlowSystemNotice = (() => {
         const dom = t.match(/\b[a-z0-9][a-z0-9-]*\.(?:com|net|org|io|co|dev|app|co\.il|org\.il|il)\b/i);
         return (m[1].toLowerCase() === 'renew' ? 'renew ' : 'reactivate ') + (dom ? dom[0] : 'your plan');
       }
-      if (m) return m[0].trim().replace(/\s+/g, ' ').replace(/[,;:\s]+$/, '');
+      // A link is never part of the task title (it was cut mid-host: "… Admin console https://ad").
+      if (m) return m[0].replace(/\bhttps?:\/\/\S*/gi, '').trim().replace(/\s+/g, ' ').replace(/[,;:\s]+$/, '').replace(/\s+(?:at|here|in|on|via)$/i, '');
     }
     return null;
   }
@@ -173,6 +200,8 @@ const FlowSystemNotice = (() => {
     if (BULK_LOCAL.test(localOf(email))) return null;
     const blob = (i.subject ? String(i.subject) + '\n' : '') + String(i.text || '');
     for (const re of NEWSLETTER) if (re.test(blob)) return null;
+    for (const re of RELAY) if (re.test(blob)) return null;
+    if (foreignLink(blob, known, i.knownSenders)) return null;
     if (!CONSEQUENCE.test(blob)) return null;
     const dueIso = deadlineOf(blob, i.now);
     if (!dueIso) return null;
@@ -185,7 +214,7 @@ const FlowSystemNotice = (() => {
     return { kind: 'system-notice', provider, action: cap, dueIso, title };
   }
 
-  return { KNOWN_DOMAINS, detect, knownService, deadlineOf, actionOf };
+  return { KNOWN_DOMAINS, detect, knownService, deadlineOf, actionOf, foreignLink };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowSystemNotice };
