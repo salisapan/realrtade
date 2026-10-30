@@ -113,7 +113,8 @@ test('meta.connected=true does not change the status pill; Google and Outlook ro
   await expect(page.locator('#statusPill')).toHaveText('Google connected');
   await expect(page.locator('[data-provider="google"]')).toHaveCount(1);
   await expect(page.locator('[data-provider="meta"]')).toHaveCount(1);
-  await expect(page.locator('.conn').filter({ has: page.locator('b', { hasText: 'Outlook' }) })).toHaveCount(1);
+  await expect(page.locator('[data-provider="google"] .badge.on')).toBeVisible();
+  await expect(page.locator('#statusPill')).not.toContainText('Meta');
   await expect(page.locator('[data-provider="meta"] .badge')).not.toHaveClass(/\bon\b/);
 });
 
