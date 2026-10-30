@@ -29,7 +29,9 @@ const LOOPS = [
   loop('w-noa', 500, 'USD', 'Noa Bar', 'noa@vendor.co', { lang: 'en' }),
   loop('w-old', 700, 'ILS', 'Moshe', 'moshe@x.co.il', { status: 'resolved', closedAs: 'paid' })
 ];
-const mail = (id, from, subject, text, extra) => Object.assign({ id, from, subject, text, dateMs: T0 + DAY }, extra || {});
+// Red team 2026-10-30: only a notice that passed DKIM/SPF counts (authPass must be true), so the fixtures say so; the cases about failed or unknown
+// authentication pass it explicitly.
+const mail = (id, from, subject, text, extra) => Object.assign({ id, from, subject, text, dateMs: T0 + DAY, authPass: true }, extra || {});
 
 // ---- 1. notices that close one loop -----------------------------------------
 console.log('\n--- a real money-in notice closes the one loop it matches ---\n');
