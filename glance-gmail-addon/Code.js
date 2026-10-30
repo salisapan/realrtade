@@ -7,7 +7,21 @@ var GLANCE_TASK_LIST = 'Glance';
 var UNDO_PREFIX = 'glanceUndo_';
 var PREFETCH_KEY = 'glancePrefetch';
 
+// Label/star inbox marker needs gmail.modify (CASA-restricted). Off until DOM or an explicit user action path ships.
+function glanceMarkerMailApiEnabled_() {
+  return false;
+}
+
 function onHomepage(e) {
+  try {
+    if (glanceMarkerMailApiEnabled_() && typeof GlanceMarker !== 'undefined' && GlanceMarker.installSweepTriggerIfNeeded) {
+      GlanceMarker.installSweepTriggerIfNeeded();
+    } else if (typeof GlanceMarker !== 'undefined' && GlanceMarker.removeLegacySweepTriggersIfPresent) {
+      GlanceMarker.removeLegacySweepTriggersIfPresent();
+    }
+  } catch (triggerErr) {
+    console.error(triggerErr && triggerErr.message ? triggerErr.message : triggerErr);
+  }
   var lang = Glance.i18n.locale(localeOf_(e));
   try {
     var existing = readUndo_('prefetch');
@@ -164,7 +178,158 @@ function silenceCard_(decision, messageId, lang) {
   if (decision && decision.reason === 'dropped' && (decision.droppedPlanId || decision.planId)) {
     return Glance.cards.spottedUnsupported(decision, messageId, lang);
   }
-  return Glance.cards.quiet(lang, decision && decision.reason);
+  return Glance.cards.quiet(lang, decision && decision.reason, { messageId: messageId });
+}
+
+function sweep() {
+  if (!glanceMarkerMailApiEnabled_()) {
+    return { scanned: 0, marked: 0, stopped: 'mail-api-off' };
+  }
+  var started = Date.now();
+  var readerCtx = readerContextForSweep_();
+  var sweepZone = sweepTimeZone_();
+  return GlanceMarker.sweep({
+    startedMs: started,
+    readerCtx: readerCtx,
+    buildOpened: buildOpenedFromMessage_,
+    isClosable: function (opened) {
+      return isClosableForMarker_(opened, sweepZone);
+    }
+  });
+}
+
+function readerContextForSweep_() {
+  var email = '';
+  try {
+    if (typeof Session !== 'undefined' && Session.getActiveUser) {
+      email = Session.getActiveUser().getEmail();
+      if (email) email = String(email).trim().toLowerCase();
+    }
+  } catch (err) { /* no reader */ }
+  if (!email) {
+    return {
+      userName: null,
+      ownNames: [],
+      ownAddresses: [],
+      readerEmail: null,
+      toRecipients: [],
+      ccRecipients: []
+    };
+  }
+  return readerContext_('', '', { userEmail: email });
+}
+
+function buildOpenedFromMessage_(message, readerCtx) {
+  if (!message) return null;
+  var plain = String(message.getPlainBody() || '');
+  var subject = String(message.getSubject() || '');
+  var fromRaw = message.getFrom();
+  var parsed = parseFrom_(fromRaw);
+  var toRaw = typeof message.getTo === 'function' ? message.getTo() : '';
+  var ccRaw = typeof message.getCc === 'function' ? message.getCc() : '';
+  var attachmentCount = 0;
+  if (typeof message.getAttachments === 'function') {
+    var attachments = message.getAttachments();
+    attachmentCount = attachments && attachments.length ? attachments.length : 0;
+  }
+  var thread = message.getThread();
+  var threadId = thread ? String(thread.getId()) : '';
+  var reader = readerCtx || readerContextForSweep_();
+  var ownAddresses = (reader.ownAddresses || []).slice();
+  return {
+    messageId: String(message.getId()),
+    threadId: threadId,
+    threadUrl: messageIdOk_(threadId) ? 'https://mail.google.com/mail/u/0/#all/' + encodeURIComponent(threadId) : '',
+    body: plain.slice(0, 20000),
+    subject: subject.slice(0, 300),
+    fromName: parsed.name,
+    fromEmail: parsed.email,
+    toList: emailsIn_(toRaw),
+    ownAddresses: ownAddresses,
+    userName: reader.userName,
+    ownNames: reader.ownNames,
+    readerEmail: reader.readerEmail,
+    toRecipients: (reader.toRecipients && reader.toRecipients.length)
+      ? reader.toRecipients
+      : parseRecipientList_(toRaw),
+    ccRecipients: (reader.ccRecipients && reader.ccRecipients.length)
+      ? reader.ccRecipients
+      : parseRecipientList_(ccRaw),
+    attachmentCount: attachmentCount
+  };
+}
+
+function isClosableForMarker_(opened, timeZone) {
+  var now = new Date();
+  var zone = timeZone || sweepTimeZone_();
+  var engine = function (raw) { return engineHit_(raw, opened, now); };
+  var resolveCtx = {
+    now: now,
+    timeZone: zone,
+    engine: engine,
+    userName: opened.userName || null,
+    ownNames: opened.ownNames || null,
+    readerEmail: opened.readerEmail || null,
+    toRecipients: opened.toRecipients || [],
+    ccRecipients: opened.ccRecipients || []
+  };
+  var decision = Glance.intent.silence('no-plan', null);
+  var body = String(opened.body || '').trim();
+  if (body) decision = Glance.intent.resolveTask(body, resolveCtx);
+  if (!decision.speak && decision.reason !== 'dropped' && opened.subject) {
+    decision = Glance.intent.resolveTask(opened.subject, resolveCtx);
+  }
+  return decision.speak === true;
+}
+
+function rememberGlanceUserTimeZone_(zone) {
+  var id = zoneId_(zone);
+  if (!id) return;
+  try {
+    PropertiesService.getUserProperties().setProperty('glanceUserTimeZone', id);
+  } catch (err) { /* ignore */ }
+}
+
+function sweepTimeZone_() {
+  var id = '';
+  try {
+    id = zoneId_(PropertiesService.getUserProperties().getProperty('glanceUserTimeZone'));
+    if (id) return id;
+  } catch (errStored) { /* ignore */ }
+  try {
+    if (typeof CalendarApp !== 'undefined' && CalendarApp.getDefaultCalendar) {
+      var calendar = CalendarApp.getDefaultCalendar();
+      id = zoneId_(calendar && calendar.getTimeZone && calendar.getTimeZone());
+      if (id) return id;
+    }
+  } catch (err) {
+    console.warn('sweep calendar zone skipped ' + (err && err.message ? err.message : err));
+  }
+  try {
+    if (typeof Session !== 'undefined' && Session.getScriptTimeZone) {
+      id = zoneId_(Session.getScriptTimeZone());
+      if (id) return id;
+    }
+  } catch (err2) {
+    console.warn('sweep script zone skipped ' + (err2 && err2.message ? err2.message : err2));
+  }
+  return 'Asia/Jerusalem';
+}
+
+function onNotThis(e) {
+  var lang = Glance.i18n.locale(localeOf_(e));
+  var messageId = e && e.parameters ? String(e.parameters.messageId || '') : '';
+  if (!messageId || !messageIdOk_(messageId)) {
+    return update_(render_(Glance.cards.quiet(lang)));
+  }
+  if (glanceMarkerMailApiEnabled_()) {
+    try {
+      GlanceMarker.onNotThis(messageId);
+    } catch (err) {
+      errorLog_(err);
+    }
+  }
+  return update_(render_(Glance.cards.quiet(lang)));
 }
 
 function remindTitle_(opened, lang) {
@@ -177,6 +342,24 @@ function remindTitle_(opened, lang) {
     if (line) return Glance.intent.sanitizeTitle(line);
   }
   return he ? 'לחזור להודעה' : 'Follow up on this email';
+}
+
+function markerOnProofClose_(messageId) {
+  if (!glanceMarkerMailApiEnabled_() || !messageId || messageId === 'prefetch') return;
+  try {
+    if (typeof GlanceMarker !== 'undefined' && GlanceMarker.onProofClose) GlanceMarker.onProofClose(messageId);
+  } catch (err) {
+    console.error(err && err.message ? err.message : err);
+  }
+}
+
+function markerOnUndoRestore_(messageId) {
+  if (!glanceMarkerMailApiEnabled_() || !messageId || messageId === 'prefetch') return;
+  try {
+    if (typeof GlanceMarker !== 'undefined' && GlanceMarker.onUndoRestore) GlanceMarker.onUndoRestore(messageId);
+  } catch (err) {
+    console.error(err && err.message ? err.message : err);
+  }
 }
 
 function buildSha_() {
@@ -308,6 +491,7 @@ function stageUndo_(e, lang) {
         throw err;
       }
       if (result.action === 'deleted') {
+        markerOnUndoRestore_(id);
         clearUndo_(id);
         return update_(render_(Glance.cards.undone(lang)));
       }
@@ -458,6 +642,7 @@ function finishCalendar_(decision, opened, messageId, lang, timeZone) {
       view: holdView,
       snapshot: { kind: 'event', event: eventResult.snapshot }
     });
+    markerOnProofClose_(messageId);
     return update_(render_(Glance.cards.proof(holdView, lang, {
       messageId: messageId,
       source: 'message',
@@ -500,6 +685,7 @@ function finishCalendar_(decision, opened, messageId, lang, timeZone) {
     view: scheduleView,
     snapshot: { kind: 'schedule', event: eventResult.snapshot, task: taskResult.snapshot }
   });
+  markerOnProofClose_(messageId);
   return update_(render_(Glance.cards.proof(scheduleView, lang, {
     messageId: messageId,
     source: 'message',
@@ -532,6 +718,7 @@ function finishCreate_(proposal, messageId, lang) {
   logReadBack_('task', result);
   if (!result.confirmed || !result.view) return unconfirmedResult_(result, lang, 'task');
   var saved = saveUndo_(messageId, { view: result.view, snapshot: result.snapshot });
+  markerOnProofClose_(messageId);
   return update_(render_(Glance.cards.proof(result.view, lang, {
     messageId: messageId,
     source: messageId === 'prefetch' ? 'prefetch' : 'message',

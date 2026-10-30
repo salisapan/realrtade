@@ -49,30 +49,38 @@ var GlanceCards = (function () {
 
   function proposal(decision, messageId, lang) {
     var L = i18n();
+    var notThisBtn = messageId
+      ? button(lang, 'notThis', 'onNotThis', { messageId: String(messageId) })
+      : null;
     if (decision.kind === 'hold') {
       var holdWhen = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
-      return card(lang, [
+      var holdWidgets = [
         text(lang, L.t(lang, 'calendarHold')),
         text(lang, decision.title),
         whenLine(lang, holdWhen),
         doItButton(messageId, lang)
-      ]);
+      ];
+      if (notThisBtn) holdWidgets.push(notThisBtn);
+      return card(lang, holdWidgets);
     }
     if (decision.kind === 'schedule') {
       var when = decision.dateIso;
       if (Number.isInteger(decision.hour) && Number.isInteger(decision.minute)) {
         when = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
       }
-      return card(lang, [
+      var schedWidgets = [
         text(lang, decision.title),
         whenLine(lang, when),
         text(lang, L.t(lang, 'schedule')),
         doItButton(messageId, lang)
-      ]);
+      ];
+      if (notThisBtn) schedWidgets.push(notThisBtn);
+      return card(lang, schedWidgets);
     }
     var widgets = [text(lang, decision.title)];
     if (decision.due) widgets.push(dueLine(lang, decision.due));
     widgets.push(doItButton(messageId, lang));
+    if (notThisBtn) widgets.push(notThisBtn);
     return card(lang, widgets);
   }
 
@@ -183,9 +191,13 @@ var GlanceCards = (function () {
     return pack[id] || en[id] || id || 'close';
   }
 
-  function quiet(lang, reason) {
+  function quiet(lang, reason, opts) {
     var key = (!reason || reason === 'no-plan' || reason === 'intent-null' || reason === 'quiet') ? 'quietEmpty' : 'quiet';
-    return card(lang, [text(lang, i18n().t(lang, key))]);
+    var widgets = [text(lang, i18n().t(lang, key))];
+    if (opts && opts.messageId) {
+      widgets.push(button(lang, 'notThis', 'onNotThis', { messageId: String(opts.messageId) }));
+    }
+    return card(lang, widgets);
   }
 
   function spottedUnsupported(decision, messageId, lang) {

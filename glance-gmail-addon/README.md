@@ -35,14 +35,25 @@ The homepage shows the next pending action when a prefetch cache returns one. Se
 
 ## Scopes
 
+Workspace add-on host (`appsscript.json`):
+
 - `https://www.googleapis.com/auth/gmail.addons.current.message.readonly`
 - `https://www.googleapis.com/auth/gmail.addons.execute`
+- `https://www.googleapis.com/auth/gmail.modify` (inbox `Glance` label + star marker sweep only; no send)
+- `https://www.googleapis.com/auth/script.scriptapp` (hourly `sweep` trigger)
 - `https://www.googleapis.com/auth/tasks`
 - `https://www.googleapis.com/auth/calendar.events`
-- `https://www.googleapis.com/auth/script.external_request` (only if a script property URL is set)
-- `https://www.googleapis.com/auth/script.locale` (the card language follows the Gmail locale)
+- `https://www.googleapis.com/auth/userinfo.email`
 
-No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`. No full `calendar` scope. If the Apps Script editor adds `https://www.googleapis.com/auth/calendar` when the Calendar service is enabled, delete that line and keep `calendar.events`.
+No `script.external_request`, no `urlFetchWhitelist`, no `gmail.send`. No full `calendar` scope.
+
+**GCP project (marker deployment):** `130212967225` — Apps Script project name **Glance Gmail (marker)**. Do not mix with unrelated Glance GCP projects.
+
+## Inbox marker (GB)
+
+On homepage open, installs an hourly `sweep` trigger (idempotent). `sweep()` searches `in:inbox newer_than:2d -label:Glance`, runs the same bundled judge as the card, and applies label `Glance` + star on the thread’s latest message only when the card would offer **Do it**. Processed and dismissed message IDs live in `PropertiesService` (FIFO ~2000, no mail content). After **ProofOfClose**, the marker is removed; **Undo** restores it; **Not this** dismisses permanently. Stops cleanly at 4.5 minutes per run.
+
+Tests: `node glance-gmail-addon/test/marker.test.cjs` (mocked Gmail; corpus counts per `UTC` and `Asia/Jerusalem`).
 
 ## Tests
 
@@ -50,6 +61,8 @@ No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`. No full `
 node glance-gmail-addon/scripts/build-bundle.js
 node glance-gmail-addon/scripts/check-core-bundle.cjs
 node glance-gmail-addon/test/v1.test.cjs
+node glance-gmail-addon/test/marker.test.cjs
+node glance-gmail-addon/test/card-titles-corpus.cjs
 node glance-gmail-addon/test/build-stamp.test.cjs
 ```
 

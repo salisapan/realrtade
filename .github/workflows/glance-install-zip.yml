@@ -17,6 +17,8 @@ jobs:
       - name: Gmail add-on bundle and corpora
         run: |
           node glance-gmail-addon/scripts/check-core-bundle.cjs
+          node glance-gmail-addon/scripts/check-marker-bundle.cjs
+          node glance-gmail-addon/test/marker.test.cjs
           node glance-gmail-addon/test/v1.test.cjs
           node glance-gmail-addon/test/card-titles-corpus.cjs
           node glance-gmail-addon/test/build-stamp.test.cjs
