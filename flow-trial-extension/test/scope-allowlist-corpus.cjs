@@ -83,6 +83,7 @@ function auditShippedManifest(man, label) {
   const optionalHosts = man.optional_host_permissions || [];
   check(tag + ': v1 optional_host_permissions matches the allowed set exactly', JSON.stringify(optionalHosts.slice().sort()) === JSON.stringify(ALLOWED_V1_OPTIONAL_HOSTS.slice().sort()), { got: optionalHosts, want: ALLOWED_V1_OPTIONAL_HOSTS });
   check(tag + ': no forbidden v1 optional chat/Meta host', !optionalHosts.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))), optionalHosts);
+  check(tag + ': no forbidden v1 chat/Meta host in host_permissions', !hosts.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))), hosts);
   if (label === 'repo manifest') {
     check('mutant messenger.com optional host is rejected by v1 optional audit', (() => {
       const bad = optionalHosts.concat(['https://www.messenger.com/*']);
@@ -133,12 +134,14 @@ check('e2e launch.js: outlook calendar mock requests MailboxSettings.Read with C
   /Calendars\.ReadWrite/.test(launchSrc) && /MailboxSettings\.Read/.test(launchSrc));
 check('e2e launch.js: mailboxSettings mock includes timeZone UTC',
   /mailboxSettings[\s\S]{0,120}timeZone:\s*'UTC'/.test(launchSrc));
-check('e2e launch.js: optionalChat patches only optional_host_permissions in the E2E copy',
+check('e2e launch.js: optionalChat on optional_host_permissions; whatsappE2eHost on host; partial chat grant via profile prefs',
   /optionalChat/.test(launchSrc)
     && /optional_host_permissions[^\n]*optionalChat/.test(launchSrc)
     && /whatsappE2eHost/.test(launchSrc)
-    && !/concat\(hostExtra,\s*optionalChat\)/.test(launchSrc)
-    && !read('manifest.json').match(/web\.whatsapp\.com|messenger\.com\/\*|instagram\.com\/direct/));
+    && /grantOriginsInProfile/.test(launchSrc)
+    && /E2E_CHAT_GRANT_ORIGINS/.test(launchSrc)
+    && !/manifest\.host_permissions[^\n]*optionalChat/.test(launchSrc)
+    && !read('manifest.json').match(/web\.whatsapp\.com|messenger\.com|instagram\.com\/direct|business\.facebook\.com\/latest\/inbox/));
 check('repo manifest.json: Gmail and Outlook content_scripts are declared (v1 mail lanes)',
   (() => {
     const cs = man.content_scripts || [];

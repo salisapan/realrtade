@@ -967,6 +967,7 @@ function glanceUiCopy(kind) {
       const email = String(n.getAttribute('email') || '').trim().toLowerCase();
       if (email && email !== from && !inMessageBody(n)) found.add(email);
     });
+    if (found.size === 1 && found.has(own)) return false;
     return found.size > 0 && (from !== own || !found.has(own) || found.size > 1);
   }
 
@@ -2448,18 +2449,12 @@ function glanceUiCopy(kind) {
           })
         });
         if (chain && chain.move === 'needs-you') {
-          if (!(await gmailComposeApiAllowedFromStorage())) {
-            logScanSkip(messageId, 'compose-closed');
-            recordSilence(messageId, 'file');
-            chainSettled = true;
-          } else {
-            injectNeedsYou(message, {
-              messageId, intent, sender, subject, attachment, attachments,
-              threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
-            });
-            watchCopiedOnly(message, messageId, text, ownEmail, audience);
-            return;
-          }
+          injectNeedsYou(message, {
+            messageId, intent, sender, subject, attachment, attachments,
+            threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
+          });
+          watchCopiedOnly(message, messageId, text, ownEmail, audience);
+          return;
         }
         if (chain && (chain.move === 'watch' || chain.reason === 'conflict' || chain.reason === 'unclear')) {
           logScanSkip(messageId, 'file-chain');

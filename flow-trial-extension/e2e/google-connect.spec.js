@@ -98,6 +98,25 @@ test('an expired implicit token tries prompt=none before Reconnect', async ({ gl
   expect(out.log.some((line) => line.indexOf('"state":"reconnect"') >= 0)).toBe(true);
 });
 
+test('meta.connected=true does not change the status pill; Google and Outlook rows stay', async ({ glance }) => {
+  await glance.seed({
+    onboarded: true,
+    connectorId: 'googleTasks',
+    googleTasksAuth: { taskListId: 'glance-list' },
+    googleWebAuth: { accessToken: 'ya29.e2e', expiresAt: Date.now() + 60 * 60 * 1000 },
+    googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' },
+    googleGrantedScopes: { version: 'openid\nhttps://www.googleapis.com/auth/tasks', status: 'granted', source: 'chrome', at: Date.now() },
+    outlookAuth: { token: { accessToken: 'AT-e2e', expiresAt: Date.now() + 3600000 }, account: { address: 'me@x.com' } },
+    meta: { connected: true }
+  });
+  const page = await glance.openPopup();
+  await expect(page.locator('#statusPill')).toHaveText('Google connected');
+  await expect(page.locator('[data-provider="google"]')).toHaveCount(1);
+  await expect(page.locator('[data-provider="meta"]')).toHaveCount(1);
+  await expect(page.locator('.conn').filter({ has: page.locator('b', { hasText: 'Outlook' }) })).toHaveCount(1);
+  await expect(page.locator('[data-provider="meta"] .badge')).not.toHaveClass(/\bon\b/);
+});
+
 test('getAuthToken failure leaves Google disconnected and does not open a window', async ({ glance }) => {
   await glance.setAuthFail(true);
   const page = await glance.openPopup();

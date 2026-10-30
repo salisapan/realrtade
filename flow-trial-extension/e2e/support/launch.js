@@ -37,8 +37,8 @@ function copyExtension(opts) {
     'http://127.0.0.1/*',
     'http://localhost/*'
   ];
+  // E2E copy only. v1 product manifest omits chat optional hosts; blocking chat specs grant them at boot.
   const optionalChat = [
-    // E2E copy only. v1 product manifest omits chat optional hosts; Meta lane specs patch them in.
     'https://www.messenger.com/*',
     'https://messenger.com/*',
     'https://web.whatsapp.com/*',
@@ -60,6 +60,36 @@ function copyExtension(opts) {
   manifest.optional_host_permissions = Array.from(new Set((manifest.optional_host_permissions || []).concat(optionalChat)));
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return dest;
+}
+
+const E2E_CHAT_GRANT_ORIGINS = [
+  'https://www.messenger.com/*',
+  'https://messenger.com/*',
+  'https://business.facebook.com/latest/inbox',
+  'https://business.facebook.com/latest/inbox/*',
+  'https://www.business.facebook.com/latest/inbox',
+  'https://www.business.facebook.com/latest/inbox/*',
+  'https://www.instagram.com/direct',
+  'https://www.instagram.com/direct/*',
+  'https://instagram.com/direct',
+  'https://instagram.com/direct/*'
+];
+
+function grantOriginsInProfile(userData, extensionId, origins) {
+  const prefsPath = path.join(userData, 'Default', 'Preferences');
+  const prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf8'));
+  const row = prefs.extensions && prefs.extensions.settings && prefs.extensions.settings[extensionId];
+  if (!row) throw new Error('extension preferences were not written');
+  function add(block) {
+    const hosts = new Set((block && block.explicit_host) || []);
+    origins.forEach((origin) => hosts.add(origin));
+    block.explicit_host = Array.from(hosts);
+  }
+  row.granted_permissions = row.granted_permissions || {};
+  row.active_permissions = row.active_permissions || {};
+  add(row.granted_permissions);
+  add(row.active_permissions);
+  fs.writeFileSync(prefsPath, JSON.stringify(prefs));
 }
 
 function outlookAuth(opts) {
@@ -661,9 +691,7 @@ function installE2EHooks() {
 async function boot() {
   const extDir = copyExtension();
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-profile-'));
-  const context = await chromium.launchPersistentContext(userData, {
-    // Cloud sessions ship one Chromium whose build differs from this Playwright
-    // pin. GLANCE_CHROMIUM=/opt/pw-browsers/chromium uses it; CI leaves it unset.
+  const contextOpts = {
     executablePath: process.env.GLANCE_CHROMIUM || undefined,
     headless: false,
     viewport: { width: 1280, height: 800 },
@@ -676,7 +704,14 @@ async function boot() {
       '--no-default-browser-check',
       '--disable-dev-shm-usage'
     ]
-  });
+  };
+  let context = await chromium.launchPersistentContext(userData, contextOpts);
+  let worker = context.serviceWorkers()[0];
+  if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 30000 });
+  const extensionId = worker.url().split('/')[2];
+  await context.close();
+  grantOriginsInProfile(userData, extensionId, E2E_CHAT_GRANT_ORIGINS);
+  context = await chromium.launchPersistentContext(userData, contextOpts);
 
   const documents = new Map();
   await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|web\.whatsapp\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com|www\.instagram\.com)\//, async (route) => {
@@ -705,7 +740,7 @@ async function boot() {
     sw.on('pageerror', (err) => noteError('worker-pageerror', err && err.message ? err.message : err));
   }
   context.on('serviceworker', (next) => { worker = next; watchWorker(next); });
-  let worker = context.serviceWorkers()[0];
+  worker = context.serviceWorkers()[0];
   if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 30000 });
   watchWorker(worker);
 
@@ -743,7 +778,6 @@ async function boot() {
   }
   await evalWorker(() => { globalThis.__glanceE2e.authCalls = []; globalThis.__glanceE2e.calls = []; });
 
-  const extensionId = worker.url().split('/')[2];
   harness.extensionId = extensionId;
 
   function popupUrl() {
