@@ -258,6 +258,9 @@ function wireChrome(w, store, pageSent, bgSend, outbound, hooks) {
     }
     if (t === 'flow:pro-status') return { ok: true, active: true, record: { key: 'k', valid: true, activeUntil: Date.now() + 1e9 } };
     if (t === 'flow:connector-status') return { googleTasks: { connected: true, configured: true } };
+    // Default stays the stub. A spec that must prove the real gate passes followDraftViaBackground: the
+    // page's click then reaches the loaded service worker (followDraftCreate), not this stand-in.
+    if (t === 'flow:follow-draft' && h.followDraftViaBackground) return bgSend(msg);
     if (t === 'flow:follow-task') return { ok: true, ref: { taskListId: 'LIST_A', taskId: 'T1' } };
     if (t === 'flow:gmail-compose') {
       return {
@@ -666,7 +669,7 @@ function activityLogRefBehaviour(ref) {
     check('v1 contacts plan stays silent (missing-scope), never offers a chip off-device', contactPlan && contactPlan.action === 'silence' && contactPlan.reason === 'missing-scope', contactPlan);
   }
 
-  console.log('\n--- G1: missing invoice needs-you only when gmail.compose is granted ---\n');
+  console.log('\n--- G1: the missing-invoice needs-you card shows with or without gmail.compose; drafting stays gated at the action (followDraftCreate -> compose-closed) ---\n');
   {
     const invoiceAsk = 'Please send me the invoice by Thursday.';
     const searchDrive = () => ({ ok: true, files: [] });
@@ -689,6 +692,35 @@ function activityLogRefBehaviour(ref) {
     const needsNo = wNo.document.querySelector('.flow-chip-host[data-glance-chain="needs-you"]');
     check('G1: without gmail.compose the missing-invoice needs-you card still names the gap', Boolean(needsNo), Boolean(needsNo));
     wNo.close();
+
+    // The card needs no compose scope, but its holding-reply action writes a draft. That write is refused
+    // where it happens: the page's click reaches followDraftCreate, which answers compose-closed, and no
+    // Gmail draft or send request goes out. This background is built on the no-compose store, so the
+    // refusal comes from the shipped gate and not from the page.
+    const fetchedC = [];
+    const outboundC = [];
+    const storeC = JSON.parse(JSON.stringify(baseStored));
+    storeC.googleGrantedScopes = GRANTED_NO_COMPOSE;
+    const bgC = createBackground(storeC, (url, method) => {
+      fetchedC.push({ url: String(url), method });
+      return /oauth2\/v3\/userinfo/.test(url) ? res(200, { email: 'me@x.com' }) : null;
+    }, outboundC, []);
+    const sentC = [];
+    const { w: wC } = bootGmailPage(invoiceAsk, storeC, sentC, bgC.send, outboundC, { searchDrive, followDraftViaBackground: true });
+    await wC.__glanceGmailPage.rescan();
+    await sleep(800);
+    const cardC = wC.document.querySelector('.flow-chip-host[data-glance-chain="needs-you"]');
+    const chipC = cardC && cardC.querySelector('button.flow-chip');
+    check('G1: without gmail.compose the needs-you card has its holding-reply action', Boolean(chipC), Boolean(chipC));
+    if (chipC) { chipC.click(); await sleep(1500); }
+    const draftMsgs = sentC.filter((m) => m.type === 'flow:follow-draft');
+    check('G1: clicking the holding-reply action without gmail.compose asks the service worker once', draftMsgs.length === 1, draftMsgs.length);
+    check('G1: without gmail.compose the click ends in an error chip, never a done/draft-ready card', Boolean(cardC) && !cardC.querySelector('.flow-chip-done') && Boolean(cardC.querySelector('.flow-chip-error')) && !/Draft ready/i.test(cardC.textContent || ''), cardC && cardC.textContent);
+    const direct = await bgC.send({ type: 'flow:follow-draft', payload: { to: 'vendor@example.com', subject: 'Billing', body: 'I will send the invoice shortly.' } });
+    check('G1: followDraftCreate without gmail.compose answers compose-closed, not sent, no draft', direct && direct.ok === false && direct.reason === 'compose-closed' && direct.sent === false && !direct.ref, direct);
+    check('G1: without gmail.compose no Gmail request is made at all (no drafts, no send)', !fetchedC.some((f) => /gmail\.googleapis\.com|\/gmail\/v1\//.test(f.url)), fetchedC.map((f) => f.method + ' ' + f.url));
+    check('G1: without gmail.compose the click writes nothing to Google (no task, no event, no draft)', !outboundC.some((o) => o.kind === 'google-api' && o.method !== 'GET'), outboundC.map((o) => o.method + ' ' + o.url));
+    wC.close();
   }
 
   console.log('\n--- G2/G3: follow receipt offers draft only when gmail.compose is granted ---\n');
