@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<base href="../site/">
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-Onprem.">
+<meta name="theme-color" content="#07090F">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<title>Security & Architecture | Flow (S1 B4-open3 proposal)</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Security &amp; Architecture | Flow">
+<meta property="og:description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-Onprem.">
+<meta property="og:url" content="https://theflow-ai.com/security.html">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Security &amp; Architecture | Flow">
+<meta name="twitter:description" content="Intended architecture for how Flow handles data. The office chooses between Flow's dedicated secure cloud with masking, Flow-Edge, and Flow-Onprem.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat, which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+</style>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';d.dataset.ui=l;var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
+</script>
+<link rel="stylesheet" href="assets/flow-header.css">
+<link rel="stylesheet" href="assets/flow-booking.css">
+<link rel="stylesheet" href="assets/flow-inner.css">
+<link rel="stylesheet" href="assets/flow-rich.css">
+<link rel="stylesheet" href="../samples/hero-samples.css">
+<link rel="stylesheet" href="../samples/v3.css">
+<link rel="stylesheet" href="../samples/v4.css">
+<link rel="stylesheet" href="../samples/v5.css">
+<link rel="stylesheet" href="../samples/onprem.css">
+<link rel="stylesheet" href="../samples/sx.css">
+<link rel="stylesheet" href="../samples/sxh.css">
+<link rel="stylesheet" href="../samples/sxh-b4o3.css">
+<noscript><style>.rich .rv{opacity:1!important;transform:none!important}.rich .w>span{transform:none!important}.rich .tier{opacity:1!important;transform:none!important}.rich .sf .sw{opacity:1}</style></noscript>
+
+<script>document.documentElement.classList.add("rich")</script>
+</head>
+<body>
+<a class="skip-link" href="#main" data-he="דלג לתוכן">Skip to content</a>
+<div class="ctl" id="ctl">
+  <div class="lang">
+    <button type="button" id="langBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu" aria-label="Language">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"/></svg>
+      <span class="sr-only" id="langName">English</span>
+    </button>
+    <div class="menu" id="langMenu" role="menu" aria-labelledby="langBtn"></div>
+  </div>
+  <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Night mode">
+    <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"/></svg>
+    <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
+  </button>
+</div>
+<flow-header data-base=""></flow-header>
+<main id="main" class="rc hs v3"><section class="rc-ch sx sx-hx" data-bg="g" data-v="B4" data-open="1" aria-label="Security and Architecture: four layers, Encryption, Masking, Permissions, Audit"><div class="hx-track"><div class="hx-pin"><div class="hx-top"><span class="hx-eb" data-he="אבטחה וארכיטקטורה">Security &amp; Architecture</span><h1 class="rc-h2" data-he="<span class=&quot;ln&quot;>ממוסך לפני עיבוד.</span><span class=&quot;ln&quot;>מאושר לפני ביצוע.</span><span class=&quot;ln&quot;>מתועד אחרי.</span>"><span class="ln">Masked before processing.</span><span class="ln">Approved before execution.</span><span class="ln">Recorded after.</span></h1></div><div class="hx-tile"><div class="hs-tile hs-c2 hs-c3 hs-c5 hs-c6 hs-c8"><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="hx-sw" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="70" y2="70" gradientTransform="translate(-90,-90)"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><mask id="hx-m" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200"><rect x="0" y="0" width="200" height="200" fill="url(#hx-sw)"/></mask><pattern id="hx-hb2" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V12" fill="none" stroke-width="2" stroke="#2D5EFE"/></pattern><pattern id="hx-hb" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V12" fill="none" stroke-width="1.5" stroke="#2D5EFE"/></pattern><radialGradient id="hx-sd" gradientUnits="userSpaceOnUse" cx="116" cy="124" r="142"><stop offset="0" stop-color="#0e1838" stop-opacity=".46"/><stop offset=".6" stop-color="#0e1838" stop-opacity=".24"/><stop offset="1" stop-color="#0c1432" stop-opacity="0"/></radialGradient><radialGradient id="hx-sd-d" gradientUnits="userSpaceOnUse" cx="116" cy="124" r="132"><stop offset="0" stop-color="#000" stop-opacity=".62"/><stop offset=".55" stop-color="#000" stop-opacity=".32"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient><linearGradient id="hx-edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".98"/><stop offset=".5" stop-color="#d4d7df" stop-opacity=".85"/><stop offset="1" stop-color="#a9aebb" stop-opacity=".75"/></linearGradient><linearGradient id="hx-edge-d" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#cfd5e6" stop-opacity=".3"/><stop offset="1" stop-color="#cfd5e6" stop-opacity=".16"/></linearGradient><linearGradient id="hs-gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset=".45" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><pattern id="hs-h" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V12" fill="none" stroke-width="1" style="stroke:var(--hs-fine)"/></pattern><pattern id="hs-d" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="7" cy="7" r="1.1" style="fill:var(--hs-fine)"/></pattern><linearGradient id="hs-gl2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".96"/><stop offset=".5" stop-color="#eef3ff" stop-opacity=".5"/><stop offset="1" stop-color="#c9dbff" stop-opacity=".42"/></linearGradient><linearGradient id="hs-ed" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4F7DFE"/><stop offset="1" stop-color="#1F46D6"/></linearGradient><linearGradient id="hs-gl3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".45" stop-color="#f3f7ff" stop-opacity=".42"/><stop offset="1" stop-color="#eaf1ff" stop-opacity=".5"/></linearGradient><linearGradient id="hs-gl5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset=".38" stop-color="#fff" stop-opacity=".16"/><stop offset=".62" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".22"/></linearGradient><linearGradient id="hs-ed5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2D5EFE"/><stop offset=".5" stop-color="#6E9BFE" stop-opacity=".7"/><stop offset="1" stop-color="#1F46D6"/></linearGradient><linearGradient id="hs-gl8" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".4" stop-color="#fff" stop-opacity=".4"/><stop offset=".66" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#4F7DFE" stop-opacity=".3"/></linearGradient><linearGradient id="hs-rb" x1="0" y1="0" x2="1" y2="1"><stop offset=".34" stop-color="#fff" stop-opacity="0"/><stop offset=".46" stop-color="#fff" stop-opacity=".85"/><stop offset=".53" stop-color="#fff" stop-opacity=".12"/><stop offset=".62" stop-color="#fff" stop-opacity="0"/></linearGradient><linearGradient id="hs-ed8" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6E9BFE" stop-opacity=".55"/><stop offset=".55" stop-color="#3F6FFE" stop-opacity=".85"/><stop offset="1" stop-color="#1F46D6"/></linearGradient></defs></svg><div class="hs-stage"><div class="hs-ground"></div><div class="hs-obj" role="img" aria-label="Four protection layers: Encryption, Masking, Permissions, Audit"><div class="hs-pl" style="--k:0"><svg viewBox="0 0 200 200" aria-hidden="true"><rect class="b" x="2" y="2" width="196" height="196" rx="14"/><rect class="sp" x="5" y="5" width="190" height="190" rx="11"/><rect class="gl" x="2" y="2" width="196" height="196" rx="14"/><rect class="rb" x="2" y="2" width="196" height="196" rx="14"/><rect class="sd" x="2" y="2" width="196" height="196" rx="14"/><rect x="2" y="2" width="196" height="196" rx="14" fill="url(#hs-h)"/><rect class="enc0" x="2" y="2" width="196" height="196" rx="14" fill="url(#hx-hb2)"/><rect class="enc" x="2" y="2" width="196" height="196" rx="14" fill="url(#hx-hb2)" mask="url(#hx-m)"/><rect class="f fr" x="30" y="30" width="140" height="140" rx="6"/><path class="l" d="M14 26V14h12M174 14h12v12M186 174v12h-12M26 186H14v-12" opacity=".9"/></svg></div><div class="hs-pl" style="--k:1"><svg viewBox="0 0 200 200" aria-hidden="true"><rect class="b" x="2" y="2" width="196" height="196" rx="14"/><rect class="sp" x="5" y="5" width="190" height="190" rx="11"/><rect class="gl" x="2" y="2" width="196" height="196" rx="14"/><rect class="rb" x="2" y="2" width="196" height="196" rx="14"/><rect class="sd" x="2" y="2" width="196" height="196" rx="14"/><rect x="2" y="2" width="196" height="196" rx="14" fill="url(#hs-d)"/><rect class="r r0" x="40" y="72" width="104" height="11" rx="5.5"/><rect class="r r1" x="40" y="94" width="72" height="11" rx="5.5"/><rect class="r r2" x="40" y="116" width="120" height="11" rx="5.5"/><path class="l" d="M14 26V14h12M174 14h12v12M186 174v12h-12M26 186H14v-12" opacity=".9"/></svg></div><div class="hs-pl" style="--k:2"><svg viewBox="0 0 200 200" aria-hidden="true"><rect class="b" x="2" y="2" width="196" height="196" rx="14"/><rect class="sp" x="5" y="5" width="190" height="190" rx="11"/><rect class="gl" x="2" y="2" width="196" height="196" rx="14"/><rect class="rb" x="2" y="2" width="196" height="196" rx="14"/><rect class="sd" x="2" y="2" width="196" height="196" rx="14"/><rect class="f cb c0" x="40" y="56" width="11" height="11" rx="2.5"/><path class="ck k0" d="M42.6 61.8l2.7 2.9 5-5.7" pathLength="1"/><path class="l w w0" d="M64 62 H143" opacity=".75"/><circle class="n o o0" cx="152" cy="62" r="5.5"/><rect class="f cb c1" x="40" y="94" width="11" height="11" rx="2.5"/><path class="ck k1" d="M42.6 99.8l2.7 2.9 5-5.7" pathLength="1"/><path class="l w w1" d="M64 100 H143" opacity=".75"/><circle class="s o o1" cx="152" cy="100" r="5.5"/><rect class="f cb c2" x="40" y="132" width="11" height="11" rx="2.5"/><path class="ck k2" d="M42.6 137.8l2.7 2.9 5-5.7" pathLength="1"/><path class="l w w2" d="M64 138 H143" opacity=".75"/><circle class="n o o2" cx="152" cy="138" r="5.5"/><path class="f" d="M40 86H160M40 124H160"/><path class="l" d="M14 26V14h12M174 14h12v12M186 174v12h-12M26 186H14v-12" opacity=".9"/></svg></div><div class="hs-pl top" style="--k:3"><svg viewBox="0 0 200 200" aria-hidden="true"><rect class="b" x="2" y="2" width="196" height="196" rx="14"/><rect class="sp" x="5" y="5" width="190" height="190" rx="11"/><rect class="gl" x="2" y="2" width="196" height="196" rx="14"/><rect class="rb" x="2" y="2" width="196" height="196" rx="14"/><path class="f" d="M56 48V152" stroke-dasharray="2 4"/><circle class="n" cx="56" cy="48" r="5.5"/><path class="l" d="M72 48 H150" opacity=".75"/><circle class="n" cx="56" cy="82" r="5.5"/><path class="l" d="M72 82 H128" opacity=".75"/><circle class="n" cx="56" cy="116" r="5.5"/><path class="l" d="M72 116 H158" opacity=".75"/><circle class="s rd" cx="56" cy="152" r="5.5"/><path class="l rl" d="M72 152 H110" opacity=".75"/><path class="l" d="M14 26V14h12M174 14h12v12M186 174v12h-12M26 186H14v-12" opacity=".9"/></svg></div></div></div><ul class="hs-spec"><li data-he="הצפנה">Encryption</li><li data-he="מיסוך">Masking</li><li data-he="הרשאות">Permissions</li><li data-he="תיעוד">Audit</li></ul></div></div><div class="hx-caps"><div class="hx-cap" style="--i:0"><span class="k">01</span><h3 data-he="הצפנה">Encryption</h3><p data-he="כל התעבורה ב-HTTPS עם HSTS.">All traffic over HTTPS with HSTS.</p></div><div class="hx-cap" style="--i:1"><span class="k">02</span><h3 data-he="מיסוך">Masking</h3><p data-he="שדות רגישים מוחלפים בסימונים לפני עיבוד.">Sensitive fields masked before processing.</p></div><div class="hx-cap" style="--i:2"><span class="k">03</span><h3 data-he="הרשאות">Permissions</h3><p data-he="האוטונומיה מוגבלת במדיניות שלכם.">Autonomy is bounded by your policy.</p></div><div class="hx-cap" style="--i:3"><span class="k">04</span><h3 data-he="תיעוד">Audit</h3><p data-he="מה נצפה, הוצע, אושר ובוצע.">Observed, proposed, approved, executed.</p></div><div class="hx-cap hold" aria-hidden="true"><h3 data-he="ארבע שכבות. בין המידע שלכם לכל השאר.">Four layers. Between your data and everything else.</h3></div></div></div></div></section><svg class="sx-svg" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M3 12s3.5-6.5 9-6.5S21 12 21 12s-3.5 6.5-9 6.5S3 12 3 12z"/><circle cx="12" cy="12" r="2.6"/><path d="M4 4l16 16"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3.5"/><path d="M10.5 12.5L20 3M16 7l3 3"/></symbol>
+<symbol id="i-chipoff" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4M4 4l16 16"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12h5M9.5 16h5"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+<symbol id="i-browser" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9.5h18"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.5 7.5l8.5 6 8.5-6"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.4v.1"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></symbol>
+<symbol id="i-sendoff" viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/><path d="M4 4l16 16"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 9h6v6H9z"/></symbol>
+<symbol id="i-case" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M3 12s3.5-6.5 9-6.5S21 12 21 12s-3.5 6.5-9 6.5S3 12 3 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+</defs></svg><section class="rc-ch v3-intro" data-bg="w"><div class="rc-in n"><p class="rc-lead rv" data-he="Flow נבנה לארגונים שאינם יכולים לשלוח מידע רגיש גולמי למודל של צד שלישי: משפט, בריאות, פיננסים, ביטוח וממשל. הדף הזה מתאר איך המערכת מתוכננת, כדי שצוות האבטחה שלכם יוכל להעריך אותה בלי שיחה.">Flow is built for organizations that cannot send raw sensitive data to a third-party model: legal, healthcare, finance, insurance, and government. This page describes how the system is designed, so your security team can evaluate it without a call.</p></div></section><section class="rc-ch sx sx-sec sx-dep" data-bg="w" data-zone-scope><div class="sx-in"><h2 class="rc-h2 rv" data-he="מודלי פריסה">Deployment Models</h2><p class="sx-lead rv" data-he="איפה מתבצע העיבוד? המשרד בוחר אחת משלוש אפשרויות.">Where does processing happen? The office chooses one of three setups.</p><div class="hs2 rv"><div class="hs2-ctl"><div class="hs-segc" role="radiogroup" data-he-label="איפה Flow רצה" aria-label="Where Flow runs" data-i="0"><i><span class="doit hs-do" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="cloud"><span data-he="ענן">Cloud</span><small data-he="ברירת מחדל">Default</small></button><button type="button" role="radio" aria-checked="false" data-m="edge">Edge<small></small></button><button type="button" role="radio" aria-checked="false" data-m="onprem">Onprem<small></small></button></div></div><p class="hs-segnote" aria-live="polite"></p></div><div id="onprem" class="sx-op rv" lang="he"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></div><div class="sx-gts"><div class="sx-gt rv" data-m="cloud"><span class="bd" data-he="נבחר">Selected</span><h3 data-he="ענן">Cloud</h3><ul><li data-he="הענן המאובטח הייעודי של Flow">Flow's dedicated secure cloud</li><li data-he="ממוסך לפני עיבוד">Masked before it is processed</li></ul></div><div class="sx-gt rv" data-m="edge"><span class="bd" data-he="נבחר">Selected</span><h3 data-he="Edge">Edge</h3><ul><li data-he="Flow-Edge, במחשב העובד">Flow-Edge, on the employee’s computer</li><li data-he="למחשבים עם חומרה מתאימה">For computers with suitable hardware</li></ul></div><div class="sx-gt rv" data-m="onprem"><span class="bd" data-he="נבחר">Selected</span><h3 data-he="Onprem">Onprem</h3><ul><li data-he="Flow-Onprem, שרת ייעודי">Flow-Onprem, a dedicated server</li><li data-he="בתוך רשת המשרד">Inside the office network</li></ul></div></div><p class="sx-note rv"><a href="/solutions/deployment.html" data-he="לעמוד הפריסה">See the deployment page</a></p><div class="sx-row rv"><p data-he="נמפה איתכם את התהליכים האמיתיים בשיחה קצרה.">We’ll map your real processes with you on a short call.</p><span class="magnetic"><a class="doit" href="https://calendar.app.google/96Z1x4KntqhnXHCt5" data-ga="security_flow_call_row" data-cta-label="book" target="_blank" rel="noopener"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-he="קביעת שיחה">Book a call</span></a></span></div></div></section><section class="rc-ch sx sx-sec" data-bg="w"><div class="sx-in"><h2 class="rc-h2 rv" data-he="מיסוך מידע">Data Masking</h2><p class="sx-lead rv" data-he="שדות רגישים מוחלפים בסימונים לפני שהמודל רואה אותם.">Sensitive fields are replaced before the model sees them.</p><div class="sx-bento c3"><div class="sx-card  rv"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-layers"/></svg></span><h3 data-he="סימונים שומרים מבנה">Placeholders keep structure</h3><p data-he="שדות רגישים מוחלפים לפני העיבוד.">Sensitive fields are replaced before processing.</p></div><div class="sx-card  rv"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eyeoff"/></svg></span><h3 data-he="המודל רואה גרסה ממוסכת">The model sees the masked version</h3><p data-he="לא את הערכים האמיתיים.">Never the real values.</p></div><div class="sx-card  rv"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-key"/></svg></span><h3 data-he="המיפוי חזרה אצלכם">The mapping back stays with you</h3><p data-he="המזהה האמיתי לא מגיע לפרומפט, ללוג או לספק.">The real identifier never reaches a prompt, a log, or a provider.</p></div></div><div class="sx-bar rv"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shield"/></svg></span><div class="bt"><p data-he="מיסוך מפחית סיכון ואינו תחליף לארכיטקטורה.">Masking reduces risk; it does not replace architecture.</p><span class="sx-meta" data-he="כשהמידע חייב להישאר בבניין:">When data must stay in the building:</span></div><div class="sx-chips"><span class="tg">Flow-Edge</span><span class="tg">Flow-Onprem</span></div></div></div></section><section class="rc-ch sx sx-sec" data-bg="g"><div class="sx-in"><div class="sx-duo"><div class="sx-panel"><h2 class="rc-h2 rv" data-he="עיבוד ללא שמירה">Zero-Retention Processing</h2><p class="sx-lead rv" data-he="התוכן לא נשמר מעבר למשימה.">Content is not kept beyond the task.</p><ul class="sx-ticks"><li class="rv"><span class="ck"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shield"/></svg></span><span data-he="לא נשמר לאימון מודלים">Not retained for model training</span></li><li class="rv"><span class="ck"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shield"/></svg></span><span data-he="לא נשמר מעבר לחיי המשימה">Not persisted beyond the task</span></li></ul><p class="sx-meta rv"><span data-he="כדאי לאמת הצהרה כזו מול כל ספק, גם מולנו. ">Worth verifying with any vendor, including us. </span><a href="/blog/zero-retention-ai-architecture.html" data-he="איך מאמתים">How to verify</a></p></div><div class="sx-panel"><h2 class="rc-h2 rv" data-he="ביצוע דטרמיניסטי">Deterministic Execution</h2><p class="sx-lead rv" data-he="ריצה קפדנית, לא פלט חופשי של מודל.">A strict runtime, not free-form model output.</p><div class="sx-vs rv"><div class="a"><small data-he="פלט חופשי">Free-form output</small><b data-he="״בדרך כלל״ נכון">“Usually” right</b></div><div class="b"><small>Flow</small><b data-he="ריצה קפדנית">A strict runtime</b></div></div><p class="sx-meta" data-he="כשכשל הוא אירוע שיש לדווח עליו, ״בדרך כלל״ לא מספיק.">Where failure is a reportable incident, “usually” is not enough.</p></div></div></div></section><section class="rc-ch sx sx-sec" data-bg="w"><div class="sx-in"><h2 class="rc-h2 rv" data-he="יומן ביקורת ומקור המידע">Audit Logging &amp; Provenance</h2><p class="sx-lead rv" data-he="כל הרצף נרשם, ואפשר לשחזר אותו מרשומות.">The full sequence is recorded and can be rebuilt from records.</p><div class="sx-prov rv"><div class="pv-h"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-doc"/></svg></span><b data-he="הרצף המתועד">The recorded sequence</b></div><ol class="pv-chain"><li class="rv" style="--k:0"><span class="d">1</span><span data-he="נצפה">Observed</span></li><li class="rv" style="--k:1"><span class="d">2</span><span data-he="הוצע">Proposed</span></li><li class="rv" style="--k:2"><span class="d">3</span><span data-he="אושר">Approved</span></li><li class="rv" style="--k:3"><span class="d">4</span><span data-he="בוצע">Executed</span></li></ol><div class="pv-f"><p data-he="כשמבקר שואל למה מערכת פעלה כך לפני שנה וחצי, התשובה נשענת על רשומות.">When an auditor asks why a system acted that way eighteen months ago, the answer comes from records.</p><p data-he="היקף היומן מוסכם עם צוות האבטחה שלכם.">The log scope is agreed with your security team.</p></div></div><p class="sx-rel rv"><span data-he="לקריאה נוספת:">Related reading:</span> <a href="/blog/auditability-by-design-ai-systems.html" data-he="ביקורתיות כבר בתכנון">Auditability by Design</a> · <a href="/blog/ai-observability-tracing-debugging.html" data-he="מעקב אחרי החלטה בתהליך עד המקור">Tracing a workflow decision back to its source</a></p></div></section><section class="rc-ch sx sx-sec" data-bg="g"><div class="sx-in"><h2 class="rc-h2 rv" data-he="שערי אישור אנושי">Human Approval Gates</h2><p class="sx-lead rv" data-he="פעולה בסיכון גבוה לא יוצאת לדרך בלי אישור מפורש של אדם.">A high-risk action never runs without explicit approval from a person.</p><div class="sx-ap"><div class="sx-st3 rv"><span class="n">1</span><h3 data-he="Flow מציעה">Flow proposes</h3><p data-he="הפעולה מוצגת עם ההקשר שלה.">The action is shown with its context.</p><span class="arrow"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg></span></div><div class="sx-st3 rv"><span class="n">2</span><h3 data-he="אדם מחליט">A person decides</h3><p data-he="מאשרים או דוחים. ההחלטה בידיים שלכם.">Approve or reject. The decision is yours.</p><span class="arrow"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg></span></div><div class="sx-st3 rv"><span class="n">3</span><h3 data-he="Do It מכין ומתעד">Do It prepares and records</h3><p data-he="הפעולה מוכנה ומתועדת.">The action is prepared and recorded.</p><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="arrow"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg></span></div></div><div class="sx-pr"><div class="sx-card  rv"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sliders"/></svg></span><h3 data-he="האוטונומיה נקבעת במדיניות שלכם">Autonomy is set by your policy</h3><p data-he="לא לפי הביטחון של המודל בעצמו.">Not by the model’s confidence in itself.</p></div><div class="sx-card  rv"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sendoff"/></svg></span><h3 data-he="Flow לא שולחת בשמכם">Flow never sends in your name</h3><p data-he="שום דבר לא יוצא בלי שאישרתם.">Nothing goes out without your approval.</p></div></div></div></section><section class="rc-ch sx sx-sec" data-bg="w"><div class="sx-in"><h2 class="rc-h2 rv" data-he="אבטחת תעבורה ואפליקציה">Transport &amp; Application Security</h2><p class="sx-lead rv" data-he="תעבורה מוצפנת, דפדפן מוקשח והרשמה מאומתת.">Encrypted transport, a hardened browser, verified signups.</p><div class="sx-bento c3"><div class="sx-card  rv"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lock"/></svg></span><h3 data-he="תעבורה">Transport</h3><p data-he="כל התעבורה עוברת ב-HTTPS עם HSTS.">All traffic is served over HTTPS with HSTS.</p><div class="sx-chips"><span class="tg">HTTPS</span><span class="tg">HSTS</span></div></div><div class="sx-card  rv"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-browser"/></svg></span><h3 data-he="הקשחת דפדפן">Browser hardening</h3><p data-he="מדיניות אבטחת תוכן מחמירה וכותרות הגנה.">A strict Content-Security-Policy and protective headers.</p><div class="sx-chips"><code class="sx-c">CSP</code><code class="sx-c">X-Frame-Options: DENY</code><code class="sx-c">nosniff</code></div></div><div class="sx-card  rv"><span class="ib"><svg class="sx-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-mail"/></svg></span><h3 data-he="נתוני רשימת המתנה">Waitlist data</h3><p data-he="כל הרשמה מאומתת באימייל באימות כפול.">Every signup is confirmed by email double opt-in.</p></div></div></div></section><section class="rc-ch sx sx-sec" data-bg="g"><div class="sx-in"><div class="sx-duo"><div class="sx-panel"><h2 class="rc-h2 rv" data-he="מודל איומים">Threat Model</h2><p class="sx-lead rv" data-he="הזרקת פרומפט וזליגת מידע הם איומים מרכזיים, לא מקרי קצה.">Prompt injection and data exfiltration are first-class threats, not edge cases.</p><div class="sx-box rv"><div class="sx-chips"><span class="tg" data-he="הזרקת פרומפט">Prompt injection</span><span class="tg" data-he="זליגת מידע">Data exfiltration</span></div><p data-he="למנוע עם גישה אמיתית למערכות יש רדיוס פגיעה גדול משל צ׳אט.">An engine with real system access has a larger blast radius than a chat.</p><span class="sx-rel" style="margin:0"><a href="/blog/prompt-injection-ai-threat-modeling.html" data-he="לקריאת המאמר">Read the article</a></span></div></div><div class="sx-panel"><h2 class="rc-h2 rv" data-he="דיווח על פגיעות">Reporting a Vulnerability</h2><p class="sx-lead rv" data-he="מצאתם בעיית אבטחה ב-Flow או באתר? שלחו לנו.">Found a security issue in Flow or on this site? Tell us.</p><div class="sx-box rv"><p class="sx-meta" data-he="שלחו פרטים לשחזור. נאשר קבלה, ולא נפעל נגד מחקר בתום לב שנמנע מפגיעה בפרטיות, משיבוש שירות ומהרס מידע.">Send details to reproduce it. We will acknowledge it and will not pursue good-faith research that avoids privacy violations, service disruption, and data destruction.</p><a class="doit" href="mailto:info@theflow-ai.com?subject=Security%20vulnerability%20report" data-ga="security_vuln_report" ><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-he="שליחת דיווח">Send a report</span></a></div></div></div></div></section><section class="rc-ch sx sx-sec" data-bg="w"><div class="sx-in"><h2 class="rc-h2 rv" data-he="עמדת תאימות">Compliance Posture</h2><p class="sx-lead rv" data-he="הארכיטקטורה מתוכננת לתמוך בפריסה תחת המסגרות האלה.">The architecture is designed to support deployment under these frameworks.</p><div class="sx-comp rv"><div class="sx-chips"><span class="tg">HIPAA</span><span class="tg">GDPR</span><span class="tg">SOC 2</span><span class="tg">21 CFR Part 11</span><span class="tg">NERC CIP</span><span class="tg">CJIS</span><span class="tg" data-he="דרישות ממשל בהלימה ל-FedRAMP">FedRAMP-aligned government requirements</span></div><div class="cm-f"><p data-he="מצב אישורים ודוחות ביקורת, ומודל הפריסה המתאים לכם, נמסרים בכתב: &lt;a href=&quot;mailto:info@theflow-ai.com?subject=Security%20review&quot;&gt;info@theflow-ai.com&lt;/a&gt;">Certification status, audit reports, and the deployment model that fits you, in writing: <a href="mailto:info@theflow-ai.com?subject=Security%20review">info@theflow-ai.com</a></p><p class="sx-meta" data-he="נעדיף תשובה מדויקת בכתב על פני מסקנה מתג.">We would rather give an accurate written answer than have you infer from a badge.</p></div></div></div></section><section class="rc-ch sx sx-sec sx-cta" data-bg="g"><div class="sx-in"><div class="sx-ctab rv"><h2 class="rc-h2" data-he="בוחנים את Flow לסביבה מוסדרת?">Evaluating Flow for a regulated environment?</h2><p class="sx-lead" data-he="ספרו לנו איזו מסגרת חלה עליכם, ונתחיל בפרטי הארכיטקטורה הרלוונטיים.">Tell us which framework applies to you and we will lead with the relevant architecture detail.</p><a class="doit" href="/contact.html" data-ga="security_contact"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-he="Do It">Do It</span></a></div></div></section></main>
+<footer class="site-foot" id="footer" lang="en" dir="ltr">
+  <div class="foot-in">
+    <div class="foot-cols">
+      <div class="foot-col foot-brand">
+        <img loading="lazy" src="assets/flow-logo-200.webp" alt="Flow" width="64" height="28">
+        <a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+      </div>
+      <nav class="foot-col" aria-label="Product">
+        <h3 data-k="ft.hFlow">Product</h3>
+        <a href="./trial.html" data-k="ft.glance">Glance</a>
+        <a href="./#product" data-k="ft.flow">Flow</a>
+        <a href="./security.html" data-k="ft.sec">Security</a>
+        <a href="./pricing.html" data-k="ft.pricing">Pricing</a>
+        <a href="./solutions/" data-k="ft.solutions">Solutions</a>
+      </nav>
+      <nav class="foot-col" aria-label="Company">
+        <h3 data-k="ft.hCo">Company</h3>
+        <a href="./about.html" data-k="ft.about">About</a>
+        <a href="./blog/" data-k="ft.blog">Insights</a>
+        <a href="./contact.html" data-k="ft.contact">Contact</a>
+      </nav>
+    </div>
+    <div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav class="foot-legal" aria-label="Legal"><a href="./privacy.html" data-k="ft.privacy">Privacy</a><a href="./terms.html" data-k="ft.terms">Terms</a></nav></div>
+  </div>
+</footer>
+<script src="assets/flow-header.js"></script>
+<script src="assets/flow-inner.js"></script>
+<script src="../samples/vendor/lenis.min.js"></script>
+<script src="../samples/flow-rich-v5.js"></script>
+<script src="../samples/hero-tile.js"></script>
+<script src="../samples/v3.js"></script>
+<script src="../samples/v4.js"></script>
+<script src="../samples/v5.js"></script>
+<script src="../samples/onprem.js"></script>
+<script src="../samples/sx.js"></script>
+<script src="../samples/sxh-b4o3.js"></script>
+</body></html>

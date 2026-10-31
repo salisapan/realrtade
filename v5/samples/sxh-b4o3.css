@@ -1,0 +1,239 @@
+/* Security S1 hero, variant B4 (loaded after sxh.css, only by security-S1-B4.html and security-S1-B4-open.html). B4 = B3 plus: no caption box, lift (translateZ) + depth of field + inter-layer shadow + live in-plane content, larger darker text.
+   Everything still only changes opacity / blur / z inside the 3D object, so the layout never shifts. */
+.sx-hx[data-v="B4"]{--hx-dim:.6}
+/* plane opacity: 1 when idle or active, 1 - dim at rest (= 20%), driven continuously by --a (how far we are into the scroll) and --l (this layer) */
+.sx-hx[data-v="B4"] .hx-tile .hs-pl{opacity:calc(1 - var(--dk,var(--hx-dim)) * var(--a) * (1 - var(--l)))}
+/* active layer is a more solid piece of glass (body fill follows --l), inactive keeps the original glass fill */
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"] .hs-c6 .hs-pl[style] .b{fill:rgba(255,255,255,calc(.30 + .42 * var(--l)))!important}
+/* neutral edges: white highlight to cool grey, no blue. Same stroke width as the original. */
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"] .hs-pl .b,html:not([data-theme="dark"]) .sx-hx[data-v="B4"] .hs-pl.top .b{stroke:url(#hx-edge)!important}
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"] .hs-pl .l{stroke:rgba(88,94,110,.55)!important}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl .b,html[data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl.top .b{stroke:url(#hx-edge-d)!important}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl .l{stroke:rgba(200,206,222,.5)!important}
+/* neutral shadows: same geometry as the original filter, blue glow replaced by a neutral one */
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"] .hs-c6 .hs-pl{filter:drop-shadow(0 0 4px rgba(255,255,255,.5)) drop-shadow(0 0 5px rgba(15,22,45,.10)) drop-shadow(0 46px 34px rgba(30,45,100,.07))}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl{filter:drop-shadow(0 0 12px rgba(255,255,255,.07)) drop-shadow(0 30px 28px rgba(0,0,0,.35))}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl .b{fill:rgba(255,255,255,calc(.045 + .08 * var(--l)))}
+.sx-hx[data-v="B4"] .hs-pl .lit{display:none}
+/* spec row follows the same continuous --l */
+.sx-hx[data-v="B4"] .hx-tile .hs-spec li{color:color-mix(in srgb,var(--hs-ink) calc(var(--l,0) * 100%),var(--hs-sub));opacity:calc(.55 + .45 * var(--l,0))}
+.sx-hx[data-v="B4"].hx-static .hx-tile .hs-spec li{opacity:1}
+
+/* ===== desktop scale ===== */
+@media (min-width:900px){
+ .sx-hx[data-v="B4"] .hx-tile .hs-obj{--hx-w:min(clamp(340px,42vw,800px),82cqh)}
+ .sx-hx[data-v="B4"] .hx-top{max-width:min(1500px,calc(100% - 48px))}
+ .rc .sx-hx[data-v="B4"] .hx-top h1.rc-h2{font-size:clamp(30px,3.1vw,60px)}
+ .sx-hx[data-v="B4"] .hx-caps{width:min(100% - 24px,clamp(560px,40vw,760px));height:clamp(92px,12.5svh,132px)}
+ .sx-hx.hx-static[data-v="B4"] .hx-caps{height:auto;width:min(100% - 24px,clamp(560px,40vw,760px))}
+ .sx-hx[data-v="B4"] .hx-cap h3{font-size:clamp(26px,1.9vw,38px)}
+ .sx-hx[data-v="B4"] .hx-cap p{font-size:clamp(16px,1.15vw,22px)}
+ .sx-hx[data-v="B4"] .hx-cap .k{width:clamp(22px,1.5vw,28px);height:clamp(22px,1.5vw,28px);font-size:clamp(12px,.85vw,15px)}
+ .sx-hx[data-v="B4"] .hx-tile .hs-spec{font-size:clamp(14px,1vw,19px)}
+}
+/* ===== wider content column on large screens (all sections share it) ===== */
+@media (min-width:1200px){
+ .sx-in{max-width:min(1480px,100% - 0px);padding-inline:clamp(40px,3.4vw,72px)}
+ #onprem.sx-op .op-in{max-width:none}
+}
+@media (min-width:1700px){.sx-in{max-width:1640px}
+ /* B4 1920 composition: wider tile (fills the width), stack a little smaller so its lower tip clears the label row, labels spread to the wider tile */
+ .sx-hx[data-v="B4"] .hx-tile .hs-tile{width:min(100% - 24px,1560px)}
+ .sx-hx[data-v="B4"] .hx-tile .hs-obj{--hx-w:min(clamp(340px,42vw,800px),114cqh)}
+ .sx-hx[data-v="B4"] .hx-tile .hs-spec{width:min(100%,900px)}
+}
+/* deployment diagram: the original component is drawn at 1120 x 476. It is scaled as one piece (its own JS reads the scale), --dk set by sxh-b2.js */
+#onprem.sx-op{--dk:1}
+#onprem.sx-op .card{transform:scale(var(--dk));transform-origin:50% 0;margin-bottom:calc(476px * (var(--dk) - 1))!important}
+@media (min-width:1200px){
+ .sx-dep .hs2 .hs-segc{width:min(calc(100% - 40px),clamp(440px,32vw,560px))}
+ .sx-dep .hs2 .hs-segc button{min-height:clamp(54px,4vw,66px);font-size:clamp(16px,1.25vw,20px)}
+ .sx-dep .hs-segnote{font-size:clamp(15px,1.1vw,19px);max-width:40em}
+}
+/* B4: caption capsule dissolves instead of blinking. Old and new text always sum to full opacity (see sxh-b3.js); a little blur on the fading one keeps the overlap soft, not garbled. */
+.sx-hx[data-v="B4"] .hx-cap{filter:blur(calc((1 - var(--c,0)) * (1 - var(--c,0)) * 5px))}
+.sx-hx.hx-static[data-v="B4"] .hx-cap{filter:none}
+
+/* ================= B4 ================= */
+/* (1) lift  (2) camera focus  (5) shadow. --lf = how lifted this layer is (0..1); light theme planes are drawn at 200% and scaled .5, so blur/shadow lengths are doubled there (--bs) */
+.sx-hx[data-v="B4"] .hx-tile .hs-pl{--lf:calc(var(--l) * var(--a));--bs:1;--blur:max(2.2px,calc(var(--hx-w) * .0048));--lift:calc(var(--hs-gap) * .36);transform:translateZ(calc((var(--k) - 1.5) * var(--hs-gap) + var(--lf) * var(--lift)))}
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"] .hs-c3 .hs-pl[style]{--bs:2;transform:translateZ(calc((var(--k) - 1.5) * var(--hs-gap) + var(--lf) * var(--lift))) scale(.5)}
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"] .hs-c6 .hs-pl{filter:blur(calc(var(--blur) * var(--bs) * var(--a) * (1 - var(--l)))) drop-shadow(0 0 4px rgba(255,255,255,.5)) drop-shadow(0 0 5px rgba(15,22,45,.10)) drop-shadow(0 calc(46px + 40px * var(--lf)) calc(34px + 34px * var(--lf)) rgba(30,45,100,calc(.07 + .07 * var(--lf))))}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl{filter:blur(calc(var(--blur) * var(--a) * (1 - var(--l)))) drop-shadow(0 0 12px rgba(255,255,255,.07)) drop-shadow(0 calc(30px + 26px * var(--lf)) calc(28px + 26px * var(--lf)) rgba(0,0,0,calc(.35 + .2 * var(--lf))))}
+/* (5) the plane above casts a soft shadow onto this plane (strength --sd, set from the plane above's light) */
+.sx-hx[data-v="B4"] .hs-pl .sd{fill:url(#hx-sd);stroke:none;opacity:var(--sd,0);pointer-events:none}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl .sd{fill:url(#hx-sd-d)}
+.sx-hx[data-v="B4"].hx-static .hs-pl .sd{opacity:.55}
+/* (4) live content. Values come from sxh-b4.js on one clock; with no value set every element looks exactly like the B3 original. Flow blue only. */
+.sx-hx[data-v="B4"] .hs-pl .enc{opacity:var(--en,0);pointer-events:none}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .fr{stroke:color-mix(in srgb,#2D5EFE calc(var(--q,0) * 70%),var(--hs-fine));fill:rgba(45,94,254,calc(.05 * var(--q,0)))}
+.sx-hx[data-v="B4"] .hs-pl .r{transform-box:fill-box;transform-origin:0 50%}
+.sx-hx[data-v="B4"] .hs-pl .r0{transform:scaleX(calc(1 - .38 * var(--m0,0)))}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .r.r0{opacity:calc(.55 + .45 * var(--m0,0))!important}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .cb.c0{stroke:color-mix(in srgb,#2D5EFE calc(var(--a0,0) * 100%),var(--hs-fine));fill:rgba(45,94,254,var(--a0,0))}
+.sx-hx[data-v="B4"] .hs-pl .ck.k0{fill:none;stroke:#fff;stroke-width:1.7px;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round;opacity:var(--a0,0);transform-box:fill-box;transform-origin:center;transform:scale(calc(.55 + .45 * var(--a0,0)))}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .l.w.w0{stroke:color-mix(in srgb,#2D5EFE calc(var(--a0,0) * 100%),rgba(88,94,110,.55))!important}
+html[lang][data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl .l.w.w0{stroke:color-mix(in srgb,#2D5EFE calc(var(--a0,0) * 100%),rgba(200,206,222,.5))!important}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .o.o0{fill:color-mix(in srgb,#2D5EFE calc(var(--a0,0) * 100%),var(--hs-sky,#fff))}
+.sx-hx[data-v="B4"] .hs-pl .r1{transform:scaleX(calc(1 - .38 * var(--m1,0)))}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .r.r1{opacity:calc(.55 + .45 * var(--m1,0))!important}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .cb.c1{stroke:color-mix(in srgb,#2D5EFE calc(var(--a1,0) * 100%),var(--hs-fine));fill:rgba(45,94,254,var(--a1,0))}
+.sx-hx[data-v="B4"] .hs-pl .ck.k1{fill:none;stroke:#fff;stroke-width:1.7px;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round;opacity:var(--a1,0);transform-box:fill-box;transform-origin:center;transform:scale(calc(.55 + .45 * var(--a1,0)))}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .l.w.w1{stroke:color-mix(in srgb,#2D5EFE calc(var(--a1,0) * 100%),rgba(88,94,110,.55))!important}
+html[lang][data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl .l.w.w1{stroke:color-mix(in srgb,#2D5EFE calc(var(--a1,0) * 100%),rgba(200,206,222,.5))!important}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .o.o1{fill:color-mix(in srgb,#2D5EFE calc(var(--a1,0) * 100%),var(--hs-sky,#fff))}
+.sx-hx[data-v="B4"] .hs-pl .r2{transform:scaleX(calc(1 - .38 * var(--m2,0)))}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .r.r2{opacity:calc(.55 + .45 * var(--m2,0))!important}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .cb.c2{stroke:color-mix(in srgb,#2D5EFE calc(var(--a2,0) * 100%),var(--hs-fine));fill:rgba(45,94,254,var(--a2,0))}
+.sx-hx[data-v="B4"] .hs-pl .ck.k2{fill:none;stroke:#fff;stroke-width:1.7px;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round;opacity:var(--a2,0);transform-box:fill-box;transform-origin:center;transform:scale(calc(.55 + .45 * var(--a2,0)))}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .l.w.w2{stroke:color-mix(in srgb,#2D5EFE calc(var(--a2,0) * 100%),rgba(88,94,110,.55))!important}
+html[lang][data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl .l.w.w2{stroke:color-mix(in srgb,#2D5EFE calc(var(--a2,0) * 100%),rgba(200,206,222,.5))!important}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .o.o2{fill:color-mix(in srgb,#2D5EFE calc(var(--a2,0) * 100%),var(--hs-sky,#fff))}
+.sx-hx[data-v="B4"] .hs-pl .ck{display:block}
+.sx-hx[data-v="B4"] .hs-pl .rd{transform-box:fill-box;transform-origin:center;transform:scale(var(--rd,1));opacity:var(--ro,1)}
+.sx-hx[data-v="B4"] .hs-pl .rl{transform-box:fill-box;transform-origin:0 50%;transform:scaleX(var(--rl,1));opacity:calc(.75 * var(--ro,1))}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .l.rl{stroke:color-mix(in srgb,#2D5EFE calc(var(--rn,0) * 100%),rgba(88,94,110,.55))!important}
+html[lang][data-theme="dark"] .sx-hx[data-v="B4"] .hs-pl .l.rl{stroke:color-mix(in srgb,#2D5EFE calc(var(--rn,0) * 100%),rgba(200,206,222,.5))!important}
+.sx-hx[data-v="B4"].hx-static .hs-pl .ck{opacity:0}
+
+/* (0) caption: no capsule, text straight on the page. Clear sizes and contrast. */
+html[lang] .sx-hx[data-v="B4"] .hx-caps{background:none!important;box-shadow:none!important;border-radius:0;overflow:visible;isolation:auto;width:min(100% - 32px,560px);height:clamp(142px,18.5svh,172px);padding-inline:0}
+.sx-hx[data-v="B4"] .hx-cap{inset:0;gap:6px}
+.sx-hx[data-v="B4"] .hx-cap .k{width:28px;height:28px;font-size:14px}
+.sx-hx[data-v="B4"] .hx-cap h3{font:750 26px/1.14 var(--disp);letter-spacing:-.022em;color:#1d1d1f;margin:4px 0 0}
+.sx-hx[data-v="B4"] .hx-cap p{font:400 16.5px/1.42 var(--text);color:#424245;max-width:23em}
+.sx-hx[data-v="B4"] .hx-cap.hold h3{max-width:13em;font-weight:750}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hx-cap h3{color:#f5f5f7}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hx-cap p{color:#c8c9d0}
+@media (max-width:480px){.sx-hx[data-v="B4"] .hx-cap p{font-size:16.5px}}
+/* layer labels under the stack: larger, darker; the active one is near-black and bolder (text-stroke so the width never changes) */
+.sx-hx[data-v="B4"] .hx-tile .hs-spec{font-size:15.5px}
+.sx-hx[data-v="B4"] .hx-tile .hs-spec li{font-size:1em;font-weight:600;letter-spacing:-.01em;opacity:1;color:color-mix(in srgb,#1d1d1f calc(var(--l,0) * 100%),#6e6e73);-webkit-text-stroke:calc(var(--l,0) * .6px) currentColor}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hx-tile .hs-spec li{color:color-mix(in srgb,#f5f5f7 calc(var(--l,0) * 100%),#a1a1a8)}
+.sx-hx[data-v="B4"].hx-static .hx-tile .hs-spec li{color:#424245;-webkit-text-stroke:0}
+html[data-theme="dark"] .sx-hx[data-v="B4"].hx-static .hx-tile .hs-spec li{color:#d6d7de}
+.sx-hx[data-v="B4"].hx-static .hx-cap p{max-width:none}
+html[lang] .sx-hx[data-v="B4"].hx-static .hx-caps{width:min(100% - 32px,640px);height:auto}
+html[lang] .sx-hx[data-v="B4"].hx-static .hx-cap h3{font-size:22px}
+@media (min-width:900px){
+ html[lang] .sx-hx[data-v="B4"] .hx-caps{width:min(100% - 48px,clamp(640px,46vw,900px));height:clamp(132px,15svh,184px)}
+ .sx-hx[data-v="B4"] .hx-cap .k{width:clamp(28px,1.9vw,38px);height:clamp(28px,1.9vw,38px);font-size:clamp(14px,.95vw,19px)}
+ .sx-hx[data-v="B4"] .hx-cap h3{font-size:clamp(28px,2.3vw,44px)}
+ .sx-hx[data-v="B4"] .hx-cap p{font-size:clamp(18px,1.4vw,27px);max-width:30em}
+ .sx-hx[data-v="B4"] .hx-tile .hs-spec{font-size:clamp(17px,1.3vw,25px)}
+ html[lang] .sx-hx[data-v="B4"].hx-static .hx-caps{width:min(100% - 48px,760px);height:auto}
+}
+/* B4-open: no panel. The stack and its labels sit on the page. */
+html[lang] .sx-hx[data-v="B4"][data-open] .hx-tile .hs-tile{background:none!important;box-shadow:none!important;border-radius:0;overflow:visible}
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"][data-open] .hs-c6 .hs-pl{filter:blur(calc(var(--blur) * var(--bs) * var(--a) * (1 - var(--l)))) drop-shadow(0 0 1px rgba(15,22,45,.20)) drop-shadow(0 0 7px rgba(15,22,45,.10)) drop-shadow(0 calc(16px + 12px * var(--lf)) calc(12px + 10px * var(--lf)) rgba(34,52,108,calc(.14 + .16 * var(--lf)))) drop-shadow(0 calc(46px + 44px * var(--lf)) calc(34px + 40px * var(--lf)) rgba(40,58,120,calc(.12 + .12 * var(--lf))))}
+html[lang] .sx-hx[data-v="B4"][data-open] .hx-tile .hs-tile{background:radial-gradient(52% 50% at 50% 44%,rgba(120,134,190,.10),rgba(120,134,190,0) 72%)!important}
+html[data-theme="dark"][lang] .sx-hx[data-v="B4"][data-open] .hx-tile .hs-tile{background:radial-gradient(52% 50% at 50% 44%,rgba(120,140,220,.12),rgba(120,140,220,0) 72%)!important}
+.sx-hx[data-v="B4"] .hx-eb{font-size:13px;letter-spacing:.1em;color:#6e6e73}
+@media (min-width:900px){.sx-hx[data-v="B4"] .hx-eb{font-size:clamp(14px,.95vw,18px)}}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hx-eb{color:#a1a1a8}
+
+/* B4 whole page: no blue outlines, no blue-tinted boxes, no grey cards. Scoped so B3 and the shared sx.css stay untouched. */
+html:has(.sx-hx[data-v="B4"]) .sx-vs .a{background:var(--g-bg);box-shadow:var(--sh),inset 0 1px 0 var(--g-hi);border:0}
+html:has(.sx-hx[data-v="B4"]) .sx-vs .b{border:0;box-shadow:var(--sh),0 18px 40px -22px rgba(45,94,255,.28),inset 0 1px 0 var(--g-hi)}
+html:has(.sx-hx[data-v="B4"]) .sx-bar{border-color:transparent;background:var(--g-bg)}
+html:has(.sx-hx[data-v="B4"]) .sx-ctab,html[data-theme="dark"]:has(.sx-hx[data-v="B4"]) .sx-ctab{border:0;background:var(--g-bg)}
+html:has(.sx-hx[data-v="B4"]) [data-dep="cloud"] .sx-gt[data-m="cloud"],html:has(.sx-hx[data-v="B4"]) [data-dep="edge"] .sx-gt[data-m="edge"],html:has(.sx-hx[data-v="B4"]) [data-dep="onprem"] .sx-gt[data-m="onprem"]{border-color:transparent;box-shadow:var(--sh),0 22px 44px -22px rgba(20,30,70,.28),inset 0 1px 0 var(--g-hi);transform:translateY(-3px)}
+html:has(.sx-hx[data-v="B4"]) .sx-lay.sl-static .sl-cap{border-color:transparent}
+
+/* ===== B4-open depth pass: inactive layers are frosted pale glass (visible against a white page), the active layer is crisp and lifted, and it casts a clear grey shadow ===== */
+/* glass body: the plane opacity (about .38 for the layer just under the active one down to .33 for the lowest, at full scroll, set by sxh-b4.js) times this fill alpha is what the eye sees. Inactive = cool pale grey glass, active = near white. Greys only. */
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"][data-open] .hs-c6 .hs-pl[style] .b{fill:rgba(calc(184 + 71 * var(--l)),calc(191 + 64 * var(--l)),calc(208 + 47 * var(--l)),calc(.74 + .26 * var(--l)))!important}
+/* edge: white top-left highlight to grey, no blue (same gradient, unchanged). The soft inner highlight (.sp) stays white. */
+/* shadows are measured in the layer gap (--hs-gap) so they scale with the stack; offsets point straight down on screen: in plane space that is (-.967 d, d) at this camera angle. --bs doubles lengths for the 200% drawn planes. */
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"][data-open] .hs-c6 .hs-pl{--lift:calc(var(--hs-gap) * .46);--sy:calc(var(--hs-gap) * var(--bs) * (.42 + .5 * var(--lf)));--sb:calc(var(--hs-gap) * var(--bs) * (.22 + .2 * var(--lf)) * (1 + .2 * (1 - min(1, var(--k)))));--cy:calc(var(--hs-gap) * var(--bs) * .13 * var(--lf));--cb:calc(var(--hs-gap) * var(--bs) * .07 * (.4 + var(--lf)));
+ filter:blur(calc(var(--blur) * var(--bs) * var(--a) * (1 - var(--l)))) saturate(calc(1 + 1 * var(--lf))) contrast(calc(1 + .16 * var(--lf)))
+  drop-shadow(0 0 calc(1px * var(--bs)) rgba(24,28,44,calc(.16 + .46 * var(--lf))))
+  drop-shadow(calc(var(--cy) * -.967) var(--cy) var(--cb) rgba(22,28,48,calc(.44 * var(--lf) * (1 + .3 * (1 - min(1, var(--k)))))))
+  drop-shadow(calc(var(--sy) * -.967) var(--sy) var(--sb) rgba(22,28,48,calc((.13 + .34 * var(--lf)) * (1 - .25 * (1 - min(1, var(--k)))))))}
+/* active layer: stronger lift (.46 gap, was .36), brighter fill, darker hairline edge (alpha .52 when active), a tight contact shadow right under it, and saturated, higher contrast inner content. Greys only. */
+/* dark theme, same treatment: inactive = pale slate glass at about 22 to 27% visibility (fill alpha .62 to .32 times plane opacity .33 to .38), active = brighter crisp glass with a lighter hairline, a tight contact shadow and a deep soft shadow. Greys only. */
+html[data-theme="dark"] .sx-hx[data-v="B4"][data-open] .hs-pl .b{fill:rgba(calc(132 + 82 * var(--l)),calc(142 + 80 * var(--l)),calc(172 + 68 * var(--l)),calc(.62 - .30 * var(--l)))}
+html[data-theme="dark"] .sx-hx[data-v="B4"][data-open] .hs-pl{--lift:calc(var(--hs-gap) * .46);--sy:calc(var(--hs-gap) * (.42 + .5 * var(--lf)));--sb:calc(var(--hs-gap) * (.22 + .2 * var(--lf)) * (1 + .2 * (1 - min(1, var(--k)))));--cy:calc(var(--hs-gap) * .13 * var(--lf));--cb:calc(var(--hs-gap) * .07 * (.4 + var(--lf)));
+ filter:blur(calc(var(--blur) * var(--a) * (1 - var(--l)))) saturate(calc(1 + 1.2 * var(--lf))) contrast(calc(1 + .3 * var(--lf)))
+  drop-shadow(0 0 1px rgba(255,255,255,calc(.16 + .6 * var(--lf))))
+  drop-shadow(calc(var(--cy) * -.967) var(--cy) var(--cb) rgba(0,0,0,calc(.6 * var(--lf) * (1 + .3 * (1 - min(1, var(--k)))))))
+  drop-shadow(calc(var(--sy) * -.967) var(--sy) var(--sb) rgba(0,0,0,calc((.3 + .5 * var(--lf)) * (1 - .15 * (1 - min(1, var(--k)))))))}
+/* dark, active Encryption layer: the blue grid is darkened and saturated against the lighter glass so it reads */
+html[data-theme="dark"] .sx-hx[data-v="B4"][data-open] .hs-pl .enc{filter:brightness(calc(1 - .45 * var(--l))) saturate(calc(1 + .8 * var(--l)))}
+
+/* =====================================================================================================
+   B4-open2 (sample, copy of B4-open + five approved improvements). Everything above is B4-open unchanged.
+   1 encryption grid stronger when active  2 thin "01" numbering instead of the blue badge  3 dark: blue glow under the active layer
+   4 caption body larger and one line at 390  5 desktop: stack enlarged, caption beside it (start side), phone stays stacked
+   ===================================================================================================== */
+
+/* ---------- 1. Encryption grid ---------- */
+/* a steady grid (enc0) that rises with the layer's light, plus the sweeping band (enc) at full strength on top */
+.sx-hx[data-v="B4"] .hs-pl .enc0{opacity:calc(var(--l,0) * var(--a,0) * .62);pointer-events:none}
+html:not([data-theme="dark"]) #hx-hb2 path{stroke-width:2.6;stroke:#2D5EFE}
+html[data-theme="dark"] #hx-hb2 path{stroke-width:1.6;stroke:#5C86FF}
+.sx-hx[data-v="B4"] .hs-pl .enc{opacity:min(1,calc(var(--en,0) * 1.4))}
+html[data-theme="dark"] .sx-hx[data-v="B4"][data-open] .hs-pl .enc{filter:none}
+/* the sealed frame: clearer blue edge and tint while it is shown */
+html[lang] .sx-hx[data-v="B4"] .hs-pl .fr{stroke:color-mix(in srgb,#2D5EFE calc(var(--q,0) * 100%),var(--hs-fine));fill:rgba(45,94,254,calc(.12 * var(--q,0)))}
+html[lang] .sx-hx[data-v="B4"] .hs-pl .fr{stroke-width:1.6px}
+
+/* ---------- 2. thin numbering ---------- */
+.sx-hx[data-v="B4"] .hx-cap .k{display:block;width:auto;height:auto;border-radius:0;background:none;color:#2D5EFE;font:300 14px/1 var(--disp);letter-spacing:.16em;font-variant-numeric:tabular-nums;margin:0 0 2px;opacity:.9}
+html[data-theme="dark"] .sx-hx[data-v="B4"] .hx-cap .k{color:#7C9DFF}
+.sx-hx.hx-static[data-v="B4"] .hx-cap{grid-template-columns:34px 1fr}
+.sx-hx.hx-static[data-v="B4"] .hx-cap .k{grid-row:1/3;align-self:center;font-size:13px}
+@media (min-width:900px){.sx-hx[data-v="B4"] .hx-cap .k{width:auto;height:auto;font-size:clamp(14px,1.05vw,20px)}}
+
+/* ---------- 3. dark: delicate #2D5EFF glow under the active layer instead of the black shadow ---------- */
+html[data-theme="dark"] .sx-hx[data-v="B4"][data-open] .hs-pl{
+ filter:blur(calc(var(--blur) * var(--a) * (1 - var(--l)))) saturate(calc(1 + 1.2 * var(--lf))) contrast(calc(1 + .3 * var(--lf)))
+  drop-shadow(0 0 1px rgba(255,255,255,calc(.16 + .6 * var(--lf))))
+  drop-shadow(calc(var(--cy) * -.967) var(--cy) calc(var(--cb) * 1.5) rgba(45,94,255,calc(.34 * var(--lf) * var(--lf))))
+  drop-shadow(calc(var(--sy) * -.967) var(--sy) calc(var(--sb) * 1.25) rgba(45,94,255,calc(.20 * var(--lf) * var(--lf))))}
+/* the plane above no longer paints a black patch on the plane below in dark; a faint cool shade instead */
+html[data-theme="dark"] .sx-hx[data-v="B4"][data-open] .hs-pl .sd{opacity:calc(var(--sd,0) * .45)}
+
+/* ---------- 4. caption body: larger, one line at 390 ---------- */
+@media (max-width:480px){
+ .sx-hx[data-v="B4"] .hx-cap p{font-size:18px;max-width:none;white-space:nowrap}
+ html[data-ui="en"] .sx-hx[data-v="B4"] .hx-cap p{white-space:normal;text-wrap:balance}
+ .sx-hx[data-v="B4"] .hx-caps{height:clamp(128px,16.5svh,160px)}
+}
+
+/* ---------- 5. desktop: caption beside the stack ---------- */
+@media (min-width:900px){
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-pin{
+  grid-template-columns:minmax(300px,28%) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);
+  column-gap:clamp(8px,1.5vw,32px);padding-inline:clamp(24px,3.2vw,80px);justify-items:stretch}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-top{grid-column:1/-1;grid-row:1;justify-self:center}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-tile{grid-column:2;grid-row:2;align-self:stretch}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-tile .hs-tile{width:100%;padding-top:0}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-tile .hs-tile .hs-stage{height:100%;min-height:0;margin-top:0}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-tile .hs-obj{--hx-w:min(clamp(380px,44vw,1000px),86cqh)}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-tile .hs-spec{width:min(100%,clamp(560px,50vw,980px))}
+ html[lang] .sx-hx[data-v="B4"]:not(.hx-static) .hx-caps{grid-column:1;grid-row:2;align-self:center;justify-self:stretch;width:auto;max-width:none;height:clamp(240px,34svh,380px)}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-cap{justify-items:start;text-align:start;align-content:center;gap:clamp(8px,.9vw,16px)}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-cap .k{font-size:clamp(15px,1.15vw,22px)}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-cap h3{font-size:clamp(36px,3.2vw,64px);line-height:1.08}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-cap p{font-size:clamp(19px,1.5vw,29px);line-height:1.45;max-width:17em;text-wrap:balance}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-cap.hold h3{max-width:9em;font-size:clamp(32px,2.8vw,56px)}
+}
+@media (min-width:1700px){
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-tile .hs-tile{width:100%}
+ .sx-hx[data-v="B4"]:not(.hx-static) .hx-tile .hs-obj{--hx-w:min(clamp(380px,44vw,1000px),86cqh)}
+}
+
+/* =====================================================================================================
+   B4-open3 (copy of B4-open2). ONE change, LIGHT mode only, bottom (Encryption) layer only: it must read clearly active and inactive.
+   Stronger #2D5EFF grid that stays visible when inactive, a little less blur, a slightly deeper plane fill, a blue hairline edge,
+   and its tab label in near-black ink. Sizes, layout, animation, other layers and dark mode are untouched.
+   ===================================================================================================== */
+/* grid: a steady floor so the inactive layer still shows its grid, rising to the open2 strength when active, hairline a touch thicker */
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"] .hs-obj>.hs-pl:first-child .enc0{opacity:max(calc(var(--a,0) * .5),calc(var(--l,0) * var(--a,0) * .8))}
+html:not([data-theme="dark"]) #hx-hb2 path{stroke-width:3;stroke:#2D5EFE}
+/* plane: less frosted when inactive (opacity floor and blur), slightly deeper fill, blue hairline edge */
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"] .hx-tile .hs-obj>.hs-pl:first-child{--blur:max(1.1px,calc(var(--hx-w) * .0022));opacity:calc(1 - var(--dk,var(--hx-dim)) * .55 * var(--a) * (1 - var(--l)))!important}
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"][data-open] .hs-c6 .hs-obj>.hs-pl[style]:first-child .b{fill:rgba(calc(160 + 95 * var(--l)),calc(174 + 81 * var(--l)),calc(204 + 51 * var(--l)),calc(.86 + .14 * var(--l)))!important;stroke:rgba(45,94,254,calc(.55 + .25 * var(--l)))!important;stroke-width:1.6px}
+/* label: near-black ink */
+html:not([data-theme="dark"]) .sx-hx[data-v="B4"]:not(.hx-static) .hx-tile .hs-spec li:first-child{color:color-mix(in srgb,#1d1d1f calc((.8 + .2 * var(--l,0)) * 100%),#6e6e73);opacity:1}
