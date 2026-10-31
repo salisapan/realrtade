@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('./support/harness');
-const { e2eGoogleGrantedScopes } = require('./support/launch');
+const { manifestOauthScopes } = require('./support/launch');
 const { sameDayIso } = require('./support/frozen-date');
 
 const SHOTS = '/opt/cursor/artifacts/screenshots';
@@ -174,16 +174,6 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
 
   // After the names read. A second Gmail tab with no account button writes
   // glanceNamesDiag source none, and that must not land before the assertion.
-  // v1 OAuth is compose-only; the deck needs-you card runs the file chain after
-  // mailbox Drive search (same E2E grant as live-gate file asks).
-  await glance.seed({
-    googleGrantedScopes: {
-      version: e2eGoogleGrantedScopes(),
-      status: 'granted',
-      source: 'chrome',
-      at: Date.now()
-    }
-  });
   const deck = await glance.openGmail({
     lang: 'he',
     messageId: 'm-he-deck',
@@ -195,10 +185,22 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
     ownEmail: 'ai.local.flow@gmail.com',
     to: ['ai.local.flow@gmail.com']
   });
-  const missing = deck.locator('[data-legacy-message-id="m-he-deck"] .flow-chip-host');
-  await expect(missing).toBeVisible({ timeout: 8000 });
-  await expect(missing).toContainText('לא מצאתי את');
-  await expect(missing).toContainText('לא מחובר, אז לא חיפשתי');
-  const deckBad = offenders(await visibleChrome(deck, '[data-legacy-message-id="m-he-deck"] .flow-chip-host'));
-  expect(deckBad, await missing.innerText()).toEqual([]);
+  // Real v1: the grant is exactly the manifest scopes (no drive.readonly), so
+  // flow:search-drive answers drive-search-unavailable and the file chain goes
+  // quiet. No needs-you card, no visible text of any kind, no write. A hidden
+  // marker carries the reason. Nothing here seeds a wider grant.
+  const msg = deck.locator('[data-legacy-message-id="m-he-deck"]');
+  const quiet = msg.locator('[data-glance-why="drive-search-unavailable-v1"]');
+  await expect(quiet).toHaveCount(1, { timeout: 15000 });
+  await expect(quiet).toBeHidden();
+  expect(await quiet.evaluate((el) => el.textContent)).toBe('');
+  await expect(deck.locator('div[role="main"] .flow-chip-host')).toHaveCount(0);
+  await expect(msg.locator('.flow-why-not')).toHaveCount(0);
+  const glanceText = await visibleChrome(deck, '[data-legacy-message-id="m-he-deck"] .flow-why-quiet');
+  expect(glanceText.trim(), 'the quiet v1 marker shows no text').toBe('');
+  const storedScopes = await glance.storage();
+  expect(String(storedScopes.googleGrantedScopes.version).split('\n').sort(), 'the grant is exactly the v1 manifest scopes').toEqual(manifestOauthScopes().sort());
+  const calls = await glance.apiCalls();
+  expect(calls.filter((c) => /\/drive\/v3\/files\?/.test(JSON.stringify(c))), 'no Drive search call in v1').toEqual([]);
+  expect(storedScopes.log || [], 'nothing was written').toEqual([]);
 });

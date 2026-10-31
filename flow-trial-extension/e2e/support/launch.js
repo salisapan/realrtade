@@ -8,20 +8,34 @@ const { gmailHtml, outlookHtml, outlookUrl, gmailUrl } = require('./fixtures');
 const EXT_ROOT = path.resolve(__dirname, '../..');
 const SKIP_DIRS = new Set(['node_modules', 'e2e', 'e2e-report', 'test-results', 'playwright-report', 'test']);
 
-function manifestGoogleGrantedVersion() {
+// Fixture grants must never be wider than what the shipped v1 manifest asks
+// Google for. A fixture that needs a scope the product does not have is testing
+// something a real user cannot reach: fix the test, never widen the grant.
+function manifestOauthScopes() {
   const manifest = JSON.parse(fs.readFileSync(path.join(EXT_ROOT, 'manifest.json'), 'utf8'));
-  const scopes = (manifest.oauth2 && manifest.oauth2.scopes) || [];
-  return scopes.slice().sort().join('\n');
+  return ((manifest.oauth2 && manifest.oauth2.scopes) || []).slice();
 }
 
-// Headless lane tests exercise mailbox Drive search (live gate report ask,
-// file chains). Production v1 OAuth stays compose-only; E2E pretends readonly
-// was granted so search runs against the lane server instead of file silence.
-function e2eGoogleGrantedScopes() {
-  const base = manifestGoogleGrantedVersion();
-  const readonly = 'https://www.googleapis.com/auth/drive.readonly';
-  if (base.split('\n').indexOf(readonly) >= 0) return base;
-  return base + '\n' + readonly;
+function manifestGoogleGrantedVersion() {
+  return manifestOauthScopes().sort().join('\n');
+}
+
+function grantedScopeList(version) {
+  if (Array.isArray(version)) return version.slice();
+  return String(version || '').split('\n').filter(Boolean);
+}
+
+// Scopes in a fixture grant that the shipped manifest does not declare.
+function scopesOutsideManifest(version) {
+  const allowed = new Set(manifestOauthScopes());
+  return grantedScopeList(version).filter((scope) => !allowed.has(scope));
+}
+
+function assertFixtureScopesWithinManifest(grant) {
+  const extra = scopesOutsideManifest(grant && grant.version);
+  if (extra.length) {
+    throw new Error('FIXTURE_SCOPES_OUTSIDE_V1_MANIFEST:' + extra.join(','));
+  }
 }
 
 function copyExtension(opts) {
@@ -804,6 +818,7 @@ async function boot() {
   await closeStrayPopups();
 
   harness.seed = async function seed(data) {
+    if (data && data.googleGrantedScopes) assertFixtureScopesWithinManifest(data.googleGrantedScopes);
     await evalWorker(async (bag) => {
       const e = globalThis.__glanceE2e;
       if (e && e.todoTasks) {
@@ -1160,4 +1175,4 @@ async function boot() {
   return harness;
 }
 
-module.exports = { boot, outlookAuth, copyExtension, e2eGoogleGrantedScopes, manifestGoogleGrantedVersion };
+module.exports = { boot, outlookAuth, copyExtension, manifestGoogleGrantedVersion, manifestOauthScopes, scopesOutsideManifest, assertFixtureScopesWithinManifest };

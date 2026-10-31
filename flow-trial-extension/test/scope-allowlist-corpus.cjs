@@ -106,6 +106,8 @@ if (packagedManifestPath) {
   } else {
     const packed = JSON.parse(fs.readFileSync(packagedManifestPath, 'utf8'));
     auditShippedManifest(packed, 'packaged zip manifest');
+    const packedScopes = (packed.oauth2 && packed.oauth2.scopes) || [];
+    check('packaged zip manifest scopes equal the repo manifest scopes (what fixtures are checked against)', JSON.stringify(packedScopes.slice().sort()) === JSON.stringify(manScopes.slice().sort()), { packed: packedScopes, repo: manScopes });
   }
 }
 
@@ -128,8 +130,24 @@ audit('e2e launch fixture google scopes (manifest oauth2 list)', manScopes.slice
 const launchSrc = read('e2e/support/launch.js');
 const launchGoogleAuth = launchSrc.match(/googleapis\.com\/auth\/[A-Za-z0-9._-]+/g) || [];
 const launchGoogleScopes = launchGoogleAuth.map((h) => 'https://www.' + h);
-const launchBad = launchGoogleScopes.filter((s) => !ALLOW.has(s) && !FORBIDDEN.has(s));
-check('e2e launch.js: no Google OAuth scope literal outside allowlist/forbidden pins', launchBad.length === 0, launchBad);
+const launchBad = launchGoogleScopes.filter((s) => !ALLOW.has(s));
+check('e2e launch.js: no Google OAuth scope literal outside the allowlist (forbidden scopes are not tolerated as fixture seeds)', launchBad.length === 0, launchBad);
+check('e2e launch.js: the old e2eGoogleGrantedScopes drive.readonly seed helper is gone', !/e2eGoogleGrantedScopes/.test(launchSrc));
+check('e2e launch.js: harness.seed refuses a googleGrantedScopes grant wider than the manifest', /assertFixtureScopesWithinManifest\(data\.googleGrantedScopes\)/.test(launchSrc));
+
+// Every e2e file that seeds googleGrantedScopes may only name scopes the shipped manifest declares.
+const manifestScopeSet = new Set(manScopes);
+const e2eDir = path.join(ROOT, 'e2e');
+const e2eFiles = fs.readdirSync(e2eDir).filter((f) => /\.js$/.test(f)).map((f) => 'e2e/' + f)
+  .concat(fs.readdirSync(path.join(e2eDir, 'support')).filter((f) => /\.js$/.test(f)).map((f) => 'e2e/support/' + f));
+const seeders = e2eFiles.filter((f) => /googleGrantedScopes/.test(read(f)));
+check('e2e fixtures: found the specs that seed googleGrantedScopes', seeders.length >= 3, seeders);
+for (const f of seeders) {
+  const lits = (read(f).match(/googleapis\.com\/auth\/[A-Za-z0-9._-]+/g) || []).map((h) => 'https://www.' + h);
+  const outside = lits.filter((s) => !manifestScopeSet.has(s));
+  check('e2e fixtures: ' + f + ' granted scopes are a subset of the manifest scopes', outside.length === 0, outside);
+}
+check('mutant: a fixture that adds drive.readonly is rejected by the subset rule', [G + 'drive.file', G + 'drive.readonly'].filter((s) => !manifestScopeSet.has(s)).join() === G + 'drive.readonly');
 check('e2e launch.js: outlook calendar mock requests MailboxSettings.Read with Calendars.ReadWrite',
   /Calendars\.ReadWrite/.test(launchSrc) && /MailboxSettings\.Read/.test(launchSrc));
 check('e2e launch.js: mailboxSettings mock includes timeZone UTC',
