@@ -2417,6 +2417,12 @@ function glanceUiCopy(kind) {
         chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
       });
       if (searched && searched.reason === 'drive-search-unavailable') {
+        // v1 has no mailbox-wide Drive search (drive.readonly is not in the
+        // grant) and no Drive picker in the packaged install (picker/ is
+        // omitted, PICKER_BUNDLED false), so there is no honest "pick it
+        // yourself" offer to make. Fail closed and quiet: no card, no
+        // visible text, nothing written. A hidden marker records why.
+        markQuietWhy(message, 'drive-search-unavailable-v1');
         logScanSkip(messageId, 'file');
         recordSilence(messageId, 'file');
         void flushSuggest(false);
@@ -3136,6 +3142,21 @@ function glanceUiCopy(kind) {
     line.className = 'flow-why-not';
     line.textContent = text;
     line.setAttribute('data-glance-why', reason || 'names-pending');
+  }
+
+  // A silence that shows nothing. One hidden, empty element carries the reason
+  // for tests and support. It has no text and is never part of what a person reads.
+  function markQuietWhy(messageNode, reason) {
+    if (!messageNode || !messageNode.querySelector || !reason) return;
+    const known = messageNode.querySelector('.flow-why-quiet');
+    if (known && known.getAttribute('data-glance-why') === reason) return;
+    const mark = known || document.createElement('span');
+    mark.className = 'flow-why-quiet';
+    mark.hidden = true;
+    mark.setAttribute('hidden', '');
+    mark.setAttribute('aria-hidden', 'true');
+    mark.setAttribute('data-glance-why', reason);
+    if (!known) messageNode.appendChild(mark);
   }
 
   function paintAccountReconnectRow(messageNode, messageId, subject) {
