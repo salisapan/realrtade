@@ -10,7 +10,7 @@
 // The engine's own card (tier 0) is returned as the engine built it; this file never replans or changes it.
 // Nothing here closes, writes or sends: the host shows the card, and every step runs on the person's click.
 //
-// Switches: everything rides on the router's aiPrimary (off). With it off read() returns { used:false } and calls nothing, so the host
+// Switches: everything rides on the router's aiPrimary (off). aiKindCheckV1 (off) adds core/kind-check.js on each model answer. With it off read() returns { used:false } and calls nothing, so the host
 // keeps today's path byte for byte. aiPlanV1 (off) adds the plan and the watch; aiRelevanceV1 (off) and aiDeviceTier1 (off) are read by
 // the router and the device adapter. Portable: no chrome.*, no DOM, no network; every capability is injected.
 const FlowAiEngine = (() => {
@@ -20,6 +20,7 @@ const FlowAiEngine = (() => {
   }
   const router = () => sibling(typeof FlowUnderstandingRouter !== 'undefined' ? FlowUnderstandingRouter : null, './understanding-router.js', 'FlowUnderstandingRouter');
   const planner = () => sibling(typeof FlowModelPlan !== 'undefined' ? FlowModelPlan : null, './model-plan.js', 'FlowModelPlan');
+  const kinds = () => sibling(typeof FlowKindCheck !== 'undefined' ? FlowKindCheck : null, './kind-check.js', 'FlowKindCheck');
   const floor = () => sibling(typeof FlowAiFloor !== 'undefined' ? FlowAiFloor : null, './ai-floor.js', 'FlowAiFloor');
 
   // A host that injects no gate or veto gets the production floor (core/ai-floor.js) bound to this mail. A host gate or veto wins.
@@ -33,6 +34,13 @@ const FlowAiEngine = (() => {
     return Object.assign({}, deps, { gate: typeof deps.gate === 'function' ? deps.gate : f.gate, veto: typeof deps.veto === 'function' ? deps.veto : f.veto });
   }
 
+  // aiKindCheckV1 (off): each model answer passes core/kind-check.js before the router validates it (who owes what, from the model's own quotes).
+  function withKindCheck(deps, flags) {
+    const K = kinds();
+    if (!K || !K.enabled(flags)) return deps;
+    return Object.assign({}, deps, { tier1: K.wrap(flags, deps.tier1), tier2: K.wrap(flags, deps.tier2) });
+  }
+
   // read(mail, deps, flags) -> { used:false } | { used:true, tier, reason, card:null|{ source, step, proposal?, plan?, rows? }, watch, trace, calls }
   // mail: { text, subject, today, direction, attachmentCount, surface, lang, cloudConsent, tier0:{quiet,step,possible},
   //         threadId, messageId, counterpart, channel, now }
@@ -40,7 +48,7 @@ const FlowAiEngine = (() => {
     const R = router();
     if (!R || !R.enabled(flags)) return { used: false };
     mail = mail || {};
-    deps = withFloor(deps || {}, mail);
+    deps = withKindCheck(withFloor(deps || {}, mail), flags);
     const r = await R.route({ text: mail.text, today: mail.today, attachmentCount: mail.attachmentCount || 0, direction: mail.direction,
       cloudConsent: mail.cloudConsent === true, tier0: mail.tier0 || {} }, deps, flags);
     const base = { used: true, tier: r.tier, reason: r.reason || null, trace: r.trace, calls: r.calls, watch: null };

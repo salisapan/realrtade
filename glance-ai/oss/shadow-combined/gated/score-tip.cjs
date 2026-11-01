@@ -3,7 +3,8 @@
 // same engine as Tier 0 of the AI engine (flow-trial-extension/core/ai-engine.js read(): router, real device mask, the strict gate and
 // veto, plan, carry). Tier 2 is the CACHED Qwen3.5-4B answer (no model is run). Spec labels, the 786 shadow cases.
 // The older score-*.cjs files use the 0.9.35 engine columns stored in the cases; this one runs the current engine.
-// usage: node glance-ai/oss/shadow-combined/gated/score-tip.cjs [--core-floor]
+// usage: node glance-ai/oss/shadow-combined/gated/score-tip.cjs [--core-floor] [--kind-check]
+//   --kind-check  aiKindCheckV1 on: core/kind-check.js corrects who owes what from the model's own quotes.
 //   --core-floor  no lab gate or veto is injected: the AI engine uses the production floor, core/ai-floor.js (what the extension will run).
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const LV = require('../../veto/llm-veto.cjs');
@@ -27,13 +28,14 @@ const goodTitle = (t, lang) => t && !LV.titleVeto(t) && (HE.test(t) === (lang ==
 const sb = { module: undefined, console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, Promise, TextEncoder, atob, btoa };
 vm.createContext(sb);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'step-list.js', 'json-enforce.js',
-  'understanding.js', 'request-types.js', 'follow-up.js', 'model-plan.js', 'privacyShield.js', 'mask-ids.js', 'exec-router.js', 'understanding-router.js', 'ai-floor.js', 'ai-engine.js'])
+  'understanding.js', 'request-types.js', 'follow-up.js', 'model-plan.js', 'privacyShield.js', 'mask-ids.js', 'exec-router.js', 'understanding-router.js', 'ai-floor.js', 'kind-check.js', 'ai-engine.js'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'flow-trial-extension/core', f), 'utf8'), sb, { filename: f });
 const g = (n) => vm.runInContext(n, sb);
 const AI = g('FlowAiEngine'), U = g('FlowUnderstanding'), ER = g('FlowExecRouter'), Shield = g('FlowPrivacyShield'), MI = g('FlowMaskIds');
 const TIP = makeEngine('tip');
 const CORE_FLOOR = process.argv.includes('--core-floor');
-const OUT = CORE_FLOOR ? 'tip-core-floor' : 'tip';
+const KIND_CHECK = process.argv.includes('--kind-check');
+const OUT = (CORE_FLOOR ? 'tip-core-floor' : 'tip') + (KIND_CHECK ? '-kind-check' : '');
 
 const sentences = (t) => String(t || '').split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter((s) => s.length >= 3);
 const words = (t) => new Set((String(t).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []).map((w) => (HE.test(w) ? w.replace(/^[להבוכמש]/, '') : w)));
@@ -73,7 +75,7 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const gg = c.gold.step;
     const quiet = c.vetoBase || c.vetoProduct || c.textVeto || null;
     const mail = { text: c.own, body: c.prompt.body, subject: c.subject, today: c.today, direction: c.direction, attachmentCount: c.attachmentCount || 0, surface: c.surface, lang: c.lang, cloudConsent: true,
       threadId: 'lab-' + c.id, now: Date.parse(c.today + 'T09:00:00'), tier0: { quiet: tipStep === 'SILENT' ? quiet : null, step: tipStep, possible: tipStep === 'SILENT' && !!LLM[c.id] } };
-    const out = await AI.read(mail, deps, { aiPrimary: true, aiPlanV1: true });
+    const out = await AI.read(mail, deps, Object.assign({ aiPrimary: true, aiPlanV1: true }, KIND_CHECK ? { aiKindCheckV1: true } : {}));
     rows.push({ c, tip: tipStep, ai: out.card ? out.card.step : 'SILENT', out });
   }
   const SETS = [['OSS 275', (c) => c.set === 'oss'], ['v2 held-out 400', (c) => c.set === 'v2test'], ['adversarial 72', (c) => c.set === 'adv'], ['injection 39', (c) => c.set === 'inj'], ['ALL pooled 786', () => true]];
@@ -97,6 +99,7 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const gg = c.gold.step;
   const wrongStep = model.filter((r) => { const gd = goldOf(r.c); return gd && gd !== 'SILENT' && gd !== r.out.card.step; }).map((r) => r.c.id + ':' + r.out.card.step + '≠' + goldOf(r.c));
   const save = model.filter((r) => r.out.card.suggestSave), saveGold = save.filter((r) => goldOf(r.c) === 'file_save').length;
   md += `\nModel cards: ${model.length} (planned ${planned}, carried by the follow loop ${watched}); model cards on a gold-silent mail: ${wrongModel.length}${wrongModel.length ? ' (' + wrongModel.join(', ') + ')' : ''}. Mails that reached the cloud tier: ${cloud}/${rows.length}.\nModel cards with a different step than the label: ${wrongStep.length}${wrongStep.length ? ' (' + wrongStep.join(', ') + ')' : ''}. File cards handed to suggest-save (shown only if it finds the real attachment): ${save.length}, of which the label is a file save: ${saveGold}.\n`;
+  R.cardSteps = Object.fromEntries(model.map((r) => [r.c.id, r.out.card.step + (r.out.card.proposal && r.out.card.proposal.kind === 'promise_by_me' ? ':own-promise' : '') + (r.out.card.plan ? ':' + r.out.card.plan.processId : '') + (r.out.watch ? ':' + r.out.watch.direction : '')]));
   R.model = { cards: model.length, planned, watched, cloud, wrongModel, wrongStep, suggestSave: save.length, suggestSaveGold: saveGold };
   fs.writeFileSync(path.join(__dirname, OUT + '-tables.md'), md);
   fs.writeFileSync(path.join(__dirname, OUT + '-results.json'), JSON.stringify(R, null, 1) + '\n');
