@@ -8,6 +8,13 @@
 // notionOAuth: "Sign in with Notion" through the token relay (flow-landing/netlify/functions/token-relay). Needs the relay deployed,
 //              NOTION_CLIENT_ID / NOTION_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.notionClientId set. Off = the pasted token only.
 //
+// slackAnswerReadBack: READ-ONLY. The person links one Slack direct message to one loop; Glance reads that DM (user scopes im:history, im:read) and counts the loop closed only
+//                      when the person's OWN real answer is read back by its timestamp (core/slack-answer-close.js). It never posts, edits or deletes a message, never reads
+//                      a channel; a short "ok" is held open; a reply from the other side is reported, never closed on. Off = flow:slack-answer-check / flow:slack-answer-release
+//                      answer connector-not-live. The recognition switch SLACK_ANSWER (core/slack-answer.js) is separate.
+// slackAnswerOAuth:    "Sign in with Slack" for that read, through the token relay (no PKCE at Slack). Needs the relay deployed, SLACK_CLIENT_ID / SLACK_CLIENT_SECRET set in Netlify,
+//                      OAUTH_PUBLIC.slackClientId set, and the two user scopes added to the Slack app.
+//
 // dropboxReadBack: one file saved into the person's Dropbox app folder, read back by id, size and content hash (core/dropbox-close.js). Never overwrites, never
 //                  renames; Undo refuses a file the person edited. Off = the messages flow:dropbox-save / flow:dropbox-undo answer connector-not-live.
 // dropboxOAuth:    "Sign in with Dropbox" (OAuth with PKCE, no secret, no relay). Needs OAUTH_PUBLIC.dropboxAppKey set.
@@ -32,4 +39,4 @@
 //                Off = no Asana writer exists at all (nothing is registered under the id "asana").
 // asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
 //                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false };
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false, slackAnswerReadBack: false, slackAnswerOAuth: false };

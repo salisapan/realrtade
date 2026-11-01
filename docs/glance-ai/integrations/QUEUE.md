@@ -18,7 +18,7 @@ The single queue both connector routines use. Built from the rows of `docs/glanc
 |---|---|---|---|---|---|
 | Notion | claude | built (merged into the working branch in #177, 2026-10-21, switches off) | #177 | | 2026-10-14 | Foundation (token relay, consent catalogue, learning hook) built with it. Waiting on CoS/owner: Notion public integration registration + env vars, relay deploy, `api.notion.com` manifest host, unverified vendor facts, steps-list destination wiring (open-tasks row 80) |
 | ClickUp | free | free | - | - | OAuth2. CoS: ClickUp OAuth app + client id/secret |
-| Slack | claude | claimed | `claude/connector-2026-11-01-slack` | 2026-11-01 | OAuth2 + secret (relay); app review for distribution. CoS: Slack app |
+| Slack | claude | built | `claude/connector-2026-11-01-slack` / #250 (draft, targets the working branch) | 2026-11-01 | READ-ONLY (never posts; DMs only; user scopes `im:history`, `im:read`). Built and tested against a mock; not verified live; switches off. Waiting on CoS/owner: the two user scopes on the Slack app + `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`, relay deploy, `slack.com/api` manifest host, Slack review for distribution, unverified vendor facts (`connectors/slack.md` §9), the steps-list card (open-tasks row 80) |
 | Monday | free | free | - | - | OAuth2. CoS: monday app |
 | HubSpot | free | free | - | - | **Blocked on a decision:** Glance or Flow (owner). Do not claim until decided |
 | Pipedrive | free | free | - | - | OAuth2 + secret (relay). CoS: Pipedrive app. Same Glance-vs-Flow question as CRM rows; confirm with owner |

@@ -12,8 +12,8 @@ ok('select all never includes a coming service or the contribution box', () => {
   assert.ok(C.selectAll().indexOf('notion') >= 0);
 });
 ok('a coming id ticked by hand is dropped and reported, no step', () => {
-  const r = C.stepsFor(['zoom', 'contribute', 'nope']);
-  assert.deepStrictEqual(r.steps, []); assert.deepStrictEqual(r.dropped, ['zoom', 'contribute', 'nope']);
+  const r = C.stepsFor(['stripe', 'contribute', 'nope']);
+  assert.deepStrictEqual(r.steps, []); assert.deepStrictEqual(r.dropped, ['stripe', 'contribute', 'nope']);
 });
 ok('notion tick = relay sign-in + its one host, nothing else', () => {
   const r = C.stepsFor(['notion']);
@@ -43,6 +43,11 @@ ok('docusign tick = relay sign-in + its two hosts, nothing else; all five connec
   assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-relay:docusign', 'host-permission:https://account.docusign.com/*', 'host-permission:https://*.docusign.net/*']);
   assert.strictEqual(C.stepsFor(['notion', 'asana', 'jira', 'linear', 'docusign']).steps.length, 11);
   assert.ok(C.selectAll().indexOf('docusign') >= 0);
+});
+ok('slack tick = relay sign-in + its one API host, nothing else; it is in select all', () => {
+  const r = C.stepsFor(['slack']);
+  assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-relay:slack', 'host-permission:https://slack.com/api/*']);
+  assert.ok(C.selectAll().indexOf('slack') >= 0); assert.strictEqual(C.byId('slack').state, 'experimental');
 });
 ok('dropbox tick = a PKCE sign-in (no relay, no secret) + its two API hosts, nothing else', () => {
   const r = C.stepsFor(['dropbox']);
