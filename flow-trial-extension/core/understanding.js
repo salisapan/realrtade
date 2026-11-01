@@ -201,7 +201,6 @@ const FlowUnderstanding = (() => {
       let step = null, why = null;
       if (it.kind === 'meeting') { if (!it.due) why = 'meeting-without-date'; else if (!it.due_time) why = 'meeting-without-time'; else step = 'calendar'; }
       else if (it.kind === 'promise_to_me') { if (it.due) step = 'task'; else why = 'promise-without-date'; }
-      else if (it.kind === 'promise_by_me' && ctx.promiseByMe === true) { if (it.due) step = 'task'; else why = 'own-promise-without-date'; } // core/kind-check.js (aiKindCheckV1)
       else if (it.kind === 'ask_of_me') {
         if (u.needs.indexOf('file') >= 0 && (ctx.attachmentCount || 0) > 0) step = 'file_save';
         else if (it.due) step = 'draft'; else why = 'ask-without-date';
@@ -214,7 +213,7 @@ const FlowUnderstanding = (() => {
     const kinds = Array.from(new Set(real.map((s) => s.step)));
     if (kinds.length > 1) return silent('two-intentions');
     const best = real.sort((a, b) => b.it.confidence - a.it.confidence)[0];
-    return { step: best.step, kind: best.it.kind, due: best.it.due || null, due_time: best.it.due_time || null, askSpan: best.it.ask_span, evidence: best.it.evidence_span, confidence: best.it.confidence,
+    return { step: best.step, due: best.it.due || null, due_time: best.it.due_time || null, askSpan: best.it.ask_span, evidence: best.it.evidence_span, confidence: best.it.confidence,
       proposalOnly: true, needsClick: true, closes: false };
   }
 

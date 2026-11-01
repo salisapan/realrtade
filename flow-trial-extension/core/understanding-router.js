@@ -16,6 +16,7 @@ const FlowUnderstandingRouter = (() => {
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
   }
   const U = sibling(typeof FlowUnderstanding !== 'undefined' ? FlowUnderstanding : null, './understanding.js', 'FlowUnderstanding');
+  const kindCheck = () => sibling(typeof FlowKindCheck !== 'undefined' ? FlowKindCheck : null, './kind-check.js', 'FlowKindCheck'); // aiKindCheckV1
   const ER = sibling(typeof FlowExecRouter !== 'undefined' ? FlowExecRouter : null, './exec-router.js', 'FlowExecRouter');
 
   const SWITCH = 'aiPrimary';
@@ -72,7 +73,8 @@ const FlowUnderstandingRouter = (() => {
     const out = (step, tier, extra) => Object.assign({ used: true, step, tier, calls, trace }, extra || {});
     const ms = typeof deps.timeoutMs === 'number' ? deps.timeoutMs : TIMEOUT_MS;
     const vopts = { today: input.today };
-    const pctx = { attachmentCount: input.attachmentCount || 0, promiseByMe: flags.aiKindCheckV1 === true };
+    const pctx = { attachmentCount: input.attachmentCount || 0 };
+    const KC = flags.aiKindCheckV1 === true ? kindCheck() : null;
 
     // Tier 0: the device rules keep the last word on quiets, and the clear half never reaches a model.
     if (input.direction && input.direction !== 'inbound') { trace.push('tier0:not-inbound'); return out(t0.step || 'SILENT', 0, { reason: 'not-inbound' }); }
@@ -92,7 +94,7 @@ const FlowUnderstandingRouter = (() => {
 
     const decide = (v, tier) => {
       if (!v.ok) return out('SILENT', tier, { reason: 'invalid:' + v.reason, drops: v.drops });
-      const p = U.proposal(v.understanding, pctx);
+      const p = KC ? KC.proposal(U, v.understanding, pctx) : U.proposal(v.understanding, pctx);
       if (p.step === 'SILENT') return out('SILENT', tier, { reason: 'model:' + p.reason, understanding: v.understanding, drops: v.drops });
       const f = floor(p, input, deps);
       if (!f.pass) return out('SILENT', tier, { reason: f.reason, proposal: p, understanding: v.understanding, drops: v.drops });

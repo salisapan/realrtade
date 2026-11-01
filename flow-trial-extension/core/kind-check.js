@@ -63,7 +63,20 @@ const FlowKindCheck = (() => {
     };
   }
 
-  return { SWITCH, DEFAULTS, enabled, kindFor, check, wrap };
+  // proposal(U, understanding, ctx) -> core/understanding.js proposal(), plus the person's own promise. U.proposal() has no step for
+  // promise_by_me; here a dated one becomes a task the person owes (kind: 'promise_by_me', planned by core/model-plan.js as the engine's
+  // Follow-through). An undated one stays silent. Every other intention is read exactly as U.proposal() reads it.
+  function proposal(U, u, ctx) {
+    const list = u && Array.isArray(u.intentions) ? u.intentions : [];
+    const own = list.filter((it) => it && it.kind === 'promise_by_me');
+    if (!own.length) return U.proposal(u, ctx);
+    const p = U.proposal(Object.assign({}, u, { intentions: list.map((it) => (it && it.kind === 'promise_by_me' ? Object.assign({}, it, { kind: 'promise_to_me', ownPromise: true }) : it)) }), ctx);
+    if (p.step === 'SILENT' && p.reason === 'promise-without-date' && !list.some((it) => it && it.kind === 'promise_to_me')) return { step: 'SILENT', reason: 'own-promise-without-date' };
+    if (p.step === 'task' && own.some((it) => it.ask_span === p.askSpan)) return Object.assign({}, p, { kind: 'promise_by_me' });
+    return p;
+  }
+
+  return { SWITCH, DEFAULTS, enabled, kindFor, check, wrap, proposal };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowKindCheck };
