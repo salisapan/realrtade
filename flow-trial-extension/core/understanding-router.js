@@ -72,7 +72,7 @@ const FlowUnderstandingRouter = (() => {
     const out = (step, tier, extra) => Object.assign({ used: true, step, tier, calls, trace }, extra || {});
     const ms = typeof deps.timeoutMs === 'number' ? deps.timeoutMs : TIMEOUT_MS;
     const vopts = { today: input.today };
-    const pctx = { attachmentCount: input.attachmentCount || 0 };
+    const pctx = { attachmentCount: input.attachmentCount || 0, promiseByMe: flags.aiKindCheckV1 === true };
 
     // Tier 0: the device rules keep the last word on quiets, and the clear half never reaches a model.
     if (input.direction && input.direction !== 'inbound') { trace.push('tier0:not-inbound'); return out(t0.step || 'SILENT', 0, { reason: 'not-inbound' }); }
