@@ -180,5 +180,18 @@ const run = (e, f, logs) => relay(e, { env: ENV, fetch: f, now: () => 1000, log:
     const f3 = mock(200, { access_token: 'x', note: 'DS-DEMO-SECRET' });
     assert.strictEqual((await relay(ev({ vendor: 'docusign-demo', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f3, now: () => 1 })).statusCode, 502);
   });
+  await t('slack: client id and secret in a form body to slack.com/api/oauth.v2.access; no PKCE verifier needed; refresh works; secret never returned', async () => {
+    const env = Object.assign({}, ENV, { SLACK_CLIENT_ID: 'scid', SLACK_CLIENT_SECRET: 'SL-SECRET' });
+    const f = mock(200, { ok: true, authed_user: { id: 'U1', access_token: 'xoxp-a', scope: 'im:history,im:read' } });
+    const r = await relay(ev({ vendor: 'slack', grant: 'code', code: 'c1', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f, now: () => 1 });
+    assert.strictEqual(r.statusCode, 200); assert.strictEqual(f.calls[0].url, 'https://slack.com/api/oauth.v2.access');
+    const form = new URLSearchParams(f.calls[0].init.body); assert.strictEqual(form.get('client_id'), 'scid'); assert.strictEqual(form.get('client_secret'), 'SL-SECRET'); assert.strictEqual(form.get('grant_type'), 'authorization_code'); assert.ok(!f.calls[0].init.headers.Authorization);
+    assert.ok(r.body.indexOf('SL-SECRET') < 0);
+    const f2 = mock(200, { ok: true, authed_user: { access_token: 'x', refresh_token: 'y' } });
+    assert.strictEqual((await relay(ev({ vendor: 'slack', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 })).statusCode, 200);
+    assert.strictEqual(new URLSearchParams(f2.calls[0].init.body).get('grant_type'), 'refresh_token');
+    const f3 = mock(200, { ok: true, note: 'SL-SECRET' });
+    assert.strictEqual((await relay(ev({ vendor: 'slack', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f3, now: () => 1 })).statusCode, 502);
+  });
   console.log('\n' + passed + ' passed');
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

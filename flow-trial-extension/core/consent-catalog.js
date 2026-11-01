@@ -43,7 +43,8 @@ const FlowConsentCatalog = (() => {
       steps: [{ type: 'oauth-pkce', vendor: 'dropbox' }, { type: 'host-permission', origin: 'https://api.dropboxapi.com/*' }, { type: 'host-permission', origin: 'https://content.dropboxapi.com/*' }] },
     // Listed so the screen can show them honestly. Select all never includes these.
     { id: 'zoom', label: 'Zoom', detail: 'Create one meeting link and read it back.', group: 'meetings', state: 'coming', steps: [] },
-    { id: 'slack', label: 'Slack', detail: 'Count a request closed when the answer arrives in the DM.', group: 'chat', state: 'coming', steps: [] },
+    { id: 'slack', label: 'Slack', detail: 'Read the one direct message you link to a request, to see whether you have answered it. Read only: Glance never posts, edits or deletes a message, and reads no channel.', group: 'chat', state: 'experimental',
+      steps: [{ type: 'oauth-relay', vendor: 'slack' }, { type: 'host-permission', origin: 'https://slack.com/api/*' }] },
     { id: 'stripe', label: 'Stripe', detail: 'Count a request closed when the payment arrives.', group: 'payments', state: 'coming', steps: [] },
     // Path D (docs/glance-ai/learning-from-use.md): dormant until the owner approves the consent and privacy text. Off by default.
     { id: 'contribute', label: 'Help improve Glance (no text leaves your device)', detail: 'Share noisy statistics only. Off by default; not available yet.', group: 'learning', state: 'coming', steps: [] }

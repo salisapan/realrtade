@@ -27,7 +27,7 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 | 6 | Dropbox | the file is saved | OAuth2 PKCE | **ready, waiting for owner** (2026-10-21): [doc](connectors/dropbox.md); built and tested against a mock; DRAFT PR #182 (stacked on #177); switches `dropboxReadBack`, `dropboxOAuth` off. Waiting: Dropbox app (App folder, 2 scopes) + app key, `api.dropboxapi.com` / `content.dropboxapi.com` hosts, unverified vendor facts (content hash, delete by id), Save-card destination + attachment bytes |
 | 7 | Zoom | the meeting link exists | OAuth2 + secret (relay); marketplace review | not started |
 | 8 | Microsoft Teams via Graph | the answer arrived in the chat | same Entra app as Outlook, no secret | not started |
-| 9 | Slack via its official API | the answer arrived in the DM | OAuth2 + secret (relay); app review for distribution | not started |
+| 9 | Slack via its official API | the person's own answer is in the DM | OAuth2 + secret (relay); app review for distribution | **ready, waiting for owner** (2026-11-01): [doc](connectors/slack.md); **read-only** (never posts, DMs only); built and tested against a mock; DRAFT PR #250; switches `slackAnswerReadBack`, `slackAnswerOAuth` and recognition `SLACK_ANSWER` off. Waiting: two user scopes on the Slack app + `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`, relay deploy, `slack.com/api` host, Slack review, unverified vendor facts (`connectors/slack.md` §9), steps-list card (row 80) |
 | 10 | Stripe (PayPal after it) | the payment arrived | OAuth + secret (relay) | not started |
 | 11 | Trello | a card exists | API key + token flow, not OAuth2 | not started |
 | 12 | Monday | an item exists | OAuth2 | not started |

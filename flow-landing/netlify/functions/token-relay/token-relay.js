@@ -57,6 +57,16 @@ const VENDORS = {
     extraHeaders: {},
     supportsRefresh: true
   },
+  slack: {
+    tokenUrl: 'https://slack.com/api/oauth.v2.access',
+    idEnv: 'SLACK_CLIENT_ID',
+    secretEnv: 'SLACK_CLIENT_SECRET',
+    // Slack takes client_id and client_secret in a form-encoded body and answers HTTP 200 with {ok:false,error} on a refusal; it has no PKCE; a refresh needs token rotation switched on in the app (verify against the vendor page before go-live).
+    clientAuth: 'body',
+    bodyFormat: 'form',
+    extraHeaders: {},
+    supportsRefresh: true
+  },
   // DocuSign: HTTP Basic client auth and a form body (verify against the vendor page before go-live). Production and the developer (demo) servers are two vendors:
   // the integration key is the same, the secret is not.
   docusign: {

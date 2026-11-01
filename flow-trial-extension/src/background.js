@@ -88,6 +88,7 @@ import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/slack-answer-close.js'; // classic: sets globalThis.FlowSlackAnswerClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
 import './google-lane-host.js';
@@ -1833,7 +1834,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth', slackAnswer: 'slackAnswerAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1861,7 +1862,7 @@ async function disconnectConnector(connectorId) {
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : connectorId === 'slackAnswer' ? [key, 'slackAnswerLedger'] : key);
   return { ok: true };
 }
 
@@ -4139,8 +4140,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack, slack: CONNECTORS.slackAnswerReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file', slack: 'slack/message' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -4568,6 +4569,87 @@ async function docusignCheck(payload) {
 async function docusignRelease(payload) {
   const r = await docusignCloseEngine().release((payload || {}).key);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'docusign', closeType: 'signature' });
+  return r;
+}
+
+/* ------------------------------------------------ Slack DM answer (official API), with a proof */
+// docs/glance-ai/connectors/slack.md. READ-ONLY: Glance reads one direct message the person linked to one loop; it never posts, edits or deletes a message.
+// It is separate from the older "post to a channel" Slack writer (slackAuth): its own token (user scopes im:history, im:read) lives under slackAnswerAuth.
+// Everything here is behind config/connectors.public.js (slackAnswerOAuth, slackAnswerReadBack), both off.
+
+const SLACK_ANSWER_USER_SCOPES = 'im:history,im:read';
+const SLACK_ANSWER_LEDGER_KEY = 'slackAnswerLedger';
+
+async function getSlackAnswerAuth() {
+  const { slackAnswerAuth } = await chrome.storage.local.get('slackAnswerAuth');
+  return slackAnswerAuth || null;
+}
+
+// Slack answers HTTP 200 with {ok:false,error} on a refusal, and with only a user scope the token is authed_user.access_token (not the top-level one),
+// so this does not use relayTokenRequest. The secret is added by the relay (token-relay vendor "slack"). Slack has no PKCE.
+async function slackAnswerRelay(body) {
+  const res = await fetch(NOTION_RELAY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ vendor: 'slack', install_id: await relayInstallId() }, body)) });
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  const u = data && data.ok === true && data.authed_user && typeof data.authed_user === 'object' ? data.authed_user : null;
+  if (!res.ok || !u || typeof u.access_token !== 'string' || !u.access_token) return { ok: false, status: res.status, error: (data && typeof data.error === 'string' && data.error.slice(0, 60)) || 'relay-failed' };
+  return { ok: true, token: u.access_token, refreshToken: typeof u.refresh_token === 'string' ? u.refresh_token : null, scope: String(u.scope || '') };
+}
+
+async function connectSlackAnswerOAuth() {
+  if (!CONNECTORS.slackAnswerOAuth) throw new Error('Sign in with Slack for answers is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.slackClientId);
+  if (!clientId) throw new Error('Slack sign-in isn’t configured on this build yet.');
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(SLACK_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&user_scope=' + encodeURIComponent(SLACK_ANSWER_USER_SCOPES) + '&redirect_uri=' + encodeURIComponent(redirectUri), 'Slack');
+  const got = await slackAnswerRelay({ grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Slack connection failed (' + got.error + ').');
+  // Only the two read scopes are kept as the grant; a token that also carries a write scope is refused here, never stored.
+  const granted = got.scope.split(/[\s,]+/).filter(Boolean);
+  if (granted.some((s) => !/^(im:history|im:read)$/.test(s)) || granted.indexOf('im:history') < 0) throw new Error('Slack granted a different set of permissions than asked, so nothing was connected.');
+  await chrome.storage.local.set({ slackAnswerAuth: { token: got.token, refreshToken: got.refreshToken, via: 'oauth' } });
+  return { title: 'Slack' };
+}
+
+async function slackAnswerRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await slackAnswerRelay({ grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.token, refreshToken: got.refreshToken || auth.refreshToken };
+}
+
+function slackAnswerEngine() {
+  return globalThis.FlowSlackAnswerClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getSlackAnswerAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ slackAnswerAuth: a }); },
+    refresh: slackAnswerRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(SLACK_ANSWER_LEDGER_KEY))[SLACK_ANSWER_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(SLACK_ANSWER_LEDGER_KEY))[SLACK_ANSWER_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [SLACK_ANSWER_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+// payload: { key, conversation (a DM id or a Slack message link), askedAtIso, direction: "mine" | "theirs" }
+async function slackAnswerCheck(payload) {
+  const started = Date.now();
+  const r = await slackAnswerEngine().check(payload || {});
+  if (r.closed) await noteConnectorOutcome('handled', started, { connector: 'slack', closeType: 'answer' });
+  else if (r.reason === 'verify_failed') await noteConnectorOutcome('readback_failed', started, { connector: 'slack', closeType: 'answer' });
+  return r;
+}
+
+async function slackAnswerRelease(payload) {
+  const r = await slackAnswerEngine().release((payload || {}).key);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'slack', closeType: 'answer' });
   return r;
 }
 
@@ -6968,6 +7050,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'slackAnswer') return reply(sendResponse, connectSlackAnswerOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'docusign') return reply(sendResponse, connectDocusignOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
@@ -6993,6 +7076,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     if (!CONNECTORS.dropboxReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
     return reply(sendResponse, msg.type === 'flow:dropbox-save' ? dropboxSave(msg.payload) : dropboxUndo(msg.payload));
+  }
+
+  // Slack DM answer (read-only): link one DM to one loop and read it for the person's own answer; release stops watching. Off = not live.
+  if (msg.type === 'flow:slack-answer-check' || msg.type === 'flow:slack-answer-release') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (!CONNECTORS.slackAnswerReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
+    return reply(sendResponse, msg.type === 'flow:slack-answer-check' ? slackAnswerCheck(msg.payload) : slackAnswerRelease(msg.payload));
   }
 
   // DocuSign (read-only): link one envelope to one loop and read its status; release stops watching. Off = not live.
