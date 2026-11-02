@@ -19,6 +19,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.compose',
   'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/forms.body',
   'openid',
   'https://www.googleapis.com/auth/userinfo.profile'
 ];
@@ -313,7 +314,7 @@ async function run() {
   check('unpacked redirect', api.googleRedirectUriForExtension(EXTENSION_ID) === 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/');
   check('store redirect', api.googleRedirectUriForExtension('lbihckfmoffgjjlnneoeaehbhoonfenh') === 'https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/');
   check('blank extension id has no redirect', api.googleRedirectUriForExtension('  ') === '');
-  check('default scopes match the manifest list', JSON.stringify(api.googleOAuthScopesFrom(null)) === JSON.stringify(api.GOOGLE_OAUTH_SCOPES) && api.GOOGLE_OAUTH_SCOPES.length === 7);
+  check('default scopes match the manifest list', JSON.stringify(api.googleOAuthScopesFrom(null)) === JSON.stringify(api.GOOGLE_OAUTH_SCOPES) && api.GOOGLE_OAUTH_SCOPES.length === 8);
   check('the one consent includes openid and userinfo.profile',
     api.GOOGLE_OAUTH_SCOPES.indexOf('openid') !== -1 &&
     api.GOOGLE_OAUTH_SCOPES.indexOf('https://www.googleapis.com/auth/userinfo.profile') !== -1);

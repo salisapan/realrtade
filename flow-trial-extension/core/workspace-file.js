@@ -8,8 +8,7 @@
 // the person and the people they share it with. Glance does not share it.
 // Drive files.create uses `drive.file`, already granted, no new scope.
 // A Form is created through the Forms API (forms.googleapis.com/v1, scope forms.body and its host
-// permission; neither is in manifest.json yet, so the write answers not-connected until the owner
-// adds them). The read-back is the form by id: same title. Undo trashes it through Drive only
+// permission; both are in manifest.json since owner approval 2026-10-24, behind the second off switch GOOGLE_FORMS). The read-back is the form by id: same title. Undo trashes it through Drive only
 // while the form's revisionId is the one read back; a form the person edited is left alone.
 // Handled only when the read-back by id shows the same name, the Doc or Sheet
 // type, and not trashed. Undo trashes it only while version and modifiedTime
@@ -35,6 +34,8 @@ const FlowWorkspaceFile = (() => {
 
   const SWITCH = 'WORKSPACE_FILE';
   const SWITCH_DEFAULT = false;
+  // A form needs its own switch on top of WORKSPACE_FILE: it is the only file here that asks the extra scope forms.body.
+  const FORMS_SWITCH = 'GOOGLE_FORMS';
   const SYSTEM_DOC = 'google/docs';
   const SYSTEM_SHEET = 'google/sheets';
   const CONNECTOR = 'googleNewFile';
@@ -121,6 +122,10 @@ const FlowWorkspaceFile = (() => {
     return { kind: 'clear', lang: lang, fileKind: kind, name: name };
   }
 
+  function formsEnabled(flags) {
+    return Boolean(flags && flags[FORMS_SWITCH] === true);
+  }
+
   function systemOf(kind) {
     return kind === 'sheet' ? SYSTEM_SHEET : kind === 'slides' ? SYSTEM_SLIDES : kind === 'form' ? SYSTEM_FORM : SYSTEM_DOC;
   }
@@ -134,6 +139,7 @@ const FlowWorkspaceFile = (() => {
     if (!enabled(input.flags)) return { action: 'off', reason: 'switch-off' };
     const r = recognize(input.text);
     if (r.kind !== 'clear') return silence(r.reason || 'no-ask');
+    if (r.fileKind === 'form' && !formsEnabled(input.flags)) return silence('forms-off');
     const he = r.lang === 'he';
     const kindLabel = r.fileKind === 'sheet' ? (he ? 'גיליון' : 'sheet') : r.fileKind === 'slides' ? (he ? 'מצגת' : 'slide deck') : r.fileKind === 'form' ? (he ? 'טופס' : 'form') : (he ? 'מסמך' : 'doc');
     return {
@@ -191,6 +197,7 @@ const FlowWorkspaceFile = (() => {
     const name = cleanName(input.name);
     if (!kind || !name) return miss('unclear');
     const drive = io.drive;
+    if (kind === 'form' && !formsEnabled(input.flags)) return miss('switch-off');
     if (kind === 'form') return createForm(name, io, input);
     const posted = await drive('POST', '/files?fields=' + encodeURIComponent('id,name,mimeType,trashed'), { name: name, mimeType: MIME[kind] });
     if (posted.status === 401 || posted.status === 403) return miss('not-connected');
@@ -302,7 +309,7 @@ const FlowWorkspaceFile = (() => {
     return gone ? { ok: true, undone: true, externalId: ref.fileId } : { ok: false, reason: 'undo-unverified' };
   }
 
-  return { SWITCH, SWITCH_DEFAULT, SYSTEM_DOC, SYSTEM_SHEET, SYSTEM_SLIDES, SYSTEM_FORM, CONNECTOR, enabled, recognize, plan, create, write, undo };
+  return { SWITCH, SWITCH_DEFAULT, FORMS_SWITCH, formsEnabled, SYSTEM_DOC, SYSTEM_SHEET, SYSTEM_SLIDES, SYSTEM_FORM, CONNECTOR, enabled, recognize, plan, create, write, undo };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowWorkspaceFile };

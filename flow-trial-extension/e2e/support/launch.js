@@ -878,6 +878,7 @@ async function boot() {
           'https://www.googleapis.com/auth/calendar.events',
           'https://www.googleapis.com/auth/drive.file',
           'https://www.googleapis.com/auth/drive.readonly',
+          'https://www.googleapis.com/auth/forms.body',
           'https://www.googleapis.com/auth/gmail.compose',
           'https://www.googleapis.com/auth/tasks',
           'https://www.googleapis.com/auth/userinfo.profile',

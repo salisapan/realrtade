@@ -47,12 +47,14 @@ const FlowModelPlan = (() => {
     const base = { label, confidence: 'high', source: 'model', signals: {}, entities: { what, requestWhat: what, dateIso: p.due || null, hour: t ? t.hour : null, minute: t ? t.minute : null } };
     if (p.step === 'calendar') return Object.assign(base, { type: 'event' });
     if (p.step === 'draft') return Object.assign(base, { type: 'request' });
+    if (p.step === 'task' && p.kind === 'promise_by_me') return Object.assign(base, { type: 'commitment' }); // the person's own promise: Follow-through
     if (p.step === 'task') return Object.assign(base, { type: 'followup' }); // the sender promised: Glance tracks it (Log It)
     return null; // file_save is suggest-save's decision on the real attachment list, not a model plan
   }
 
   // What really closes it, per anchor (docs/true-close.md §7; proof-of-close.js).
-  function doneWhen(anchorKind, step) {
+  function doneWhen(anchorKind, step, kind) {
+    if (kind === 'promise_by_me') return { kind: 'promise-kept', proof: 'a message the person sent in this thread that delivers it', notCompletion: 'the task or the prepared draft' };
     if (anchorKind === 'draft') return { kind: 'reply-sent', proof: 'a message the person sent in this thread', notCompletion: 'the prepared draft' };
     if (anchorKind === 'calendar') return { kind: 'event-exists', proof: 'the event read back from the calendar', notCompletion: 'a hold the person did not keep' };
     if (step === 'task') return { kind: 'promised-arrived', proof: 'the promised item or reply arrived', notCompletion: 'the tracking task' };
@@ -66,6 +68,7 @@ const FlowModelPlan = (() => {
     const FU = followUp();
     const now = todayIso ? Date.parse(todayIso + 'T12:00:00') : Date.now();
     const t = todayIso || new Date(now).toISOString().slice(0, 10);
+    if (p.step === 'task' && p.kind === 'promise_by_me') return { checkOn: p.due && p.due >= t ? p.due : t, then: 'remind' };
     if (p.step === 'task') {
       const on = FU ? FU.chaseDate(FU.KINDS.REPLY, p.due || null, now) : (p.due && p.due >= t ? p.due : t);
       return { checkOn: on, then: 'chase' };
@@ -78,6 +81,7 @@ const FlowModelPlan = (() => {
   // Carry until closed: a close only the model found is carried by the same loop as every other one.
   //   ask of you    -> direction 'mine' (you owe the answer, subtype owe:reply); closes when your reply goes out.
   //   promise to you -> direction 'theirs' (they owe it); chased until the promised thing arrives.
+  //   your own promise (kind promise_by_me, core/kind-check.js) -> direction 'mine', subtype owe:promise; looked at on its day.
   //   meeting        -> no watch: it closes on the calendar (doneWhen event-exists).
   // msg: { threadId, messageId, subject, counterpart:{email,name}, channel }. No thread, no watch.
   function toWatch(plan, p, msg, now) {
@@ -85,7 +89,8 @@ const FlowModelPlan = (() => {
     if (!FU || !plan || !p || !msg || !msg.threadId) return null;
     if (p.step !== 'draft' && p.step !== 'task') return null;
     const t = typeof now === 'number' ? now : Date.now();
-    const mine = p.step === 'draft';
+    const own = p.step === 'task' && p.kind === 'promise_by_me';
+    const mine = p.step === 'draft' || own;
     const what = String(p.askSpan || '').replace(/\s+/g, ' ').trim().slice(0, 140);
     if (!what) return null;
     const todayIso = FU.isoDay(new Date(t));
@@ -93,7 +98,7 @@ const FlowModelPlan = (() => {
     const w = FU.buildWatch({
       threadId: msg.threadId, messageId: msg.messageId || null, subject: msg.subject || '', counterpart: msg.counterpart || {}, channel: msg.channel || 'gmail', now: t,
       ask: { kind: FU.KINDS.REPLY, what, deadlineIso: p.due || null, chaseIso, lang: /[\u0590-\u05FF]/.test(what) ? 'he' : 'en',
-        subtype: mine ? 'owe:reply' : 'promised', tier: 'model', direction: mine ? 'mine' : 'theirs' }
+        subtype: own ? 'owe:promise' : (mine ? 'owe:reply' : 'promised'), tier: 'model', direction: mine ? 'mine' : 'theirs' }
     });
     return Object.assign(w, { closeWhen: plan.doneWhen ? plan.doneWhen.kind : null, planProcess: plan.processId });
   }
@@ -135,7 +140,7 @@ const FlowModelPlan = (() => {
     const steps = process.steps.map((s) => Object.assign({}, s, { needsClick: true }));
     const out = {
       processId: process.id, name: process.name, closingLine: process.closingLine, source: 'model',
-      steps, anchor: g.anchor, doneWhen: doneWhen(p.step, p.step),
+      steps, anchor: g.anchor, doneWhen: doneWhen(p.step, p.step, p.kind),
       carry: carryFor(p, ctx.today), evidence: p.evidence || null, closes: false
     };
     const rows = L && typeof L.rowsFor === 'function' ? L.rowsFor(Object.assign({}, process, { steps }), { lang: ctx.lang, memory: ctx.executionMemory }) : [];
