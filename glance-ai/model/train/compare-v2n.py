@@ -1,12 +1,12 @@
 # Compare any v2-family models (v2, v2.3, v2.4, ...) on the v2 test split: the model alone, and the product order (rules engine + hard veto first, the model
 # only where the engine is silent). Reference rows and the engine blind-spot rows (gap, train/gap-labels-v23.cjs) are counted apart.
-# usage (from glance-ai/model): .venv/bin/python train/compare-v2n.py name=preds.jsonl [name=preds.jsonl ...]   (labels: features-v23 test, as in V23.md)
+# usage (from glance-ai/model): .venv/bin/python train/compare-v2n.py name=preds.jsonl [name=preds.jsonl ...]   (labels: features-v23 test, as in V23.md; TRUTH=features-v23f scores against the reference fixes of train/ref-fix.cjs)
 import json,sys
 # Compared at STEP level (task, calendar, draft, file_save), as the product and promote_gate.cjs compare: commitment|task and
 # dated-commitment|task are the same Do It. (compare-v23.py compares the whole family|step label.)
 step=lambda l: l if l=='SILENT' else l.split('|')[-1]
 feat={}
-for l in open('train/features-v23/test.jsonl'):
+for l in open('train/'+__import__('os').environ.get('TRUTH','features-v23')+'/test.jsonl'):
   r=json.loads(l); feat[r['id']]=r
 def load(p): return {r['id']:r for r in map(json.loads,open(p))}
 def run(preds,name):
