@@ -8,6 +8,12 @@ const FROM = 'glance.salisapan@outlook.com';
 const ATTACH = 'please attach the contract to the invite';
 const HI = 'Hi Sali,\n\nCould you review the pilot proposal and confirm by Wednesday?\n';
 const REPLY = 'please reply by tomorrow at 11:00';
+// The card date is tomorrow by the real clock, so its month is tomorrow's month (a fixed 'Oct' broke on 1 November).
+function tomorrowMonth(locale) {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(d);
+}
 
 function since(glance) {
   const start = glance.consoleErrors.length;
@@ -95,7 +101,7 @@ test('Gmail chrome follows the page language, including the card date', async ({
   const enCard = english.locator('[data-legacy-message-id="m-gate163-en"] .flow-chip-host');
   await expect(enCard).toBeVisible({ timeout: 4000 });
   await expect(enCard.locator('.gs-intent-label')).toHaveText('Detected intent');
-  await expect(enCard.locator('[data-glance-when]')).toContainText('Oct');
+  await expect(enCard.locator('[data-glance-when]')).toContainText(tomorrowMonth('en'));
   await english.close();
 
   const hebrew = await glance.openGmail(mail({
@@ -107,8 +113,8 @@ test('Gmail chrome follows the page language, including the card date', async ({
   const heCard = hebrew.locator('[data-legacy-message-id="m-gate163-he"] .flow-chip-host');
   await expect(heCard).toBeVisible({ timeout: 4000 });
   await expect(heCard.locator('.gs-intent-label')).toHaveText('כוונה שזוהתה');
-  await expect(heCard.locator('[data-glance-when]')).toContainText('באוק׳');
-  await expect(heCard.locator('[data-glance-when]')).not.toContainText('Oct');
+  await expect(heCard.locator('[data-glance-when]')).toContainText('ב' + tomorrowMonth('he'));
+  await expect(heCard.locator('[data-glance-when]')).not.toContainText(tomorrowMonth('en'));
   clean();
 });
 

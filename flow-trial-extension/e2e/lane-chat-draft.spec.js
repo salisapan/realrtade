@@ -29,7 +29,9 @@ const LANE_JS = [
   'src/content-messenger.js'
 ];
 const PLACE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/messenger-place.html'), 'utf8');
-const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8');
+// The capture is dated 14 October; Messenger skips rows older than 14 days, so the spec moves them to today (a fixed date aged out on 28 October).
+const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8')
+  .split('2026-10-14T').join(new Date().toISOString().slice(0, 11));
 const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
 async function registerMessenger(glance) {
@@ -134,7 +136,7 @@ test('an open Business Suite thread drafts the existing last row and sends nothi
   expect(registered).toBe(true);
 
   await glance.seedOutlook();
-  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: '2026-10-08T10:00:00.000Z' });
+  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 11) + '10:00:00.000Z' }); // last week, as the ask (moved to today) says
   const page = await glance.openBusiness(SUITE_HTML);
   const before = await page.locator('[role="row"]').count();
   const box = page.locator('[data-glance-composer="1"]');
