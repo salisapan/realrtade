@@ -104,7 +104,9 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
   const panel = page.locator('#flow-brief-panel-host');
   await expect(panel).toBeVisible();
   await expect(panel.locator('.flow-chip-process-name').first()).toContainText('התחייבת');
-  await expect(panel.locator('.flow-chip-process-name').first()).toContainText('באוק');
+  // The seeded date is today, so the Hebrew month is today's month (a fixed 'באוק' broke on 1 November).
+  const heMonth = 'ב' + new Intl.DateTimeFormat('he', { month: 'short' }).format(new Date(sameDayIso(0) + 'T12:00:00'));
+  await expect(panel.locator('.flow-chip-process-name').first()).toContainText(heMonth);
 
   const chips = page.locator('.flow-chip-host');
   const gmailParts = [
