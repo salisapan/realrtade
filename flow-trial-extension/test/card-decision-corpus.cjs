@@ -301,12 +301,14 @@ function panel(store) {
   const oldHost = host;
   const oldHash = host && host.getAttribute('data-glance-card');
   if (oldHost) oldHost.remove();
+  // A deadline a few days after today, so the fixture does not age out once a fixed calendar date is past.
+  const dueSoon = new Date(Date.now() + 5 * 86400e3).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   showMail(shown.doc, shown.w, {
     id: 'MSG-SHOW-111',
     subject: 'Q3 summary confirm',
     toHtml: 'אל: <span>' + ME + '</span>',
     ccHtml: '',
-    bodyHtml: lines('Hi,\nCan you reply and confirm whether the board pack will be ready by November 2?\nThanks,\nFlow'),
+    bodyHtml: lines('Hi,\nCan you reply and confirm whether the board pack will be ready by ' + dueSoon + '?\nThanks,\nFlow'),
     fromTitle: 'Flow <' + FLOW + '>'
   });
   await settle(shown);
