@@ -28,30 +28,30 @@
   ]
  },
  "v2 held-out 400 / tip": {
-  "wdi": 11,
+  "wdi": 12,
   "sil": 218,
-  "miss": 57,
-  "show": 182,
-  "he": [
-   19,
-   90
-  ],
-  "en": [
-   38,
-   92
-  ]
- },
- "v2 held-out 400 / ai": {
-  "wdi": 11,
-  "sil": 218,
-  "miss": 50,
+  "miss": 48,
   "show": 182,
   "he": [
    17,
    90
   ],
   "en": [
-   33,
+   31,
+   92
+  ]
+ },
+ "v2 held-out 400 / ai": {
+  "wdi": 12,
+  "sil": 218,
+  "miss": 41,
+  "show": 182,
+  "he": [
+   15,
+   90
+  ],
+  "en": [
+   26,
    92
   ]
  },
@@ -112,32 +112,76 @@
   ]
  },
  "ALL pooled 786 / tip": {
-  "wdi": 25,
+  "wdi": 26,
   "sil": 464,
-  "miss": 128,
+  "miss": 119,
   "show": 322,
   "he": [
-   57,
+   55,
    153
   ],
   "en": [
-   71,
+   64,
    169
   ]
  },
  "ALL pooled 786 / ai": {
-  "wdi": 25,
+  "wdi": 26,
   "sil": 464,
-  "miss": 86,
+  "miss": 77,
   "show": 322,
   "he": [
-   29,
+   27,
    153
   ],
   "en": [
-   57,
+   50,
    169
   ]
+ },
+ "cardSteps": {
+  "oss-he-meet-013": "calendar:schedule",
+  "oss-he-meet-015": "calendar:schedule",
+  "oss-he-meet-019": "calendar:schedule",
+  "oss-he-meet-021": "calendar:schedule",
+  "oss-en-promise-026": "task:log-it:theirs",
+  "oss-en-promise-031": "task:log-it:theirs",
+  "oss-he-promise-038": "task:log-it:theirs",
+  "oss-he-promise-040": "task:log-it:theirs",
+  "oss-he-promise-042": "task:log-it:theirs",
+  "oss-he-promise-044": "task:log-it:theirs",
+  "oss-he-promise-045": "task:log-it:theirs",
+  "oss-he-promise-046": "task:log-it:theirs",
+  "oss-he-promise-048": "task:log-it:theirs",
+  "oss-en-ask-049": "draft:reply-track:mine",
+  "oss-en-ask-053": "draft:reply-track:mine",
+  "oss-en-ask-054": "draft:reply-track:mine",
+  "oss-he-ask-059": "draft:reply-track:mine",
+  "oss-he-ask-060": "draft:reply-track:mine",
+  "oss-he-ask-062": "draft:reply-track:mine",
+  "oss-he-ask-066": "draft:reply-track:mine",
+  "oss-he-ask-067": "draft:reply-track:mine",
+  "oss-he-move-087": "calendar:schedule",
+  "oss-he-move-088": "calendar:schedule",
+  "oss-he-move-090": "calendar:schedule",
+  "oss-B-prom-01": "task:log-it:theirs",
+  "oss-B-prom-02": "task:log-it:theirs",
+  "oss-B-prom-03": "task:log-it:theirs",
+  "v2syn-116": "draft:reply-track:mine",
+  "v2syn-774": "task:log-it:theirs",
+  "v2syn-781": "task:log-it:theirs",
+  "v2syn-1061": "draft:reply-track:mine",
+  "v2syn-1100": "task:log-it:theirs",
+  "v2syn-23131": "calendar:schedule",
+  "v2rtest-close-families-corpus-96": "calendar:schedule",
+  "adv2-to-own-en": "draft:reply-track:mine",
+  "adv2-to-own-he": "draft:reply-track:mine",
+  "adv2-to-own-cc": "draft:reply-track:mine",
+  "ctrl-en-1": "task:log-it:theirs",
+  "ctrl-he-1": "task:log-it:theirs",
+  "ctrl-he-2": "calendar:schedule",
+  "ctrl-he-3": "draft:reply-track:mine",
+  "ctrl-he-4": "task:log-it:theirs"
  },
  "model": {
   "cards": 42,
