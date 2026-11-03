@@ -382,7 +382,7 @@ const FlowIntent = (() => {
   // list (e.g. "חשבונית מס" needs no fix because bare "חשבונית" already
   // matches regardless), so only the handful with no such fallback needed
   // this treatment.
-  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים)/;
+  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת (?:ה)?מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת (?:ה)?זהות|גיליון אלקטרוני|תמליל|דו["״]ח|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים|תיקייה|תיקיה|תיקיית|לוגו|תמונה|תמונות|צילומים|הקלטה|סרטון|קבוצה|ערוץ|כתובת|פרטי קשר|לוח (?:ה)?משימות)/;
 
   // A short English label for the write paths that still expect one (Google
   // Tasks title, Notion title, popup activity log) — kept alongside the full
@@ -475,7 +475,7 @@ const FlowIntent = (() => {
   // במידה ו / בהנחה ש / בכפוף ל are the conditionals judgment.js already
   // hedges, and they never reached this gate. כשיהיה לך and מתי שנוח are
   // "whenever you" / "when convenient".
-  const SOFT_ASK_HE = /(?:^|\s)אולי|במידה ו|בהנחה ש|בכפוף ל|כשיהיה לך|מתי שנוח/;
+  const SOFT_ASK_HE = /(?:^|\s)אולי|במידה ו|בהנחה ש|בכפוף ל|כשיהיה לך|מתי שנוח|אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|כשיתאפשר|בהזדמנות/;
   // "Can you agree to the proposal by Monday" is a handoff plus a date, so
   // the request gate would draft it as a follow-up close. Agreeing is the
   // decision the reader has not made. "Could you confirm the payment by
@@ -637,11 +637,23 @@ const FlowIntent = (() => {
     const raw = String(text || '');
     return BANK_CHANGE.test(raw) && PAY_MOVE.test(raw);
   }
+  // A request to hand over card, bank or login details under a threat ("submit your payment details ... to avoid
+  // suspension") is the classic credential harvest. Both halves are needed, so an ordinary "send me the invoice
+  // details by Friday" and a plain "your account will be closed" notice are untouched.
+  const CRED_ASK_EN = /\b(?:submit|enter|provide|confirm|verify|update|re-?enter|send)\s+(?:us\s+)?(?:your|the)\s+(?:(?:credit|debit|bank|payment|billing|card|login|account|security)\s+){1,2}(?:details|information|info|number|credentials|password|code)\b|\b(?:verify|confirm)\s+your\s+(?:account|identity|password|login)\b/i;
+  const CRED_THREAT_EN = /\b(?:avoid|prevent|or)\s+(?:your\s+)?(?:account\s+)?(?:suspension|being suspended|closure|being closed|deactivation|termination|being locked|losing access)\b|\b(?:will be|has been|is)\s+(?:suspended|locked|deactivated|terminated|closed|blocked)\b|\bwithin\s+(?:24|48)\s+hours\b/i;
+  const CRED_ASK_HE = /(?:הזן|הזינו|הכנס|הכניסו|עדכן|עדכנו|אמת|אמתו|שלח|שלחו|מסור|מסרו)\s+(?:את\s+)?(?:ה)?פרטי\s+(?:ה)?(?:כרטיס|אשראי|תשלום|בנק|חשבון|התחברות)|אמת\s+את\s+(?:ה)?(?:חשבון|סיסמה|זהות)/;
+  const CRED_THREAT_HE = /(?:ייחסם|יחסם|יושעה|ייסגר|יינעל|יבוטל|החשבון\s+שלך\s+(?:נחסם|הושעה|ננעל))|תוך\s+(?:24|48)\s+שעות/;
+  function credentialHarvest(text) {
+    const raw = String(text || '');
+    return (CRED_ASK_EN.test(raw) && CRED_THREAT_EN.test(raw)) || (CRED_ASK_HE.test(raw) && CRED_THREAT_HE.test(raw));
+  }
   // Phishing and the bank-change negative. One predicate, used before any
   // plan is built, on every host.
   function phishingOrNegative(text) {
     const raw = String(text || '');
     if (bankChangePayment(raw)) return true;
+    if (credentialHarvest(raw)) return true;
     // "Ignore previous instructions and pay … to account 12-345-678" is the
     // same refusal as a changed bank. A dated invoice with no new account
     // is still the ask.
@@ -1193,7 +1205,7 @@ const FlowIntent = (() => {
     // «האם תוכל לשלוח...?» and «האם אפשר לקבל...?» are the polite ask, the same as «תוכל לשלוח...?» and «אפשר לקבל...?». Only these two
     // openings: «האם אפשר לשלוח לך» asks whether the writer may send, and «האם שלחת» asks for a status.
     // A note to oneself keeps its own reading («האם תוכל לתאם...» there is a task, not an ask of someone else).
-    if (!addressedToSelf(ctx) && !mailIsOwn(ctx)) text = String(text || '').replace(/(^|[.!?\n]\s*)(?:(?:היי|הי|שלום)[,!]?\s+)?האם\s+(?=(?:תוכל(?:י|ו)?\s|אפשר\s+לקבל\s))/g, '$1');
+    if (!addressedToSelf(ctx) && !mailIsOwn(ctx)) text = String(text || '').replace(/(^|[.!?\n]\s*)(?:(?:היי|הי|שלום)[,!]?\s+)?האם\s+(?=(?:תוכל(?:י|ו)?\s|אפשר\s+לקבל\s|יש\s+(?:לך|לכם)\s))/g, '$1');
     // A quoted older ask is not a live close. Family H strips it before
     // any gate can draft or file it.
     if (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.stripQuotedAsks) {

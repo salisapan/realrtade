@@ -7,7 +7,7 @@
 // no network.
 const FlowChatPickupNotice = (() => {
   const NOUN_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:order|parcel|package|delivery|item|items|prescription|glasses|laundry|documents?|passport|id|car|repair)\b/i;
-  const NOUN_HE = /(?:ההזמנה|החבילה|המשלוח|הפריט|המרשם|התרופה|התרופות|הכביסה|המסמכים|הדרכון|הרכב|התיקון|הטלפון|המשקפיים)\s+(?:שלך|שלכם|שלכן)|(?:הזמנתך|חבילתך)/;
+  const NOUN_HE = /(?:ההזמנה|החבילה|המשלוח|הפריט|המרשם|התרופה|התרופות|הכביסה|המסמכים|הדרכון|הרכב|התיקון|הטלפון|המשקפיים|התעודה|הרישיון|הכרטיס|הצילומים|העבודה|הטופס|הנעליים|הציוד)\s+(?:שלך|שלכם|שלכן)|(?:הזמנתך|חבילתך)/;
   const PICKUP_EN = /\b(?:ready\s+(?:for|to)\s+(?:pick\s?-?up|collect(?:ion)?|be\s+collected|be\s+picked\s+up)|(?:is|are)\s+(?:waiting|available|ready)\s+(?:for\s+(?:pick\s?-?up|collection)|at\s+(?:the|our)\b)|we(?:'ll|\s+will)?\s+(?:hold|keep)\s+(?:it|them)|(?:pick|collect)\s+(?:it|them)?\s*up|collect(?:ion)?\s+(?:it|them)?|for\s+(?:pick\s?-?up|collection))\b/i;
   const PICKUP_HE = /(?:נשמור\s+(?:אותה|אותו|אותם|אותן)|מוכנ(?:ה|ים)\s+לאיסוף|לאיסוף|ממתינ(?:ה|ים)\s+(?:לך|לכם|בדואר|בסניף|בנקודת)|לאסוף|ניתן\s+לאסוף|אפשר\s+לאסוף)/;
   const MARK = /(?:\b(?:until|by|before|till|through|no\s+later\s+than)\b|(?:^|[\s,])(?:עד|לפני)(?=\s))/i;

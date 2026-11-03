@@ -147,7 +147,35 @@ const FlowChatPaymentAsk = (() => {
     return { kind: 'ask', billed: billed, dateIso: d.iso, amount: amount, currency: currency, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
-  return { recognize: recognize };
+  // An invoice or bill that names its number and its day but no amount ("Reminder: your invoice 2231 is due on 30/10", «חשבונית מספר
+  // 2231 לתשלום עד 30/10»). The task is "Pay invoice 2231" on that day; the amount is not invented. The same refusals as above (a receipt,
+  // a charge that happens by itself, a thing already paid), and only the person's own bill in English ("your ...") or a stated due day in
+  // Hebrew. A bill that has an amount is the ask above. { kind: 'ask', ref, billed: true, amount: '', currency: '', dateIso, lang } or { kind: 'none' }.
+  const REF_EN = /\byour\s+(?:[a-z-]+\s+){0,2}(?:invoice|bill|statement|instal+ment)\s*(?:#|no\.?|number)?\s*([A-Za-z]{0,4}-?\d{2,10})\b[^.?!]{0,60}\b(?:is|are)?\s*(?:due|payable|overdue|outstanding)\b|\b(?:invoice|bill)\s*(?:#|no\.?|number)?\s*([A-Za-z]{0,4}-?\d{2,10})\s+(?:is|are)\s+(?:due|payable|overdue|outstanding)\b/i;
+  const REF_HE = /(?:חשבונית|החשבונית)\s+(?:מס(?:פר|\x27)?\.?\s*)?(\d{2,10})\b[^.?!]{0,40}(?:לתשלום\s+עד|מועד\s+(?:הפירעון|התשלום)|פירעון)/;
+  function recognizeBill(text, now) {
+    const raw = amountWords(String(dayWords(text, now) || '')).replace(/\s+/g, ' ').trim().replace(NUDGE_EN, '').replace(NUDGE_HE, '');
+    if (!raw) return { kind: 'none', reason: 'empty' };
+    if (raw.length > 200) return { kind: 'none', reason: 'long' };
+    if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-an-ask' };
+    if ((raw.match(new RegExp(AMOUNT.source, 'gi')) || []).length) return { kind: 'none', reason: 'has-amount' };
+    const m = raw.match(REF_EN) || raw.match(REF_HE);
+    if (!m) return { kind: 'none', reason: 'no-bill' };
+    const ref = String(m[1] || m[2] || '').trim();
+    if (!ref) return { kind: 'none', reason: 'no-ref' };
+    const X = extractApi();
+    if (!X || typeof X.parseDate !== 'function') return { kind: 'none', reason: 'not-configured' };
+    const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);
+    const rest = raw.replace(ref, ' ');
+    const d = X.parseDate(rest, at) || weekdayDate(rest, at);
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(d.iso || ''))) return { kind: 'none', reason: 'no-day' };
+    const today = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+    const ahead = Math.round((new Date(d.iso + 'T00:00:00') - today) / 86400000);
+    if (!(ahead >= 0 && ahead <= MAX_AHEAD_DAYS)) return { kind: 'none', reason: 'day-out-of-range' };
+    return { kind: 'ask', billed: true, ref: ref, dateIso: d.iso, amount: '', currency: '', lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+  }
+
+  return { recognize: recognize, recognizeBill: recognizeBill };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatPaymentAsk };

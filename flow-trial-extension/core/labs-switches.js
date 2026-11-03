@@ -18,6 +18,7 @@ const FlowLabsSwitches = (() => {
     { id: 'RECURRING_REMINDER', who: 'תזכורת חוזרת', note: 'התחייבות חוזרת הופכת לתזכורת חוזרת' },
     { id: 'RECURRING_TODO', who: 'משימה חוזרת', note: 'משימה של Microsoft שחוזרת על עצמה' },
     { id: 'WORKSPACE_FILE', who: 'מסמך, גיליון או מצגת של Google', note: 'קובץ ריק בשם שביקשו, ב-Drive' },
+    { id: 'GOOGLE_FORMS', who: 'טופס של Google (דורש WORKSPACE_FILE)', note: 'טופס ריק בשם שביקשו; מבקש הרשאת Forms, בלי שאלות ובלי שליחה' },
     { id: 'ONEDRIVE_NEW_FILE', who: 'מסמך או גיליון של Microsoft', note: 'קובץ ריק בשם שביקשו, ב-OneDrive' },
     { id: 'SHAREPOINT_NEW_FILE', who: 'מסמך או גיליון באתר SharePoint', note: 'קובץ ריק בשם שביקשו, באתר אחד ששמו נכתב במייל' },
     { id: 'SHAREPOINT_SAVE_FILE', who: 'קובץ מצורף באתר SharePoint', note: 'שמירת הקובץ המצורף, כמו שהוא, באתר אחד ששמו נכתב במייל' },
