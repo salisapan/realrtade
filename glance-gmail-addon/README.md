@@ -35,33 +35,33 @@ The homepage shows the next pending action when a prefetch cache returns one. Se
 
 ## Scopes
 
-Workspace add-on host (`appsscript.json`):
+Workspace add-on host (`appsscript.json`). Every entry is non-restricted. Each one has a reason:
 
-- `https://www.googleapis.com/auth/gmail.addons.current.message.readonly`
-- `https://www.googleapis.com/auth/gmail.addons.execute`
-- `https://www.googleapis.com/auth/gmail.modify` (inbox `Glance` label + star marker sweep only; no send)
-- `https://www.googleapis.com/auth/script.scriptapp` (hourly `sweep` trigger)
-- `https://www.googleapis.com/auth/tasks`
-- `https://www.googleapis.com/auth/calendar.events`
-- `https://www.googleapis.com/auth/userinfo.email`
+| Scope | Why this host needs it |
+| --- | --- |
+| `gmail.addons.execute` | Run the add-on in Gmail (the homepage and the message-open trigger). |
+| `gmail.addons.current.message.readonly` | Read the open message only, through `GmailApp.setCurrentMessageAccessToken`. No other message or thread. |
+| `tasks` | Do it writes one Google Task, reads it back, and Undo removes it. |
+| `calendar.events` | Do it writes one calendar hold or event, reads it back, and Undo removes it. Not the full `calendar` scope. |
+| `userinfo.email` | `Session.getActiveUser().getEmail()` names the reader, so a mail to someone else stays quiet. |
+| `script.external_request` | `UrlFetchApp` for the optional `GLANCE_PREFETCH_URL` homepage call. Unset, nothing is fetched. |
+| `script.locale` | `useLocaleFromApp`: the card follows the Gmail language. |
 
-No `script.external_request`, no `urlFetchWhitelist`, no `gmail.send`. No full `calendar` scope.
+Not declared, and no code path uses them: `gmail.modify`, `gmail.readonly`, `gmail.compose`, `gmail.send`, `gmail.metadata`, `drive.*`, `forms.body`, `contacts.readonly`, `script.scriptapp`. `v1.test.cjs` rejects each of them in the manifest, and rejects any scope that is not on its explicit allowlist.
 
-**GCP project (marker deployment):** `130212967225` — Apps Script project name **Glance Gmail (marker)**. Do not mix with unrelated Glance GCP projects.
+Because the add-on only sees the open message, it cannot read the other messages of a thread. It reads the whole plain body of the open message, quoted history included, up to 20000 characters. Reading the rest of the thread would need a restricted Gmail scope, so v1 does not do it.
 
-## Inbox marker (GB)
-
-On homepage open, installs an hourly `sweep` trigger (idempotent). `sweep()` searches `in:inbox newer_than:2d -label:Glance`, runs the same bundled judge as the card, and applies label `Glance` + star on the thread’s latest message only when the card would offer **Do it**. Processed and dismissed message IDs live in `PropertiesService` (FIFO ~2000, no mail content). After **ProofOfClose**, the marker is removed; **Undo** restores it; **Not this** dismisses permanently. Stops cleanly at 4.5 minutes per run.
-
-Tests: `node glance-gmail-addon/test/marker.test.cjs` (mocked Gmail; corpus counts per `UTC` and `Asia/Jerusalem`).
+There is no inbox label or star marker in this host. That needed `gmail.modify`, which is CASA-restricted, so the code was removed.
 
 ## Tests
+
+`behavior.test.cjs` drives `Code.js` the way Gmail does (open, Do it, Undo) against mocked Google services. It checks that a real ask gets a card, that the whole open message is read, that noise stays quiet with a reason in the open log, that no send, draft, label, or trigger call is reachable, and that every write is read back, shows a proof card, and can be undone.
 
 ```sh
 node glance-gmail-addon/scripts/build-bundle.js
 node glance-gmail-addon/scripts/check-core-bundle.cjs
 node glance-gmail-addon/test/v1.test.cjs
-node glance-gmail-addon/test/marker.test.cjs
+node glance-gmail-addon/test/behavior.test.cjs
 node glance-gmail-addon/test/card-titles-corpus.cjs
 node glance-gmail-addon/test/build-stamp.test.cjs
 ```
@@ -134,3 +134,20 @@ Same Google account. Open a message and tap the Glance icon under the message. T
 - Do not add a send call (`GmailApp.sendEmail`, `MailApp`, `Drafts.send`).
 - Do not add `gmail.compose`, `gmail.modify`, `gmail.readonly`, or the full `calendar` scope. The only calendar scope is `calendar.events`.
 - Do not put a client secret in the repo. The card uses the person's Apps Script grant.
+
+## Try it on a phone (Apps Script test deployment)
+
+Docs only. Nothing here is deployed by the repo, and this commit has not been installed on a phone.
+
+1. Sign in to `script.google.com` as `ai.local.flow@gmail.com`. Create a new Apps Script project. Name it `Glance Gmail (test)`.
+2. Project Settings: turn on **Show "appsscript.json" manifest file in editor**. If the project asks for a Google Cloud project, set the project number of the Glance test project.
+3. Run `node glance-gmail-addon/scripts/build-bundle.js` and `node glance-gmail-addon/scripts/check-core-bundle.cjs`.
+4. Add three script files and paste the repo files into them: `CoreBundle.js`, `BuildSha.js`, `Code.js`. Replace the manifest with `appsscript.json`. (Or use `clasp` with `.clasp.json.example`; keep the push order `CoreBundle.js`, `BuildSha.js`, `Code.js`.)
+5. **Deploy > Test deployments**. Make sure the type is **Google Workspace Add-on**, then press **Install** next to Gmail, then **Done**.
+6. Open Gmail on the web as the same account and refresh. Open a mail. Authorize the add-on when it asks. Do it asks for the Tasks and Calendar grants the first time.
+7. Open the **Gmail app on the iPhone**, signed in as the same account. Open a message. Tap the add-on icon under the message (the card does not open by itself on a phone). If the icon is missing, force-quit and reopen the app.
+8. Code changes need only a save and a Gmail refresh. A manifest change (scopes) needs the add-on re-authorized.
+
+Google documents the test deployment for the web. Whether it shows in the iPhone app for an unpublished add-on is not confirmed here; check step 7 on the device. Only editors of the project on the same domain can use a test deployment.
+
+An older build of this branch could install an hourly `sweep` trigger. If the test project ever ran that build, open **Triggers** in the Apps Script editor and delete any `sweep` trigger by hand. This host no longer has a `sweep` function.

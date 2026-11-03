@@ -622,13 +622,6 @@ function scopeUrl(id) {
   return 'https://www.googleapis.com/auth/' + id;
 }
 
-function markerMailApiEnabledInHost(hostSource) {
-  if (!hostSource) return false;
-  const block = hostSource.match(/function glanceMarkerMailApiEnabled_\(\)\s*\{([\s\S]*?)\n\}/);
-  if (!block) return false;
-  return /return\s+true\b/.test(block[1]);
-}
-
 function scopesRequiredByManifest(manifest, hostSource) {
   const required = [];
   function add(id) {
@@ -638,7 +631,6 @@ function scopesRequiredByManifest(manifest, hostSource) {
   const common = (manifest.addOns && manifest.addOns.common) || {};
   const gmail = (manifest.addOns && manifest.addOns.gmail) || {};
   const services = (manifest.dependencies && manifest.dependencies.enabledAdvancedServices) || [];
-  const markerOn = markerMailApiEnabledInHost(hostSource);
 
   if (common.useLocaleFromApp === true) add('script.locale');
   if (common.homepageTrigger || gmail.homepageTrigger || (gmail.contextualTriggers && gmail.contextualTriggers.length) || gmail.composeTrigger) {
@@ -655,9 +647,6 @@ function scopesRequiredByManifest(manifest, hostSource) {
   });
   if (hostSource && /UrlFetchApp/.test(hostSource)) add('script.external_request');
   if (hostSource && /Session\.getActiveUser/.test(hostSource)) add('userinfo.email');
-  if (markerOn && hostSource && /GlanceMarker|GmailApp\.search|createLabel/.test(hostSource)) add('gmail.modify');
-  if (markerOn && hostSource && /newTrigger\(|installSweepTrigger/.test(hostSource)) add('script.scriptapp');
-  if (hostSource && /removeLegacySweepTriggersIfPresent/.test(hostSource)) add('script.scriptapp');
   return required.sort();
 }
 
@@ -700,7 +689,6 @@ const GLANCE_APPSSCRIPT_OAUTH_ALLOWLIST = [
   scopeUrl('tasks'),
   scopeUrl('userinfo.email'),
   scopeUrl('script.external_request'),
-  scopeUrl('script.scriptapp'),
   scopeUrl('script.locale'),
   scopeUrl('gmail.addons.current.message.readonly'),
   scopeUrl('gmail.addons.execute')
@@ -723,15 +711,14 @@ function auditManifestOAuthScopes(oauthScopes, requiredScopes) {
 console.log('\n--- host boundaries ---');
 {
   const manifest = JSON.parse(fs.readFileSync(path.join(addon, 'appsscript.json'), 'utf8'));
-  const host = fs.readFileSync(path.join(addon, 'Code.js'), 'utf8') +
-    fs.readFileSync(path.join(addon, 'Marker.js'), 'utf8');
+  const host = fs.readFileSync(path.join(addon, 'Code.js'), 'utf8');
   const scopes = manifest.oauthScopes.slice().sort();
   const expected = scopesRequiredByManifest(manifest, host);
   const audit = auditManifestOAuthScopes(manifest.oauthScopes, expected);
   check('manifest declares no CASA-restricted scopes', audit.restricted.length === 0, { restricted: audit.restricted });
   check('manifest declares no scope outside the explicit allowlist', audit.unknown.length === 0, { unknown: audit.unknown });
   check('every manifest flag has its scope, and there are no extras', audit.ok === true, { scopes: scopes, expected: expected, audit: audit });
-  check('inbox marker gate keeps gmail.modify out of declared scopes', scopes.indexOf(scopeUrl('gmail.modify')) === -1);
+  check('manifest does not declare gmail.modify or script.scriptapp', scopes.indexOf(scopeUrl('gmail.modify')) === -1 && scopes.indexOf(scopeUrl('script.scriptapp')) === -1);
   const mutantRestricted = auditManifestOAuthScopes(manifest.oauthScopes.concat([scopeUrl('gmail.modify')]), expected);
   check('mutant gmail.modify is rejected', mutantRestricted.ok === false && mutantRestricted.restricted.indexOf(scopeUrl('gmail.modify')) >= 0, mutantRestricted);
   const mutantUnknown = auditManifestOAuthScopes(manifest.oauthScopes.concat(['https://www.googleapis.com/auth/unknown-scope-cto-test']), expected);
@@ -770,40 +757,31 @@ console.log('\n--- host boundaries ---');
   check('host reads an event back through performCreateEvent', host.indexOf('performCreateEvent') !== -1 && host.indexOf('performUndoEvent') !== -1);
 }
 
-console.log('\n--- marker mail-api gate ---');
+console.log('\n--- no Gmail write surface ---');
 {
-  let gmailCalls = 0;
-  const triggers = [];
+  // Every Gmail or trigger call that could change the mailbox is a tripwire.
+  const tripped = [];
+  function trip(name) { return function () { tripped.push(name); throw new Error('tripwire ' + name); }; }
   const sandbox = {
     console,
     module: undefined,
     GmailApp: {
-      search() { gmailCalls += 1; return []; },
-      getUserLabelByName() { gmailCalls += 1; return null; },
-      createLabel() { gmailCalls += 1; return { addToThread() {}, removeFromThread() {}, getName() { return 'Glance'; } }; }
+      search: trip('GmailApp.search'),
+      sendEmail: trip('GmailApp.sendEmail'),
+      createDraft: trip('GmailApp.createDraft'),
+      createLabel: trip('GmailApp.createLabel'),
+      getUserLabelByName: trip('GmailApp.getUserLabelByName'),
+      moveThreadsToInbox: trip('GmailApp.moveThreadsToInbox')
     },
+    MailApp: { sendEmail: trip('MailApp.sendEmail') },
     ScriptApp: {
-      EventType: { CLOCK: 'CLOCK' },
-      getProjectTriggers() { return triggers.slice(); },
-      deleteTrigger(tr) {
-        const idx = triggers.indexOf(tr);
-        if (idx !== -1) triggers.splice(idx, 1);
-      },
-      newTrigger() {
-        throw new Error('installSweepTrigger must not run when gate is off');
-      }
+      getProjectTriggers: trip('ScriptApp.getProjectTriggers'),
+      deleteTrigger: trip('ScriptApp.deleteTrigger'),
+      newTrigger: trip('ScriptApp.newTrigger')
     },
     PropertiesService: {
-      getUserProperties() {
-        return {
-          getProperty() { return null; },
-          setProperty() {},
-          deleteProperty() {}
-        };
-      },
-      getScriptProperties() {
-        return { getProperty() { return null; } };
-      }
+      getUserProperties() { return { getProperty() { return null; }, setProperty() {}, deleteProperty() {} }; },
+      getScriptProperties() { return { getProperty() { return null; } }; }
     },
     Session: {
       getActiveUser() { return { getEmail() { return 'owner@example.com'; } }; },
@@ -814,7 +792,6 @@ console.log('\n--- marker mail-api gate ---');
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(addon, 'BuildSha.js'), 'utf8'), sandbox, { filename: 'BuildSha.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'CoreBundle.js'), 'utf8'), sandbox, { filename: 'CoreBundle.js' });
-  vm.runInContext(fs.readFileSync(path.join(addon, 'Marker.js'), 'utf8'), sandbox, { filename: 'Marker.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8'), sandbox, { filename: 'Code.js' });
   function widget(kind) {
     const w = { kind, text: '' };
@@ -841,40 +818,9 @@ console.log('\n--- marker mail-api gate ---');
       return builder;
     }
   };
-  const sweepFn = vm.runInContext('sweep', sandbox);
-  const gateOff = vm.runInContext('glanceMarkerMailApiEnabled_()', sandbox);
-  check('glanceMarkerMailApiEnabled_ is false', gateOff === false);
-  const sweepOut = sweepFn();
-  check('sweep returns mail-api-off with zero GmailApp calls', sweepOut.stopped === 'mail-api-off' && sweepOut.marked === 0 && sweepOut.scanned === 0 && gmailCalls === 0, { sweepOut, gmailCalls });
-  const keepOther = {
-    getHandlerFunction() { return 'dailyDigest'; },
-    getEventType() { return sandbox.ScriptApp.EventType.CLOCK; }
-  };
-  triggers.push({
-    getHandlerFunction() { return 'sweep'; },
-    getEventType() { return sandbox.ScriptApp.EventType.CLOCK; }
-  });
-  triggers.push(keepOther);
-  let installs = 0;
-  sandbox.ScriptApp.newTrigger = function (name) {
-    installs += 1;
-    const self = {
-      getHandlerFunction() { return name; },
-      getEventType() { return sandbox.ScriptApp.EventType.CLOCK; }
-    };
-    return {
-      timeBased() {
-        return {
-          everyHours() {
-            return { create() { triggers.push(self); } };
-          }
-        };
-      }
-    };
-  };
+  check('no inbox sweep entry point exists', vm.runInContext("typeof sweep === 'undefined' && typeof GlanceMarker === 'undefined'", sandbox));
   vm.runInContext('onHomepage({})', sandbox);
-  check('homepage with gate off removes a legacy sweep trigger and does not install another',
-    installs === 0 && triggers.length === 1 && triggers[0] === keepOther, { installs, triggers: triggers.map((t) => t.getHandlerFunction()) });
+  check('opening the homepage touches no Gmail write call and no trigger', tripped.length === 0, tripped);
 }
 
 console.log('\n--- message path parity ---');
@@ -883,8 +829,7 @@ console.log('\n--- message path parity ---');
   const ALL_SCOPES = [
     'https://www.googleapis.com/auth/tasks',
     'https://www.googleapis.com/auth/calendar.events',
-    'https://www.googleapis.com/auth/gmail.addons.execute',
-    'https://www.googleapis.com/auth/script.scriptapp'
+    'https://www.googleapis.com/auth/gmail.addons.execute'
   ];
   function reset() {
     state.props = {};
