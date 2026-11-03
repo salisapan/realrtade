@@ -147,7 +147,39 @@ const FlowModelPlan = (() => {
     return { used: true, plan: out, rows };
   }
 
-  return { SWITCH, DEFAULTS, ALLOWED_KINDS, MAX_STEPS, enabled, toIntent, gate, plan, doneWhen, carryFor, toWatch, titleFrom };
+  // closeFor(flags, watch, msg, now) -> { none:true } | { patch, close? } : what the newest message in the thread does to a loop toWatch()
+  // opened. The host calls it in place of the follow loop's generic rule for these loops, because that rule closes a 'mine' loop only on a
+  // delivery ("attached", "done"), and an ask of you closes on your real answer (doneWhen reply-sent). Read with the follow loop's own reply
+  // reader (core/follow-up.js classifyReply), so "got it", "I'll check" and an auto-reply never close anything.
+  //   ask of you (owe:reply)       your answer closes it (replied); your "no" closes it (declined, a deliberate release); "I'll send it
+  //                                Thursday" keeps it open and moves the day; an acknowledgement or a question back keeps it open.
+  //   your own promise (owe:promise) a message of yours that delivers it closes it (kept); a new date keeps it open and moves the day.
+  //   their promise (promised)     their message is read by the follow loop's own rules (classifyReply + applyReply).
+  // msg: { isOwn, text (quoted history removed), email, evidence? }. Off with aiPlanV1, like the plan itself.
+  function closeFor(flags, w, msg, now) {
+    const FU = followUp();
+    if (!enabled(flags) || !FU || !w || w.status !== 'waiting' || w.tier !== 'model' || !msg) return { none: true };
+    const t = typeof now === 'number' ? now : Date.now();
+    const text = String(msg.text || '');
+    if (w.subtype === 'promised') {
+      if (msg.isOwn) return { none: true };
+      return FU.applyReply(w, FU.classifyReply(text, w, { now: t, email: msg.email, evidence: msg.evidence }), t);
+    }
+    if (!msg.isOwn) return { none: true }; // the ball is the person's; a message from the other side does not close what the person owes
+    if (w.subtype === 'owe:promise') {
+      if (FU.deliversFor(w, text, msg.evidence || null)) return { patch: FU.closeAsKept(w, t), close: true };
+      const r = FU.classifyReply(text, Object.assign({}, w, { kind: FU.KINDS.REPLY }), { now: t });
+      return r.outcome === 'promised' && r.promisedIso ? { patch: { stage: 'promised', promisedIso: r.promisedIso, chaseIso: r.promisedIso } } : { none: true };
+    }
+    if (w.subtype !== 'owe:reply') return { none: true };
+    const r = FU.classifyReply(text, Object.assign({}, w, { kind: FU.KINDS.REPLY }), { now: t, evidence: msg.evidence });
+    if (r.outcome === 'closed') return { patch: { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'replied' }, close: true };
+    if (r.outcome === 'declined') return { patch: { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'declined' }, close: true };
+    if (r.outcome === 'promised') return { patch: { stage: 'promised', promisedIso: r.promisedIso || null, chaseIso: r.promisedIso || FU.yoursDate(t) } };
+    return { none: true };
+  }
+
+  return { SWITCH, DEFAULTS, ALLOWED_KINDS, MAX_STEPS, enabled, toIntent, gate, plan, doneWhen, carryFor, toWatch, titleFrom, closeFor };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowModelPlan };
