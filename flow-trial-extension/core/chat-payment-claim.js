@@ -3,8 +3,8 @@
 // exists, and the person's click, decide the rest. A promise to pay later, a denial, a question, a conditional and somebody else's payment
 // stay quiet. Portable: no chrome.*, no DOM, no network.
 const FlowChatPaymentClaim = (() => {
-  const CLAIM_EN = /\b(?:i|we)(?:'ve|\s+have)?\s+(?:just\s+|already\s+|now\s+)?(?:paid|transferred|sent|wired|settled)\b|\b(?:payment|transfer|money)\s+(?:has\s+been\s+|was\s+|is\s+)?(?:sent|made|done|transferred|on\s+its\s+way)\b|\b(?:just\s+|already\s+)?sent\s+(?:you\s+)?(?:the|my|your)\s+(?:payment|money|transfer)\b|\b(?:just\s+|already\s+)?(?:paid|transferred)\s*[.!]?$|\bdone\s*[,.!-]\s*(?:i\s+)?(?:paid|transferred|sent)\b/i;
-  const CLAIM_HE = /(?:העברתי|שילמתי|שלחתי\s+(?:לך\s+)?(?:את\s+)?(?:ה)?(?:תשלום|כסף|בביט|בפייבוקס)|העברנו|שילמנו|התשלום\s+(?:נשלח|בוצע|הועבר)|הכסף\s+(?:נשלח|הועבר)|ביצעתי\s+(?:את\s+)?(?:ה)?(?:העברה|תשלום)|בוצעה\s+העברה)/;
+  const CLAIM_EN = /\b(?:i|we)(?:'ve|\s+have)?\s+(?:just\s+|already\s+|now\s+)?(?:paid|transferred|sent|wired|settled)\b|\b(?:payment|transfer|money)\s+(?:has\s+been\s+|was\s+|is\s+)?(?:sent|made|done|transferred|on\s+its\s+way)\b|\b(?:just\s+|already\s+)?sent\s+(?:you\s+)?(?:the|my|your)\s+(?:payment|money|transfer)\b|\b(?:just\s+|already\s+)?(?:paid|transferred)\s*[.!]?$|\bdone\s*[,.!-]\s*(?:i\s+)?(?:paid|transferred|sent)\b|^(?:just\s+|already\s+)?(?:paid|transferred|sent|wired)\s+(?:you\s+)?(?:the\s+)?(?:\d|[$€£₪]|via\b|by\b|on\s+(?:bit|paybox)\b|through\b|with\b)|^(?:just\s+|already\s+)?(?:paid|transferred|wired)\s+it\b|\bi\s+made\s+(?:the|a)\s+(?:payment|transfer)\b|\b(?:the\s+)?money\s+is\s+(?:now\s+)?(?:in\s+your|on\s+its\s+way|with\s+you)|\bpayment\s+(?:just\s+)?went\s+out\b/i;
+  const CLAIM_HE = /(?:העברתי|שילמתי|שלחתי\s+(?:לך\s+)?(?:את\s+)?(?:ה)?(?:תשלום|כסף|בביט|בפייבוקס)|העברנו|שילמנו|התשלום\s+(?:נשלח|בוצע|הועבר)|הכסף\s+(?:נשלח|הועבר)|ביצעתי\s+(?:את\s+)?(?:ה)?(?:העברה|תשלום)|בוצעה\s+העברה|^שולם(?:\s|[!.]|$)|התשלום\s+יצא|הכסף\s+(?:אצלך|בדרך)|שלחתי\s+(?:לך\s+)?(?:\d[\d,.]*\s*(?:ש"ח|₪|שקל|דולר)|[$€£₪]))/;
   // Later, never, not yet, a condition, somebody else, or a question: not a payment made.
   const NO_EN = /\b(?:paid\s+for|pay\s+for|will|won'?t|going\s+to|gonna|'ll|haven'?t|hasn'?t|not\s+yet|didn'?t|did\s+not|never|can'?t|cannot|if\s+i|once\s+i|when\s+i|after\s+i|tomorrow|tonight|later|soon|he\s+(?:paid|transferred|sent)|she\s+(?:paid|transferred|sent)|they\s+(?:paid|transferred|sent))\b/i;
   const NO_HE = /(?:שילמתי\s+על|שילמנו\s+על|אעביר|אשלם|אשלח|נעביר|נשלם|נשלח|אני\s+אעביר|עוד\s+לא|לא\s+(?:שילמתי|העברתי|שלחתי)|אם\s+אעביר|ברגע\s+ש|מחר|הערב|בהמשך|בקרוב|הוא\s+(?:שילם|העביר)|היא\s+(?:שילמה|העבירה)|הם\s+(?:שילמו|העבירו))/;
@@ -37,10 +37,32 @@ const FlowChatPaymentClaim = (() => {
     if (!CLAIM_EN.test(raw) && !CLAIM_HE.test(raw)) return { kind: 'none', reason: 'no-claim' };
     if (DOC_SENT.test(raw) && !AMOUNT.test(raw) && !/\b(?:payment|transfer|money|paid)\b|תשלום|כסף/i.test(raw)) return { kind: 'none', reason: 'a-document-not-a-payment' };
     const a = amountOf(raw);
-    return { kind: 'claim', amount: a ? a.amount : null, currency: a ? a.currency : null, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+    return { kind: 'claim', amount: a ? a.amount : null, currency: a ? a.currency : null, ref: refOf(raw), lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
-  return { recognize: recognize };
+  // The invoice number a claim names ("I paid invoice 2231", «שילמתי את חשבונית מספר 2231»), or ''.
+  function refOf(raw) {
+    const m = String(raw || '').match(/\b(?:invoice|bill)\s*(?:#|no\.?|number)?\s*([A-Za-z]{0,4}-?\d{2,10})\b|חשבונית\s+(?:מס(?:פר|\x27)?\.?\s*)?([A-Za-z]{0,4}-?\d{2,10})\b/i);
+    return m ? String(m[1] || m[2] || '') : '';
+  }
+
+  // The person's OWN "I paid ..." closes one of their own "Pay ..." tasks: the task whose invoice number or amount the claim names; a claim that
+  // names neither fits only when exactly one pay task is open. tasks: [{ title, ... }]. Returns the fitting tasks (a caller acts on exactly one).
+  function fitsOwn(claim, tasks) {
+    const pay = [];
+    for (const t of Array.isArray(tasks) ? tasks : []) {
+      const m = t && typeof t.title === 'string' ? t.title.match(/^(?:Pay|לשלם) (?:(?:invoice|חשבונית) (\S+)|(\d+(?:\.\d+)?) ([A-Z]{3}))(?: · .*)?$/) : null;
+      if (m) pay.push({ task: t, ref: m[1] || '', amount: m[2] || '', currency: m[3] || '' });
+    }
+    if (!claim || claim.kind !== 'claim') return [];
+    let hit;
+    if (claim.ref) hit = pay.filter((c) => c.ref && c.ref.toLowerCase() === claim.ref.toLowerCase());
+    else if (claim.amount) hit = pay.filter((c) => c.amount === claim.amount && (!claim.currency || c.currency === claim.currency));
+    else hit = pay.length === 1 ? pay : [];
+    return hit.map((c) => c.task);
+  }
+
+  return { recognize: recognize, fitsOwn: fitsOwn };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatPaymentClaim };
