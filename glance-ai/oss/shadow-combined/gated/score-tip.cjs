@@ -62,7 +62,8 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const gg = c.gold.step;
   const rows = [];
   for (const c of cases) {
     const t = tipOf(c);
-    const tipStep = c.direction !== 'inbound' ? 'SILENT' : (t.show ? t.primaryStep : 'SILENT');
+    // The person's own sent mail never gets a Do It (own-mail); a note to self is judged by the engine like any mail (it can be a task).
+    const tipStep = c.direction === 'outbound' ? 'SILENT' : (t.show ? t.primaryStep : 'SILENT');
     const p = LLM[c.id] && LLM[c.id].pred;
     const un = { fn: (x) => x };
     const deps = {
