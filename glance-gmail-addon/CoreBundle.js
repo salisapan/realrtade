@@ -304,6 +304,13 @@ const FlowExtract = (() => {
     }
   }
 
+  // "next <weekday>" lands a week past the nearest one. Sunday is the exception: it opens the week, so "next
+  // Sunday" said midweek is the coming Sunday, the first day of next week (the Israeli reading; the corpus keeps
+  // "next Monday" a week past the nearest Monday).
+  function nextWeekDelta(d, target, delta) {
+    return target === 0 ? delta : delta + 7;
+  }
+
   function iso(d) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
@@ -606,7 +613,7 @@ const FlowExtract = (() => {
       // (delta === 0, "by Friday" said on a Friday) already rolls forward
       // a full week regardless of "next", so it needs no separate bump.
       if (delta === 0) delta = 7;
-      else if (/next\s/i.test(m[0])) delta += 7;
+      else if (/next\s/i.test(m[0])) delta = nextWeekDelta(d, target, delta);
       d.setDate(d.getDate() + delta);
       // "by Friday 23/10": the number is the day. The weekday name is the same Friday.
       const numbered = slashDate(text, now);
@@ -625,7 +632,7 @@ const FlowExtract = (() => {
       const d = new Date(now);
       let delta = (target - d.getDay() + 7) % 7;
       if (delta === 0) delta = 7;
-      else delta += 7;
+      else delta = nextWeekDelta(d, target, delta);
       d.setDate(d.getDate() + delta);
       return { raw: m[0], iso: iso(d) };
     }
@@ -671,7 +678,7 @@ const FlowExtract = (() => {
       let delta = (target - d.getDay() + 7) % 7;
       const isNext = /הבא(?![\u0590-\u05FF])/.test(m[0]);
       if (delta === 0) delta = 7;
-      else if (isNext) delta += 7;
+      else if (isNext) delta = nextWeekDelta(d, target, delta);
       d.setDate(d.getDate() + delta);
       return { raw: m[0], iso: iso(d) };
     }
@@ -6066,8 +6073,10 @@ const FlowIntent = (() => {
       // different, future day (a reschedule's new slot) keeps that day.
       const famDate = entities && entities.dateIso;
       const factIso = facts.date && facts.date.iso;
+      // The day is still shown, as overdue: a card never drops the date silently. The card line reads
+      // "Overdue · <day>" from overdueIso. dateIso stays null, so no task ever gets a past due date.
       if (isPast && (!famDate || famDate === factIso)) {
-        entities = Object.assign({}, entities, { when: null, dateIso: null });
+        entities = Object.assign({}, entities, { when: null, dateIso: null, overdueIso: factIso || null });
       }
       const intent = {
         type, confidence,

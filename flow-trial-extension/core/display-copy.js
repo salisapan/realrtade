@@ -466,12 +466,24 @@ const FlowDisplay = (() => {
     'suggest:too-large': 'הקובץ המצורף גדול מדי לשמירה',
     'scan-skipped': 'עדיין קורא את המייל',
     'no-outcome': 'אין החלטה למייל הזה',
-    'names-pending': 'ממתין לשם'
+    'names-pending': 'ממתין לשם',
+    // A file or contract ask Glance cannot search Drive for in v1 (no drive.readonly) is named, never silent.
+    'file': 'הבקשה דורשת קובץ מה-Drive. אי אפשר לחפש אותו בגרסה הזו, ולכן לא נכתב דבר',
+    'file-chain-not-run': 'הבקשה דורשת קובץ מה-Drive. אי אפשר לחפש אותו בגרסה הזו, ולכן לא נכתב דבר',
+    'drive-search-unavailable-v1': 'הבקשה דורשת קובץ מה-Drive. אי אפשר לחפש אותו בגרסה הזו, ולכן לא נכתב דבר',
+    'thread-read-failed': 'לא הצלחתי לקרוא את כל השרשור. לא נכתב דבר'
+  };
+  const WHY_EN = {
+    'file': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
+    'file-chain-not-run': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
+    'drive-search-unavailable-v1': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
+    'thread-read-failed': "Couldn't read the whole thread. Nothing was written."
   };
 
-  function whyNotShownLine(reason) {
+  function whyNotShownLine(reason, lang) {
     let r = String(reason || '');
     r = r.replace(/^(?:page:|quiet:|outlook:)/, '');
+    if (lang === 'en' && WHY_EN[r]) return WHY_EN[r];
     if (WHY_HE[r]) return WHY_HE[r];
     const bare = r.replace(/^outlook-/, '');
     if (WHY_HE[bare]) return WHY_HE[bare];
@@ -529,6 +541,14 @@ const FlowDisplay = (() => {
     const day = localeDay(iso, which);
     if (!day) return '';
     return which === 'en' ? ('until ' + day) : ('עד ' + day);
+  }
+
+  // A deadline that already passed. The card keeps the original day and says it is overdue.
+  function overdueDateLine(iso, lang) {
+    const which = arguments.length >= 2 ? uiLangFrom({ setting: lang }) : 'he';
+    const day = localeDay(iso, which);
+    if (!day) return '';
+    return which === 'en' ? ('Overdue · ' + day) : ('עבר המועד · ' + day);
   }
 
   // Chrome (buttons, headings, receipts) follows the UI language. The action
@@ -1098,11 +1118,13 @@ const FlowDisplay = (() => {
 
   function readClock(bag) {
     if (!bag) return null;
-    const dateIso = bag.dateIso || (bag.date && bag.date.iso) || null;
+    const dateIso = bag.dateIso || bag.overdueIso || (bag.date && bag.date.iso) || null;
     const hour = bag.hour != null ? bag.hour : (bag.time && bag.time.hour);
     const minute = bag.minute != null ? bag.minute : (bag.time && bag.time.minute);
     if (!dateIso) return null;
-    return { dateIso: dateIso, hour: hour, minute: minute };
+    const out = { dateIso: dateIso, hour: hour, minute: minute };
+    if (!bag.dateIso && bag.overdueIso) out.overdue = true;
+    return out;
   }
 
   function holdClockFrom(ctx) {
@@ -1229,6 +1251,7 @@ const FlowDisplay = (() => {
     namesDiagFrom: namesDiagFrom,
     namesDiagLine: namesDiagLine,
     cardDateLine: cardDateLine,
+    overdueDateLine: overdueDateLine,
     holdWhenLine: holdWhenLine,
     holdCardText: holdCardText,
     holdClockFrom: holdClockFrom,

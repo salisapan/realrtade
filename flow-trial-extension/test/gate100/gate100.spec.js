@@ -175,7 +175,7 @@ test.describe('gate100', () => {
         else expect(ids.length, 'a card with steps ' + e.action).toBeGreaterThan(0);
       }
       // Writes: press Do It once and read what was sent. Never a send; a draft is a draft.
-      const needsWrite = e.title_contains || e.due || c.receipt_excludes;
+      const needsWrite = e.title_contains || e.due || e.overdue || c.receipt_excludes;
       let sent = '';
       let after = cardText;
       if (needsWrite) {
@@ -211,6 +211,11 @@ test.describe('gate100', () => {
         const due = dueFrom(e.due, now);
         expect(dayShown(bag, due.date), 'due ' + e.due + ' → ' + due.date + ' in ' + bag.slice(0, 600)).toBe(true);
         if (due.clock) expect(bag, 'due clock ' + due.clock).toContain(due.clock);
+      }
+      if (e.overdue) {
+        // A past deadline is never dropped silently: the card says overdue and still shows the original day.
+        expect(/overdue|עבר המועד/i.test(cardText), 'card marked overdue ' + cardText).toBe(true);
+        expect(dayShown(bag, e.overdue), 'original date ' + e.overdue + ' shown in ' + bag.slice(0, 400)).toBe(true);
       }
       (c.receipt_excludes || []).forEach((bad) => expect(after, 'receipt must not say ' + bad).not.toContain(bad));
     });

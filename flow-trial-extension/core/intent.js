@@ -1398,8 +1398,10 @@ const FlowIntent = (() => {
       // different, future day (a reschedule's new slot) keeps that day.
       const famDate = entities && entities.dateIso;
       const factIso = facts.date && facts.date.iso;
+      // The day is still shown, as overdue: a card never drops the date silently. The card line reads
+      // "Overdue · <day>" from overdueIso. dateIso stays null, so no task ever gets a past due date.
       if (isPast && (!famDate || famDate === factIso)) {
-        entities = Object.assign({}, entities, { when: null, dateIso: null });
+        entities = Object.assign({}, entities, { when: null, dateIso: null, overdueIso: factIso || null });
       }
       const intent = {
         type, confidence,

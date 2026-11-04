@@ -2473,9 +2473,10 @@ function glanceUiCopy(kind) {
         // v1 has no mailbox-wide Drive search (drive.readonly is not in the
         // grant) and no Drive picker in the packaged install (picker/ is
         // omitted, PICKER_BUNDLED false), so there is no honest "pick it
-        // yourself" offer to make. Fail closed and quiet: no card, no
-        // visible text, nothing written. A hidden marker records why.
-        markQuietWhy(message, 'drive-search-unavailable-v1');
+        // yourself" offer to make. Fail closed: no card, nothing written, and
+        // a visible line says why (a contract, quote or signed-copy ask is
+        // never a silent skip).
+        paintGmailWhy(message, 'drive-search-unavailable-v1', FlowDisplay.whyNotShownLine('drive-search-unavailable-v1', glanceUiHebrew() ? 'he' : 'en'));
         logScanSkip(messageId, 'file');
         recordSilence(messageId, 'file');
         void flushSuggest(false);
@@ -3290,6 +3291,7 @@ function glanceUiCopy(kind) {
     const hold = ctx.process && (ctx.process.id === 'hold' || ctx.process.id === 'schedule' || ctx.process.id === 'schedule-confirm' || ctx.process.id === 'clear-it' || ctx.process.id === 'move-it');
     let line = '';
     if (hold && typeof FlowDisplay.holdWhenLine === 'function') line = FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute, lang);
+    else if (clock.overdue && typeof FlowDisplay.overdueDateLine === 'function') line = FlowDisplay.overdueDateLine(clock.dateIso, lang);
     else if (typeof FlowDisplay.cardDateLine === 'function') line = FlowDisplay.cardDateLine(clock.dateIso, lang);
     if (!line) return;
     const node = el('p', 'flow-chip-when', line);

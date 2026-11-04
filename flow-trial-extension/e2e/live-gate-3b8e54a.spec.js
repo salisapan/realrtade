@@ -73,12 +73,12 @@ for (const row of cases) {
     }
     if (exp.quietWhy) {
       // v1 has no drive.readonly, so the file chain cannot show a card. The control still proves the
-      // message was NOT suppressed as Cc/self: the chain ran to the Drive step and went quiet with a
-      // hidden, text-free reason marker.
-      const marker = page.locator(msgSel + ' [data-glance-why="' + exp.quietWhy + '"]');
+      // message was NOT suppressed as Cc/self: the chain ran to the Drive step and stopped, and a visible
+      // line says why (a skipped contract ask is never silent).
+      const marker = page.locator(msgSel + ' .flow-why-not[data-glance-why="' + exp.quietWhy + '"]');
       await expect(marker).toHaveCount(1, { timeout: exp.quietWhyWithinMs || 8000 });
-      expect(await marker.evaluate((el) => el.textContent)).toBe('');
-      await expect(marker).toBeHidden();
+      await expect(marker).toBeVisible();
+      expect((await marker.evaluate((el) => el.textContent)).trim().length).toBeGreaterThan(0);
     }
     if (exp.detailsClose) {
       const maxOpens = exp.detailsClose.maxOpens != null ? exp.detailsClose.maxOpens : 1;

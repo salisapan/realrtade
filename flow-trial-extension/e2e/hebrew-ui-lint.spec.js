@@ -188,18 +188,17 @@ test('a Hebrew Gmail UI has no English chrome', async ({ glance }) => {
     to: ['ai.local.flow@gmail.com']
   });
   // Real v1: the grant is exactly the manifest scopes (no drive.readonly), so
-  // flow:search-drive answers drive-search-unavailable and the file chain goes
-  // quiet. No needs-you card, no visible text of any kind, no write. A hidden
-  // marker carries the reason. Nothing here seeds a wider grant.
+  // flow:search-drive answers drive-search-unavailable and the file chain
+  // stops. No needs-you card and no write, but never a silent skip: a visible
+  // Hebrew line says why. Nothing here seeds a wider grant.
   const msg = deck.locator('[data-legacy-message-id="m-he-deck"]');
-  const quiet = msg.locator('[data-glance-why="drive-search-unavailable-v1"]');
-  await expect(quiet).toHaveCount(1, { timeout: 15000 });
-  await expect(quiet).toBeHidden();
-  expect(await quiet.evaluate((el) => el.textContent)).toBe('');
+  const why = msg.locator('.flow-why-not[data-glance-why="drive-search-unavailable-v1"]');
+  await expect(why).toHaveCount(1, { timeout: 15000 });
+  await expect(why).toBeVisible();
+  const whyText = (await why.evaluate((el) => el.textContent)).trim();
+  expect(whyText, 'the v1 why is visible Hebrew text naming Drive').toMatch(/Drive/);
+  expect(whyText).toMatch(/[\u0590-\u05FF]/);
   await expect(deck.locator('div[role="main"] .flow-chip-host')).toHaveCount(0);
-  await expect(msg.locator('.flow-why-not')).toHaveCount(0);
-  const glanceText = await visibleChrome(deck, '[data-legacy-message-id="m-he-deck"] .flow-why-quiet');
-  expect(glanceText.trim(), 'the quiet v1 marker shows no text').toBe('');
   const storedScopes = await glance.storage();
   expect(String(storedScopes.googleGrantedScopes.version).split('\n').sort(), 'the grant is exactly the v1 manifest scopes').toEqual(manifestOauthScopes().sort());
   const calls = await glance.apiCalls();

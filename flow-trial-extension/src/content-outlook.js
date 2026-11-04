@@ -1881,7 +1881,7 @@
     if (raw.indexOf('page:') === 0) code = raw.slice(5);
     else if (raw.indexOf('quiet:') === 0) code = raw.slice(6);
     code = code.split(':')[0];
-    const hideQuietAsk = code === 'intent-null' || code === 'too-short' || code === 'thread-read-failed';
+    const hideQuietAsk = code === 'intent-null' || code === 'too-short';
     const visible = whyNotText(reason);
     line.textContent = hideQuietAsk ? '' : visible;
     line.setAttribute('data-glance-why', reason || 'quiet');
