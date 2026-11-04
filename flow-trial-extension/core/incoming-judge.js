@@ -259,11 +259,11 @@ const FlowIncomingJudge = (() => {
       // deadline asked without a question, a call-back day, a payment asked with its amount and day. Only a mail addressed
       // to the person; nothing is read when the mail carries a calibrated or named quiet other than notice noise.
       const q0 = intent && intent.quiet ? intent.quiet : null;
-      if ((!q0 || q0 === 'noise' || q0 === 'family') && i.senderIsUser !== true && i.inbound !== false && i.noteToSelf !== true) {
+      if ((!q0 || q0 === 'noise') && i.senderIsUser !== true && i.inbound !== false && i.noteToSelf !== true) {
         const body0 = prepareForJudge(i.text);
         const surface0 = i.surface || 'gmail';
-        const second = bookingNotice(i, body0)
-          || (q0 ? null : (taskAsk(i, body0) || paymentAsk(i, body0) || ((hit0) => (hit0 ? doItCard(i, hit0) : null))(doItAsk(i, body0))
+        // The labs readers (booking notice, task ask, payment ask) stay behind their own switches, which default OFF.
+        const second = (q0 ? null : (((hit0) => (hit0 ? doItCard(i, hit0) : null))(doItAsk(i, body0))
             || ((hit1) => (hit1 ? holdCard(i, hit1) : null))(holdProposal(i, body0))
             || ((hit2) => (hit2 ? replyCard(i, hit2) : null))(answerAsk(i, body0))));
         if (second) return { show: true, intent: second.intent, process: forSurface(second.process, surface0) };
@@ -469,6 +469,7 @@ const FlowIncomingJudge = (() => {
       }
       if (!title || title.split(/\s+/).length < 2) continue;
       let dateIso = null;
+      let pastDate = false;
       try {
         const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : null;
         const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
@@ -476,8 +477,14 @@ const FlowIncomingJudge = (() => {
           const norm = D && typeof D.normalize === 'function' ? D.normalize(sent, now0) : sent;
           const d = X.parseDate(norm, now0);
           if (d && d.iso && !d.dropped) dateIso = d.iso;
+          if (d && (d.dropped || (d.iso && d.iso < ymdOf(now0)))) pastDate = true;
         }
       } catch (e) { dateIso = null; }
+      // A reminder without a day is not a task; a day already gone is not one either.
+      if (pastDate) continue;
+      if (/\b(?:eod|cob|end\s+of\s+(?:the\s+)?day)\b|סוף\s+היום/i.test(sent)) dateIso = null;
+      // Only a task with a named day (or this/next week) is a Log It; "by EOD" or no day is the plain ask, left to the reply track.
+      if (!dateIso && !/\b(?:this|next)\s+week\b|(?:^|[^\u0590-\u05FF])(?:השבוע|שבוע\s+הבא)(?![\u0590-\u05FF])|סוף\s+השבוע/i.test(sent)) continue;
       return { title: title.slice(0, 120), dateIso, lang: he ? 'he' : 'en' };
     }
     return null;
@@ -531,14 +538,18 @@ const FlowIncomingJudge = (() => {
       if (!he) {
         const confirmAsk = /\b(?:can|could|would)\s+you\s+(?:please\s+)?(?:confirm|let\s+me\s+know|tell\s+me|advise)\b/i.test(sent) && !/\b(?:approve|accept|agree)\b/i.test(sent);
         const factQ = /^(?:what|where|when|which|who|how\s+(?:much|many))(?:'s|’s|\s+is|\s+are|\s+was)\b[^?]*\?$/i.test(sent);
-        if (confirmAsk) { hit = true; dateIso = dayOf(sent, now0).date; if (!dateIso) hit = false; }
+        const signBack = /\b(?:please\s+)?sign(?:\s+(?:it|them|this))?\s+and\s+(?:return|send)(?:\s+(?:it|them))?(?:\s+back)?\b/i.test(sent);
+        if (signBack) { dateIso = dayOf(sent, now0).date; hit = Boolean(dateIso); }
+        else if (confirmAsk) { hit = true; dateIso = dayOf(sent, now0).date; if (!dateIso) hit = false; }
         else if (factQ) {
           const need = own.find((x, j) => j !== k && /\b(?:need\s+(?:it|this|that)|by|before|until|asap)\b/i.test(x) && dayOf(x, now0).date);
           if (need) { hit = true; dateIso = dayOf(need, now0).date; }
         }
       } else {
         const askHe = /(?:תגיד|תגידי|תודיע|תודיעי|תעדכן|תעדכני)\s+(?:לי|אותי)|תעדכן\s+אותי|תחזור\s+אליי?\s+(?:עם|ו)/.test(sent) && !/(?:תאשר|אשר)\s+לי\s+אם\s+(?:להמשיך|לאשר|להסכים)/.test(sent);
-        if (askHe) { dateIso = dayOf(sent, now0).date; hit = Boolean(dateIso); }
+        const signBackHe = /(?:תחתום|תחתמי|תחתמו)\s+ו(?:תחזיר|תחזירי|תשלח|תשלחי)/.test(sent);
+        if (signBackHe) { dateIso = dayOf(sent, now0).date; hit = Boolean(dateIso); }
+        else if (askHe) { dateIso = dayOf(sent, now0).date; hit = Boolean(dateIso); }
       }
       if (!hit) continue;
       if (dateIso < ymdOf(now0)) continue;

@@ -6,7 +6,7 @@
 // 14:00–18:00 · name", that the person approves. Nobody is invited. A delivery that already happened, a failed or cancelled one, a pickup
 // (core/chat-pickup-notice.js reads those) and a tracking or survey line stay quiet. Portable: no chrome.*, no DOM, no network.
 const FlowChatDeliveryWindow = (() => {
-  const NOUN_EN = /\b(?:your\s+(?:[a-z-]+\s+){0,2}(?:order|parcel|package|delivery|shipment|items?|groceries|furniture)|the\s+(?:courier|driver|delivery\s+(?:person|guy|man)|messenger)|our\s+(?:courier|driver)|(?:the\s+|a\s+|this\s+)?(?:delivery|shipment|parcel|package|order)\s+(?:is|will\s+be)\s+(?:scheduled|set|booked|arriving|delivered|due|coming)|(?:the\s+|a\s+|this\s+)?(?:delivery|shipment)\s+will\s+arrive)\b/i;
+  const NOUN_EN = /\b(?:your\s+(?:[a-z-]+\s+){0,2}(?:order|parcel|package|delivery|shipment|items?|groceries|furniture)|the\s+(?:courier|driver|delivery\s+(?:person|guy|man)|messenger)|our\s+(?:courier|driver))\b/i;
   const NOUN_HE = /(?:ההזמנה|החבילה|המשלוח|הפריט|הרהיט(?:ים)?|הקניות)\s+(?:שלך|שלכם|שלכן)|(?:השליח|הנהג|המשלוחן|שליח)|(?:הזמנתך|חבילתך|משלוחך)/;
   // A person who comes to do work and tells the day and the hours ("The plumber will come between 8 and 12 on Tuesday", «הטכנאי יגיע ביום שלישי בין 8 ל-12»)
   // is the same window; the hold is titled "Visit", not "Delivery".
