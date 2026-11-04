@@ -43,6 +43,17 @@ const quietOnly = T.pickJudgmentMessage(
 );
 check('v1 still returns the open row when every message is quiet', quietOnly && quietOnly.row.id === 'q1' && quietOnly.show === false, quietOnly);
 
+// An auto-forward copy of the person's own is the newest message. The ask is an earlier message from someone else.
+const fwdRows = [
+  { id: 'a1', from: { emailAddress: { address: 'ronit@x.co' } }, receivedDateTime: '2026-11-04T09:10:00Z', body: { contentType: 'text', content: 'Can we meet Sunday? confirm by Wednesday' } },
+  { id: 'a2', from: { emailAddress: { address: 'me@x.co' } }, receivedDateTime: '2026-11-04T09:12:00Z', body: { contentType: 'text', content: '---------- Forwarded message ---------' } }
+];
+const own = (r) => r.from.emailAddress.address === 'me@x.co';
+const fwdPick = T.pickJudgmentMessage(fwdRows, { textOf: (r) => r.body.content, judge, isOwn: own });
+check('the newest non-own message is judged when the newest is the own forward copy', fwdPick && fwdPick.row.id === 'a1' && fwdPick.show === true, fwdPick);
+const fwdQuiet = T.pickJudgmentMessage(fwdRows.map((r) => Object.assign({}, r, { body: { contentType: 'text', content: r.id === 'a1' ? 'fyi only' : r.body.content } })), { textOf: (r) => r.body.content, judge, isOwn: own });
+check('when nothing shows, the quiet reason comes from the newest message that is not the own copy', fwdQuiet && fwdQuiet.row.id === 'a1' && fwdQuiet.show === false, fwdQuiet);
+
 T.setPickMode('latest-only');
 const mutantPick = T.pickJudgmentMessage(rows, judgeRow);
 check('mutant latest-only would pick thanks instead of the ask', mutantPick && mutantPick.row.id === 'm2');

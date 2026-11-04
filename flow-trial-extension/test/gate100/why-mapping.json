@@ -16,6 +16,8 @@
     "no-incoming-message": ["no-incoming-message"],
     "file": ["drive-unavailable"],
     "file-chain-not-run": ["drive-unavailable"],
-    "drive-search-unavailable-v1": ["drive-unavailable"]
+    "drive-search-unavailable-v1": ["drive-unavailable"],
+    "drive-not-granted": ["drive-unavailable"],
+    "drive-search-failed": ["drive-unavailable"]
   }
 }

@@ -5342,6 +5342,10 @@
 
   function threadJudgeRow(pane, ownAddresses) {
     return {
+      isOwn: (row) => {
+        const a = row && row.from && row.from.emailAddress && row.from.emailAddress.address;
+        return Boolean(a) && (ownAddresses || []).map((x) => String(x || '').toLowerCase()).indexOf(String(a).toLowerCase()) >= 0;
+      },
       textOf: (row) => {
         const body = graphBodyText(row);
         if (String(body || '').trim()) return body;
@@ -5350,11 +5354,21 @@
       judge: (text, row) => {
         if (typeof FlowIncomingJudge === 'undefined') return { show: false };
         const prepared = FlowIncomingJudge.prepareForJudge(text);
-        const from = String(pane.senderEmail || pane.ownSenderEmail || pane.openSenderEmail || '').toLowerCase();
+        // Each message in the conversation is judged by its own sender and recipients, not the open one's.
+        // The open message can be the person's own auto-forward copy; the ask sits in an earlier message.
+        const rowFrom = row && row.from && row.from.emailAddress ? row.from.emailAddress : null;
+        const rowAddrs = (list) => (Array.isArray(list) ? list.map((r) => String((r && r.emailAddress && r.emailAddress.address) || '').toLowerCase()).filter(Boolean) : null);
+        const rowTo = rowAddrs(row && row.toRecipients);
+        const rowCc = rowAddrs(row && row.ccRecipients);
+        const rowHasSender = Boolean(rowFrom && rowFrom.address);
+        const rowSender = rowHasSender ? String(rowFrom.address).toLowerCase() : '';
+        const useTo = rowHasSender && rowTo ? rowTo : (pane.to || null);
+        const useCc = rowHasSender && rowCc ? rowCc : (pane.cc || null);
+        const from = rowHasSender ? rowSender : String(pane.senderEmail || pane.ownSenderEmail || pane.openSenderEmail || '').toLowerCase();
         const selfAddressed = typeof FlowIntent !== 'undefined' && typeof FlowIntent.addressedToSelf === 'function' && FlowIntent.addressedToSelf({
-          senderEmail: pane.senderEmail,
-          to: pane.to || null,
-          cc: pane.cc || null,
+          senderEmail: rowHasSender ? rowSender : pane.senderEmail,
+          to: useTo,
+          cc: useCc,
           ownAddresses: ownAddresses || null,
           onBehalfOf: pane.onBehalfOf || null,
           forwarded: pane.onBehalf === true
@@ -5366,12 +5380,12 @@
           taskAskOn: taskAskSwitch === true,
           text: prepared,
           subject: (row && row.subject) || pane.subject || '',
-          sender: { name: pane.senderName, email: pane.senderEmail },
+          sender: rowHasSender ? { name: rowFrom.name || '', email: rowSender } : { name: pane.senderName, email: pane.senderEmail },
           now: new Date(),
           threadUrl: location.href,
           surface: 'outlook',
-          to: pane.to || null,
-          cc: pane.cc || null,
+          to: useTo,
+          cc: useCc,
           ownAddresses: ownAddresses || null,
           userName: pane.userName || null,
           ownNames: pane.ownNames || null,
@@ -5441,14 +5455,21 @@
     const paneTextBefore = String(pane.text || '').trim();
     const graphBody = String(rowPane.text || '').trim();
     const graphSubject = String(rowPane.subject || '').trim();
+    // The open message is the person's own copy (an auto-forward) and the judged message is an earlier inbound
+    // one in the same conversation: the judged message's own text, sender, recipients and files are used.
+    const ownLower = (ownAddresses || []).map((a) => String(a || '').toLowerCase());
+    const openSenderLower = String(pane.openSenderEmail || pane.senderEmail || pane.ownSenderEmail || '').toLowerCase();
+    const judgedFrom = String(rowPane.senderEmail || '').toLowerCase();
+    const redirected = Boolean(openSenderLower) && ownLower.indexOf(openSenderLower) >= 0
+      && Boolean(judgedFrom) && ownLower.indexOf(judgedFrom) < 0 && String(picked.row.id || '') !== String(pane.itemId || '');
     let mergedText = graphBody;
-    if (!mergedText || (paneTextBefore.length > mergedText.length + 8)) mergedText = paneTextBefore || mergedText;
+    if (!redirected && (!mergedText || (paneTextBefore.length > mergedText.length + 8))) mergedText = paneTextBefore || mergedText;
     if (!mergedText) mergedText = graphSubject || String(pane.subject || '').trim();
     if (!mergedText) return { ok: false, pane: pane };
     const mergedTo = (rowPane.to && rowPane.to.length) ? rowPane.to : (pane.to || []);
     const mergedCc = (rowPane.cc && rowPane.cc.length) ? rowPane.cc : (pane.cc || []);
     const wasUnconfirmed = pane.idSource === 'url-unconfirmed';
-    const openSender = pane.openSenderEmail || pane.senderEmail || '';
+    const openSender = redirected ? judgedFrom : (pane.openSenderEmail || pane.senderEmail || '');
     return {
       ok: true,
       pane: Object.assign({}, pane, rowPane, {
@@ -5460,14 +5481,15 @@
         senderEmail: wasUnconfirmed ? (pane.senderEmail || rowPane.senderEmail) : rowPane.senderEmail,
         senderName: wasUnconfirmed ? (pane.senderName || rowPane.senderName) : rowPane.senderName,
         idSource: wasUnconfirmed ? 'url-unconfirmed' : rowPane.idSource,
-        receivedDateTime: pane.receivedDateTime || rowPane.receivedDateTime,
+        receivedDateTime: redirected ? (rowPane.receivedDateTime || pane.receivedDateTime) : (pane.receivedDateTime || rowPane.receivedDateTime),
         clockAmbiguous: pane.clockAmbiguous === true,
         clockUnread: pane.clockUnread === true,
         clockAlt: pane.clockAlt || rowPane.clockAlt || '',
         pageHour24: pane.pageHour24 === true || rowPane.pageHour24 === true,
         hourCycle: pane.hourCycle || rowPane.hourCycle || '',
-        attachments: (pane.attachments && pane.attachments.length) ? pane.attachments : (rowPane.attachments || []),
+        attachments: (!redirected && pane.attachments && pane.attachments.length) ? pane.attachments : (rowPane.attachments || []),
         threadRead: true,
+        threadRedirected: redirected,
         threadMessageCount: fetched.rows.length,
         threadJudgmentShow: picked.show === true
       })

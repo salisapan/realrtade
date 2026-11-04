@@ -36,7 +36,14 @@ const FlowOutlookThreadV1 = (() => {
     let i = judged.length - 1;
     while (i >= 0 && !judged[i].show) i--;
     if (i < 0) {
-      const last = judged[judged.length - 1];
+      // Nothing in the conversation shows a card. Explain the newest message from someone else, not the
+      // person's own auto-forward copy, so the quiet reason names the real ask.
+      let k = judged.length - 1;
+      if (typeof judgeRow.isOwn === 'function') {
+        while (k >= 0 && judgeRow.isOwn(judged[k].row)) k--;
+        if (k < 0) k = judged.length - 1;
+      }
+      const last = judged[k];
       return last ? { row: last.row, text: last.text, show: false, judgment: last.judgment } : null;
     }
     return judged[i];
