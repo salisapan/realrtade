@@ -1002,7 +1002,7 @@ const FlowIntent = (() => {
   function buriedReaderRememberAsk(text) {
     const raw = String(text || '');
     if (/\bplease remember to\b/i.test(raw) && !/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\b/i.test(raw)) return true;
-    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי(?!\s+(?:מה|איזה|איזו|אילו|כמה|מי|מתי|איפה|איך|האם)(?![\u0590-\u05FF]))|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) {
       if (/(?:תזכור|תזכיר|אל\s+תשכח)\s+(?:ל)?(?:הזכיר|להזכיר|לשאול|להודיע|לעדכן|לתזכר)\s+/i.test(raw)) return false;
       return true;
     }
@@ -1159,11 +1159,16 @@ const FlowIntent = (() => {
       const sent = sentences[i];
       if (!HE_CONFIRM_ASK.test(sent)) continue;
       if (REQUESTED_LOGISTICS_HE.test(sent) && !HE_DECISION_OBJECT.test(sent)) continue;
+      // "תאשר לי אם אתה מגיע" and "נא לאשר הגעה" ask for an answer of fact
+      // (are you coming), not a yes to an offer. That is a reply, or a hold
+      // when the same mail names the meeting's day and clock.
+      if (HE_ATTENDANCE_CONFIRM.test(sent) && !HE_DECISION_OBJECT.test(sent)) continue;
       return true;
     }
     return false;
   }
   const HE_CONFIRM_ASK = /בבקשה\s+תאשר|(?:^|\s)נא\s+לאשר(?![\u0590-\u05FF])|תוכל(?:י|ו)?\s+לאשר(?![\u0590-\u05FF])|אנא\s+(?:לאשר(?![\u0590-\u05FF])|תאשר|אשר(?:י|ו)?(?![\u0590-\u05FF]))/;
+  const HE_ATTENDANCE_CONFIRM = /(?:^|[^\u0590-\u05FF])(?:הגעה|השתתפות|נוכחות|מגיע(?:ה|ים|ות)?|תגיע|תגיעו|באים|מגיעים)(?![\u0590-\u05FF])|(?:^|\s)אם\s+(?:אתה|את|אתם|אתן)\s+(?:מגיע|באים|בא|בה|מגיעים|יכול|פנוי)/;
   const HE_DECISION_OBJECT = /הצעה|חוזה|הסכם|תנאי|מחיר|תקציב/;
   // A commitment that is still conditional. "once" and "hoping" are not in
   // judgment.js's HEDGE, so assertedIn still counted them as decided.
@@ -1423,7 +1428,7 @@ const FlowIntent = (() => {
       if (/\bplease\s+create\s+a\s+task\b/i.test(text)) intent.noReplyDraft = true;
       // "Please remember to renew…" / "תזכיר לי" is the task. A reply draft is not the close.
       // "תזכורת" (a payment reminder) is not this phrase.
-      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(text)) intent.noReplyDraft = true;
+      if (/\bplease remember to\b/i.test(text) || /(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי(?!\s+(?:מה|איזה|איזו|אילו|כמה|מי|מתי|איפה|איך|האם)(?![\u0590-\u05FF]))|תזכור(?:י|ו)?\s+ל(?!הזכיר|זכיר|שאול|הודיע|עדכן|תזכר)|אל\s+תשכח(?:י|ו)?\s+ל)/.test(text)) intent.noReplyDraft = true;
       const fam = familyBox.hit;
       // A note to self is a plain task. Family A is the file chain, and
       // this mail is not that chain and not an attach to an invite.
@@ -1583,6 +1588,8 @@ const FlowIntent = (() => {
       return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence);
     }
     let askIsSoft = Boolean(requestWhat) && sentenceIsSoft(requestWhat);
+    // A slot ask with no ask sentence of its own ("אם יהיה לך זמן מתישהו אולי נדבר, לא דחוף") is soft when the text says so.
+    if (!askIsSoft && !requestWhat && s.flags && s.flags.slotAsk && !s.flags.handoff && sentenceIsSoft(String(text || ''))) askIsSoft = true;
     if (askIsSoft) {
       const parts = String(text || '').split(/(?<=[.!?])\s+|\n+/);
       for (let i = 0; i < parts.length; i++) {

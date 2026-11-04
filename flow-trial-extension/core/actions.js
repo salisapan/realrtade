@@ -589,6 +589,16 @@ const FlowActions = (() => {
     }
     return false;
   }
+  // "ישיבת צוות ביום רביעי ב-9:30 בזום, נא לאשר הגעה": the sender announces a
+  // meeting and asks for attendance. A named meeting noun and the RSVP cue.
+  function attendanceAnnouncement(text) {
+    const src = String(text || '');
+    if (!src.trim()) return false;
+    const rsvp = /(?:^|[^\u0590-\u05FF])(?:נא|אנא|בבקשה)\s+(?:ל)?אשר(?:ו|י)?\s+(?:את\s+)?הגעה|אישור\s+הגעה|\bplease\s+(?:confirm|rsvp)(?:\s+(?:your|the))?\s+attendance\b|\bplease\s+rsvp\b|\brsvp\s+(?:by|to)\b/i.test(src);
+    if (!rsvp) return false;
+    if (/\b(?:cancel(?:l?ed)?|postponed|moved|rescheduled)\b|בוטל|נדחת[הה]?|נדחה/i.test(src)) return false;
+    return /ישיבה|ישיבת|פגישה|פגישת|שיחה|כנס|אירוע|סדנה|הרצאה|\b(?:meeting|call|session|workshop|conference|webinar|lunch|dinner|interview)\b/i.test(src);
+  }
   function meetingNarrow(intent, text) {
     if (!intent || intent.type !== 'event' || intent.googleClose) return false;
     if (inboundMeetingAnnouncement(text)) return false;
@@ -677,6 +687,15 @@ const FlowActions = (() => {
       : taskInstead
         ? Object.assign({ id: 'log-it' }, PROCESS_CATALOG['log-it'])
         : processFor(intent);
+    // A meeting announced with its day and clock plus "please confirm attendance"
+    // is the hold. The RSVP is the person's own answer, so no reply is drafted.
+    if (!intent.selfTask && intent.type === 'request' && !intent.googleClose && !intent.noReplyDraft && attendanceAnnouncement(vetoText)
+      && intent.facts && intent.facts.date && intent.facts.date.iso && intent.facts.time && Number.isInteger(intent.facts.time.hour)) {
+      intent = Object.assign({}, intent, {
+        entities: Object.assign({}, intent.entities || {}, { dateIso: intent.facts.date.iso, hour: intent.facts.time.hour, minute: intent.facts.time.minute || 0 })
+      });
+      proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
+    }
     const dateConflict = Boolean(intent.facts && intent.facts.date && intent.facts.date.contradictsWeekday);
     if (inboundMeetingAnnouncement(vetoText) && meetingClock(intent) && !dateConflict
       && proc && (proc.id === 'schedule' || proc.id === 'schedule-confirm')) {

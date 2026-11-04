@@ -122,6 +122,28 @@ const FlowIncomingJudge = (() => {
     return false;
   }
 
+  // A mail the general classifier could not read as an ask still has a plain reason the person can be shown: a hedge ("we
+  // might catch up at some point, no rush"), a service notice ("see who is looking at your profile") or a closing line that
+  // asks nothing more ("signed and returned, nothing else needed").
+  function namedQuietOf(rawText, i) {
+    const raw = String(rawText || '').replace(/\s+/g, ' ').trim();
+    if (!raw) return null;
+    const hasDeadline = /\b(?:by|before|until|tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}[:\/]\d{2})\b|עד\s|מחר|היום|ביום|בשעה/i.test(raw);
+    if (/\b(?:nothing (?:else|more) (?:is )?needed|no (?:further )?(?:action|reply|response) (?:is )?(?:needed|required|necessary)|all set|all done|that'?s (?:all|it))\b/i.test(raw)
+      || /(?:אין צורך בעוד|לא\s+צריך\s+(?:עוד\s+)?כלום|הכול\s+(?:מוכן|סגור)|הכל\s+(?:מוכן|סגור))/.test(raw)) {
+      if (/\b(?:signed|sent|paid|done|returned|completed|received)\b|חתמתי|שלחתי|שילמתי|סיימתי|קיבלתי/i.test(raw)) return 'resolution';
+    }
+    if (!hasDeadline) {
+      if (/\b(?:might|maybe|perhaps|possibly)\b[^.!?]*\b(?:at some point|sometime|whenever|no rush|eventually|one day)\b/i.test(raw)
+        || /\bno rush\b[^.!?]*\bwhenever\b|\bwhenever (?:you|it)[^.!?]*\bno rush\b/i.test(raw)
+        || /(?:^|\s)(?:אולי|מתישהו)(?:\s|$)[^.!?]*\bלא דחוף\b/.test(raw)
+        || /(?:^|\s)אולי(?:\s|$)/.test(raw) && /מתישהו|לא דחוף|אם יהיה זמן|כשיהיה זמן/.test(raw)) return 'hedge';
+    }
+    if (/\b(?:see who(?:'|’)?s|who(?:'|’)?s (?:looking|viewed|viewing)|people (?:also )?viewed|you appeared in \d+|your profile (?:was|has been) viewed|new connection suggestions?)\b/i.test(raw)
+      || /מי\s+(?:צפה|הסתכל)\s+ב/.test(raw)) return 'noise';
+    return null;
+  }
+
   function textForJudge(rawText, subject, selfNote) {
     const body = withoutPhoneSignature(prepareForJudge(rawText));
     const sub = String(prepareForJudge(subject || '')).replace(/\s+/g, ' ').trim();
@@ -232,7 +254,25 @@ const FlowIncomingJudge = (() => {
       return { show: false, reason: 'quiet:relay', intent: intent || null };
     }
     if (!intent || !intent.type) {
-      return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };
+      // The general classifier found nothing, or only a notice sender. The structural readers the chat card uses run
+      // second, each strict about its own shape: a booking told to the person, a pickup with a last day, a reminder or a
+      // deadline asked without a question, a call-back day, a payment asked with its amount and day. Only a mail addressed
+      // to the person; nothing is read when the mail carries a calibrated or named quiet other than notice noise.
+      const q0 = intent && intent.quiet ? intent.quiet : null;
+      if ((!q0 || q0 === 'noise' || q0 === 'family') && i.senderIsUser !== true && i.inbound !== false && i.noteToSelf !== true) {
+        const body0 = prepareForJudge(i.text);
+        const surface0 = i.surface || 'gmail';
+        const second = bookingNotice(i, body0)
+          || (q0 ? null : (taskAsk(i, body0) || paymentAsk(i, body0) || ((hit0) => (hit0 ? doItCard(i, hit0) : null))(doItAsk(i, body0))
+            || ((hit1) => (hit1 ? holdCard(i, hit1) : null))(holdProposal(i, body0))
+            || ((hit2) => (hit2 ? replyCard(i, hit2) : null))(answerAsk(i, body0))));
+        if (second) return { show: true, intent: second.intent, process: forSurface(second.process, surface0) };
+      }
+      if (!q0) {
+        const named = namedQuietOf(prepareForJudge(i.text), i);
+        if (named) return { show: false, reason: 'quiet:' + named, intent: intent || null };
+      }
+      return { show: false, reason: q0 ? 'quiet:' + q0 : 'intent-null', intent: intent || null };
     }
     // A self-sent webinar or launch blast stays quiet. The task rule does
     // not cover marketing.
@@ -255,6 +295,13 @@ const FlowIncomingJudge = (() => {
     // The Outlook task path and the Gmail path both stop here.
     if (typeof intentApi.phishingOrNegative === 'function' && intentApi.phishingOrNegative(vetoText)) {
       return { show: false, reason: 'quiet:family', intent };
+    }
+    // A request that names a thing for the person to DO (fill in a form, upload a file, renew a subscription) is the task,
+    // not a reply. An ask for an answer, a signed copy back or a file sent stays the reply.
+    if (isRequest && !intent.googleClose && !intent.selfTask && !intent.noReplyDraft && !intent.inviteFile
+      && i.senderIsUser !== true && i.inbound !== false && !(i.attachmentCount > 0)) {
+      const doIt = doItAsk(i, prepareForJudge(i.text));
+      if (doIt) return { show: true, intent: Object.assign({}, intent, doItCard(i, doIt).intent, { signals: intent.signals, facts: intent.facts }), process: forSurface(doItCard(i, doIt).process, i.surface || 'gmail') };
     }
     // "No need to send" stands the ask down before the untimed-reply rule
     // can turn "Following up on our call" into a draft.
@@ -375,6 +422,179 @@ const FlowIncomingJudge = (() => {
     return true;
   }
 
+  function taskCard(i, title, dateIso, he) {
+    return {
+      intent: { type: 'request', label: title, confidence: 0.9, taskAsk: true, personalClose: 'task-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: dateIso }, facts: { date: { iso: dateIso } } },
+      process: { id: 'log-it', name: 'Log It', closingLine: he ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: he ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, taskAsk: true,
+        steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+    };
+  }
+
+  // A thing the person is asked to DO (fill in a form, upload a file, renew a subscription), not a question to answer. The
+  // person does it, so the card is the task and no reply is drafted. One sentence, anchored at the verb; a request for an
+  // answer, a look back, a hedge or a promise never matches. Returns { title, dateIso, lang } or null.
+  const DOIT_EN = '(?:fill\\s+(?:in|out|up)|upload|renew|submit|complete|register\\s+for|sign\\s+up\\s+for|apply\\s+(?:for|to))';
+  const DOIT_HE = '(?:תחדש(?:י|ו)?|לחדש|תעלה|תעלי|תעלו|להעלות|תמלא|תמלאי|תמלאו|למלא|תגיש|תגישי|תגישו|להגיש|תשלים|תשלימי|להשלים|תירשם|תירשמי|להירשם)';
+  const DOIT_NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|forgot|already|never\s*mind|forget\s+it|i'?ll|i\s+will|maybe|might|if\s+you\s+want|cancel(?:l?ed)?|let\s+me\s+know|reply|get\s+back\s+to\s+me|tell\s+me|send\s+me|confirm|whether)\b/i;
+  const DOIT_NO_HE = /(?:אתמול|שבוע שעבר|שכחתי|כבר\s|אולי|בוטל|לבטל|תגיד לי|תודיע לי|תחזור אלי|תשיב|תאשר|תשלח לי|האם)/;
+  function doItTitle(obj) {
+    return String(obj || '')
+      .split(/\s+(?:by|before|until|no\s+later\s+than|so\s+(?:that\s+)?we|so\s+i|next\s+(?:week|month)|this\s+(?:week|month)|today|tomorrow|tonight|on\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|עד|לפני|ביום|בשבוע\s+הבא|בחודש\s+הבא|היום|מחר)(?![A-Za-z\u0590-\u05FF])/i)[0]
+      .replace(/[\s,;:.!?]+$/, '').replace(/\s+בבקשה(?=\s|$)/, '').trim();
+  }
+  function doItAsk(i, body) {
+    const text = String(body || '').trim();
+    if (!text) return null;
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const sentences = text.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+    const lead = '^(?:(?:hi|hello|hey|dear|שלום|היי|הי)\\b[^,.!?\\n]{0,30}[,.!:]\\s*)?';
+    const reEn = new RegExp(lead + '(?:please\\s+|kindly\\s+)?(?:(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?|you\\s+(?:need|have)\\s+to\\s+|(?:please\\s+)?(?:don\'?t\\s+forget|remember)\\s+to\\s+)?(' + DOIT_EN + '\\b.+)$', 'i');
+    const reRem = /^(?:(?:hi|hello|hey|dear)\b[^,.!?\n]{0,30}[,.!:]\s*)?(?:please\s+)?(?:don'?t\s+forget|remember)\s+to\s+(.+)$/i;
+    const reWait = /\b(?:i(?:'|’)?m|we(?:'|’)?re|i\s+am|we\s+are)\s+waiting\s+for\s+(?:an?\s+|the\s+)?(.+?)\s+from\s+you\b/i;
+    const reHe = new RegExp('^(?:[\\u0590-\\u05FF]{2,12},\\s*)?(?:נא\\s+|אנא\\s+|בבקשה\\s+)?(?:תוכל(?:י|ו)?\\s+)?(' + DOIT_HE + '(?![\\u0590-\\u05FF])(?:\\s+בבקשה)?\\s+\\S.*)$');
+    const reWaitHe = /מחכה\s+ל([\u0590-\u05FF][^\n.!?]*?)\s+ממך(?![\u0590-\u05FF])/;
+    for (let k = 0; k < sentences.length; k++) {
+      const sent = sentences[k];
+      const he = /[\u0590-\u05FF]/.test(sent);
+      if (he ? DOIT_NO_HE.test(sent) : DOIT_NO_EN.test(sent)) continue;
+      let title = '';
+      let m = null;
+      if (he) {
+        if ((m = sent.match(reHe))) title = doItTitle(m[1]);
+        else if ((m = sent.match(reWaitHe))) title = 'לשלוח ' + doItTitle(m[1]);
+      } else if ((m = sent.match(reEn)) || (m = sent.match(reRem))) {
+        title = doItTitle(m[1]);
+      } else if ((m = sent.match(reWait))) {
+        title = 'Send ' + doItTitle(m[1]);
+      }
+      if (!title || title.split(/\s+/).length < 2) continue;
+      let dateIso = null;
+      try {
+        const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : null;
+        const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
+        if (X && typeof X.parseDate === 'function') {
+          const norm = D && typeof D.normalize === 'function' ? D.normalize(sent, now0) : sent;
+          const d = X.parseDate(norm, now0);
+          if (d && d.iso && !d.dropped) dateIso = d.iso;
+        }
+      } catch (e) { dateIso = null; }
+      return { title: title.slice(0, 120), dateIso, lang: he ? 'he' : 'en' };
+    }
+    return null;
+  }
+  // The card for a do-it ask: the task, due that day when the mail names one.
+  function doItCard(i, hit) {
+    const he = hit.lang === 'he';
+    const card = taskCard(i, hit.title, hit.dateIso, he);
+    card.intent.taskAsk = false;
+    card.intent.doItAsk = true;
+    card.intent.personalClose = 'do-it-ask';
+    card.process.taskAsk = false;
+    return card;
+  }
+
+  // ---- second read: an answer the person owes, a call or meeting proposed with its day and clock ----
+  function dayOf(sentence, now0) {
+    try {
+      const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : null;
+      const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
+      if (!X || typeof X.parseDate !== 'function') return { date: null, time: null };
+      const norm = D && typeof D.normalize === 'function' ? D.normalize(sentence, now0) : sentence;
+      let d = X.parseDate(norm, now0);
+      if (!(d && d.iso) && /(?:\b(?:today|tonight)\b|(?:^|[^\u0590-\u05FF])היום(?![\u0590-\u05FF]))/i.test(sentence)) d = { iso: ymdOf(now0) };
+      const t = typeof X.parseTime === 'function' ? X.parseTime(norm) : null;
+      return { date: d && d.iso && !d.dropped ? d.iso : null, time: t && Number.isInteger(t.hour) ? t : null };
+    } catch (e) { return { date: null, time: null }; }
+  }
+  function sentencesOf(body) { return String(body || '').split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean); }
+  function whenLabel(iso) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m[2]) - 1] + ' ' + Number(m[3]);
+  }
+  const ANSWER_NO_EN = /\b(?:yesterday|last\s+(?:week|night)|already|never\s*mind|cancel(?:l?ed)?|maybe|might|if\s+you\s+(?:want|like)|no\s+rush|whenever)\b/i;
+  const ANSWER_NO_HE = /(?:אתמול|כבר\s|אולי|בוטל|לבטל|לא\s+דחוף|אין\s+לחץ)/;
+  // A question for a fact or a "can you confirm / tell me" with the day it is needed by. The person answers it; the reply is
+  // drafted and tracked. A decision on an offer (approve, accept, agree) is never read here.
+  function answerAsk(i, body) {
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const sents = sentencesOf(body).filter((x) => !/^(?:-{3,}|>)/.test(x));
+    if (!sents.length) return null;
+    const head = sents.findIndex((x) => /^(?:-{3,}\s*)?(?:forwarded message|from:)/i.test(x));
+    const own = head > 0 ? sents.slice(0, head) : sents;
+    for (let k = 0; k < own.length; k++) {
+      const sent = own[k];
+      const he = /[\u0590-\u05FF]/.test(sent);
+      if (he ? ANSWER_NO_HE.test(sent) : ANSWER_NO_EN.test(sent)) continue;
+      let hit = false;
+      let dateIso = null;
+      if (!he) {
+        const confirmAsk = /\b(?:can|could|would)\s+you\s+(?:please\s+)?(?:confirm|let\s+me\s+know|tell\s+me|advise)\b/i.test(sent) && !/\b(?:approve|accept|agree)\b/i.test(sent);
+        const factQ = /^(?:what|where|when|which|who|how\s+(?:much|many))(?:'s|’s|\s+is|\s+are|\s+was)\b[^?]*\?$/i.test(sent);
+        if (confirmAsk) { hit = true; dateIso = dayOf(sent, now0).date; if (!dateIso) hit = false; }
+        else if (factQ) {
+          const need = own.find((x, j) => j !== k && /\b(?:need\s+(?:it|this|that)|by|before|until|asap)\b/i.test(x) && dayOf(x, now0).date);
+          if (need) { hit = true; dateIso = dayOf(need, now0).date; }
+        }
+      } else {
+        const askHe = /(?:תגיד|תגידי|תודיע|תודיעי|תעדכן|תעדכני)\s+(?:לי|אותי)|תעדכן\s+אותי|תחזור\s+אליי?\s+(?:עם|ו)/.test(sent) && !/(?:תאשר|אשר)\s+לי\s+אם\s+(?:להמשיך|לאשר|להסכים)/.test(sent);
+        if (askHe) { dateIso = dayOf(sent, now0).date; hit = Boolean(dateIso); }
+      }
+      if (!hit) continue;
+      if (dateIso < ymdOf(now0)) continue;
+      return { what: sent.slice(0, 200), dateIso, lang: he ? 'he' : 'en' };
+    }
+    return null;
+  }
+  function ymdOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function replyCard(i, hit) {
+    const when = whenLabel(hit.dateIso);
+    const title = 'Reply requested' + (when ? ' by ' + when : '');
+    const he = hit.lang === 'he';
+    return {
+      intent: { type: 'request', label: title, confidence: 0.9, answerAsk: true, personalClose: 'follow-up-ask', signals: { score: 90, threshold: 50, handoff: true }, entities: { what: hit.what, requestWhat: hit.what, when, dateIso: hit.dateIso }, facts: { date: { iso: hit.dateIso } } },
+      process: { id: 'reply-track', name: 'Reply & Track', closingLine: 'Drafting your reply and tracking it as a task.', closedLine: 'Drafted and tracked.', needsDateChoice: false, dateChoices: null,
+        steps: [
+          { id: 'draft', kind: 'gmailDraft', label: 'Draft reply', hint: 'Prepare reply draft', params: { intentType: 'request', what: hit.what, when, amount: null, threadUrl: i.threadUrl || null, includeAttachment: false, requestedObjectTerm: null, driveFileId: null, driveFileName: null, driveMimeType: null, attachSource: null }, dependsOn: null },
+          { id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title, dateIso: hit.dateIso, amount: null, what: hit.what, threadUrl: i.threadUrl || null }, dependsOn: null }
+        ] }
+    };
+  }
+  // "נדבר מחר ב-16:00? אני אתקשר", "Let's do the interview next Thursday at 14:30 on Zoom. Does that work?": a call or a meeting
+  // proposed with its day and its clock, asked as a question. The hold goes on the calendar; nobody is invited.
+  function holdProposal(i, body) {
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const text = String(body || '');
+    if (!/[?؟]/.test(text)) return null;
+    const sents = sentencesOf(text);
+    for (let k = 0; k < sents.length; k++) {
+      const sent = sents[k];
+      const he = /[\u0590-\u05FF]/.test(sent);
+      if (he ? /(?:אולי|בוטל|לבטל|לדחות|נדחה)/.test(sent) : /\b(?:cancel(?:l?ed)?|postpone|reschedul\w*|maybe|might|if\s+you)\b/i.test(sent)) continue;
+      const cue = he
+        ? /(?:^|\s)(?:נדבר|נפגש|ניפגש|נתקשר|נקבע|נשוחח)(?![\u0590-\u05FF])/.test(sent)
+        : /\b(?:let'?s|shall\s+we|how\s+about)\s+(?:do|meet|talk|speak|call|have|catch|schedule|sync|chat)\b/i.test(sent);
+      if (!cue) continue;
+      const when = dayOf(sent, now0);
+      if (!when.date || !when.time || when.date < ymdOf(now0)) continue;
+      const rest = sents.slice(k).join(' ');
+      if (!he && !/\b(?:does\s+(?:that|this|it)\s+work|work\s+for\s+you|ok\??|good\s+for\s+you)\b/i.test(rest) && !/\?/.test(sent)) continue;
+      const subj = String(i.subject || '').replace(/^\s*(?:(?:re|fw|fwd)\s*:\s*)+/i, '').trim();
+      const title = he ? (/נפגש|ניפגש/.test(sent) ? 'פגישה' : 'שיחה') : (subj && subj.length <= 80 ? subj : 'Meeting');
+      return { title, dateIso: when.date, hour: when.time.hour, minute: when.time.minute || 0, lang: he ? 'he' : 'en' };
+    }
+    return null;
+  }
+  function holdCard(i, hit) {
+    const he = hit.lang === 'he';
+    const title = hit.title;
+    return {
+      intent: { type: 'event', label: title, confidence: 0.9, holdProposal: true, personalClose: 'calendar-hold', signals: { score: 90, threshold: 50 }, entities: { dateIso: hit.dateIso, hour: hit.hour, minute: hit.minute }, facts: { date: { iso: hit.dateIso } } },
+      process: { id: 'hold', name: 'Hold It', closingLine: he ? 'מוסיף ליומן.' : 'Putting this on your calendar.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title, dateIso: hit.dateIso, hour: hit.hour, minute: hit.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+    };
+  }
+
   function taskAsk(i, body) {
     if (!addressedOnTo(i)) return null;
     const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
@@ -392,11 +612,7 @@ const FlowIncomingJudge = (() => {
     if (!title) return null;
     title = title.slice(0, 120);
     const he = lang === 'he';
-    return {
-      intent: { type: 'request', label: title, confidence: 0.9, taskAsk: true, personalClose: 'task-ask', signals: { score: 90, threshold: 50 }, entities: { what: title, deadline: dateIso }, facts: { date: { iso: dateIso } } },
-      process: { id: 'log-it', name: 'Log It', closingLine: he ? 'מוסיף למשימות.' : 'Logging this so it stays tracked.', closedLine: he ? 'במשימות.' : 'Logged and tracked.', needsDateChoice: false, dateChoices: null, taskAsk: true,
-        steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Create task: ' + title, params: { title: title, dateIso: dateIso, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null }] }
-    };
+    return taskCard(i, title, dateIso, he);
   }
 
   function paymentAsk(i, body) {
