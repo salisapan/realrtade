@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+  xsi:type="MailApp">
+  <Id>87851e39-e51b-439a-bbf5-459ab69b3615</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Flow AI</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Glance" />
+  <Description DefaultValue="Glance reads the whole thread and closes open loops inside Outlook. You insert the draft yourself. It never sends." />
+  <IconUrl DefaultValue="https://theflow-ai.com/apple-touch-icon.png" />
+  <HighResolutionIconUrl DefaultValue="https://theflow-ai.com/apple-touch-icon.png" />
+  <SupportUrl DefaultValue="https://theflow-ai.com/privacy" />
+  <AppDomains>
+    <AppDomain>https://theflow-ai.com</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Mailbox" />
+  </Hosts>
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.5" />
+    </Sets>
+  </Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://theflow-ai.com/glance-outlook-addin/src/taskpane.html" />
+      </DesktopSettings>
+    </Form>
+    <Form xsi:type="ItemEdit">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://theflow-ai.com/glance-outlook-addin/src/taskpane.html" />
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  <Permissions>ReadWriteItem</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read" />
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit" />
+  </Rule>
+  <DisableEntityHighlighting>true</DisableEntityHighlighting>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.5">
+        <bt:Set Name="Mailbox" />
+      </bt:Sets>
+    </Requirements>
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+          <ExtensionPoint xsi:type="MessageReadCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="Glance.ReadGroup">
+                <Label resid="Glance.Label" />
+                <Control xsi:type="Button" id="Glance.ReadTaskpane">
+                  <Label resid="Glance.Label" />
+                  <Supertip>
+                    <Title resid="Glance.Label" />
+                    <Description resid="Glance.Desc" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Glance.Icon" />
+                    <bt:Image size="32" resid="Glance.Icon" />
+                    <bt:Image size="80" resid="Glance.Icon" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+          <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="Glance.ComposeGroup">
+                <Label resid="Glance.Label" />
+                <Control xsi:type="Button" id="Glance.ComposeTaskpane">
+                  <Label resid="Glance.Label" />
+                  <Supertip>
+                    <Title resid="Glance.Label" />
+                    <Description resid="Glance.Desc" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Glance.Icon" />
+                    <bt:Image size="32" resid="Glance.Icon" />
+                    <bt:Image size="80" resid="Glance.Icon" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Glance.Icon" DefaultValue="https://theflow-ai.com/apple-touch-icon.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://theflow-ai.com/glance-outlook-addin/src/taskpane.html" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Glance.Label" DefaultValue="Glance" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Glance.Desc" DefaultValue="Read the whole thread, then close the open loop with a draft reply you insert yourself. Never send." />
+      </bt:LongStrings>
+    </Resources>
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.5">
+          <bt:Set Name="Mailbox" />
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="Glance.ReadGroup">
+                  <Label resid="Glance.Label" />
+                  <Control xsi:type="Button" id="Glance.ReadTaskpane">
+                    <Label resid="Glance.Label" />
+                    <Supertip>
+                      <Title resid="Glance.Label" />
+                      <Description resid="Glance.Desc" />
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Glance.Icon" />
+                      <bt:Image size="32" resid="Glance.Icon" />
+                      <bt:Image size="80" resid="Glance.Icon" />
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url" />
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+            <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="Glance.ComposeGroup">
+                  <Label resid="Glance.Label" />
+                  <Control xsi:type="Button" id="Glance.ComposeTaskpane">
+                    <Label resid="Glance.Label" />
+                    <Supertip>
+                      <Title resid="Glance.Label" />
+                      <Description resid="Glance.Desc" />
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Glance.Icon" />
+                      <bt:Image size="32" resid="Glance.Icon" />
+                      <bt:Image size="80" resid="Glance.Icon" />
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url" />
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+          <MobileFormFactor>
+            <ExtensionPoint xsi:type="MobileMessageReadCommandSurface">
+              <Group id="Glance.MobileGroup">
+                <Label resid="Glance.Label" />
+                <Control xsi:type="MobileButton" id="Glance.MobileButton">
+                  <Label resid="Glance.Label" />
+                  <Icon xsi:type="bt:MobileIconList">
+                    <bt:Image size="25" scale="1" resid="Glance.Icon" />
+                    <bt:Image size="25" scale="2" resid="Glance.Icon" />
+                    <bt:Image size="25" scale="3" resid="Glance.Icon" />
+                    <bt:Image size="32" scale="1" resid="Glance.Icon" />
+                    <bt:Image size="32" scale="2" resid="Glance.Icon" />
+                    <bt:Image size="32" scale="3" resid="Glance.Icon" />
+                    <bt:Image size="48" scale="1" resid="Glance.Icon" />
+                    <bt:Image size="48" scale="2" resid="Glance.Icon" />
+                    <bt:Image size="48" scale="3" resid="Glance.Icon" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </ExtensionPoint>
+          </MobileFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Images>
+          <bt:Image id="Glance.Icon" DefaultValue="https://theflow-ai.com/apple-touch-icon.png" />
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="Taskpane.Url" DefaultValue="https://theflow-ai.com/glance-outlook-addin/src/taskpane.html" />
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="Glance.Label" DefaultValue="Glance" />
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="Glance.Desc" DefaultValue="Read the whole thread, then close the open loop with a draft reply you insert yourself. Never send." />
+        </bt:LongStrings>
+      </Resources>
+    </VersionOverrides>
+  </VersionOverrides>
+</OfficeApp>
