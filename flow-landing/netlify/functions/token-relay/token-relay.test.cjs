@@ -180,5 +180,18 @@ const run = (e, f, logs) => relay(e, { env: ENV, fetch: f, now: () => 1000, log:
     const f3 = mock(200, { access_token: 'x', note: 'DS-DEMO-SECRET' });
     assert.strictEqual((await relay(ev({ vendor: 'docusign-demo', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f3, now: () => 1 })).statusCode, 502);
   });
+  await t('stripe: client id and platform secret in a form body to connect.stripe.com/oauth/token; refresh works; the secret key is never returned', async () => {
+    const env = Object.assign({}, ENV, { STRIPE_CLIENT_ID: 'ca_test', STRIPE_CLIENT_SECRET: 'sk_live_PLATFORMSECRET' });
+    const f = mock(200, { access_token: 'rk_live_a', refresh_token: 'rt', livemode: true, scope: 'read_only' });
+    const r = await relay(ev({ vendor: 'stripe', grant: 'code', code: 'c1', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f, now: () => 1 });
+    assert.strictEqual(r.statusCode, 200); assert.strictEqual(f.calls[0].url, 'https://connect.stripe.com/oauth/token');
+    const form = new URLSearchParams(f.calls[0].init.body); assert.strictEqual(form.get('client_id'), 'ca_test'); assert.strictEqual(form.get('client_secret'), 'sk_live_PLATFORMSECRET'); assert.strictEqual(form.get('grant_type'), 'authorization_code');
+    assert.ok(r.body.indexOf('PLATFORMSECRET') < 0);
+    const f2 = mock(200, { access_token: 'x', refresh_token: 'y', livemode: true, scope: 'read_only' });
+    assert.strictEqual((await relay(ev({ vendor: 'stripe', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 })).statusCode, 200);
+    assert.strictEqual(new URLSearchParams(f2.calls[0].init.body).get('grant_type'), 'refresh_token');
+    const f3 = mock(200, { access_token: 'x', note: 'sk_live_PLATFORMSECRET' });
+    assert.strictEqual((await relay(ev({ vendor: 'stripe', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f3, now: () => 1 })).statusCode, 502);
+  });
   console.log('\n' + passed + ' passed');
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

@@ -8,6 +8,13 @@
 // notionOAuth: "Sign in with Notion" through the token relay (flow-landing/netlify/functions/token-relay). Needs the relay deployed,
 //              NOTION_CLIENT_ID / NOTION_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.notionClientId set. Off = the pasted token only.
 //
+// stripeReadBack: READ-ONLY and never moves money. The person links one Stripe invoice (in_…) or payment (pi_…) they are waiting on to one loop; Glance reads it
+//                 (GET only) and counts the loop closed only when Stripe shows it paid for real: not open, void, refunded or disputed, and, when the person gave an
+//                 expected amount, not less (core/stripe-close.js). It never creates a charge, invoice, payment link or refund. Test-mode objects never close a live loop.
+//                 Off = flow:payment-check / flow:payment-release answer connector-not-live. The recognition switch STRIPE_PAYMENT (core/stripe-pay.js) is separate.
+// stripeOAuth:    "Connect with Stripe" (Stripe Connect, scope read_only) through the token relay. Needs the relay deployed, STRIPE_CLIENT_ID (the platform's ca_… id) and
+//                 STRIPE_CLIENT_SECRET (the platform secret key: it stays in Netlify) set, and OAUTH_PUBLIC.stripeClientId set.
+//
 // dropboxReadBack: one file saved into the person's Dropbox app folder, read back by id, size and content hash (core/dropbox-close.js). Never overwrites, never
 //                  renames; Undo refuses a file the person edited. Off = the messages flow:dropbox-save / flow:dropbox-undo answer connector-not-live.
 // dropboxOAuth:    "Sign in with Dropbox" (OAuth with PKCE, no secret, no relay). Needs OAUTH_PUBLIC.dropboxAppKey set.
@@ -32,4 +39,4 @@
 //                Off = no Asana writer exists at all (nothing is registered under the id "asana").
 // asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
 //                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false };
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false, stripeReadBack: false, stripeOAuth: false };
