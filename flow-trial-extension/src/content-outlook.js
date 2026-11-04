@@ -3414,13 +3414,27 @@
     return steps.length > 0 && steps.every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
   }
 
+  function consentDueIso(ctx) {
+    const found = [];
+    if (ctx && ctx.intent && ctx.intent.dateIso) found.push(ctx.intent.dateIso);
+    ((ctx && ctx.process && ctx.process.steps) || []).forEach((st) => {
+      const p = (st && st.params) || {};
+      [p.dateIso, p.dueIso, p.due].forEach((v) => { if (v) found.push(v); });
+    });
+    const hit = found.map((v) => String(v).slice(0, 10)).find((v) => /^\d{4}-\d{2}-\d{2}$/.test(v));
+    return hit || '';
+  }
+
   function paintTodoConsent(host, ctx) {
     if (paintDepth <= 0) return;
     if (!host || host.querySelector('[data-glance-consent="todo"]')) return;
     const row = FlowChipHost.el('div', 'flow-chip-consent');
     row.setAttribute('data-glance-consent', 'todo');
     row.setAttribute('dir', 'rtl');
-    row.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'אין הרשאת To Do'));
+    // The ask keeps its deadline on the consent card, so the day is not lost while the grant is pending.
+    const dueIso = consentDueIso(ctx);
+    const dueLine = dueIso && typeof FlowDisplay !== 'undefined' && FlowDisplay.cardDateLine ? FlowDisplay.cardDateLine(dueIso, 'he') : '';
+    row.appendChild(FlowChipHost.el('span', 'flow-chip-label', dueLine ? ('אין הרשאת To Do · ' + dueLine) : 'אין הרשאת To Do'));
     const actions = FlowChipHost.el('span', 'flow-chip-actions');
     [['אפשר פעם אחת', 'once'], ['אפשר תמיד', 'always'], ['לא עכשיו', 'not-now']].forEach((pair) => {
       const button = FlowChipHost.el('button', 'flow-chip-consent-btn capture-secondary', pair[0]);
