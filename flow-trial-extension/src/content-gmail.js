@@ -2348,6 +2348,11 @@ function glanceUiCopy(kind) {
       });
     }
     if (!FlowIntent.shouldShowChip(intent) && !(audienceNeedsProbe && (inboundAsk || inboundAttachAsk)) && !attachKeep) {
+      // An incoming attachment with no ask at all: Save the file? (click only). Any ask, named quiet or unclear
+      // audience keeps the silence it had.
+      if (inboundMail && usingGoogle && attachments.length && !audienceNeedsProbe && !intent.type && !intent.quiet && !intent.googleSilence
+        && !(typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.namedQuietOf === 'function' && FlowIncomingJudge.namedQuietOf(text, {}))
+        && await showSuggestSaveChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, attachments })) return;
       clearGmailWhy(message);
       // Named silence only. An ordinary miss stays the classification
       // counter above — it is not given a reason it did not earn.
@@ -2355,6 +2360,8 @@ function glanceUiCopy(kind) {
         || (factOwns && !intent.type ? 'fact' : null)
         || (!intent.type && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.namedQuietOf === 'function'
           ? FlowIncomingJudge.namedQuietOf(text, {}) : null);
+      // A contacts lookup is named on the page: contacts are not in v1, and a skip with no reason is not allowed.
+      if (reason === 'contacts-unavailable') paintGmailWhy(message, 'contacts-unavailable', FlowDisplay.whyNotShownLine('contacts-unavailable', glanceUiHebrew() ? 'he' : 'en'));
       logScanSkip(messageId, reason || 'no-chip-candidate');
       recordSilence(messageId, reason, {
         family: intent.closeFamily || intent.quiet,
@@ -3589,6 +3596,75 @@ function glanceUiCopy(kind) {
         intent: compactIntent(intent), app: SOURCE_APP
       });
     }
+    return true;
+  }
+
+  // An attachment mail with no ask is offered "Save the file?" and nothing else. Click only: nothing is written until
+  // Do It. It is the same Drive step the file card uses (driveFile, drive.file, read back, Undo trashes the file),
+  // one file at a time. A card that already exists, a negated or marketing mail, a second file, no drive.file grant
+  // and an earlier dismissal all end it, and the decision's own reason code is kept in the local suggest log.
+  async function showSuggestSaveChip(message, c) {
+    if (typeof FlowSuggestSave === 'undefined' || typeof FlowSuggestSave.suggestSave !== 'function') return false;
+    if (typeof FlowGoogleConfig === 'undefined' || typeof FlowGoogleConfig.hasScope !== 'function') return false;
+    if (!c.attachments || !c.attachments.length) return false;
+    let bag = {};
+    try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
+    let scopes = null;
+    try {
+      const granted = await chrome.storage.local.get('googleGrantedScopes');
+      const raw = granted && granted.googleGrantedScopes && granted.googleGrantedScopes.version;
+      if (raw != null) scopes = String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
+    } catch (e) { scopes = null; }
+    const consent = scopes ? FlowGoogleConfig.hasScope(scopes, FlowGoogleConfig.SCOPE_DRIVE_FILE) === true : false;
+    const decision = FlowSuggestSave.suggestSave({
+      surface: 'gmail',
+      inbound: true,
+      consent: consent,
+      text: c.text || '',
+      subject: c.subject || '',
+      messageId: c.messageId,
+      attachments: c.attachments.map((meta) => {
+        const sized = Number(meta.size);
+        return { id: meta.url || meta.filename, name: meta.filename, filename: meta.filename, contentType: meta.mimeType || '', size: (isFinite(sized) && sized > 0) ? sized : 8192 };
+      }),
+      otherCard: false,
+      dismissals: bag.suggestDismissals || {},
+      log: bag.log || []
+    });
+    if (!decision.eligible) {
+      void appendSuggestLog({ messageId: c.messageId, reason: decision.reason, fileCount: 0 });
+      return false;
+    }
+    if (decision.files.length !== 1 || c.attachments.length !== 1) {
+      void appendSuggestLog({ messageId: c.messageId, reason: 'suggest:bulk', fileCount: decision.files.length });
+      return false;
+    }
+    const file = decision.files[0];
+    const he = glanceUiHebrew() || /[\u0590-\u05FF]/.test(String(c.text || ''));
+    const copy = decision.step && decision.step.copy;
+    const line = copy ? (he ? (copy.he || copy.en) : (copy.en || copy.he)) : file.name;
+    const process = {
+      id: 'suggest-save',
+      name: 'Save the file?',
+      closingLine: '',
+      closedLine: he ? 'נשמר ב-Drive.' : 'Saved to Drive.',
+      steps: [{
+        id: 'file',
+        kind: 'driveFile',
+        label: 'Drive',
+        hint: line,
+        dependsOn: null,
+        params: { copyAttachment: true, googleClose: { personalClose: 'drive-file', target: 'drive', kind: 'file', copyAttachment: true, destination: 'none', lang: he ? 'he' : 'en' }, destinationText: 'Drive · ' + file.name, suggestOnly: true }
+      }]
+    };
+    const intent = { type: FlowIntent.TYPES.REQUEST, label: 'Save the file?', lang: he ? 'he' : 'en', signals: { score: 0 }, entities: {}, suggestOnly: true };
+    openSuggest = null;
+    void appendSuggestLog({ messageId: c.messageId, reason: 'suggest:show', fileCount: 1, target: 'drive' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds, intent: intent, process: process,
+      sender: c.sender, subject: c.subject, attachment: c.attachments[0], attachments: c.attachments,
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail', fileCard: true, suggestOnly: true
+    });
     return true;
   }
 
@@ -6026,6 +6102,16 @@ function glanceUiCopy(kind) {
 
   async function onDismiss(host, ctx) {
     host.remove();
+    // A suggestion is not a decision: remember the dismissal for this mail, nothing else.
+    if (ctx && ctx.suggestOnly) {
+      try {
+        const bag = await FlowStorage.get();
+        const map = Object.assign({}, bag.suggestDismissals || {});
+        map[ctx.messageId] = { at: Date.now() };
+        await FlowStorage.set({ suggestDismissals: map });
+      } catch (e) { console.error('[Glance] failed to remember a dismissed file suggestion', e); }
+      return;
+    }
     // Same staleness guard as onDoIt, for the same reason — just a lighter
     // consequence here: recording a second 'dismissed' outcome for an
     // already-closed message doesn't create a duplicate real-world write

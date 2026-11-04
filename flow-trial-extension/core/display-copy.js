@@ -473,7 +473,8 @@ const FlowDisplay = (() => {
     'drive-search-unavailable-v1': 'הבקשה דורשת קובץ מה-Drive. אי אפשר לחפש אותו בגרסה הזו, ולכן לא נכתב דבר',
     'drive-not-granted': 'הבקשה דורשת קובץ מה-Drive. אי אפשר לחפש אותו בגרסה הזו, ולכן לא נכתב דבר',
     'drive-search-failed': 'הבקשה דורשת קובץ מה-Drive. החיפוש נכשל, ולכן לא נכתב דבר',
-    'thread-read-failed': 'לא הצלחתי לקרוא את כל השרשור. לא נכתב דבר'
+    'thread-read-failed': 'לא הצלחתי לקרוא את כל השרשור. לא נכתב דבר',
+    'contacts-unavailable': 'חיפוש כתובת באנשי הקשר לא זמין בגרסה הזו, ולכן לא נכתב דבר'
   };
   const WHY_EN = {
     'file': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
@@ -481,7 +482,8 @@ const FlowDisplay = (() => {
     'drive-search-unavailable-v1': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
     'drive-not-granted': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
     'drive-search-failed': 'This asks for a file from Drive, and the search failed. Nothing was written.',
-    'thread-read-failed': "Couldn't read the whole thread. Nothing was written."
+    'thread-read-failed': "Couldn't read the whole thread. Nothing was written.",
+    'contacts-unavailable': 'Looking up an address in Contacts is not available in this version. Nothing was written.'
   };
 
   function whyNotShownLine(reason, lang) {

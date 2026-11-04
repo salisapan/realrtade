@@ -63,14 +63,28 @@ function whyMatches(want, seen) {
   return codes.some((code) => code === want || (WHY_MAP[code] || []).indexOf(want) >= 0);
 }
 
-function actionOfSteps(ids) {
+// The actions a card's steps can be read as. A card with a calendar step is Hold It; with a file step File it;
+// with a draft step Reply & Track; with only a task step Log It. A card that carries both a file step and a draft
+// step (save the attachment and send it back) is both File it and Reply & Track; the case's expected action
+// decides which reading it asks for. A draft is always a draft, never a send.
+function actionsOfSteps(ids) {
   const has = (re) => ids.some((i) => re.test(i));
-  if (has(/^calendar/)) return 'Hold It';
-  if (has(/^(file|attachmentSave)/)) return 'File it';
-  if (has(/^draft/)) return 'Reply & Track';
-  if (has(/^(task|outlookTask)/)) return 'Log It';
-  return 'unknown:' + ids.join(',');
+  const out = [];
+  if (has(/^calendar/)) out.push('Hold It');
+  if (has(/^(file|attachmentSave)/)) out.push('File it');
+  if (has(/^draft/)) out.push('Reply & Track');
+  if (!out.length && has(/^(task|outlookTask)/)) out.push('Log It');
+  return out;
 }
+
+function actionOfSteps(ids) {
+  const all = actionsOfSteps(ids);
+  return all.length ? all[0] : 'unknown:' + ids.join(',');
+}
+
+// A labs run (GATE100_LABS=1) turns on the cases that need a labs switch and expects what the switch gives.
+// The default run expects the quiet the shipped config gives.
+const LABS_RUN = process.env.GATE100_LABS === '1';
 
 function processLabel(c, action) {
   if (c.ui !== 'he') return action;
@@ -140,7 +154,7 @@ test.describe('gate100', () => {
       const host = c.surface === 'gmail' ? 'div[role="main"]' : '#ReadingPaneContainerId';
       const card = page.locator(host + ' .flow-chip-host');
       const why = page.locator(host + ' .flow-why-not, ' + host + ' .flow-why-quiet');
-      const e = c.expect;
+      const e = (LABS_RUN && c.labs_expect) ? c.labs_expect : c.expect;
       // A case ends in a card or a visible reason. Neither within the window is a failure of its own.
       const settled = await expect.poll(async () => {
         if (await card.count()) return 'card';
@@ -169,9 +183,11 @@ test.describe('gate100', () => {
         // from the steps it will perform: calendar = Hold It, draft + task = Reply & Track, task alone = Log It,
         // a file step = File it.
         const ids = await page.evaluate((q) => Array.from(document.querySelectorAll(q + ' li.act[data-step-id]')).map((n) => n.getAttribute('data-step-id')), host + ' .flow-chip-host');
-        const got = actionOfSteps(ids);
+        const gotAll = actionsOfSteps(ids);
+        const want = e.action === 'Save the file?' ? 'File it' : e.action;
+        const got = gotAll.indexOf(want) >= 0 ? want : actionOfSteps(ids);
         const loose = e.action === "Answer with Dana's address" || e.action === 'Accept the invitation';
-        if (!loose) expect(got, 'action ' + JSON.stringify({ ids, state })).toBe(e.action === 'Save the file?' ? 'File it' : e.action);
+        if (!loose) expect(got, 'action ' + JSON.stringify({ ids, state })).toBe(want);
         else expect(ids.length, 'a card with steps ' + e.action).toBeGreaterThan(0);
       }
       // Writes: press Do It once and read what was sent. Never a send; a draft is a draft.
@@ -203,7 +219,10 @@ test.describe('gate100', () => {
         const labels = [processLabel(c, e.action), processLabel(c, 'Reply & Track'), processLabel(c, 'Hold It'), processLabel(c, 'Log It')]
           .concat(cardText.split('\n').map((l) => l.trim()).filter(Boolean)).map((l) => l.toLowerCase());
         const bodies = c.thread.map((t) => (t.subject + ' ' + t.body).toLowerCase());
-        const titleOk = bag.toLowerCase().includes(want)
+        // A file card's heading is its process label ("Save the file?"): that is the title of a File it card.
+        const fileHeading = (e.action === 'File it' || e.action === 'Save the file?')
+          && /^(save the file\?|לשמור את הקובץ\?)$/i.test(cardText.split('\n').map((l) => l.trim()).filter(Boolean).find((l) => /\?$/.test(l)) || '');
+        const titleOk = fileHeading || bag.toLowerCase().includes(want)
           || written.some((w) => labels.indexOf(w.toLowerCase()) >= 0 || bodies.some((b) => b.includes(w.toLowerCase())));
         expect(titleOk, 'title_contains ' + e.title_contains + ' (either the ask word or the process label) ' + JSON.stringify({ written })).toBe(true);
       }

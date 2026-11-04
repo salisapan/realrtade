@@ -125,6 +125,13 @@ const FlowIncomingJudge = (() => {
   // A mail the general classifier could not read as an ask still has a plain reason the person can be shown: a hedge ("we
   // might catch up at some point, no rush"), a service notice ("see who is looking at your profile") or a closing line that
   // asks nothing more ("signed and returned, nothing else needed").
+  const CONTACTS_EN = /\b[Ww]hat(?:(?:'|’)s| is)\s+[A-Z][\w.-]{0,40}(?:\s+[A-Z][\w.-]{0,40})?(?:'|’)s\s+(?:e-?mail(?: address)?|phone(?: number)?|number)\b|\b(?:e-?mail(?: address)?)\s+(?:for|of)\s+[A-Z][\w.-]{0,40}\b/;
+  const CONTACTS_HE = /מה\s+(?:ה)?(?:כתובת\s+)?(?:המייל|אימייל|דוא["']?ל|הטלפון|המספר)\s+של\s+[\u0590-\u05FF]/;
+  function contactsAsk(raw) {
+    const s = String(raw || '').slice(0, 600);
+    return CONTACTS_HE.test(s) || CONTACTS_EN.test(s);
+  }
+
   function namedQuietOf(rawText, i) {
     const raw = String(rawText || '').replace(/\s+/g, ' ').trim();
     if (!raw) return null;
@@ -139,6 +146,9 @@ const FlowIncomingJudge = (() => {
         || /(?:^|\s)(?:אולי|מתישהו)(?:\s|$)[^.!?]*\bלא דחוף\b/.test(raw)
         || /(?:^|\s)אולי(?:\s|$)/.test(raw) && /מתישהו|לא דחוף|אם יהיה זמן|כשיהיה זמן/.test(raw)) return 'hedge';
     }
+    // A person's address asked for by name ("What's Dana's email?") is a contacts lookup. Contacts are not in v1, so the
+    // mail ends in a visible reason, never a silent skip and never a guessed address.
+    if (contactsAsk(raw)) return 'contacts-unavailable';
     if (/\b(?:see who(?:'|’)?s|who(?:'|’)?s (?:looking|viewed|viewing)|people (?:also )?viewed|you appeared in \d+|your profile (?:was|has been) viewed|new connection suggestions?)\b/i.test(raw)
       || /מי\s+(?:צפה|הסתכל)\s+ב/.test(raw)) return 'noise';
     return null;
@@ -852,7 +862,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id));
   }
 
-  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, namedQuietOf, secondRead, doItOverride, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
+  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, namedQuietOf, contactsAsk, secondRead, doItOverride, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };
