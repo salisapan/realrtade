@@ -465,6 +465,7 @@ const FlowDisplay = (() => {
     'suggest:attachments-unread': 'לא הצלחתי לקרוא את הקבצים המצורפים',
     'suggest:too-large': 'הקובץ המצורף גדול מדי לשמירה',
     'scan-skipped': 'עדיין קורא את המייל',
+    'no-outcome': 'אין החלטה למייל הזה',
     'names-pending': 'ממתין לשם'
   };
 

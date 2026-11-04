@@ -1809,6 +1809,37 @@ function glanceUiCopy(kind) {
     return listed;
   }
 
+  // Every message row of the open conversation in page order: the open messages,
+  // and the folded one-line rows Gmail paints for older ones (an address, a snippet,
+  // no body). A folded row counts only when it names a sender.
+  function threadRows(main, openNodes, openLists) {
+    const rows = openNodes.map((node, i) => ({ node, emails: openLists[i] || [], bodyless: false }));
+    if (!openNodes.length || !main || !main.querySelectorAll) return rows;
+    const seen = [];
+    const candidates = main.querySelectorAll('[data-legacy-message-id], div.kv, div[role="listitem"][aria-expanded="false"]');
+    for (let i = 0; i < candidates.length; i++) {
+      const node = candidates[i];
+      if (openNodes.some((n) => n === node || n.contains(node) || node.contains(n))) continue;
+      if (node.querySelector('.a3s')) continue;
+      if (seen.some((n) => n.contains(node))) continue;
+      const emails = addressesOn(node);
+      if (!emails.length) continue;
+      for (let k = seen.length - 1; k >= 0; k--) if (node.contains(seen[k])) seen.splice(k, 1);
+      seen.push(node);
+    }
+    for (const node of seen) rows.push({ node, emails: addressesOn(node), bodyless: true });
+    rows.sort((a, b) => (a.node.compareDocumentPosition(b.node) & 4 ? -1 : 1));
+    return rows;
+  }
+
+  // A folded row opens with a click on the row. Once per row, so a row that
+  // does not open is reported as it is and not clicked again.
+  function openFoldedRow(node) {
+    if (!node || node.getAttribute('data-glance-folded-click') === '1') return false;
+    node.setAttribute('data-glance-folded-click', '1');
+    try { node.click(); return true; } catch (e) { return false; }
+  }
+
   async function scanReadingPane() {
     if (!watching || !chromeLive()) return;
     publishNamesDiag();
@@ -1894,7 +1925,21 @@ function glanceUiCopy(kind) {
     const emailLists = [];
     for (let i = 0; i < messages.length; i++) emailLists.push(addressesOn(messages[i]));
     let judgeAt = -1;
-    if (typeof FlowGoogleCloses !== 'undefined' && FlowGoogleCloses.messageToJudge) {
+    let threadWhy = '';
+    let foldedAsk = null;
+    if (typeof FlowGoogleCloses !== 'undefined' && FlowGoogleCloses.threadTarget) {
+      // The whole conversation, collapsed older rows included, so an ask that is
+      // folded away is still found. Only a message that carries the account as
+      // sender and the asker as a recipient answers it; a forward copy does not.
+      const rows = threadRows(main, messages, emailLists);
+      const verdict = FlowGoogleCloses.threadTarget(rows.map((r) => ({ emails: r.emails, bodyless: r.bodyless })), ownEmail);
+      threadWhy = verdict.why || '';
+      if (verdict.index >= 0) {
+        const row = rows[verdict.index];
+        if (row.bodyless) foldedAsk = row.node;
+        else judgeAt = messages.indexOf(row.node);
+      }
+    } else if (typeof FlowGoogleCloses !== 'undefined' && FlowGoogleCloses.messageToJudge) {
       judgeAt = FlowGoogleCloses.messageToJudge(emailLists, ownEmail);
     } else {
       for (let i = emailLists.length - 1; i >= 0; i--) {
@@ -1906,7 +1951,15 @@ function glanceUiCopy(kind) {
     }
     const message = judgeAt >= 0 ? messages[judgeAt] : null;
     if (!message) {
-      logScanSkip('', 'no-incoming-message');
+      if (foldedAsk) {
+        // The ask is a folded one-line row with no words to read. Open it once, the way
+        // a click on that row does. The next pass reads it like any open message.
+        const foldedId = foldedAsk.getAttribute('data-legacy-message-id') || '';
+        const opened = openFoldedRow(foldedAsk);
+        logScanSkip(foldedId, opened ? 'ask-collapsed-opening' : 'ask-collapsed');
+        return;
+      }
+      logScanSkip('', threadWhy || 'no-incoming-message');
       return; // own mail to someone else, or no message we can tell apart from one
     }
 
@@ -4907,8 +4960,13 @@ function glanceUiCopy(kind) {
   // stays as the honest fallback for a partial success (some steps failed)
   // — closedLine describes the full process and would overclaim if only
   // some of it actually landed.
+// A preview that closes nothing ("Open Reply first") is a hand-off to the user. It is not a step that failed.
+  function draftHandOff(r) {
+    return !!(r && r.response && r.response.preview === true && r.response.closes === false);
+  }
+
   function closedSummary(succeeded, ctx, results) {
-    const failedStep = (results || []).some((r) => !stepHandled(r) && !(r.response && (r.response.ok || r.response.skipped)));
+    const failedStep = (results || []).some((r) => !stepHandled(r) && !draftHandOff(r) && !(r.response && (r.response.ok || r.response.skipped)));
     const isFullClose = !failedStep && ctx && ctx.process.closedLine && succeeded.length === ctx.process.steps.length;
     if (isFullClose) return ctx.process.closedLine;
     const verbs = succeeded.map((r) => STEP_DONE_VERB[r.action.kind] || 'completed one step');
@@ -5557,7 +5615,11 @@ function glanceUiCopy(kind) {
     // replace that word with the longer magic-moment sentence. The
     // sentence, when it applies, is an extra line under the status.
     const taskSteps = results.filter(taskKind);
-    const attempted = results.filter((r) => r && r.action && !(r.response && r.response.skipped));
+    // A reply draft that Gmail left to the user ("Open Reply first", a preview that closes nothing) is a
+    // hand-off, not a step that failed: it stays on the receipt as its own line, and the status word
+    // describes the writes Glance actually made. Counting it made a fully written task say "Partly handled".
+    const handOff = draftHandOff;
+    const attempted = results.filter((r) => r && r.action && !(r.response && r.response.skipped) && !handOff(r));
     const closedSteps = attempted.filter(receiptClosedStep);
     const copy = FlowReceipt.confirmation({
       succeeded: closedSteps.length,
