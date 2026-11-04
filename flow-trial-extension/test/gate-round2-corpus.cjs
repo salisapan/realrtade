@@ -31,6 +31,7 @@ const YES = [
   ['See below. Can you confirm by end of week whether we renew?', 'reply-track', '2026-11-06'],
   ['מצורפת המצגת, תעבור עליה ותגיד לי עד יום ראשון אם זה בסדר', 'reply-track', '2026-11-08'],
   ['מצורף החוזה המעודכן. תחתום ותחזיר לי עד יום חמישי בבקשה.', 'reply-track', '2026-11-05'],
+  ['קיבלת את הצעת המחיר?', 'reply-track', '2000-01-01'],
   ['נדבר מחר ב-16:00? אני אתקשר', 'hold', '2026-11-05'],
   ["Let's do the interview next Thursday at 14:30 on Zoom. Does that work?", 'hold|schedule', '2026-11-12']
 ];

@@ -2352,7 +2352,9 @@ function glanceUiCopy(kind) {
       // Named silence only. An ordinary miss stays the classification
       // counter above — it is not given a reason it did not earn.
       const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
-        || (factOwns && !intent.type ? 'fact' : null);
+        || (factOwns && !intent.type ? 'fact' : null)
+        || (!intent.type && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.namedQuietOf === 'function'
+          ? FlowIncomingJudge.namedQuietOf(text, {}) : null);
       logScanSkip(messageId, reason || 'no-chip-candidate');
       recordSilence(messageId, reason, {
         family: intent.closeFamily || intent.quiet,
