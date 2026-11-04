@@ -4,6 +4,7 @@ const path = require('path');
 const { chromium } = require('@playwright/test');
 const { ME } = require('./sentences');
 const { gmailHtml, outlookHtml, outlookUrl, gmailUrl } = require('./fixtures');
+const { frozenDateSource } = require('./frozen-date');
 
 const EXT_ROOT = path.resolve(__dirname, '../..');
 const SKIP_DIRS = new Set(['node_modules', 'e2e', 'e2e-report', 'test-results', 'playwright-report', 'test']);
@@ -82,6 +83,18 @@ function copyExtension(opts) {
   const whatsappE2eHost = ['https://web.whatsapp.com/*'];
   manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(hostExtra, whatsappE2eHost)));
   manifest.optional_host_permissions = Array.from(new Set((manifest.optional_host_permissions || []).concat(optionalChat)));
+  // gate100 only: a fixed "now" for the content scripts. Their isolated world keeps the real
+  // Date, so the shim is a first content script in this temp copy (the product manifest is untouched).
+  const clockIso = (opts && opts.clockIso) || process.env.GLANCE_E2E_CLOCK_ISO || '';
+  if (clockIso) {
+    const start = Date.parse(clockIso);
+    if (!Number.isFinite(start)) throw new Error('GLANCE_E2E_CLOCK_ISO needs an ISO instant, got ' + clockIso);
+    fs.writeFileSync(path.join(dest, 'e2e-clock.js'), frozenDateSource(clockIso).replace(/window\.Date = FrozenDate;/, 'globalThis.Date = FrozenDate;'));
+    (manifest.content_scripts || []).forEach((entry) => {
+      if (entry.world === 'MAIN') return;
+      entry.js = ['e2e-clock.js'].concat(entry.js || []);
+    });
+  }
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   return dest;
 }
@@ -210,7 +223,7 @@ function installE2EHooks() {
       host === 'www.googleapis.com' || host === 'oauth2.googleapis.com' || host === 'theflow-ai.com';
     if (!watched) return origFetch(input, init);
     const method = String((init && init.method) || (typeof input !== 'string' && input && input.method) || 'GET').toUpperCase();
-    e2e.calls.push({ url: url, method: method, at: Date.now() });
+    e2e.calls.push({ url: url, method: method, at: Date.now(), body: typeof (init && init.body) === 'string' ? init.body.slice(0, 6000) : '' });
     const path = decodeURIComponent(parsed.pathname);
     const scenario = e2e.scenario || {};
 
@@ -396,6 +409,16 @@ function installE2EHooks() {
         return Promise.resolve(item ? json(200, item) : json(404, { error: { code: 'itemNotFound' } }));
       }
       const createdReply = path.match(/\/me\/messages\/([^/]+)\/createReply$/);
+      if (createdReply && method === 'POST' && scenario.draftStatus) {
+        return Promise.resolve(json(scenario.draftStatus, { error: { code: 'e2e-draft-status', message: 'refused' } }));
+      }
+      if (createdReply && method === 'POST' && scenario.draftHang) {
+        // Never answers. Only the caller's abort ends it, the way a stalled network does.
+        return new Promise((resolve, reject) => {
+          const sig = init && init.signal;
+          if (sig) sig.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        });
+      }
       if (createdReply && method === 'POST') {
         const id = 'e2e-draft-' + (e2e.seq++);
         let posted = {};

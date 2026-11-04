@@ -90,9 +90,52 @@ function threadHeaderAttrs(o, threadId) {
   return ' data-legacy-thread-id="' + esc(threadId) + '" data-thread-perm-id="thread-f:1"';
 }
 
+// A conversation of several messages, oldest first. Each entry: { messageId, senderEmail,
+// senderName, to, cc, body, collapsed }. A collapsed entry is the one-line row Gmail paints
+// for an older message: the sender's address and a snippet, no body. Clicking it opens
+// the message, the way Gmail does. The newest entry is open unless it says collapsed.
+function gmailThreadHtml(o) {
+  const ownEmail = o.ownEmail || 'me@x.com';
+  const threadId = o.threadId || 't-thread';
+  const subject = o.subject || 'Hello';
+  function open(m) {
+    const senderEmail = m.senderEmail || 'dana@acme.com';
+    const senderName = m.senderName || 'Dana';
+    const to = Array.isArray(m.to) ? m.to : [];
+    const cc = Array.isArray(m.cc) ? m.cc : [];
+    const line = (label, list) => list.length
+      ? ('<div class="' + label.toLowerCase().replace(':', '') + '">' + label + ' ' + list.map((a) => '<span email="' + esc(a) + '">' + esc(a) + '</span>').join(' ') + '</div>')
+      : '';
+    return '<div class="adn ads" role="listitem" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(m.messageId) + '">' +
+      '<span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span>' +
+      line('To:', to) + line('Cc:', cc) +
+      '<div class="a3s">' + esc(m.body || '') + '</div>' + attachmentChips(m) + '</div>';
+  }
+  function attachmentChips(m) {
+    return (Array.isArray(m.attachments) ? m.attachments : []).map((f) => {
+      const name = (f && (f.name || f.filename)) || 'report.pdf';
+      const mime = (f && f.mimeType) || 'application/pdf';
+      const url = (f && f.url) || ('https://mail.google.com/mail/u/0/?view=att&disp=safe&name=' + encodeURIComponent(name));
+      return '<span download_url="' + esc(mime + ':' + name + ':' + url) + '">' + esc(name) + '</span>';
+    }).join('');
+  }
+  function folded(m) {
+    return '<div class="kv" role="listitem" aria-expanded="false" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(m.messageId) + '"' +
+      ' data-open="' + esc(open(m)) + '" onclick="this.outerHTML=this.getAttribute(\'data-open\')">' +
+      '<span class="yP" email="' + esc(m.senderEmail || 'dana@acme.com') + '" name="' + esc(m.senderName || 'Dana') + '">' + esc(m.senderName || 'Dana') + '</span>' +
+      '<span class="y2">' + esc(String(m.body || '').slice(0, 40)) + '</span></div>';
+  }
+  const rows = (o.thread || []).map((m) => (m.collapsed ? folded(m) : open(m))).join('');
+  const titleEmail = o.titleEmail || ownEmail;
+  return '<!doctype html><html><head><title>Inbox - ' + esc(titleEmail) + ' - Gmail</title></head><body>' +
+    accountButton(o, ownEmail, o.accountName || '') +
+    '<div role="main"><h2 class="hP">' + esc(subject) + '</h2>' + rows + '</div></body></html>';
+}
+
 function gmailHtml(opts) {
   const o = opts || {};
   if (o.liveSelf) return gmailLiveSelf(o);
+  if (Array.isArray(o.thread)) return gmailThreadHtml(o);
   const senderEmail = o.senderEmail || 'dana@acme.com';
   const senderName = o.senderName || 'Dana';
   const subject = o.subject || 'Hello';

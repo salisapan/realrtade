@@ -77,3 +77,6 @@ glance-ai/model/shadow-pkg/bench/out/
 
 # Graphify local AST graph (large HTML/JSON/cache). Rebuilt on demand; not committed.
 graphify-out/
+flow-trial-extension/blob-report/
+flow-trial-extension/test-results-gate100/
+flow-trial-extension/gate100-results.json
