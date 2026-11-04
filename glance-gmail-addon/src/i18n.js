@@ -12,6 +12,10 @@ var GlanceI18n = (function () {
       diag: 'diag',
       edited: "The task was edited, so I won't undo it",
       quiet: 'Nothing to close.',
+      quietEmpty: 'Nothing to close in this email.',
+      spottedPrefix: 'Spotted, not supported yet: ',
+      remindMe: 'Remind me',
+      build: 'Build',
       openMessage: 'Open a message.',
       next: 'Next',
       due: 'Due',
@@ -23,7 +27,8 @@ var GlanceI18n = (function () {
       onCalendar: 'On your calendar.',
       schedule: 'Calendar and a reminder.',
       editedEvent: "The event was edited, so I won't undo it",
-      grant: 'Grant permission'
+      grant: 'Grant permission',
+      notThis: 'Not this'
     },
     he: {
       doIt: 'בצע',
@@ -33,6 +38,10 @@ var GlanceI18n = (function () {
       diag: 'diag',
       edited: 'המשימה נערכה, אז לא אבטל אותה',
       quiet: 'אין מה לסגור.',
+      quietEmpty: 'אין מה לסגור בהודעה הזו.',
+      spottedPrefix: 'זוהה, עדיין לא נתמך: ',
+      remindMe: 'תזכירו לי',
+      build: 'בנייה',
       openMessage: 'פתחו הודעה.',
       next: 'הפעולה הבאה',
       due: 'יעד',
@@ -44,7 +53,8 @@ var GlanceI18n = (function () {
       onCalendar: 'ביומן.',
       schedule: 'יומן ותזכורת.',
       editedEvent: 'האירוע נערך, אז לא אבטל אותו',
-      grant: 'תנו הרשאה'
+      grant: 'תנו הרשאה',
+      notThis: 'לא זה'
     }
   };
 

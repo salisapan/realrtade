@@ -49,30 +49,38 @@ var GlanceCards = (function () {
 
   function proposal(decision, messageId, lang) {
     var L = i18n();
+    var notThisBtn = messageId
+      ? button(lang, 'notThis', 'onNotThis', { messageId: String(messageId) })
+      : null;
     if (decision.kind === 'hold') {
       var holdWhen = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
-      return card(lang, [
+      var holdWidgets = [
         text(lang, L.t(lang, 'calendarHold')),
         text(lang, decision.title),
         whenLine(lang, holdWhen),
         doItButton(messageId, lang)
-      ]);
+      ];
+      if (notThisBtn) holdWidgets.push(notThisBtn);
+      return card(lang, holdWidgets);
     }
     if (decision.kind === 'schedule') {
       var when = decision.dateIso;
       if (Number.isInteger(decision.hour) && Number.isInteger(decision.minute)) {
         when = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
       }
-      return card(lang, [
+      var schedWidgets = [
         text(lang, decision.title),
         whenLine(lang, when),
         text(lang, L.t(lang, 'schedule')),
         doItButton(messageId, lang)
-      ]);
+      ];
+      if (notThisBtn) schedWidgets.push(notThisBtn);
+      return card(lang, schedWidgets);
     }
     var widgets = [text(lang, decision.title)];
     if (decision.due) widgets.push(dueLine(lang, decision.due));
     widgets.push(doItButton(messageId, lang));
+    if (notThisBtn) widgets.push(notThisBtn);
     return card(lang, widgets);
   }
 
@@ -143,16 +151,75 @@ var GlanceCards = (function () {
     ]);
   }
 
-  function quiet(lang) {
-    return card(lang, [text(lang, i18n().t(lang, 'quiet'))]);
+  function planTypeLabel(lang, planId) {
+    var id = String(planId || '').toLowerCase();
+    var en = {
+      'reply-track': 'reply & track',
+      'reply-fact': 'fact reply',
+      'log-it': 'log it',
+      'follow-through': 'follow-through',
+      'hold': 'calendar hold',
+      'schedule': 'schedule meeting',
+      'schedule-confirm': 'schedule meeting',
+      'file-it': 'save to Drive',
+      'attach-invite': 'attach to invite',
+      'clear-it': 'clear calendar',
+      'move-it': 'move calendar',
+      'create-missing': 'draft from template',
+      'file-on-hold': 'file on calendar',
+      'file-on-task': 'file on task',
+      'sheet': 'sheet'
+    };
+    var he = {
+      'reply-track': 'מעקב תשובה',
+      'reply-fact': 'תשובה על עובדה',
+      'log-it': 'תיעוד',
+      'follow-through': 'מעקב',
+      'hold': 'החזקה ביומן',
+      'schedule': 'תיאום פגישה',
+      'schedule-confirm': 'תיאום פגישה',
+      'file-it': 'שמירה ב-Drive',
+      'attach-invite': 'צירוף לזימון',
+      'clear-it': 'ביטול ביומן',
+      'move-it': 'הזזה ביומן',
+      'create-missing': 'טיוטה מתבנית',
+      'file-on-hold': 'קובץ ביומן',
+      'file-on-task': 'קובץ במשימה',
+      'sheet': 'גיליון'
+    };
+    var pack = lang === 'he' ? he : en;
+    return pack[id] || en[id] || id || 'close';
   }
 
-  function homepage(next, lang) {
+  function quiet(lang, reason, opts) {
+    var key = (!reason || reason === 'no-plan' || reason === 'intent-null' || reason === 'quiet') ? 'quietEmpty' : 'quiet';
+    var widgets = [text(lang, i18n().t(lang, key))];
+    if (opts && opts.messageId) {
+      widgets.push(button(lang, 'notThis', 'onNotThis', { messageId: String(opts.messageId) }));
+    }
+    return card(lang, widgets);
+  }
+
+  function spottedUnsupported(decision, messageId, lang) {
     var L = i18n();
-    if (!next || !next.title) return card(lang, [text(lang, L.t(lang, 'openMessage'))]);
+    var label = planTypeLabel(lang, decision.droppedPlanId || decision.planId);
+    return card(lang, [
+      text(lang, L.t(lang, 'spottedPrefix') + label),
+      button(lang, 'remindMe', 'onRemindMe', { messageId: String(messageId || ''), source: 'message' })
+    ]);
+  }
+
+  function homepage(next, lang, buildSha) {
+    var L = i18n();
+    if (!next || !next.title) {
+      var widgets = [text(lang, L.t(lang, 'openMessage'))];
+      if (buildSha) widgets.push(text(lang, L.t(lang, 'build') + ': ' + L.isolateLtr(buildSha)));
+      return card(lang, widgets);
+    }
     var widgets = [text(lang, L.t(lang, 'next')), text(lang, next.title)];
     if (next.due) widgets.push(dueLine(lang, next.due));
     widgets.push(button(lang, 'doIt', 'onDoIt', { messageId: 'prefetch', source: 'prefetch' }));
+    if (buildSha) widgets.push(text(lang, L.t(lang, 'build') + ': ' + L.isolateLtr(buildSha)));
     return card(lang, widgets);
   }
 
@@ -172,6 +239,8 @@ var GlanceCards = (function () {
     undone: undone,
     grant: grant,
     quiet: quiet,
+    spottedUnsupported: spottedUnsupported,
+    planTypeLabel: planTypeLabel,
     homepage: homepage,
     buttons: buttons
   };

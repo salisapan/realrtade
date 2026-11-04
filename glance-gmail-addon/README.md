@@ -35,23 +35,55 @@ The homepage shows the next pending action when a prefetch cache returns one. Se
 
 ## Scopes
 
-- `https://www.googleapis.com/auth/gmail.addons.current.message.readonly`
-- `https://www.googleapis.com/auth/gmail.addons.execute`
-- `https://www.googleapis.com/auth/tasks`
-- `https://www.googleapis.com/auth/calendar.events`
-- `https://www.googleapis.com/auth/script.external_request` (only if a script property URL is set)
-- `https://www.googleapis.com/auth/script.locale` (the card language follows the Gmail locale)
+Workspace add-on host (`appsscript.json`). Every entry is non-restricted. Each one has a reason:
 
-No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`. No full `calendar` scope. If the Apps Script editor adds `https://www.googleapis.com/auth/calendar` when the Calendar service is enabled, delete that line and keep `calendar.events`.
+| Scope | Why this host needs it |
+| --- | --- |
+| `gmail.addons.execute` | Run the add-on in Gmail (the homepage and the message-open trigger). |
+| `gmail.addons.current.message.readonly` | Read the open message only, through `GmailApp.setCurrentMessageAccessToken`. No other message or thread. |
+| `tasks` | Do it writes one Google Task, reads it back, and Undo removes it. |
+| `calendar.events` | Do it writes one calendar hold or event, reads it back, and Undo removes it. Not the full `calendar` scope. |
+| `userinfo.email` | `Session.getActiveUser().getEmail()` names the reader, so a mail to someone else stays quiet. |
+| `script.external_request` | `UrlFetchApp` for the optional `GLANCE_PREFETCH_URL` homepage call. Unset, nothing is fetched. |
+| `script.locale` | `useLocaleFromApp`: the card follows the Gmail language. |
+
+Not declared, and no code path uses them: `gmail.modify`, `gmail.readonly`, `gmail.compose`, `gmail.send`, `gmail.metadata`, `drive.*`, `forms.body`, `contacts.readonly`, `script.scriptapp`. `v1.test.cjs` rejects each of them in the manifest, and rejects any scope that is not on its explicit allowlist.
+
+Because the add-on only sees the open message, it cannot read the other messages of a thread. It reads the whole plain body of the open message, quoted history included, up to 20000 characters. Reading the rest of the thread would need a restricted Gmail scope, so v1 does not do it.
+
+There is no inbox label or star marker in this host. That needed `gmail.modify`, which is CASA-restricted, so the code was removed.
 
 ## Tests
 
+`behavior.test.cjs` drives `Code.js` the way Gmail does (open, Do it, Undo) against mocked Google services. It checks that a real ask gets a card, that the whole open message is read, that noise stays quiet with a reason in the open log, that no send, draft, label, or trigger call is reachable, and that every write is read back, shows a proof card, and can be undone.
+
 ```sh
 node glance-gmail-addon/scripts/build-bundle.js
+node glance-gmail-addon/scripts/check-core-bundle.cjs
 node glance-gmail-addon/test/v1.test.cjs
+node glance-gmail-addon/test/behavior.test.cjs
+node glance-gmail-addon/test/card-titles-corpus.cjs
+node glance-gmail-addon/test/build-stamp.test.cjs
 ```
 
 Re-run the bundle script after changing `src/` or the classifier. `CoreBundle.js` is generated. Do not edit it.
+
+### BuildSha (`dev` in git, real SHA only at deploy)
+
+`BuildSha.js` and the trailing `// GLANCE_BUILD_SHA=…` line in `CoreBundle.js` stay **`dev`** in every commit. The homepage shows that value locally. A normal `node scripts/build-bundle.js` (or `npm run build`) syncs the bundle and keeps **`dev`**.
+
+Right before `clasp push`, stamp the current git short SHA, verify, then push:
+
+```sh
+cd glance-gmail-addon
+node scripts/build-bundle.js --deploy    # or: npm run deploy:stamp
+node scripts/check-core-bundle.cjs --deploy
+npx clasp push
+```
+
+`npm run predeploy` runs the deploy check (`check-core-bundle.cjs --deploy`) and fails if `BuildSha` is still `dev` or does not match `git rev-parse --short HEAD`. Do not commit the stamped files; run `node scripts/build-bundle.js` again after push to restore **`dev`** for the next change.
+
+`check-core-bundle.cjs` (without `--deploy`) compares bundle sources and ignores the stamp line; it does not rewrite `BuildSha.js`.
 
 ## Deploy as a test deployment
 
@@ -67,10 +99,10 @@ cp .clasp.json.example .clasp.json
 npx clasp create --type standalone --title "Glance" --rootDir .
 ```
 
-`.clasp.json` holds the script id and stays uncommitted.
+Copy `.clasp.json.example` to `.clasp.json` locally (gitignored); never commit a live `scriptId`.
 
 5. `npx clasp open`. **Project Settings → Google Cloud Platform (GCP) Project → Change project.** Paste the project **number** (not the id string).
-6. `node scripts/build-bundle.js` if `src/` is newer than `CoreBundle.js`, then `npx clasp push`. The push sends `appsscript.json`, `CoreBundle.js`, and `Code.js`.
+6. Sync and stamp, then push (see **BuildSha** above): `node scripts/build-bundle.js`, then `node scripts/build-bundle.js --deploy`, `node scripts/check-core-bundle.cjs --deploy`, then `npx clasp push`. The push sends `appsscript.json`, `CoreBundle.js`, `BuildSha.js`, and `Code.js`.
 7. In the Apps Script editor: **Deploy → Test deployments**. Install from that dialog. Do not use **Deploy → New deployment** for the Marketplace, and do not open the Workspace Marketplace SDK.
 8. Share the Apps Script project with each test account (editor is enough), and have each account open the test-deployment install link while logged into that account.
 
@@ -79,7 +111,7 @@ npx clasp create --type standalone --title "Glance" --rootDir .
 A test deployment keeps the manifest it was installed with. `npx clasp push` updates the script project. An already installed card does not ask for a new scope until that deployment is updated and the account installs it again.
 
 1. `appsscript.json` lists the Calendar advanced service under `dependencies.enabledAdvancedServices`: `userSymbol` `Calendar`, `serviceId` `calendar`, `version` `v3`. `oauthScopes` includes `https://www.googleapis.com/auth/calendar.events`. It does not include `https://www.googleapis.com/auth/calendar`.
-2. `node scripts/build-bundle.js`, then `npx clasp push`.
+2. `node scripts/build-bundle.js --deploy`, `node scripts/check-core-bundle.cjs --deploy`, then `npx clasp push`.
 3. In the Apps Script editor, open **Project Settings** and confirm the Calendar advanced service is on (identifier `Calendar`, version `v3`). If the editor added the full calendar scope, delete `https://www.googleapis.com/auth/calendar` from `appsscript.json` and keep `calendar.events`, then push again.
 4. **Deploy → Test deployments**. Update that test deployment, or delete it and create the test deployment again. Copy the new install link. An old link keeps the old manifest, so Gmail does not show a consent screen for `calendar.events`.
 5. Each test account opens that link and accepts the consent screen. If no consent screen appears, that account is still on the previous deployment.
@@ -102,3 +134,20 @@ Same Google account. Open a message and tap the Glance icon under the message. T
 - Do not add a send call (`GmailApp.sendEmail`, `MailApp`, `Drafts.send`).
 - Do not add `gmail.compose`, `gmail.modify`, `gmail.readonly`, or the full `calendar` scope. The only calendar scope is `calendar.events`.
 - Do not put a client secret in the repo. The card uses the person's Apps Script grant.
+
+## Try it on a phone (Apps Script test deployment)
+
+Docs only. Nothing here is deployed by the repo, and this commit has not been installed on a phone.
+
+1. Sign in to `script.google.com` as `ai.local.flow@gmail.com`. Create a new Apps Script project. Name it `Glance Gmail (test)`.
+2. Project Settings: turn on **Show "appsscript.json" manifest file in editor**. If the project asks for a Google Cloud project, set the project number of the Glance test project.
+3. Run `node glance-gmail-addon/scripts/build-bundle.js` and `node glance-gmail-addon/scripts/check-core-bundle.cjs`.
+4. Add three script files and paste the repo files into them: `CoreBundle.js`, `BuildSha.js`, `Code.js`. Replace the manifest with `appsscript.json`. (Or use `clasp` with `.clasp.json.example`; keep the push order `CoreBundle.js`, `BuildSha.js`, `Code.js`.)
+5. **Deploy > Test deployments**. Make sure the type is **Google Workspace Add-on**, then press **Install** next to Gmail, then **Done**.
+6. Open Gmail on the web as the same account and refresh. Open a mail. Authorize the add-on when it asks. Do it asks for the Tasks and Calendar grants the first time.
+7. Open the **Gmail app on the iPhone**, signed in as the same account. Open a message. Tap the add-on icon under the message (the card does not open by itself on a phone). If the icon is missing, force-quit and reopen the app.
+8. Code changes need only a save and a Gmail refresh. A manifest change (scopes) needs the add-on re-authorized.
+
+Google documents the test deployment for the web. Whether it shows in the iPhone app for an unpublished add-on is not confirmed here; check step 7 on the device. Only editors of the project on the same domain can use a test deployment.
+
+An older build of this branch could install an hourly `sweep` trigger. If the test project ever ran that build, open **Triggers** in the Apps Script editor and delete any `sweep` trigger by hand. This host no longer has a `sweep` function.
