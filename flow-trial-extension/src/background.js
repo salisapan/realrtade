@@ -5330,14 +5330,14 @@ async function outlookConsentScope(msg) {
   if (scope === 'Contacts.Read' || scope === 'Chat.Read') return { ok: false, reason: 'scope-refused' };
   const todoScope = scope === 'Tasks.ReadWrite';
   const calendarScope = scope === 'Calendars.ReadWrite';
-  if (!todoScope && !calendarScope) return { ok: false, reason: 'scope-refused' };
+  // Setup's OneDrive box. Files.ReadWrite is a Connect scope already; this adds nothing new.
+  const filesScope = scope === 'Files.ReadWrite' && typeof cfg.incrementalFilesScopes === 'function';
+  if (!todoScope && !calendarScope && !filesScope) return { ok: false, reason: 'scope-refused' };
   const bag = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
   const auth = bag[OUTLOOK_AUTH_KEY];
   if (!auth || !auth.token) return { ok: false, reason: 'not-connected' };
-  const scopes = cfg.incrementalConsentScopes(
-    [].concat(auth.requestedScopes || [], (auth.token && auth.token.grantedScopes) || [], cfg.SCOPES || []),
-    scope
-  );
+  const known = [].concat(auth.requestedScopes || [], (auth.token && auth.token.grantedScopes) || [], cfg.SCOPES || []);
+  const scopes = filesScope ? cfg.incrementalFilesScopes(known) : cfg.incrementalConsentScopes(known, scope);
   if (!scopes) return { ok: false, reason: 'scope-refused' };
   const r = await A.signIn({
     fetch: (u, i) => fetch(u, i),
@@ -5360,6 +5360,7 @@ async function outlookConsentScope(msg) {
   const has = names.some((s) => String(s).toLowerCase() === scope.toLowerCase());
   if (calendarScope && (!Cal || !Cal.hasWriteScope(effective))) return { ok: false, reason: 'calendar-write-not-granted' };
   if (todoScope && !has) return { ok: false, reason: 'tasks-not-granted' };
+  if (filesScope && !has) return { ok: false, reason: 'files-not-granted' };
   const policy = (msg && msg.policy) === 'always' ? 'always' : 'once';
   const policyKey = todoScope ? 'glanceTodoConsent' : 'glanceCalendarConsent';
   const stored = {
@@ -5368,7 +5369,8 @@ async function outlookConsentScope(msg) {
       requestedScopes: scopes
     })
   };
-  stored[policyKey] = { mode: policy, scope: scope, revoked: false, at: Date.now() };
+  // OneDrive has no consent-policy record: the granted scope itself is the permission.
+  if (!filesScope) stored[policyKey] = { mode: policy, scope: scope, revoked: false, at: Date.now() };
   await chrome.storage.local.set(stored);
   return { ok: true, policy: policy, scope: scope };
 }
@@ -5482,6 +5484,12 @@ async function outlookAccessToken(opts) {
 // A Graph call with the session's token; a 401 is answered once with a forced refresh (or silent renewal) and a retry.
 // A read-back GET gives up after 8s. The controller aborts the fetch. Undo then refuses and deletes nothing.
 const OUTLOOK_READ_MS = 8000;
+// One draft write step (createReply, the body PATCH, an attachment). The page bounds the whole Do It, and each step fails closed at 10s.
+function outlookWriteMs() {
+  const e2e = globalThis.__glanceE2e;
+  const n = e2e && e2e.scenario && Number(e2e.scenario.writeTimeoutMs);
+  return n > 0 ? n : 10000;
+}
 async function outlookFetch(url, init) {
   let token = await outlookAccessToken();
   if (!token) return { status: 0, ok: false, notConnected: true };
@@ -5489,17 +5497,20 @@ async function outlookFetch(url, init) {
     const method = String((init && init.method) || 'GET').toUpperCase();
     const headers = Object.assign({}, (init && init.headers) || {}, { Authorization: 'Bearer ' + t });
     const opts = Object.assign({}, init || {}, { headers: headers });
+    // A write is bounded only when its caller says how long (timeoutMs); a draft write must end, not spin.
+    const writeMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 0;
+    delete opts.timeoutMs;
     let ctl = null;
     let timer = null;
-    if (method === 'GET' && typeof AbortController === 'function') {
+    if ((method === 'GET' || writeMs) && typeof AbortController === 'function') {
       ctl = new AbortController();
-      timer = setTimeout(() => ctl.abort(), OUTLOOK_READ_MS);
+      timer = setTimeout(() => ctl.abort(), writeMs || OUTLOOK_READ_MS);
       opts.signal = ctl.signal;
     }
     try {
       return await fetch(url, opts);
     } catch (e) {
-      if (ctl && ctl.signal.aborted) return { status: 0, ok: false, reason: 'verify-timeout', timedOut: true };
+      if (ctl && ctl.signal.aborted) return { status: 0, ok: false, reason: writeMs ? 'write-timeout' : 'verify-timeout', timedOut: true };
       throw e;
     } finally {
       if (timer) clearTimeout(timer);
@@ -5775,9 +5786,10 @@ async function outlookDraftWrite(p) {
   outlookAssertNotSend(url);
   const immutable = p && p.outlookImmutableId === true;
   const prefer = immutable ? { Prefer: 'IdType="ImmutableId"' } : {};
-  const res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }) });
+  const res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }), timeoutMs: outlookWriteMs() });
   if (res.notConnected) return { ok: false, reason: 'not-connected' };
-  if (res.status === 401) return { ok: false, reason: 'not-connected' };
+  if (res.timedOut) return { ok: false, reason: 'timeout' };
+  if (res.status === 401) return { ok: false, reason: 'not-connected', needsSignIn: true };
   if (res.status === 403) return { ok: false, reason: 'consent', error: 'Outlook draft permission not granted yet: open Glance and reconnect Outlook once.' };
   if (!res.ok) return { ok: false, reason: 'http-' + res.status };
   const draft = await res.json();
@@ -5796,12 +5808,12 @@ async function outlookDraftWrite(p) {
   }
   if (draft.isDraft !== false) {
     try {
-      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify(patchBody) });
+      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify(patchBody), timeoutMs: outlookWriteMs() });
       if (pr && pr.ok) bodyWritten = true;
       fromSet = Boolean(pr && pr.ok && patchBody.from);
-      // One body write. A refused From does not send the body again.
-      if (!bodyWritten && comment) {
-        const bodyOnly = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
+      // One body write. A refused From does not send the body again. A timed-out PATCH is not tried a second time.
+      if (!bodyWritten && comment && !(pr && pr.timedOut)) {
+        const bodyOnly = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }), timeoutMs: outlookWriteMs() });
         bodyWritten = Boolean(bodyOnly && bodyOnly.ok);
       }
     } catch (e) { /* createReply's comment already holds the body */ }
@@ -5823,7 +5835,8 @@ async function outlookDraftWrite(p) {
         name: file.filename,
         contentType: file.mimeType,
         contentBytes: file.base64
-      })
+      }),
+      timeoutMs: outlookWriteMs()
     });
     let created = null;
     if (att && att.ok) { try { created = await att.json(); } catch (e) { created = null; } }
@@ -7284,6 +7297,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   // The person pressed רענן. Recovery never reloads a tab on its own.
+  // The page's Reconnect row. Opens Glance's setup; it connects nothing and writes nothing.
+  if (msg.type === 'flow:open-setup') {
+    const tabId = sender && sender.tab && sender.tab.id;
+    try { if (typeof tabId === 'number' && chrome.sidePanel && chrome.sidePanel.open) chrome.sidePanel.open({ tabId: tabId }).catch(() => {}); } catch (e) { /* the toolbar button opens it */ }
+    try { sendResponse({ ok: true }); } catch (e) { /* the page went away */ }
+    return true;
+  }
+
   if (msg.type === 'flow:outlook-refresh-tab') {
     const tabId = typeof msg.tabId === 'number' ? msg.tabId : (sender && sender.tab && sender.tab.id);
     if (typeof tabId === 'number' && chrome.tabs && typeof chrome.tabs.reload === 'function') {

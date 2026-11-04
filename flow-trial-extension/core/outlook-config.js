@@ -108,9 +108,8 @@ FlowOutlookConfig.connectIdsFromChecked = function connectIdsFromChecked(service
 // Incremental consent for Hold. The only new scope is Calendars.ReadWrite.
 // Scopes already granted stay on the request so Mail is not dropped.
 // Mail.Send and any Shared scope are never added.
-FlowOutlookConfig.incrementalConsentScopes = function incrementalConsentScopes(existing, scope) {
-  const add = String(scope || '');
-  if (add !== 'Calendars.ReadWrite' && add !== 'Tasks.ReadWrite') return null;
+// Scopes already granted, as plain names. Mail.Send and any Shared scope are dropped.
+function cleanGrantedScopes(existing) {
   const out = [];
   const raw = Array.isArray(existing) ? existing : String(existing || '').split(/[\s,;]+/);
   raw.forEach((s) => {
@@ -121,8 +120,23 @@ FlowOutlookConfig.incrementalConsentScopes = function incrementalConsentScopes(e
     if (!name || /Mail\.Send/i.test(name) || /Shared$/i.test(name)) return;
     if (out.indexOf(name) < 0) out.push(name);
   });
+  return out;
+}
+
+FlowOutlookConfig.incrementalConsentScopes = function incrementalConsentScopes(existing, scope) {
+  const add = String(scope || '');
+  if (add !== 'Calendars.ReadWrite' && add !== 'Tasks.ReadWrite') return null;
+  const out = cleanGrantedScopes(existing);
   if (out.indexOf(add) < 0) out.push(add);
   if (add === 'Calendars.ReadWrite' && out.indexOf('MailboxSettings.Read') < 0) out.push('MailboxSettings.Read');
+  return out;
+};
+
+// Setup's OneDrive box: Files.ReadWrite is already one of Connect's own scopes (CONNECT_SERVICES, 'onedrive'). It is the
+// only scope added. Hold never asks for it, so incrementalConsentScopes above still refuses it.
+FlowOutlookConfig.incrementalFilesScopes = function incrementalFilesScopes(existing) {
+  const out = cleanGrantedScopes(existing);
+  if (out.indexOf('Files.ReadWrite') < 0) out.push('Files.ReadWrite');
   return out;
 };
 

@@ -1320,6 +1320,51 @@
     return written === "Created, couldn't verify" ? written : undefined;
   }
 
+  // A Do It write has to end. The service worker bounds each Graph write; this bound is the page's
+  // own, for a worker that never answers. Neither sends mail: the draft step only writes a draft.
+  const DO_IT_WRITE_MS = 50000;
+  function sendBounded(msg, ms) {
+    return new Promise((resolve) => {
+      let done = false;
+      const timer = setTimeout(() => { if (!done) { done = true; resolve({ ok: false, reason: 'timeout' }); } }, ms);
+      Promise.resolve(send(msg)).then((r) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(r);
+      }, () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve({ ok: false, reason: 'timeout' });
+      });
+    });
+  }
+
+  const AUTH_WRITE_REASONS = ['not-connected', 'token-expired', 'needs-sign-in', 'consent', 'drafts-not-granted'];
+  function draftFailureLine(r, file) {
+    const reason = r && !r.ok ? String(r.reason || '') : '';
+    if (r && !r.ok && (r.needsSignIn || AUTH_WRITE_REASONS.indexOf(reason) >= 0)) {
+      return { auth: true, line: 'צריך להתחבר מחדש ל-Outlook. לא נכתב דבר ולא נשלח דבר.' };
+    }
+    if (reason === 'timeout') {
+      return { auth: false, line: 'Outlook לא ענה בזמן. לא נשלח דבר. בדוק את הטיוטות לפני ניסיון נוסף.' };
+    }
+    return { auth: false, line: (r && !r.ok && (r.reason || r.error)) || (file ? 'Could not attach that file.' : 'Could not create draft') };
+  }
+
+  // Every step Do It was preparing leaves that state. An auth failure reads as offline; any other failure keeps its own reason.
+  function failSteps(host, failure) {
+    const view = host && host.__glanceSteps;
+    if (!view) return;
+    if (failure.auth) { view.setAll('offline', failure.line); return; }
+    view.setAll('failed');
+    if (typeof view.rows !== 'function' || typeof view.setRow !== 'function') return;
+    view.rows().forEach((row) => {
+      if (row && row.id && !row.manual && row.role !== 'close' && row.checked !== false) view.setRow(row.id, 'failed', failure.line);
+    });
+  }
+
   async function onDoIt(host, chip, ctx, liveSteps) {
     const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
@@ -1424,7 +1469,7 @@
     }
     payload.connectorId = 'outlookDraft';
     if (ignoreStaleClick(host)) return;
-    const r = await send({ type: 'flow:execute-action', payload: payload });
+    const r = await sendBounded({ type: 'flow:execute-action', payload: payload }, DO_IT_WRITE_MS);
     // A file is attached only when Graph returned an attachment id. A success
     // without that id is not a draft we keep, and the receipt never says attached.
     if (!r || !r.ok || (file && !r.attachmentId)) {
@@ -1438,8 +1483,26 @@
           senderEmail: ctx.sender && ctx.sender.email
         });
       }
+      const failure = draftFailureLine(r, file);
+      // The step list was switched to "preparing" when Do It started. It has to leave that
+      // state on every failure, or the card shows a spinner for a write that already ended.
       paintIfCurrent(token, function () {
-        FlowChipHost.setChipState(chip, 'flow-chip-error', (r && !r.ok && (r.reason || r.error)) || (file ? 'Could not attach that file.' : 'Could not create draft'));
+        failSteps(host, failure);
+        FlowChipHost.setChipState(chip, 'flow-chip-error', failure.line);
+        if (!failure.auth || host.querySelector('[data-glance-consent="reconnect"]')) return;
+        // The needs-you row for an auth failure. It writes nothing; the button only asks the browser to open Glance's setup.
+        const row = FlowChipHost.el('div', 'flow-chip-consent');
+        row.setAttribute('data-glance-consent', 'reconnect');
+        row.setAttribute('dir', 'rtl');
+        row.appendChild(FlowChipHost.el('span', 'flow-chip-label', 'Outlook מנותק'));
+        const actions = FlowChipHost.el('span', 'flow-chip-actions');
+        const button = FlowChipHost.el('button', 'flow-chip-consent-btn capture-secondary', 'התחבר מחדש');
+        button.type = 'button';
+        button.setAttribute('data-glance-reconnect', '1');
+        button.addEventListener('click', () => { send({ type: 'flow:open-setup' }).catch(() => {}); });
+        actions.appendChild(button);
+        row.appendChild(actions);
+        host.appendChild(row);
       });
       return;
     }
@@ -6302,6 +6365,24 @@
     paintIfCurrent(token, function () { return paintUndoneStatus(mount, pane, banner.line); });
   }
 
+  // A mail that is open and shows neither a card nor a why line is the one outcome that must not exist. The scan
+  // paints a why on every path it knows about; this is the net under the paths it does not. It never paints over a
+  // card, a consent row or an existing why, and never on a different mail than the scan started on.
+  const SCAN_STALL_MS = 25000;
+  function ensureWhy(token, reason) {
+    try {
+      if (doItInFlight || !mailTokenLive(token)) return false;
+      const slot = mountPoint() || openMailRoot();
+      if (!slot || typeof slot.querySelector !== 'function') return false;
+      const root = openMailRoot() || slot;
+      if (root.querySelector('.flow-chip-host, .flow-why-not, [data-glance-consent]') || slot.querySelector('.flow-chip-host, .flow-why-not, [data-glance-consent]')) return false;
+      const why = lastOutcome === 'reason' && lastLoggedReason ? lastLoggedReason : reason;
+      paintIfCurrent(token, function () { return paintWhyNot(slot, why); });
+      try { console.info('[Glance] no card, no reason from the scan: painted', why); } catch (e) { /* console gone */ }
+      return true;
+    } catch (e) { return false; }
+  }
+
   let scanForEpoch = null;
   async function runScan() {
     timer = null;
@@ -6311,6 +6392,8 @@
     const epoch = mailEpoch;
     scanning = true;
     scanForEpoch = epoch;
+    const startToken = captureMailToken();
+    const stallTimer = setTimeout(() => { if (scanForEpoch === epoch) ensureWhy(startToken, 'scan-skipped'); }, SCAN_STALL_MS);
     try { await scan(); }
     catch (e) {
       try { console.error('Glance: outlook scan error', e && e.message ? e.message : e); } catch (x) { /* console gone */ }
@@ -6322,11 +6405,13 @@
       } catch (x2) { /* storage gone with the page */ }
     }
     finally {
+      clearTimeout(stallTimer);
       if (scanForEpoch !== epoch) return;
       try { await recordSuggestNote(); } catch (e) { /* the note is not the card */ }
       if (scanForEpoch !== epoch) return;
       try { await paintStoredUndoneIfQuiet(); } catch (e) { /* the banner is not the card */ }
       if (scanForEpoch !== epoch) return;
+      ensureWhy(startToken, 'no-outcome');
       scanning = false;
       if (renderLive()) switchPending = false;
       if (again || switchPending || mailEpoch !== epoch) { again = false; schedule(); }

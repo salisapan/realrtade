@@ -1192,6 +1192,53 @@ await ok('K3c: onMessage flow:microsoft-optional-scopes contacts bucket calls si
   assert.deepStrictEqual(sortScopes(gotScopes), sortScopes(MS_EXPECTED.concat(['Contacts.Read'])));
 });
 
+// Setup's "Add permission": Calendar and OneDrive must reach the consent window (signIn), not return scope-refused.
+// Files.ReadWrite is one of Connect's own scopes (CONNECT_SERVICES 'onedrive'); nothing else is added, never Mail.Send.
+for (const row of [
+  { scope: 'Files.ReadWrite', add: ['Files.ReadWrite'] },
+  { scope: 'Calendars.ReadWrite', add: ['Calendars.ReadWrite', 'MailboxSettings.Read'] },
+  { scope: 'Tasks.ReadWrite', add: ['Tasks.ReadWrite'] }
+]) {
+  await ok('K3d: outlook-consent-scope ' + row.scope + ' opens the consent window with only its own scopes', async () => {
+    const { dispatch, sandbox } = loadBackgroundMessageHarness({
+      stored: {
+        outlookAuth: {
+          ecosystem: true,
+          token: { accessToken: 'tok', grantedScopes: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'] },
+          requestedScopes: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'],
+          account: { address: 'me@outlook.com' }
+        }
+      }
+    });
+    vm.runInContext(`
+      globalThis.__k3dScopes = [];
+      FlowOutlookAuth.signIn = async function (_d, _c, _r, opts) {
+        globalThis.__k3dScopes.push((opts && opts.scopes) ? opts.scopes.slice() : []);
+        return { ok: true, token: { accessToken: 'new', grantedScopes: (opts && opts.scopes) || [], scope: ((opts && opts.scopes) || []).join(' ') } };
+      };
+    `, sandbox);
+    const out = await dispatch({ type: 'flow:outlook-consent-scope', scope: row.scope, policy: 'always' });
+    const asked = JSON.parse(JSON.stringify(vm.runInContext('globalThis.__k3dScopes', sandbox)));
+    assert.ok(out && out.reason !== 'scope-refused', JSON.stringify(out));
+    assert.strictEqual(asked.length, 1, 'one consent window: ' + JSON.stringify(asked));
+    assert.deepStrictEqual(sortScopes(asked[0]), sortScopes(['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'].concat(row.add)));
+    assert.ok(!asked[0].some((x) => /Mail\.Send|Shared$/i.test(x)));
+  });
+}
+
+await ok('K3e: MailboxSettings.Read, Sites.ReadWrite.All and Files.ReadWrite.All are still refused as their own consent', async () => {
+  const { dispatch } = loadBackgroundMessageHarness();
+  for (const scope of ['MailboxSettings.Read', 'Sites.ReadWrite.All', 'Files.ReadWrite.All', 'Mail.Send']) {
+    const out = await dispatch({ type: 'flow:outlook-consent-scope', scope: scope });
+    assert.strictEqual(out.reason, 'scope-refused', scope);
+  }
+});
+
+await ok('K3f: Setup Add permission never sends MailboxSettings.Read on its own', () => {
+  const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+  assert.ok(/MailboxSettings\.Read'\s*\?\s*'Calendars\.ReadWrite'/.test(popup), 'the popup maps MailboxSettings.Read to the Calendars.ReadWrite consent');
+});
+
 await ok('K3s: flow:microsoft-optional-scopes rejects foreign sender', async () => {
   const { dispatch } = loadBackgroundMessageHarness({
     stored: {

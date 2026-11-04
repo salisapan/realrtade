@@ -1928,6 +1928,19 @@
         lab.appendChild(el('span', null, serviceLabel(svc)));
         scopeScreen.appendChild(lab);
       });
+      // A refused or cancelled consent says so in words. A raw reason code is for the log, not for the person.
+      const SCOPE_NOTES = {
+        'scope-refused': 'ההרשאה הזאת לא נתמכת מכאן.',
+        'cancelled': 'ההרשאה בוטלה. לא השתנה דבר.',
+        'not-connected': 'Outlook לא מחובר. התחבר ונסה שוב.',
+        'calendar-write-not-granted': 'מיקרוסופט לא אישרה גישה ליומן.',
+        'tasks-not-granted': 'מיקרוסופט לא אישרה גישה ל-To Do.',
+        'files-not-granted': 'מיקרוסופט לא אישרה גישה ל-OneDrive.'
+      };
+      function scopeNote(r) {
+        const code = r && (r.reason || r.error);
+        return SCOPE_NOTES[code] || (code ? 'ההרשאה לא נוספה (' + code + ').' : 'ההרשאה לא נוספה.');
+      }
       const addScope = el('button', 'ghost sm', 'הוסף הרשאה');
       addScope.type = 'button';
       addScope.setAttribute('data-glance-add-scope', '1');
@@ -1938,6 +1951,15 @@
           if (!box || !box.checked || box.disabled) return false;
           return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
         });
+        let consentedNow = [];
+        const ticked = scopeServices.some((svc) => { const b = scopeBoxes[svc.id]; return b && b.checked && !b.disabled; });
+        if (ticked && !add.length) {
+          // Ticked, and every scope of it is already on the token: nothing to ask, and the person is told so.
+          addScope.disabled = false;
+          note.hidden = false;
+          note.textContent = 'ההרשאות שסימנת כבר ניתנו.';
+          return;
+        }
         for (let i = 0; i < add.length; i++) {
           const svc = add[i];
           const bucket = (globalThis.FlowConnectEcosystem && typeof FlowConnectEcosystem.optionalScopeBucketForOutlookService === 'function')
@@ -1953,16 +1975,21 @@
             }
             continue;
           }
-          const scopes = svc.scopes || [];
+          // MailboxSettings.Read is not asked for on its own: the Calendars.ReadWrite consent carries it.
+          // One consent window per scope, and a scope an earlier window in this click already covered is skipped.
+          const scopes = (svc.scopes || []).map((sc) => (sc === 'MailboxSettings.Read' ? 'Calendars.ReadWrite' : sc));
           for (let j = 0; j < scopes.length; j++) {
-            if (grantedNow.indexOf(scopes[j]) >= 0) continue;
+            if (scopes.indexOf(scopes[j]) !== j) continue;
+            const wants = svc.id === 'calendar' ? ['Calendars.ReadWrite', 'MailboxSettings.Read'] : [scopes[j]];
+            if (wants.every((sc) => grantedNow.indexOf(sc) >= 0 || consentedNow.indexOf(sc) >= 0)) continue;
             const grantedScope = await send({ type: 'flow:outlook-consent-scope', scope: scopes[j], policy: 'always' });
             if (!grantedScope || grantedScope.ok !== true) {
               addScope.disabled = false;
               note.hidden = false;
-              note.textContent = (grantedScope && (grantedScope.reason || grantedScope.error)) || 'ההרשאה לא נוספה.';
+              note.textContent = scopeNote(grantedScope);
               return;
             }
+            consentedNow = consentedNow.concat(wants);
           }
         }
         await renderSurfaces();
