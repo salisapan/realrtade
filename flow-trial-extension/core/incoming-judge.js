@@ -758,6 +758,8 @@ const FlowIncomingJudge = (() => {
     const announce = actionsApi && typeof actionsApi.inboundMeetingAnnouncement === 'function' && actionsApi.inboundMeetingAnnouncement(src);
     const timed = meetingClockInText(src, intent);
     if (id === 'hold' && timed) return true;
+    // A time proposed with its clock and asked back ("Does that work?") is a hold the person can place; there is no reply to draft.
+    if (id === 'schedule' && timed && /\b(?:does\s+(?:that|this|it)\s+work|work(?:s)?\s+for\s+you)\b/i.test(src)) return true;
     if (id === 'schedule' && announce && !timed) return false;
     if (announce && (id === 'hold' || id === 'schedule')) return false;
     return false;
