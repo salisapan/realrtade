@@ -674,6 +674,43 @@ const FlowGoogleCloses = (() => {
     return -1;
   }
 
+  // Which message of an open conversation is the ask, and is it still open?
+  // rows[i] = { emails: [sender, ...every other address on the row], bodyless }.
+  // bodyless is a collapsed older message: its address is known, its words are not.
+  // The target is the newest message from someone other than the account.
+  // A message the account wrote counts as an answer only when it is a real reply:
+  // the asker is among its recipients. An auto-forward copy to info@, a copy to another
+  // alias of yours or a forward to third parties is not one and is ignored.
+  // Result: { index, why }. index -1 means stay quiet, and why says so.
+  // why: 'no-incoming-message', 'ask-collapsed' (index points at
+  // the collapsed row, the caller opens it) or '' (judge rows[index]).
+  function threadTarget(rows, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const list = Array.isArray(rows) ? rows : [];
+    if (!own || !list.length) return { index: -1, why: 'no-incoming-message' };
+    const lowered = (row) => (row && Array.isArray(row.emails) ? row.emails : [])
+      .map((e) => String(e || '').trim().toLowerCase());
+    const newest = list.length - 1;
+    if (!(list[newest] && list[newest].bodyless) && noteToSelf(lowered(list[newest]), own)) {
+      return { index: newest, why: '' };
+    }
+    let target = -1;
+    for (let i = newest; i >= 0; i--) {
+      const sender = lowered(list[i])[0] || '';
+      // A row whose sender cannot be read is judged, as messageToJudge does; only the account's own rows are skipped.
+      if (sender !== own) { target = i; break; }
+    }
+    if (target < 0) return { index: -1, why: 'no-incoming-message' };
+    const asker = lowered(list[target])[0];
+    for (let j = target + 1; j < list.length; j++) {
+      const emails = lowered(list[j]);
+      if (emails[0] !== own) continue;
+      if (emails.slice(1).indexOf(asker) >= 0) return { index: -1, why: 'no-incoming-message' };
+    }
+    if (list[target].bodyless) return { index: target, why: 'ask-collapsed' };
+    return { index: target, why: '' };
+  }
+
   // Exactly one name match. Zero or two-plus is not a file we may use.
   function pickOneFile(files, term) {
     const hits = [];
@@ -701,6 +738,7 @@ const FlowGoogleCloses = (() => {
     pickOneFile: pickOneFile,
     noteToSelf: noteToSelf,
     messageToJudge: messageToJudge,
+    threadTarget: threadTarget,
     MAX_CHAT_TURNS: MAX_CHAT_TURNS,
     FIELD_CAP: FIELD_CAP,
     ARTIFACTS: ARTIFACTS
