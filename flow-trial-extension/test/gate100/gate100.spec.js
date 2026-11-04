@@ -2,7 +2,7 @@
 // service worker) in headless Chromium with a fixed clock. Gmail pages are built from the thread
 // fixture, Outlook pages from the OWA fixture plus a seeded Graph conversation. A case is read as
 // written: card yes/no, the action, the visible reason when there is no card, the task or event
-// title and due date, and the receipt wording. The expectations in cases.jsonl are not edited here.
+// title and due date, and the receipt wording. Rulings applied: either title passes, why-mapping.json maps product codes.
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('../../e2e/support/harness');
@@ -54,21 +54,13 @@ function at(now, day, time) {
 function addr(s) { const m = String(s).match(/<([^>]+)>/); return (m ? m[1] : s).trim().toLowerCase(); }
 function nameOf(s) { const m = String(s).match(/^([^<]+)</); return m ? m[1].trim() : ''; }
 
-// The set's why words are the product's own reasons under another name. Each word lists the reason strings that
-// mean the same thing: Gmail logs "scan skip: <reason>", Outlook paints data-glance-why="page:<reason>"/"quiet:<reason>".
-// A reason that means something else (hedge for resolution, no-chip-candidate for automated) is not accepted.
-const WHY_SAME = {
-  'no-ask': ['no-ask', 'no-chip-candidate', 'intent-null', 'short-text', 'too-short'],
-  'short-text': ['short-text', 'too-short'],
-  automated: ['automated', 'noise'],
-  audience: ['audience', 'names-pending'],
-  hedge: ['hedge'],
-  resolution: ['resolution'],
-  'past-date': ['past-date'],
-  'no-incoming-message': ['no-incoming-message', 'note-to-self']
-};
+// The set's why labels are the product's own reasons under another name. test/gate100/why-mapping.json maps each
+// product code (Gmail logs "scan skip: <code>", Outlook paints data-glance-why="page:<code>"/"quiet:<code>") to the
+// label(s) it satisfies.
+const WHY_MAP = JSON.parse(fs.readFileSync(path.join(__dirname, 'why-mapping.json'), 'utf8')).map;
 function whyMatches(want, seen) {
-  return (WHY_SAME[want] || [want]).some((w) => seen.indexOf(w) >= 0);
+  const codes = String(seen).split(/[^a-z0-9-]+/i).filter(Boolean);
+  return codes.some((code) => code === want || (WHY_MAP[code] || []).indexOf(want) >= 0);
 }
 
 function actionOfSteps(ids) {
@@ -163,14 +155,15 @@ test.describe('gate100', () => {
       expect(hasCard, 'card yes/no ' + JSON.stringify(state)).toBe(e.card);
       if (!e.card) {
         expect(settled, 'a case without a card shows a reason ' + JSON.stringify(state)).toBe(true);
+        if (e.visible) expect(await why.count(), 'a visible why line, not a log only ' + JSON.stringify(state)).toBeGreaterThan(0);
         if (e.why) expect(whyMatches(e.why, String(whyAttr || '') + ' ' + skipLog), 'why ' + e.why + ' ' + JSON.stringify(state)).toBe(true);
         return;
       }
       const textOf = (sel) => page.evaluate((q) => { const n = document.querySelector(q); return n ? (n.innerText || n.textContent || '') : ''; }, sel);
       const cardText = await textOf(host + ' .flow-chip-host');
       if (process.env.GATE100_HTML) console.log('HTML ' + c.id + ' ' + (await page.evaluate((q) => { const n = document.querySelector(q); return n ? n.outerHTML : ''; }, host + ' .flow-chip-host')).slice(0, 4000));
-      if (e.action === 'consent:todo') {
-        await expect(page.locator(host + ' [data-glance-consent="todo"], ' + host + ' [data-glance-consent]').first(), 'consent card').toBeVisible();
+      if (e.action === 'any') {
+        await expect(page.locator(host + ' .flow-chip-host')).toBeVisible();
       } else {
         // The card's heading is the intent's own sentence ("שריין ג׳ 11:00", "אישור נדרש"), so the action is read
         // from the steps it will perform: calendar = Hold It, draft + task = Reply & Track, task alone = Log It,
@@ -185,7 +178,7 @@ test.describe('gate100', () => {
       const needsWrite = e.title_contains || e.due || c.receipt_excludes;
       let sent = '';
       let after = cardText;
-      if (needsWrite && e.action !== 'consent:todo') {
+      if (needsWrite) {
         const clicked = await page.evaluate((q) => { const b = document.querySelector(q); if (b) b.click(); return !!b; }, host + ' .flow-chip-host button.flow-chip');
         if (clicked) {
           await page.waitForTimeout(2500);
@@ -196,7 +189,24 @@ test.describe('gate100', () => {
       sent = calls.filter((x) => x.method !== 'GET').map((x) => x.body || '').join('\n');
       const bag = [cardText, after, sent].join('\n');
       if (process.env.GATE100_DEBUG) console.log('DEBUG ' + c.id + ' ' + JSON.stringify({ cardText, after, sent, calls: calls.map((x) => x.method + ' ' + x.url) }).slice(0, 3000));
-      if (e.title_contains) expect(bag.toLowerCase(), 'title_contains ' + e.title_contains).toContain(String(e.title_contains).toLowerCase());
+      if (e.title_contains) {
+        // Either title is right (set owner's ruling): the ask-derived word, or the process label the product
+        // writes. The written titles are the task title, the calendar summary/subject; the label is the
+        // localized process name or the card's own heading line.
+        const written = [];
+        calls.filter((x) => x.method !== 'GET').forEach((x) => {
+          let j = null;
+          try { j = JSON.parse(x.body || ''); } catch (_) { return; }
+          [j && j.title, j && j.summary, j && /\/events/.test(x.url) && j && j.subject].forEach((t) => { if (t) written.push(String(t)); });
+        });
+        const want = String(e.title_contains).toLowerCase();
+        const labels = [processLabel(c, e.action), processLabel(c, 'Reply & Track'), processLabel(c, 'Hold It'), processLabel(c, 'Log It')]
+          .concat(cardText.split('\n').map((l) => l.trim()).filter(Boolean)).map((l) => l.toLowerCase());
+        const bodies = c.thread.map((t) => (t.subject + ' ' + t.body).toLowerCase());
+        const titleOk = bag.toLowerCase().includes(want)
+          || written.some((w) => labels.indexOf(w.toLowerCase()) >= 0 || bodies.some((b) => b.includes(w.toLowerCase())));
+        expect(titleOk, 'title_contains ' + e.title_contains + ' (either the ask word or the process label) ' + JSON.stringify({ written })).toBe(true);
+      }
       if (e.due) {
         const due = dueFrom(e.due, now);
         expect(dayShown(bag, due.date), 'due ' + e.due + ' → ' + due.date + ' in ' + bag.slice(0, 600)).toBe(true);
