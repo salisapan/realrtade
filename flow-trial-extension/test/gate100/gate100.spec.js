@@ -66,8 +66,8 @@ function whyMatches(want, seen) {
 function actionOfSteps(ids) {
   const has = (re) => ids.some((i) => re.test(i));
   if (has(/^calendar/)) return 'Hold It';
-  if (has(/^draft/)) return 'Reply & Track';
   if (has(/^(file|attachmentSave)/)) return 'File it';
+  if (has(/^draft/)) return 'Reply & Track';
   if (has(/^(task|outlookTask)/)) return 'Log It';
   return 'unknown:' + ids.join(',');
 }
