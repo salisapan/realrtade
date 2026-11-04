@@ -410,6 +410,11 @@ const FlowDisplay = (() => {
     if (id === 'attach-invite' || (intent && intent.inviteFile)) {
       return { title: (intent && intent.label) || name, sentence: null, fileCard: false, logIt: false };
     }
+    // An invitation mail: the card asks to accept it, and says so in the mail's language.
+    if (id === 'accept-invite') {
+      const blob0 = String((extra && (extra.bodyText || extra.text)) || '');
+      return { title: /[\u0590-\u05FF]/.test(blob0) ? 'לאשר את ההזמנה?' : 'Accept the invitation?', sentence: null, fileCard: false, logIt: false };
+    }
     // A calendar hold is a meeting. The button stays Hold It / השהה.
     if (id === 'hold') {
       const blob = String((extra && (extra.bodyText || extra.text)) || '');

@@ -9880,6 +9880,14 @@ const FlowIncomingJudge = (() => {
     return false;
   }
 
+  // "Prepare the quarterly report and send it to me by Sunday" asks the reader to make something. That is a reply and
+  // a tracked task, not a lookup of an existing file, so the Drive search is not the answer to it.
+  function authoringAsk(text) {
+    const raw = String(text || '');
+    return /(?:^|[\s,.;:!?("'])(?:ל|ש|ו|ת)?(?:הכין|הכן|תכין|תכיני|תכינו)(?:\s|$)/.test(raw)
+      || /\b(?:prepare|put together|compile)\s+(?:the|a|an|our|my|this)\b/i.test(raw);
+  }
+
   // A mail the general classifier could not read as an ask still has a plain reason the person can be shown: a hedge ("we
   // might catch up at some point, no rush"), a service notice ("see who is looking at your profile") or a closing line that
   // asks nothing more ("signed and returned, nothing else needed").
@@ -9954,7 +9962,8 @@ const FlowIncomingJudge = (() => {
     const body0 = prepareForJudge(i.text);
     return ((hit0) => (hit0 ? doItCard(i, hit0) : null))(doItAsk(i, body0))
       || ((hit1) => (hit1 ? holdCard(i, hit1) : null))(holdProposal(i, body0))
-      || ((hit2) => (hit2 ? replyCard(i, hit2) : null))(answerAsk(i, body0));
+      || ((hit2) => (hit2 ? replyCard(i, hit2) : null))(answerAsk(i, body0))
+      || ((hit3) => (hit3 ? inviteCard(i, hit3) : null))(inviteAccept(i, body0));
   }
 
   function judge(input, deps) {
@@ -10109,7 +10118,7 @@ const FlowIncomingJudge = (() => {
       // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
       // Putting a file on an invite that already exists is the file track
       // (task + short attached draft), on Outlook as well as Gmail.
-      if (i.surface && i.surface !== 'gmail' && !(intent && intent.inviteFile) && !notifyWhenDoneOnSendAsk(text)) {
+      if (i.surface && i.surface !== 'gmail' && !(intent && intent.inviteFile) && !notifyWhenDoneOnSendAsk(text) && !authoringAsk(text)) {
         return { show: false, reason: 'file-chain-not-run', intent };
       }
       // A contract, a quote, a proposal, or a signed copy is not a reply.
@@ -10378,6 +10387,49 @@ const FlowIncomingJudge = (() => {
     }
     return null;
   }
+  // A mail that is itself a calendar invitation ("Invitation: Steering committee", "You're invited: ... Wednesday 15:00. Accept /
+  // Tentative / Decline"). The card is "Accept the invitation": the event goes on the person's own calendar at the day and
+  // clock the mail names, read back, with Undo. Glance never answers the organizer: no RSVP is sent and no mail goes out.
+  // Outlook only (Gmail shows its own invitation mail through Google Calendar). Both the frame and the invitation controls
+  // must be there, so a party invitation in a chat-like mail without them stays on the labs switch it had.
+  function inviteAccept(i, body) {
+    if ((i.surface || 'gmail') === 'gmail') return null;
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const subject = String(i.subject || '').replace(/\s+/g, ' ').trim();
+    const raw = String(body || '');
+    const subjectFrame = /^(?:updated\s+)?invitation\s*:\s*\S/i.test(subject) || /^(?:הזמנה)\s*:\s*\S/.test(subject);
+    const controls = /\baccept\b[\s\S]{0,40}\bdecline\b/i.test(raw) || /(?:אשר|אישור)[\s\S]{0,40}(?:דחה|סרב|דחייה)/.test(raw);
+    if (!subjectFrame && !controls) return null;
+    const invApi = sibling(typeof FlowChatInvitationNotice !== 'undefined' ? FlowChatInvitationNotice : null, './chat-invitation-notice.js', 'FlowChatInvitationNotice');
+    // The response buttons are not a hedge: "Tentative" is a button here, not "maybe".
+    const cleaned = raw.replace(/\b(?:accept|tentative|decline)\b(?:\s*\/\s*)?/gi, ' ').replace(/\s+/g, ' ').trim();
+    // "Wednesday 15:00" is the clock the invitation names; the reader wants "at".
+    const spoken = cleaned
+      .replace(/\b((?:mon|tues|wednes|thurs|fri|satur|sun)day)\s*,?\s+(\d{1,2}:\d{2})\b/gi, '$1 at $2')
+      .replace(/((?:ביום\s+)?(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת))\s*,?\s+(\d{1,2}:\d{2})/g, '$1 בשעה $2');
+    const inv = firstHit(invApi, spoken, now0, 'invitation');
+    if (!inv) return null;
+    const he = inv.lang === 'he';
+    let title = subject.replace(/^(?:updated\s+)?invitation\s*:\s*/i, '').replace(/^הזמנה\s*:\s*/, '').trim();
+    if (!title) {
+      const m = cleaned.match(/(?:invited|מוזמנים?)\s*:?\s*(?:to\s+)?([^,.\n]{3,80})/i);
+      title = m ? m[1].trim() : (he ? 'הזמנה' : 'Invitation');
+    }
+    title = title.replace(/\s*@.*$/, '').slice(0, 120);
+    return { inv, title, he };
+  }
+
+  function inviteCard(i, hit) {
+    const inv = hit.inv;
+    const he = hit.he;
+    const title = hit.title;
+    return {
+      intent: { type: 'event', label: title, confidence: 0.9, inviteAccept: true, personalClose: 'invite-accept', signals: { score: 90, threshold: 50 }, entities: { dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute }, facts: { date: { iso: inv.dateIso } } },
+      process: { id: 'accept-invite', name: 'Accept the invitation', closingLine: he ? 'מוסיף ליומן. לא נשלחת תשובה למזמין.' : 'Putting it on your calendar. No reply is sent to the organizer.', closedLine: he ? 'ביומן.' : 'On your calendar.', needsDateChoice: false, dateChoices: null,
+        steps: [{ id: 'calendar', kind: 'calendar', label: 'Calendar', hint: 'Add to Calendar: ' + title, params: { title, dateIso: inv.dateIso, hour: inv.hour, minute: inv.minute, calendarOp: null, quote: '', requireTime: true, meeting: true, noRsvp: true, durationMinutes: inv.durationMinutes || undefined, threadUrl: i.threadUrl || null }, dependsOn: null }] }
+    };
+  }
+
   function holdCard(i, hit) {
     const he = hit.lang === 'he';
     const title = hit.title;
