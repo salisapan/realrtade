@@ -28,7 +28,7 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 | 7 | Zoom | the meeting link exists | OAuth2 + secret (relay); marketplace review | not started |
 | 8 | Microsoft Teams via Graph | the answer arrived in the chat | same Entra app as Outlook, no secret | not started |
 | 9 | Slack via its official API | the answer arrived in the DM | OAuth2 + secret (relay); app review for distribution | not started |
-| 10 | Stripe (PayPal after it) | the payment arrived | OAuth + secret (relay) | not started |
+| 10 | Stripe (PayPal after it) | the payment arrived | OAuth (Connect, `read_only`) + secret (relay) | **ready, waiting for owner** (2026-11-04): [doc](connectors/stripe.md); **read-only, never moves money**; built and tested against a mock; DRAFT PR #259; switches `stripeReadBack`, `stripeOAuth` and recognition `STRIPE_PAYMENT` off. PayPal not built. Waiting: the owner chooses Connect platform vs restricted key, `STRIPE_CLIENT_ID`/`STRIPE_CLIENT_SECRET` (the platform secret key), relay deploy, `api.stripe.com` host, unverified vendor facts (`connectors/stripe.md` §9), id picker + steps-list card (row 80) |
 | 11 | Trello | a card exists | API key + token flow, not OAuth2 | not started |
 | 12 | Monday | an item exists | OAuth2 | not started |
 | 13 | ClickUp | a task exists | OAuth2 | not started |

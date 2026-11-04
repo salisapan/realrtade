@@ -88,6 +88,7 @@ import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/stripe-close.js'; // classic: sets globalThis.FlowStripeClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
 import './google-lane-host.js';
@@ -1833,7 +1834,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth', stripe: 'stripeAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1861,7 +1862,7 @@ async function disconnectConnector(connectorId) {
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : connectorId === 'stripe' ? [key, 'stripeLedger'] : key);
   return { ok: true };
 }
 
@@ -4139,8 +4140,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack, stripe: CONNECTORS.stripeReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file', stripe: 'stripe/payment' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -4568,6 +4569,76 @@ async function docusignCheck(payload) {
 async function docusignRelease(payload) {
   const r = await docusignCloseEngine().release((payload || {}).key);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'docusign', closeType: 'signature' });
+  return r;
+}
+
+/* ----------------------------------------------------------- Stripe, with a proof */
+// docs/glance-ai/connectors/stripe.md. READ-ONLY and never moves money: Glance reads one invoice or payment the person linked to one loop and counts the loop
+// closed when Stripe shows it paid. It never creates a charge, invoice, payment link or refund. Everything here is behind config/connectors.public.js
+// (stripeReadBack, stripeOAuth), both off.
+
+const STRIPE_AUTH_BASE = 'https://connect.stripe.com/oauth/authorize';
+const STRIPE_LEDGER_KEY = 'stripeLedger';
+
+async function getStripeAuth() {
+  const { stripeAuth } = await chrome.storage.local.get('stripeAuth');
+  return stripeAuth || null;
+}
+
+// "Connect with Stripe" (Stripe Connect OAuth, scope read_only). The one-time code goes to the relay, which adds the platform's client id and secret key.
+async function connectStripeOAuth() {
+  if (!CONNECTORS.stripeOAuth) throw new Error('Connect with Stripe is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.stripeClientId);
+  if (!clientId) throw new Error('Stripe sign-in isn’t configured on this build yet.');
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(STRIPE_AUTH_BASE + '?response_type=code&client_id=' + encodeURIComponent(clientId) + '&scope=read_only&redirect_uri=' + encodeURIComponent(redirectUri), 'Stripe');
+  const got = await relayTokenRequest({ vendor: 'stripe', grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Stripe connection failed (' + got.error + ').');
+  // Only a read-only grant is ever kept: a token with any other scope is refused here, never stored.
+  if (got.data.scope !== 'read_only' || typeof got.data.livemode !== 'boolean') throw new Error('Stripe granted a different permission than asked, so nothing was connected.');
+  await chrome.storage.local.set({ stripeAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, testMode: got.data.livemode === false, via: 'oauth' } });
+  return { title: 'Stripe' };
+}
+
+async function stripeRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: 'stripe', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok || got.data.scope !== 'read_only') return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+function stripeCloseEngine() {
+  return globalThis.FlowStripeClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getStripeAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ stripeAuth: a }); },
+    refresh: stripeRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(STRIPE_LEDGER_KEY))[STRIPE_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(STRIPE_LEDGER_KEY))[STRIPE_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [STRIPE_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+// payload: { key, objectId (an in_… / pi_… id or a dashboard link), expect?: { amount (minor units), currency } }
+async function stripeCheck(payload) {
+  const started = Date.now();
+  const r = await stripeCloseEngine().check(payload || {});
+  if (r.closed) await noteConnectorOutcome('handled', started, { connector: 'stripe', closeType: 'payment' });
+  else if (r.reason === 'verify_failed') await noteConnectorOutcome('readback_failed', started, { connector: 'stripe', closeType: 'payment' });
+  return r;
+}
+
+async function stripeRelease(payload) {
+  const r = await stripeCloseEngine().release((payload || {}).key);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'stripe', closeType: 'payment' });
   return r;
 }
 
@@ -6968,6 +7039,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'stripe') return reply(sendResponse, connectStripeOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'docusign') return reply(sendResponse, connectDocusignOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
@@ -6993,6 +7065,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     if (!CONNECTORS.dropboxReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
     return reply(sendResponse, msg.type === 'flow:dropbox-save' ? dropboxSave(msg.payload) : dropboxUndo(msg.payload));
+  }
+
+  // Stripe (read-only, never moves money): link one invoice or payment to one loop and read whether it is paid; release stops watching. Off = not live.
+  if (msg.type === 'flow:payment-check' || msg.type === 'flow:payment-release') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (!CONNECTORS.stripeReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
+    return reply(sendResponse, msg.type === 'flow:payment-check' ? stripeCheck(msg.payload) : stripeRelease(msg.payload));
   }
 
   // DocuSign (read-only): link one envelope to one loop and read its status; release stops watching. Off = not live.

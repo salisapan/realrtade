@@ -57,6 +57,16 @@ const VENDORS = {
     extraHeaders: {},
     supportsRefresh: true
   },
+  stripe: {
+    tokenUrl: 'https://connect.stripe.com/oauth/token',
+    idEnv: 'STRIPE_CLIENT_ID',
+    secretEnv: 'STRIPE_CLIENT_SECRET',
+    // Stripe Connect (standard accounts): client_id is the platform's ca_… id and client_secret is the platform's secret key, in a form body; the answer carries access_token, refresh_token, livemode and scope; no PKCE (verify against the vendor page before go-live). The platform secret key can do far more than read: it lives ONLY in this function's environment and is withheld from any response.
+    clientAuth: 'body',
+    bodyFormat: 'form',
+    extraHeaders: {},
+    supportsRefresh: true
+  },
   // DocuSign: HTTP Basic client auth and a form body (verify against the vendor page before go-live). Production and the developer (demo) servers are two vendors:
   // the integration key is the same, the secret is not.
   docusign: {

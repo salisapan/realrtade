@@ -44,7 +44,8 @@ const FlowConsentCatalog = (() => {
     // Listed so the screen can show them honestly. Select all never includes these.
     { id: 'zoom', label: 'Zoom', detail: 'Create one meeting link and read it back.', group: 'meetings', state: 'coming', steps: [] },
     { id: 'slack', label: 'Slack', detail: 'Count a request closed when the answer arrives in the DM.', group: 'chat', state: 'coming', steps: [] },
-    { id: 'stripe', label: 'Stripe', detail: 'Count a request closed when the payment arrives.', group: 'payments', state: 'coming', steps: [] },
+    { id: 'stripe', label: 'Stripe', detail: 'Read the one invoice or payment you link to a request, to see whether it has been paid. Read only: Glance never charges, invoices or refunds anyone.', group: 'payments', state: 'experimental',
+      steps: [{ type: 'oauth-relay', vendor: 'stripe' }, { type: 'host-permission', origin: 'https://api.stripe.com/*' }] },
     // Path D (docs/glance-ai/learning-from-use.md): dormant until the owner approves the consent and privacy text. Off by default.
     { id: 'contribute', label: 'Help improve Glance (no text leaves your device)', detail: 'Share noisy statistics only. Off by default; not available yet.', group: 'learning', state: 'coming', steps: [] }
   ];
