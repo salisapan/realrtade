@@ -674,7 +674,7 @@ const FlowActions = (() => {
       Boolean(vetoText && typeof FlowIntent !== 'undefined' && typeof FlowIntent.meetingPlanVeto === 'function' && FlowIntent.meetingPlanVeto(vetoText));
     if (intent.type === 'event' && vetoed) return null;
 
-    const e = intent.entities || {};
+    let e = intent.entities || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);
     // baseOnly is the plan the base judge would build. The show decision
     // uses it. A hedge ("perhaps", "possibly") stays that plan. A Meeting
@@ -692,8 +692,13 @@ const FlowActions = (() => {
     if (!intent.selfTask && intent.type === 'request' && !intent.googleClose && !intent.noReplyDraft && attendanceAnnouncement(vetoText)
       && intent.facts && intent.facts.date && intent.facts.date.iso && intent.facts.time && Number.isInteger(intent.facts.time.hour)) {
       intent = Object.assign({}, intent, {
-        entities: Object.assign({}, intent.entities || {}, { dateIso: intent.facts.date.iso, hour: intent.facts.time.hour, minute: intent.facts.time.minute || 0 })
+        entities: Object.assign({}, intent.entities || {}, {
+          dateIso: intent.facts.date.iso, hour: intent.facts.time.hour, minute: intent.facts.time.minute || 0,
+          what: String(((intent.entities && intent.entities.what) || intent.label || 'Meeting')).replace(/[\s,.;:-]*(?:(?:נא|אנא|בבקשה)\s+(?:ל)?אשר(?:ו|י)?\s+(?:את\s+)?הגעה|אישור\s+הגעה|please\s+(?:confirm|rsvp)[\s\S]*|rsvp[\s\S]*)$/i, '').trim() || 'Meeting'
+        }),
+        personalClose: 'calendar-hold'
       });
+      e = intent.entities;
       proc = Object.assign({ id: 'hold' }, PROCESS_CATALOG.hold);
     }
     const dateConflict = Boolean(intent.facts && intent.facts.date && intent.facts.date.contradictsWeekday);

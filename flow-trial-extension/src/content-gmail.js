@@ -1638,6 +1638,11 @@ function glanceUiCopy(kind) {
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
     let intent = FlowIntent.classify(prepared, ctx);
+    if (intent && intent.type === 'request' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.doItOverride === 'function'
+        && base && base.inbound !== false && ctx.senderIsUser !== true) {
+      const over = FlowIncomingJudge.doItOverride({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true, attachmentCount: ctx.attachmentCount || 0 }, intent);
+      if (over) return Object.assign({}, over.intent, { plannedProcess: over.process });
+    }
     if (intent && intent.googleWait && intent.googleWait.fileTerm) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
       if (!usingGoogle) await ensureGoogleAutoConnect();
@@ -1649,6 +1654,14 @@ function glanceUiCopy(kind) {
         intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match || 'unknown' }));
         if (intent && found && found.file) intent.laneFile = found.file;
       }
+    }
+    if ((!intent || !intent.type) && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.secondRead === 'function'
+        && base && base.inbound !== false && ctx.senderIsUser !== true) {
+      // The same second read Outlook's judge runs when the classifier finds nothing: a do-it ask with a named day, a timed
+      // proposal asked back, an answer-needing ask with a date. Nothing is sent; the plan is the usual card.
+      const q0 = intent && intent.quiet ? intent.quiet : null;
+      const hit = FlowIncomingJudge.secondRead({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true }, q0);
+      if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
     return intent || { type: null };
   }
@@ -2412,7 +2425,7 @@ function glanceUiCopy(kind) {
     // (task + short draft). The receipt chain does not own that ask.
     // The shared judge skips this silence when intent.inviteFile is set.
     const inviteAsked = Boolean(intent && intent.inviteFile);
-    if (!inviteAsked && fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) {
+    if (!inviteAsked && fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST && !intent.doItAsk) {
       const fileReason = fileGate.reason === 'third-party' ? 'third-party' : 'file';
       logScanSkip(messageId, fileReason);
       recordSilence(messageId, fileReason);
@@ -2421,7 +2434,7 @@ function glanceUiCopy(kind) {
     // A request that attests a payment (a receipt) takes more than one step.
     // The shared judge is the only receipt check on this page. A contract,
     // a quote, or a signed copy is a file to send, not that silence.
-    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesReceipt === 'function' && FlowIncomingJudge.silencesReceipt(text)) {
+    if (!inviteAsked && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && !intent.doItAsk && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesReceipt === 'function' && FlowIncomingJudge.silencesReceipt(text)) {
       logScanSkip(messageId, 'file');
       recordSilence(messageId, 'file');
       return;
@@ -2459,13 +2472,13 @@ function glanceUiCopy(kind) {
       ? FlowIntent.attachToInvitePlan(text) : null;
     // A file onto an existing invite is the file-track card (task + short
     // draft) even when the file was not found. Never the needs-you banner.
-    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && !intent.googleClose && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesOwnedDeliverable === 'function' && FlowIncomingJudge.silencesOwnedDeliverable(text)) {
+    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && !intent.googleClose && !intent.doItAsk && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.silencesOwnedDeliverable === 'function' && FlowIncomingJudge.silencesOwnedDeliverable(text)) {
       logScanSkip(messageId, 'resolution');
       recordSilence(messageId, 'resolution');
       void flushSuggest(false);
       return;
     }
-    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && !intent.googleClose && typeof FlowFileAttach !== 'undefined') {
+    if (!invitePlan && !deadlineWasDropped(intent) && fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && !intent.googleClose && !intent.doItAsk && typeof FlowFileAttach !== 'undefined') {
       const searched = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
       });

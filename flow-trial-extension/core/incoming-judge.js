@@ -165,6 +165,30 @@ const FlowIncomingJudge = (() => {
   //          hasThreadAttachment, executionMemory, surface ('gmail' | 'outlook') }
   // deps:  { intent, actions, factReply, fileAttach, resolution, quietMetrics } (each falls back to its global)
   // -> { show:true, intent, process } | { show:false, reason, intent }
+  // A request that names a thing for the person to DO is the task. Gmail's chip path calls this after its own classify, so both
+  // mailboxes turn the same ask into the same Log It card.
+  function doItOverride(i, intent, isRequest) {
+    if (isRequest === undefined) isRequest = Boolean(intent && intent.type === 'request');
+    if (!(isRequest && !intent.googleClose && !intent.selfTask && !intent.noReplyDraft && !intent.inviteFile
+      && i.senderIsUser !== true && i.inbound !== false && !(i.attachmentCount > 0))) return null;
+    const doIt = doItAsk(i, prepareForJudge(i.text));
+    if (!doIt) return null;
+    const card = doItCard(i, doIt);
+    return { intent: Object.assign({}, intent, card.intent, { signals: intent.signals, facts: intent.facts }), process: card.process };
+  }
+
+  // The readers that run after the general classifier found nothing: a do-it ask with a named day, a timed proposal asked back,
+  // an answer-needing ask with a date. Gmail's chip path calls this too, so both mailboxes share one second read.
+  // The labs readers (booking notice, task ask, payment ask) stay behind their own switches, which default OFF.
+  function secondRead(i, q0) {
+    if (q0 && q0 !== 'noise') return null;
+    if (q0 || i.senderIsUser === true || i.inbound === false || i.noteToSelf === true) return null;
+    const body0 = prepareForJudge(i.text);
+    return ((hit0) => (hit0 ? doItCard(i, hit0) : null))(doItAsk(i, body0))
+      || ((hit1) => (hit1 ? holdCard(i, hit1) : null))(holdProposal(i, body0))
+      || ((hit2) => (hit2 ? replyCard(i, hit2) : null))(answerAsk(i, body0));
+  }
+
   function judge(input, deps) {
     const i = input || {};
     const d = deps || {};
@@ -259,15 +283,8 @@ const FlowIncomingJudge = (() => {
       // deadline asked without a question, a call-back day, a payment asked with its amount and day. Only a mail addressed
       // to the person; nothing is read when the mail carries a calibrated or named quiet other than notice noise.
       const q0 = intent && intent.quiet ? intent.quiet : null;
-      if ((!q0 || q0 === 'noise') && i.senderIsUser !== true && i.inbound !== false && i.noteToSelf !== true) {
-        const body0 = prepareForJudge(i.text);
-        const surface0 = i.surface || 'gmail';
-        // The labs readers (booking notice, task ask, payment ask) stay behind their own switches, which default OFF.
-        const second = (q0 ? null : (((hit0) => (hit0 ? doItCard(i, hit0) : null))(doItAsk(i, body0))
-            || ((hit1) => (hit1 ? holdCard(i, hit1) : null))(holdProposal(i, body0))
-            || ((hit2) => (hit2 ? replyCard(i, hit2) : null))(answerAsk(i, body0))));
-        if (second) return { show: true, intent: second.intent, process: forSurface(second.process, surface0) };
-      }
+      const second = secondRead(i, q0);
+      if (second) return { show: true, intent: second.intent, process: forSurface(second.process, i.surface || 'gmail') };
       if (!q0) {
         const named = namedQuietOf(prepareForJudge(i.text), i);
         if (named) return { show: false, reason: 'quiet:' + named, intent: intent || null };
@@ -298,11 +315,8 @@ const FlowIncomingJudge = (() => {
     }
     // A request that names a thing for the person to DO (fill in a form, upload a file, renew a subscription) is the task,
     // not a reply. An ask for an answer, a signed copy back or a file sent stays the reply.
-    if (isRequest && !intent.googleClose && !intent.selfTask && !intent.noReplyDraft && !intent.inviteFile
-      && i.senderIsUser !== true && i.inbound !== false && !(i.attachmentCount > 0)) {
-      const doIt = doItAsk(i, prepareForJudge(i.text));
-      if (doIt) return { show: true, intent: Object.assign({}, intent, doItCard(i, doIt).intent, { signals: intent.signals, facts: intent.facts }), process: forSurface(doItCard(i, doIt).process, i.surface || 'gmail') };
-    }
+    const doItHit = doItOverride(i, intent, isRequest);
+    if (doItHit) return { show: true, intent: doItHit.intent, process: forSurface(doItHit.process, i.surface || 'gmail') };
     // "No need to send" stands the ask down before the untimed-reply rule
     // can turn "Following up on our call" into a draft.
     if (/\b(?:do not|don't|no need to)\s+(?:send|attach|forward|share|resend|provide)\b/i.test(text)) {
@@ -838,7 +852,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id));
   }
 
-  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
+  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, secondRead, doItOverride, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };
