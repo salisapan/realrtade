@@ -463,7 +463,7 @@ const FlowIncomingJudge = (() => {
     const sentences = text.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
     const lead = '^(?:(?:hi|hello|hey|dear|שלום|היי|הי)\\b[^,.!?\\n]{0,30}[,.!:]\\s*)?';
     const reEn = new RegExp(lead + '(?:please\\s+|kindly\\s+)?(?:(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?|you\\s+(?:need|have)\\s+to\\s+|(?:please\\s+)?(?:don\'?t\\s+forget|remember)\\s+to\\s+)?(' + DOIT_EN + '\\b.+)$', 'i');
-    const reRem = /^(?:(?:hi|hello|hey|dear)\b[^,.!?\n]{0,30}[,.!:]\s*)?(?:please\s+)?(?:don'?t\s+forget|remember)\s+to\s+(.+)$/i;
+    // A bare "don't forget to <anything>" is the TASK_ASK reader (labs, off by default); only a named do-it verb is read here.
     const reWait = /\b(?:i(?:'|’)?m|we(?:'|’)?re|i\s+am|we\s+are)\s+waiting\s+for\s+(?:an?\s+|the\s+)?(.+?)\s+from\s+you\b/i;
     const reHe = new RegExp('^(?:[\\u0590-\\u05FF]{2,12},\\s*)?(?:נא\\s+|אנא\\s+|בבקשה\\s+)?(?:תוכל(?:י|ו)?\\s+)?(' + DOIT_HE + '(?![\\u0590-\\u05FF])(?:\\s+בבקשה)?\\s+\\S.*)$');
     const reWaitHe = /מחכה\s+ל([\u0590-\u05FF][^\n.!?]*?)\s+ממך(?![\u0590-\u05FF])/;
@@ -476,7 +476,7 @@ const FlowIncomingJudge = (() => {
       if (he) {
         if ((m = sent.match(reHe))) title = doItTitle(m[1]);
         else if ((m = sent.match(reWaitHe))) title = 'לשלוח ' + doItTitle(m[1]);
-      } else if ((m = sent.match(reEn)) || (m = sent.match(reRem))) {
+      } else if ((m = sent.match(reEn))) {
         title = doItTitle(m[1]);
       } else if ((m = sent.match(reWait))) {
         title = 'Send ' + doItTitle(m[1]);

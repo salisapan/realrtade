@@ -24,7 +24,6 @@ const kinds = (r) => ((r.process && r.process.steps) || []).map((s) => s.kind.re
 
 const YES = [
   ['Please fill in the vendor onboarding form by Friday so we can pay you.', 'log-it', '2026-11-06'],
-  ["Don't forget to send the final logo files next week.", 'log-it', null],
   ['Hi, can you upload your 106 form to the portal by the 15th of next month?', 'log-it', '2000-01-01'],
   ['תחדש בבקשה את המנוי לתוכנה עד סוף השבוע', 'log-it', '2026-11-05'],
   ["What's the address for Sunday's offsite? Need it today.", 'reply-track', '2026-11-04'],
@@ -45,6 +44,8 @@ for (const [text, proc, day] of YES) {
 const NO = [
   'Please upload the CV to the portal by EOD',
   "Don't forget to bring the form",
+  "Don't forget to bring the signed form tomorrow.",
+  "Don't forget to send the final logo files next week.",
   'Remember to call on 2025-01-02',
   'I forgot to send it on Monday',
   'Please let me know when you can.'
