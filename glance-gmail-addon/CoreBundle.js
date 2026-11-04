@@ -9961,6 +9961,7 @@ const FlowIncomingJudge = (() => {
     if (q0 || i.senderIsUser === true || i.inbound === false || i.noteToSelf === true) return null;
     const body0 = prepareForJudge(i.text);
     return ((hit0) => (hit0 ? doItCard(i, hit0) : null))(doItAsk(i, body0))
+      || ((hitD) => (hitD ? doItCard(i, hitD) : null))(decideAsk(i, body0))
       || ((hit1) => (hit1 ? holdCard(i, hit1) : null))(holdProposal(i, body0))
       || ((hit2) => (hit2 ? replyCard(i, hit2) : null))(answerAsk(i, body0))
       || ((hit3) => (hit3 ? inviteCard(i, hit3) : null))(inviteAccept(i, body0));
@@ -10277,6 +10278,35 @@ const FlowIncomingJudge = (() => {
       // Only a task with a named day (or this/next week) is a Log It; "by EOD" or no day is the plain ask, left to the reply track.
       if (!dateIso && !/\b(?:this|next)\s+week\b|(?:^|[^\u0590-\u05FF])(?:השבוע|שבוע\s+הבא)(?![\u0590-\u05FF])|סוף\s+השבוע/i.test(sent)) continue;
       return { title: title.slice(0, 120), dateIso, lang: he ? 'he' : 'en' };
+    }
+    return null;
+  }
+  // An ask to approve, accept or decide that carries a deadline is a task (owner rule of 24/10): "the policy renews next week,
+  // approve whether to continue", "please approve the quote by Thursday". The person decides; Glance logs it with the day the mail
+  // names (a named day is resolved; this/next week stays the span, as in the do-it ask). No day, a hedge or a past day: not read.
+  const DECIDE_EN = /\b(?:(?:please|kindly)\s+(?:approve|accept|decide)|(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:approve|accept|decide)|(?:need|want)\s+you\s+to\s+(?:approve|accept|decide)|need\s+your\s+(?:approval|decision)|(?:approve|accept|decide)\s+(?:by|before|until))\b/i;
+  const DECIDE_HE = /(?:^|[^\u0590-\u05FF])(?:תאשר(?:י|ו)?|לאשר|אשר(?:י|ו)?|תסכים|תסכימי|להסכים|תחליט|תחליטי|תחליטו|להחליט)(?:\s+לי)?(?![\u0590-\u05FF])/;
+  const DECIDE_NO_EN = /\b(?:yesterday|last\s+(?:week|night)|already|never\s*mind|cancel(?:l?ed)?|maybe|might|if\s+you\s+(?:want|like)|no\s+rush|whenever|i'?ll|i\s+will)\b/i;
+  const DECIDE_NO_HE = /(?:אתמול|שבוע\s+שעבר|כבר\s|אולי|בוטל|לבטל|לא\s+דחוף|אין\s+לחץ)/;
+  function decideAsk(i, body) {
+    const text = String(body || '').trim();
+    if (!text) return null;
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const sents = sentencesOf(text).filter((x) => !/^(?:-{3,}|>)/.test(x));
+    const head = sents.findIndex((x) => /^(?:-{3,}\s*)?(?:forwarded message|from:)/i.test(x));
+    const own = head > 0 ? sents.slice(0, head) : sents;
+    for (let k = 0; k < own.length; k++) {
+      const sent = own[k];
+      const he = /[\u0590-\u05FF]/.test(sent);
+      if (he ? DECIDE_NO_HE.test(sent) : DECIDE_NO_EN.test(sent)) continue;
+      if (!(he ? DECIDE_HE.test(sent) : DECIDE_EN.test(sent))) continue;
+      const when = dayOf(sent, now0);
+      const span = /\b(?:this|next)\s+week\b|(?:^|[^\u0590-\u05FF])(?:השבוע|בשבוע\s+הבא|שבוע\s+הבא)(?![\u0590-\u05FF])|סוף\s+השבוע/i.test(sent);
+      if (!when.date && !span) continue;
+      if (when.date && when.date < ymdOf(now0)) continue;
+      const subj = String(i.subject || '').replace(/^\s*(?:(?:re|fw|fwd|השב|תשובה|הועבר)\s*:\s*)+/i, '').replace(/\s+/g, ' ').trim();
+      const title = (subj && subj.length >= 3 ? subj : sent).slice(0, 120);
+      return { title, dateIso: when.date || null, lang: he ? 'he' : 'en' };
     }
     return null;
   }
