@@ -3,7 +3,7 @@
 //   flow-trial-extension/core/extract.js
 //   flow-trial-extension/core/judgment.js
 // Regenerate with: scripts/build-glance-engine.sh
-// Last synced: 2026-10-28
+// Last synced: 2026-11-04
 //
 // This is the exact client-side judgment engine the Glance extension
 // runs — concatenated as-is (no edits) so the live demo on trial.html
@@ -210,6 +210,13 @@ const FlowExtract = (() => {
     } catch (e) {
       return money.raw;
     }
+  }
+
+  // "next <weekday>" lands a week past the nearest one. Sunday is the exception: it opens the week, so "next
+  // Sunday" said midweek is the coming Sunday, the first day of next week (the Israeli reading; the corpus keeps
+  // "next Monday" a week past the nearest Monday).
+  function nextWeekDelta(d, target, delta) {
+    return target === 0 ? delta : delta + 7;
   }
 
   function iso(d) {
@@ -514,7 +521,7 @@ const FlowExtract = (() => {
       // (delta === 0, "by Friday" said on a Friday) already rolls forward
       // a full week regardless of "next", so it needs no separate bump.
       if (delta === 0) delta = 7;
-      else if (/next\s/i.test(m[0])) delta += 7;
+      else if (/next\s/i.test(m[0])) delta = nextWeekDelta(d, target, delta);
       d.setDate(d.getDate() + delta);
       // "by Friday 23/10": the number is the day. The weekday name is the same Friday.
       const numbered = slashDate(text, now);
@@ -533,7 +540,7 @@ const FlowExtract = (() => {
       const d = new Date(now);
       let delta = (target - d.getDay() + 7) % 7;
       if (delta === 0) delta = 7;
-      else delta += 7;
+      else delta = nextWeekDelta(d, target, delta);
       d.setDate(d.getDate() + delta);
       return { raw: m[0], iso: iso(d) };
     }
@@ -579,7 +586,7 @@ const FlowExtract = (() => {
       let delta = (target - d.getDay() + 7) % 7;
       const isNext = /הבא(?![\u0590-\u05FF])/.test(m[0]);
       if (delta === 0) delta = 7;
-      else if (isNext) delta += 7;
+      else if (isNext) delta = nextWeekDelta(d, target, delta);
       d.setDate(d.getDate() + delta);
       return { raw: m[0], iso: iso(d) };
     }
@@ -976,7 +983,7 @@ const FlowJudgment = (() => {
   // a hedge sitting in front of the phrase still kill them) instead of
   // HANDOFF's bare .test(), which cannot see "please don't follow up".
   const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|chase up|send (?:a |the )?reminder|send \w+ a reminder|please remind|please remember to)\b/i;
-  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
+  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)תזכור(?:י|ו)?\s+ל|(?:^|\s)אל\s+תשכח(?:י|ו)?\s+ל|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
   // The sender wants a call or a meeting and is waiting for the reader to name a time. It goes through
   // directedAsk() like the follow-up asks, so a withdrawn or hedged ask stays quiet. A slot ask clears the
   // bar on its own: the close is a reply that offers times (the draft names two slots to fill, never a time).
@@ -1114,8 +1121,8 @@ const FlowJudgment = (() => {
   const STATUS_INTRO_ASK_HE = /(?:^|\s)(?:תעדכן|תעדכני|תעדכנו|עדכן|עדכני)\s+אותי|(?:^|\s)מה\s+(?:ה)?סטטוס\s+של|(?:אשמח|נשמח)\s+(?:ל(?:קבל\s+)?)?עדכון|(?:^|\s)(?:תעדכן|תעדכני|תעדכנו)\s+(?:אותי\s+)?(?:את\s+)?(?:ה)?סטטוס|(?:^|\s)(?:תפגיש|תפגישי|תכיר|תכירי|תחבר|תחברי)\s+(?:אותי|לי)|(?:ש|ל)(?:תפגיש|תפגישי)\s+אותי|(?:ל)?הכיר\s+לי\s+את|להפגיש\s+אותי/;
   // Asks for an account action: access, a password reset, a transfer, a copy of the reply. The lead ("please", "can you") is
   // required, so "access has been granted" and "your password was reset" stay quiet. Kept out of HANDOFF like the two above.
-  const ACCOUNT_ASK = /\b(?:please|kindly|can you|could you|would you(?: please)?)\s+(?:(?:return|send back)\s+(?:the|a|your)\s+(?:signed|countersigned|completed)\s+(?:copy|form|contract|agreement|paperwork)\b|add\s+your\s+availability\b|make\s+(?:the|this|your)\s+(?:payment|deposit)\b(?!\s+(?:details|information|info|method|card|online|here|on|at|via))|(?:refund|credit)\s+(?:the|our|my)\s+(?:duplicate|double|extra|incorrect)\s+(?:charge|payment)\b|(?:grant|give)\s+(?:me|us|[a-z]+)\s+(?:\S+\s+){0,2}?access\b|reset\s+(?:my|our|the)\s+(?:password|login|2fa)\b|transfer\s+(?:the|our|my)\s+(?:domain|account|licen[sc]e)\b|(?:copy|cc|bcc)\s+me\b)/i;
-  const ACCOUNT_ASK_HE = /(?:^|\s)(?:בצע|בצעי|בצעו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?את\s+(?:ה)?(?:תשלום|מקדמה)|(?:^|\s)(?:תוסיף|תוסיפי|תוסיפו)\s+(?:בבקשה\s+)?את\s+(?:ה)?זמינות\s+שלך|(?:^|\s)(?:תעלה|תעלי|תעלו|תעביר|תעבירי|תעבירו|תאפס|תאפסי|תאפסו|תשים|תשימי|תשימו)\s+(?:לי\s+)?(?:בבקשה\s+)?(?:(?:את\s+)?(?:ה)?(?:טופס|מסמך|קובץ|דומיין|סיסמה|חשבון|רישיון)|אותי\s+בעותק)|(?:^|\s)(?:תן|תני|תנו)\s+לי\s+גישה/;
+  const ACCOUNT_ASK = /\b(?:please|pls|plz|kindly|can you|can u|could you|could u|would you(?: please)?)\s+(?:walk\s+\w+\s+through\b|test\s+\S+(?:\s+\S+){0,3}\s+and\s+report\b|draft\s+(?:a|the)\s+(?:reply|response|email|message)\b|add\s+(?:the|this|my)\s+\S+\s+to\s+the\s+(?:shared|team|project)\b|send\s+(?:me|us)\s+(?:the|your)\s+(?:address|pics|photos|link|location)\b|(?:return|send back)\s+(?:the|a|your)\s+(?:signed|countersigned|completed)\s+(?:copy|form|contract|agreement|paperwork)\b|add\s+your\s+availability\b|make\s+(?:the|this|your)\s+(?:payment|deposit)\b(?!\s+(?:details|information|info|method|card|online|here|on|at|via))|(?:refund|credit)\s+(?:the|our|my)\s+(?:duplicate|double|extra|incorrect)\s+(?:charge|payment)\b|(?:grant|give)\s+(?:me|us|[a-z]+)\s+(?:\S+\s+){0,2}?access\b|reset\s+(?:my|our|the)\s+(?:password|login|2fa)\b|transfer\s+(?:the|our|my)\s+(?:domain|account|licen[sc]e)\b|(?:copy|cc|bcc)\s+me\b)/i;
+  const ACCOUNT_ASK_HE = /(?:^|\s)אפשר\s+ש(?:תביא|תביאי|תשלח|תשלחי|תעביר|תעבירי|תבדוק|תבדקי|תאסוף|תאספי|תזמין|תזמיני)\s+(?:לי|לנו|את)|(?:^|\s)(?:תעביר|תעבירי|תעבירו)\s+(?:לי\s+|לנו\s+)?ב(?:ביט|פייבוקס|פיי)\s+|(?:^|\s)(?:תבדוק|תבדקי|תבדקו)\s+אם\s+\S+(?:\s+\S+){0,4}\s+ו(?:תגיד|תגידי|תגידו)\s+(?:לי|לנו)|(?:^|\s)(?:תחזור|תחזרי|תחזרו)\s+אל(?:יי|ינו)\s+(?:עם|ב|לפני|עד)|(?:^|\s)(?:תאשר|תאשרי|תאשרו)\s+(?:לי\s+)?ש|(?:^|\s)(?:תוכל|תוכלי|תוכלו)\s+(?:ל)?(?:הוסיף|תקן|עדכן|שנות|הוסיף)\s+|(?:^|\s)(?:תתקן|תתקני|תתקנו|תוסיף|תוסיפי|תעדכן|תעדכני)\s+(?:בבקשה\s+)?את\s+(?:ה)?\S+\s+(?:ב|ל|ש)\S*\s+\S+\s+(?:עד|היום|עוד)|נשמח\s+ש(?:תשלח|תשלחי|תשלחו|תעביר|תעבירי|תעבירו|תחזור|תחזרי)|(?:^|\s)(?:אנחנו\s+מחכים|אני\s+מחכה|אנו\s+מחכים)\s+(?:ל(?:תשובה|אישור|עדכון|תגובה)|עד)|(?:^|\s)(?:שלח|שלחי|שלחו|תשלח|תשלחי|תשלחו|תעביר|תעבירי|תעבירו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?את\s+(?:ה)?(?:פרטי|שם\s+המשתמש|מספר|כתובת|קוד)|(?:^|\s)(?:תצרף|תצרפי|תצרפו|תרשום|תרשמי|תרשמו|תוסיף|תוסיפי|תוסיפו)\s+(?:אותי|אותנו)(?:\s+בבקשה)?\s+(?:ל|ב)|(?:^|\s)(?:תבדוק|תבדקי|תבדקו)\s+(?:בבקשה\s+)?\S+(?:\s+\S+){0,3}\s+ו(?:תחזור|תחזרי|תחזרו)\s+אל(?:יי|ינו)|(?:^|\s)(?:בצע|בצעי|בצעו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?את\s+(?:ה)?(?:תשלום|מקדמה)|(?:^|\s)(?:תוסיף|תוסיפי|תוסיפו)\s+(?:בבקשה\s+)?את\s+(?:ה)?זמינות\s+שלך|(?:^|\s)(?:תעלה|תעלי|תעלו|תעביר|תעבירי|תעבירו|תאפס|תאפסי|תאפסו|תשים|תשימי|תשימו)\s+(?:לי\s+)?(?:בבקשה\s+)?(?:(?:את\s+)?(?:ה)?(?:טופס|מסמך|קובץ|דומיין|סיסמה|חשבון|רישיון)|אותי\s+בעותק)|(?:^|\s)(?:תן|תני|תנו)\s+לי\s+גישה/;
   // A short direct question that asks the reader for a named thing ("יש קישור לזום ?", "Do you have the invoice?"). Chat and
   // mail both carry these; the length floor used to drop them on every surface. The whole message has to be the question, so a
   // longer text, a bare "really?" and a greeting stay on the normal path.
