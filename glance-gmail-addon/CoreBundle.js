@@ -10285,7 +10285,9 @@ const FlowIncomingJudge = (() => {
   // approve whether to continue", "please approve the quote by Thursday". The person decides; Glance logs it with the day the mail
   // names (a named day is resolved; this/next week stays the span, as in the do-it ask). No day, a hedge or a past day: not read.
   const DECIDE_EN = /\b(?:(?:please|kindly)\s+(?:approve|accept|decide)|(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:approve|accept|decide)|(?:need|want)\s+you\s+to\s+(?:approve|accept|decide)|need\s+your\s+(?:approval|decision)|(?:approve|accept|decide)\s+(?:by|before|until))\b/i;
-  const DECIDE_HE = /(?:^|[^\u0590-\u05FF])(?:תאשר(?:י|ו)?|לאשר|אשר(?:י|ו)?|תסכים|תסכימי|להסכים|תחליט|תחליטי|תחליטו|להחליט)(?:\s+לי)?(?![\u0590-\u05FF])/;
+  // Hebrew: only a request to the reader ("תאשר לי", "נא לאשר", "תוכל להחליט"); "אם דנה תאשר" is a condition, not an ask.
+  const DECIDE_VERB_HE = '(?:תאשר(?:י|ו)?|לאשר|אשר(?:י|ו)?|תסכים|תסכימי|להסכים|תחליט|תחליטי|תחליטו|להחליט)';
+  const DECIDE_HE = new RegExp('(?:^|[^\\u0590-\\u05FF])(?:' + DECIDE_VERB_HE + '\\s+לי|(?:נא|אנא|בבקשה|תוכל(?:י|ו)?|תוכלו)\\s+' + DECIDE_VERB_HE + ')(?![\\u0590-\\u05FF])');
   const DECIDE_NO_EN = /\b(?:yesterday|last\s+(?:week|night)|already|never\s*mind|cancel(?:l?ed)?|maybe|might|if\s+you\s+(?:want|like)|no\s+rush|whenever|i'?ll|i\s+will)\b/i;
   const DECIDE_NO_HE = /(?:אתמול|שבוע\s+שעבר|כבר\s|אולי|בוטל|לבטל|לא\s+דחוף|אין\s+לחץ)/;
   function decideAsk(i, body) {
