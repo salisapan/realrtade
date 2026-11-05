@@ -178,7 +178,9 @@ test('WhatsApp, CHAT_TASK_CARD on: a plain chat line shows nothing', async ({ gl
 // Meta Business Suite shares the Messenger lane (same files, the business inbox addresses): a customer writing to the person's page.
 const fs = require('fs');
 const path = require('path');
-const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8');
+// The capture is dated 14 October; Messenger skips rows older than 14 days, so the spec moves them to today (a fixed date aged out on 28 October).
+const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8')
+  .split('2026-10-14T').join(new Date().toISOString().slice(0, 11));
 const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
 test('Business Suite, CHAT_TASK_CARD on: a customer\'s payment ask on the page inbox is one To Do task, nothing is sent', async ({ glance }) => {

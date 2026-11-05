@@ -15,6 +15,8 @@ catch (e) {
 const ROOT = path.join(__dirname, '..');
 const { FlowDisplay } = require(path.join(ROOT, 'core/display-copy.js'));
 const ME = 'glance.salisapan@outlook.com';
+// A date ten days ahead, so the dated ask stays in the future (a fixed 'November 2' went past on 3 November).
+const SOON = (() => { const d = new Date(Date.now() + 10 * 86400000); return d.toLocaleString('en-US', { month: 'long' }) + ' ' + d.getDate(); })();
 const FLOW = 'ai.local.flow@gmail.com';
 const AVI = 'avi.mizrahi@northwind.example';
 const CONV = 'AQQkCONV-OLD-111';
@@ -306,7 +308,7 @@ function panel(store) {
     subject: 'Q3 summary confirm',
     toHtml: 'אל: <span>' + ME + '</span>',
     ccHtml: '',
-    bodyHtml: lines('Hi,\nCan you reply and confirm whether the board pack will be ready by November 2?\nThanks,\nFlow'),
+    bodyHtml: lines('Hi,\nCan you reply and confirm whether the board pack will be ready by ' + SOON + '?\nThanks,\nFlow'),
     fromTitle: 'Flow <' + FLOW + '>'
   });
   await settle(shown);
