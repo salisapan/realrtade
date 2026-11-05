@@ -70,6 +70,23 @@
     }
   });
 
+  const NAMES_HOLD_MS = 2000;
+  let namesWaitDone = false;
+  let namesHoldSince = 0;
+  let namesWaitTimer = null;
+
+  function armNamesHold(rescan) {
+    if (namesWaitDone) return;
+    if (!namesHoldSince) namesHoldSince = Date.now();
+    if (namesWaitTimer) return;
+    const left = Math.max(0, NAMES_HOLD_MS - (Date.now() - namesHoldSince));
+    namesWaitTimer = setTimeout(() => {
+      namesWaitTimer = null;
+      namesWaitDone = true;
+      if (typeof rescan === 'function') rescan();
+    }, left);
+  }
+
   const SCAN_EVERY_MS = 800;        // at most one scan per 0.8 s, and at least one 0.8 s after any change
   const PAGE_SYNC_MIN_MS = 60 * 1000;
   const PAGE_DIAG_KEY = 'outlookPageDiag';
@@ -806,7 +823,8 @@
       ownAddresses: ownAddresses || null,
       userName: pane.userName || null,
       ownNames: pane.ownNames || null,
-      namesPending: pane.namesPending === true,
+      namesPending: namesWaitDone ? false : pane.namesPending === true,
+      namesWaitDone: namesWaitDone === true,
       onBehalfOf: pane.onBehalfOf || null,
       forwarded: pane.onBehalf === true,
       inbound: Boolean(selfAddressed) || (from ? (ownAddresses || []).indexOf(from) < 0 : true)
@@ -4295,6 +4313,7 @@
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
     if (pane) pane.ownNames = ownNamesOf(st);
     if (pane) pane.namesPending = outlookNamesNotCached(st, userNameOf(st));
+    if (pane && pane.namesPending === true) armNamesHold(() => { scan().catch(() => {}); });
     if (pane) {
       pane.text = stripGlanceLines(pane.text);
       pane.__epoch = mailEpoch;
