@@ -20,3 +20,5 @@ create table if not exists public.community_published (
   created_at timestamptz not null default now()
 );
 alter table public.community_published enable row level security;
+
+revoke all on public.community_sketches, public.community_published from anon, authenticated;
