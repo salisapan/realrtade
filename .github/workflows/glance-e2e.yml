@@ -1,5 +1,6 @@
 name: Glance headless E2E
 
+# TEMP baseline v2: Playwright-only sharded run on 551da01b (no jsdom corpora).
 on:
   pull_request:
     branches:
@@ -8,22 +9,38 @@ on:
 
 jobs:
   e2e:
-    name: e2e (${{ matrix.tz }})
+    name: e2e (${{ matrix.tz }} shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    # The suite runs about 15 minutes on a hosted runner, so 15 cancelled it mid-run.
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include:
           - tz: UTC
-            artifact: glance-e2e-UTC
+            tz_slug: UTC
+            shard: 1
+          - tz: UTC
+            tz_slug: UTC
+            shard: 2
+          - tz: UTC
+            tz_slug: UTC
+            shard: 3
           - tz: Asia/Jerusalem
-            artifact: glance-e2e-Asia-Jerusalem
+            tz_slug: Asia-Jerusalem
+            shard: 1
+          - tz: Asia/Jerusalem
+            tz_slug: Asia-Jerusalem
+            shard: 2
+          - tz: Asia/Jerusalem
+            tz_slug: Asia-Jerusalem
+            shard: 3
     env:
       TZ: ${{ matrix.tz }}
+      CI: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -32,28 +49,17 @@ jobs:
       - name: Install dependencies
         working-directory: flow-trial-extension
         run: npm ci
-      - name: Run the jsdom regressions
-        working-directory: flow-trial-extension
-        run: |
-          node test/mail-switch-race-corpus.cjs
-          node test/cc-only-recipients-corpus.cjs
-          node test/glance-0956-corpus.cjs
-          node test/outlook-calendar-corpus.cjs
-          node test/regress-144-corpus.cjs
-          node test/negation-conditional-corpus.cjs
-          node test/self-title-preposition-corpus.cjs
-          node test/display-144-followups-corpus.cjs
       - name: Install Chromium
         working-directory: flow-trial-extension
         run: npx playwright install --with-deps chromium
       - name: Run the headless suite
         working-directory: flow-trial-extension
-        run: xvfb-run -a npx playwright test
-      - name: Upload the Playwright report
+        run: xvfb-run -a npx playwright test --shard=${{ matrix.shard }}/3
+      - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: baseline-e2e-${{ matrix.tz_slug }}-shard-${{ matrix.shard }}
           path: |
             flow-trial-extension/e2e-report/
             flow-trial-extension/test-results/
