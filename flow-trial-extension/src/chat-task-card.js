@@ -17,7 +17,7 @@ const FlowChatTaskCard = (() => {
   // The person's own dated promise in a chat ("אשלח לך את ההצעה עד יום חמישי") has its own switch, off by default.
   const SWITCH_OWN = 'CHAT_PROMISE_CARD';
   const CHAIN = 'chat-task';
-  const OPEN_LABELS = { whatsapp: 'Open in WhatsApp', messenger: 'Open in Messenger', instagram: 'Open in Instagram' };
+  const OPEN_LABELS = { whatsapp: 'Open in WhatsApp', messenger: 'Open in Messenger', instagram: 'Open in Instagram', teams: 'Open in Teams' };
   const dismissed = new Set();
 
   function runtimeAlive() {
