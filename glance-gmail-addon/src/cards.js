@@ -47,6 +47,10 @@ var GlanceCards = (function () {
     return button(lang, 'doIt', 'onDoIt', { messageId: String(messageId || ''), source: 'message' });
   }
 
+  function composeDoItButton(draftId, lang) {
+    return button(lang, 'doIt', 'onComposeDoIt', { draftId: String(draftId || ''), source: 'compose' });
+  }
+
   function proposal(decision, messageId, lang) {
     var L = i18n();
     if (decision.kind === 'hold') {
@@ -147,6 +151,30 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'quiet'))]);
   }
 
+  function composeProposal(preview, draftId, lang) {
+    var widgets = [text(lang, i18n().t(lang, 'draftReady'))];
+    if (preview) widgets.push(text(lang, preview));
+    widgets.push(composeDoItButton(draftId, lang));
+    return card(lang, widgets);
+  }
+
+  function draftProof(view, lang, opts) {
+    opts = opts || {};
+    var L = i18n();
+    var widgets = [
+      text(lang, L.t(lang, 'inDraft')),
+      text(lang, view && view.preview ? view.preview : '')
+    ];
+    if (view && view.id) widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)));
+    var undo = opts.draftId ? button(lang, 'undo', 'onComposeUndo', { draftId: String(opts.draftId), source: 'compose' }) : null;
+    if (undo) widgets.push(undo);
+    return card(lang, widgets);
+  }
+
+  function editedDraft(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'editedDraft'))]);
+  }
+
   function homepage(next, lang) {
     var L = i18n();
     if (!next || !next.title) return card(lang, [text(lang, L.t(lang, 'openMessage'))]);
@@ -173,6 +201,9 @@ var GlanceCards = (function () {
     grant: grant,
     quiet: quiet,
     homepage: homepage,
+    composeProposal: composeProposal,
+    draftProof: draftProof,
+    editedDraft: editedDraft,
     buttons: buttons
   };
 })();

@@ -133,12 +133,29 @@ var GlanceIntent = (function () {
     return { due: due, text: rest };
   }
 
+  function stripGreeting(raw) {
+    var text = collapse(raw);
+    text = text.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
+    text = text.replace(/^dear\s+[^,]{1,40},\s+/i, '');
+    text = text.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
+    return text;
+  }
+
+  // An explicit remember ask must start the message (after a short greeting).
+  // The same phrase buried after other sentences is not a local ask.
+  function buriedRemember(text) {
+    var head = String(text || '').split(/\nOn [A-Za-z]{3},/)[0].split(/\nwrote:/i)[0];
+    var raw = stripGreeting(head);
+    if (!raw) return false;
+    if (/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+/i.test(raw)) return false;
+    if (/^תזכיר(?:י)?\s+לי\s+/.test(raw) || /^אל תשכח(?:י)?\s+/.test(raw)) return false;
+    return /(?:^|[.!?]\s+)(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+/i.test(raw)
+      || /(?:^|[.!?]\s+)(?:תזכיר(?:י)?\s+לי|אל תשכח(?:י)?)\s+/.test(raw);
+  }
+
   function localRemember(text, now, timeZone) {
-    var raw = collapse(text);
+    var raw = stripGreeting(text);
     if (!raw || raw.length > 8000) return null;
-    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
-    raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
-    raw = raw.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
     var match = raw.match(/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+(.+)$/i);
     var lang = 'en';
     if (!match) {
@@ -300,9 +317,10 @@ var GlanceIntent = (function () {
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n');
     if (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.newContent === 'function') {
-      return FlowJudgment.newContent(raw);
+      raw = FlowJudgment.newContent(raw);
     }
-    return raw;
+    var quote = raw.split(/\nOn [A-Za-z]{3},/)[0].split(/\nwrote:/i)[0];
+    return collapse(quote);
   }
 
   // Card chrome follows the Gmail locale. The title written on the event
@@ -327,6 +345,27 @@ var GlanceIntent = (function () {
       if (raw.indexOf(MEETING_NOUNS_HE[i]) !== -1) return MEETING_NOUNS_HE[i];
     }
     return 'פגישה';
+  }
+
+  function explicitIsraeliDate(text, now, timeZone) {
+    if (!mailIsHebrew(text)) return null;
+    var match = String(text || '').match(/(\d{1,2})[./](\d{1,2})(?:[./](20\d{2}))?/);
+    if (!match) return null;
+    var year = match[3] ? +match[3] : +todayIso(now, timeZone).slice(0, 4);
+    var iso = year + '-' + pad(+match[2]) + '-' + pad(+match[1]);
+    return validIso(iso) ? iso : null;
+  }
+
+  function applyHebrewExplicitDate(prepared, decision, now, timeZone) {
+    if (!decision || !decision.speak) return decision;
+    var explicit = explicitIsraeliDate(prepared, now, timeZone);
+    if (!explicit) return contentTitle(prepared, decision);
+    if (decision.kind === 'schedule' || decision.kind === 'hold') {
+      decision.dateIso = explicit;
+      decision.due = explicit;
+      if (decision.kind === 'schedule') decision.taskDue = explicit;
+    }
+    return contentTitle(prepared, decision);
   }
 
   function writtenDate(text, dateIso) {
@@ -380,6 +419,65 @@ var GlanceIntent = (function () {
     };
   }
 
+  function hebrewScheduleFromIntent(prepared, intent, now, timeZone) {
+    if (!intent || intent.type !== 'event' || !mailIsHebrew(prepared)) return null;
+    var ent = intent.entities || {};
+    var dateIso = explicitIsraeliDate(prepared, now, timeZone) || isoOrNull(ent.dateIso, now, timeZone);
+    if (!dateIso) return null;
+    var clock = clockOf({ hour: ent.hour, minute: ent.minute });
+    var label = sanitizeTitle(intent.label || ent.what || '');
+    if (!label) return null;
+    var calendarParams = {
+      title: label,
+      dateIso: dateIso,
+      quote: prepared,
+      requireTime: Boolean(clock)
+    };
+    if (clock) {
+      calendarParams.hour = clock.hour;
+      calendarParams.minute = clock.minute;
+    }
+    return {
+      intent: intent,
+      plan: {
+        id: 'schedule',
+        steps: [
+          { kind: 'calendar', params: calendarParams },
+          { kind: 'googleTask', params: { title: label, dateIso: dateIso } }
+        ]
+      }
+    };
+  }
+
+  // Gmail add-on: Hebrew meetings the shared judge withholds still close as
+  // schedule (all-day or timed). A timed hold from the engine becomes schedule.
+  function normalizeEngineHit(prepared, hit, now, timeZone) {
+    if (!hit) return hit;
+    if (hit.plan && hit.plan.id === 'hold' && hit.plan.steps && hit.plan.steps[0] && mailIsHebrew(prepared)) {
+      var holdParams = (hit.plan.steps[0].params) || {};
+      if (Number.isInteger(holdParams.hour) && holdParams.requireTime === false) {
+        return {
+          intent: hit.intent,
+          plan: {
+            id: 'schedule',
+            steps: [
+              hit.plan.steps[0],
+              {
+                kind: 'googleTask',
+                params: {
+                  title: sanitizeTitle(holdParams.title || ''),
+                  dateIso: holdParams.dateIso || null
+                }
+              }
+            ]
+          }
+        };
+      }
+    }
+    if (hit.plan) return hit;
+    return hebrewScheduleFromIntent(prepared, hit.intent, now, timeZone) || hit;
+  }
+
   function resolveTask(text, ctx) {
     ctx = ctx || {};
     var prepared;
@@ -387,6 +485,7 @@ var GlanceIntent = (function () {
       err.diag = err.diag || 'judge';
       throw err;
     }
+    if (buriedRemember(prepared)) return silence('buried-remember', null);
     var local = localRemember(prepared, ctx.now, ctx.timeZone);
     if (local) return local;
     if (typeof ctx.engine === 'function') {
@@ -395,8 +494,9 @@ var GlanceIntent = (function () {
         err.diag = err.diag || 'judge';
         throw err;
       }
+      hit = normalizeEngineHit(prepared, hit, ctx.now, ctx.timeZone);
       var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
-      if (mapped) return contentTitle(prepared, mapped);
+      if (mapped) return applyHebrewExplicitDate(prepared, mapped, ctx.now, ctx.timeZone);
       if (hit && hit.plan && hit.plan.id) return silence('dropped', hit.plan.id);
       if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
       return silence('no-plan', null);
@@ -416,7 +516,9 @@ var GlanceIntent = (function () {
     sanitizeTitle: sanitizeTitle,
     prepareText: prepareText,
     contentTitle: contentTitle,
-    silence: silence
+    silence: silence,
+    normalizeEngineHit: normalizeEngineHit,
+    buriedRemember: buriedRemember
   };
 })();
 
