@@ -942,6 +942,9 @@ console.log('\n--- calendar evidence ---\n');
 
   async function open(name, url, surface, opts) {
     const o = opts || {};
+    if (surface.indexOf('instagram') >= 0 && !o.storage) {
+      o.storage = memoryStorage({ glanceSwitches: { INSTAGRAM_LANE: true } });
+    }
     const html = o.html || fs.readFileSync(path.join(__dirname, 'fixtures/chat', name), 'utf8');
     const dom = new JSDOM(html, { url: url, runScripts: 'outside-only', pretendToBeVisual: true });
     const w = dom.window;
@@ -986,8 +989,11 @@ console.log('\n--- calendar evidence ---\n');
     });
     const key = surface.indexOf('whatsapp') >= 0 ? 'whatsapp' : (surface.indexOf('messenger') >= 0 ? 'messenger' : 'instagram');
     if (o.beforeScan) o.beforeScan(w);
-    if (!o.skipScan) vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan()', ctx);
-    await new Promise((r) => setTimeout(r, 30));
+    if (!o.skipScan) {
+      if (key === 'instagram') await vm.runInContext('(async () => globalThis.__glanceChatSurfaces.instagram.scan())()', ctx);
+      else vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan()', ctx);
+    }
+    await new Promise((r) => setTimeout(r, key === 'instagram' ? 80 : 30));
     const composer = w.document.querySelector('[data-glance-composer="1"]');
     const send = w.document.querySelector('[aria-label="Send"]');
     let sendClicks = 0;

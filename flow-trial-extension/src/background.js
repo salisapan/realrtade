@@ -74,6 +74,9 @@ import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
 import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
+import '../lane-chat/surfaces.js'; // FlowChatSurfaces registry (Instagram closed-beta flag)
+import '../core/chat-kill-switch.js'; // FlowChatKillSwitch
+import './chat-on-demand.js'; // FlowChatOnDemand inject + scan
 // The worker cannot call import(). These are the helpers imported at the top of this file.
 globalThis.__glanceGoogleAuth = {
   GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
@@ -623,7 +626,8 @@ const LANE_CHAT = [
       'https://instagram.com/direct',
       'https://instagram.com/direct/*'
     ],
-    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js']
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'core/chat-kill-switch.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-redact.js', 'src/chat-indicator.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js'],
+    persistAcrossSessions: false
   }
 ];
 
@@ -671,19 +675,21 @@ async function restoreLaneChats() {
   for (const lane of LANE_CHAT) {
     try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
     try {
+      const persist = lane.persistAcrossSessions !== false;
       await chrome.scripting.registerContentScripts([{
         id: lane.id,
         matches: lane.origins,
         js: laneChatScripts(lane),
         css: LANE_CHAT_CSS,
         runAt: 'document_idle',
-        persistAcrossSessions: true
+        persistAcrossSessions: persist
       }]);
     } catch (e) {
       console.info('[Glance] whyNotShown: lane-not-registered');
       continue;
     }
     if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) continue;
+    if (lane.id === 'glance-lane-instagram') continue;
     let tabs = [];
     try { tabs = await chrome.tabs.query({ url: lane.origins }); } catch (e) { tabs = []; }
     for (const tab of tabs || []) {
@@ -6937,6 +6943,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (chrome.tabs && typeof chrome.tabs.create === 'function') chrome.tabs.create({ url: chrome.runtime.getURL(page) });
     } catch (e) { /* the signup page can open the link itself */ }
     try { sendResponse({ ok: true, page: page }); } catch (e) { /* the caller closed */ }
+    return true;
+  }
+  if (msg.type === 'flow:lane-chat-on-demand') {
+    const tabId = typeof msg.tabId === 'number' ? msg.tabId : (sender && sender.tab && sender.tab.id);
+    const surface = String(msg.surface || '');
+    if (typeof tabId !== 'number' || !surface || typeof FlowChatOnDemand === 'undefined') {
+      try { sendResponse({ ok: false, reason: 'bad-request' }); } catch (e) { /* caller closed */ }
+      return true;
+    }
+    FlowChatOnDemand.injectAndScan(tabId, surface).then((r) => { try { sendResponse(r || { ok: false }); } catch (e) { /* caller closed */ } });
     return true;
   }
   // The person pressed רענן. Recovery never reloads a tab on its own.

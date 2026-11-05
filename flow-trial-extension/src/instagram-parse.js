@@ -6,7 +6,10 @@ const FlowInstagramParse = (() => {
     let u;
     try { u = new URL(String(href || '')); } catch (e) { return null; }
     const host = u.hostname.replace(/^www\./, '');
-    if (host === 'instagram.com' && (u.pathname === '/direct' || u.pathname.indexOf('/direct/') === 0)) return { host: 'instagram' };
+    if (host === 'instagram.com' && (u.pathname === '/direct' || u.pathname.indexOf('/direct/') === 0)) {
+      if (/\/direct\/requests\b/i.test(u.pathname)) return null;
+      return { host: 'instagram' };
+    }
     return null;
   }
 
