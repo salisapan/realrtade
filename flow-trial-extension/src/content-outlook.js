@@ -1368,6 +1368,8 @@
   async function onDoIt(host, chip, ctx, liveSteps) {
     const token = captureMailToken();
     if (ignoreStaleClick(host)) return;
+    // One Do It at a time: a second click while the first is writing must not start a second write.
+    if (doItInFlight) return;
     if (ctx && ctx.removeHeld) return removeHeldHold(host, chip, ctx);
     const earlySteps = (ctx && ctx.process && ctx.process.steps) || [];
     const earlyTask = earlySteps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
@@ -2703,6 +2705,19 @@
 
   async function onOnedriveDoIt(host, chip, ctx, fileStep, token) {
     const params = (fileStep && fileStep.params) || {};
+    // A file already saved for this mail (Handled, not undone) is shown again, never written a second time.
+    let priorSaved = null;
+    try {
+      const bagNow = await FlowStorage.get();
+      priorSaved = ((bagNow && bagNow.log) || []).find((e) => e && e.kind === 'written' && e.connectorId === 'onedriveFile' &&
+        e.fetchedBack === true && ctx.messageId && e.messageId === ctx.messageId) || null;
+    } catch (e) { priorSaved = null; }
+    if (priorSaved) {
+      if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
+      const priorMount = host.parentElement || mountPoint();
+      if (priorMount) paintIfCurrent(token, function () { return paintOutlookTodoReceipt(priorMount, priorSaved); });
+      return;
+    }
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
     const r = await send({
       type: 'flow:execute-action',

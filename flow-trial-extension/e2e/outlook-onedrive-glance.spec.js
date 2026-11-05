@@ -62,7 +62,7 @@ test('Do It writes into the Glance folder and Undo deletes that file', async ({ 
   }).toPass({ timeout: 30000 });
   const calls = await glance.apiCalls();
   const put = calls.find((c) => c.method === 'PUT' && /\/me\/drive\//.test(c.url));
-  expect(put && put.url).toMatch(/\/me\/drive\/root:\/Glance\/northwind-agreement-signed\.pdf:\/content$/);
+  expect(put && put.url).toMatch(/\/me\/drive\/root:\/Glance\/northwind-agreement-signed\.pdf:\/content(\?@microsoft\.graph\.conflictBehavior=rename)?$/);
 
   await pane.locator('button.flow-chip-undo').click();
   await expect.poll(async () => {

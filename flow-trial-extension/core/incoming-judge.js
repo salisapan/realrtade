@@ -878,7 +878,11 @@ const FlowIncomingJudge = (() => {
   function forSurface(process, surface) {
     if (!process || surface !== 'outlook') return process;
     const tasks = taskOnlyProcess(process);
-    const steps = (process.steps || []).map((s) => {
+    // Saving the attachment on OneDrive is a file save and nothing else: the Drive link-draft that
+    // follows a Drive save has no counterpart here, so a draft that waits on the file step is dropped.
+    const fileIds = (process.steps || []).filter((s) => s && s.kind === 'driveFile').map((s) => s.id);
+    const saveOnly = fileIds.length > 0;
+    const steps = (process.steps || []).filter((s) => !(saveOnly && s && s.kind === 'gmailDraft' && fileIds.indexOf(s.dependsOn) >= 0)).map((s) => {
       if (s && s.kind === 'gmailDraft') {
         return Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') });
       }

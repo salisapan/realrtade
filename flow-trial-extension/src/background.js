@@ -6947,8 +6947,8 @@ async function outlookOneFileAttachment(messageId) {
 
 // One file on the person's OneDrive. Creating or replacing it is not the
 // close: Handled waits for a GET of that item id. A file that already
-// exists is replaced only when a previous version can be restored. Never
-// Mail.Send. A mail does not search the drive.
+// exists is never replaced: the new one is saved beside it under a free name.
+// Never Mail.Send. A mail does not search the drive.
 async function outlookFileWrite(p) {
   const Files = globalThis.FlowOnedriveFile;
   const Proof = globalThis.FlowProofOfClose;
@@ -6975,29 +6975,11 @@ async function outlookFileWrite(p) {
   }
   if (!name || !bytes || !bytes.length || bytes.length > Files.MAX_BYTES) return { ok: false, reason: 'unclear' };
 
-  const lookupUrl = OUTLOOK_GRAPH + Files.rootItemPath(name);
-  outlookAssertNotSend(lookupUrl);
-  const looked = await outlookFetch(lookupUrl, { method: 'GET' });
-  if (looked && looked.notConnected) return { ok: false, reason: 'not-connected' };
-  if (looked && (looked.status === 401 || looked.status === 403)) return { ok: false, reason: 'files-not-granted' };
-  const missing = !looked || looked.status === 404;
-  const existing = !missing && looked.ok ? await outlookReadJson(looked) : null;
-  if (!missing && (!existing || !existing.id)) return { ok: false, reason: 'http-' + ((looked && looked.status) || 0) };
-
-  let created = true;
-  let previousVersionId = '';
-  let putUrl = OUTLOOK_GRAPH + Files.createContentPath(name);
-  if (!missing) {
-    const versionsUrl = OUTLOOK_GRAPH + Files.versionsPath(existing.id);
-    outlookAssertNotSend(versionsUrl);
-    const vers = await outlookFetch(versionsUrl, { method: 'GET' });
-    if (vers && (vers.status === 401 || vers.status === 403)) return { ok: false, reason: 'files-not-granted' };
-    const versionId = Files.versionIdOf(await outlookReadJson(vers));
-    if (!versionId) return { ok: false, reason: 'unclear', error: 'No previous version to restore.' };
-    created = false;
-    previousVersionId = versionId;
-    putUrl = OUTLOOK_GRAPH + Files.itemContentPath(existing.id);
-  }
+  // The write never replaces a file that is already there. A taken name gets Graph's own " (1)" suffix,
+  // so the item this write returns is always one it created, and Undo deletes exactly that item.
+  const created = true;
+  const previousVersionId = '';
+  const putUrl = OUTLOOK_GRAPH + Files.createContentPath(name) + '?@microsoft.graph.conflictBehavior=rename';
   outlookAssertNotSend(putUrl);
   const put = await outlookFetch(putUrl, {
     method: 'PUT',
@@ -7008,14 +6990,14 @@ async function outlookFileWrite(p) {
   if (put && (put.status === 401 || put.status === 403)) return { ok: false, reason: 'files-not-granted' };
   if (!put || !put.ok) return { ok: false, reason: 'http-' + ((put && put.status) || 0) };
   const writtenItem = await outlookReadJson(put);
-  const itemId = (writtenItem && writtenItem.id) || (existing && existing.id) || '';
+  const itemId = (writtenItem && writtenItem.id) || '';
+  const savedName = (writtenItem && writtenItem.name) || name;
   const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
   const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
-  const base = { where: 'OneDrive', target: name, written: 'OneDrive · ' + name, url: null };
+  const base = { where: 'OneDrive', target: savedName, written: 'OneDrive · ' + savedName, url: null };
   if (!itemId) return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
 
-  const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created };
-  if (previousVersionId) ref.previousVersionId = previousVersionId;
+  const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created, name: savedName };
   const fetched = await outlookFileFetchBack(itemId);
   if (fetched && fetched.item) ref.editSnap = outlookCreationSnap(fetched.item);
   if (!fetched.ok || !outlookHasSnap(ref.editSnap)) {
@@ -7079,8 +7061,22 @@ async function outlookFileUndo(ref) {
   outlookAssertNotSend(url);
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
-  if (del && (del.ok || del.status === 204 || del.status === 404)) return { ok: true, written: 'OneDrive file removed.' };
-  return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  if (!(del && (del.ok || del.status === 204 || del.status === 404))) return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  // Removed means a GET of that item no longer finds it. A delete answer alone is not the proof.
+  if (!(await outlookFileGone(itemId))) {
+    return { ok: false, reason: 'still-there', written: 'OneDrive still has this file. Undo could not remove it.' };
+  }
+  return { ok: true, written: 'OneDrive file removed.' };
+}
+
+async function outlookFileGone(itemId) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || !itemId) return false;
+  const url = OUTLOOK_GRAPH + Files.itemPath(itemId);
+  outlookAssertNotSend(url);
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { return false; }
+  return Boolean(res && (res.status === 404 || res.status === 410));
 }
 
 // The attachmentSave step's writer. The page does not call it in 0.9.38.

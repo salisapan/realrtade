@@ -376,7 +376,24 @@ function installE2EHooks() {
         return Promise.resolve(json(401, { error: { code: 'InvalidAuthenticationToken' } }));
       }
       if (driveContent && method === 'PUT') {
-        const key = driveContent[1];
+        let key = driveContent[1];
+        // A file the user already had under that name (scenario.drivePreexisting), seeded the first time it is touched.
+        (scenario.drivePreexisting || []).forEach((k) => {
+          if (!e2e.driveByName[k] && !(e2e.driveSeeded || {})[k]) {
+            e2e.driveSeeded = Object.assign({}, e2e.driveSeeded, { [k]: true });
+            const sid = 'e2e-file-' + (e2e.seq++);
+            const seed = { id: sid, name: k.split('/').pop(), webUrl: 'https://onedrive.live.com/file/' + sid, file: { mimeType: 'application/pdf' }, size: 99, __key: k };
+            e2e.driveItems[sid] = seed;
+            e2e.driveByName[k] = seed;
+          }
+        });
+        // conflictBehavior=rename on a taken name saves beside it under " (1)", " (2)", as Graph answers.
+        if (/conflictBehavior=rename/.test(parsed.search || '')) {
+          const dot = key.lastIndexOf('.');
+          const stem = dot > key.lastIndexOf('/') ? key.slice(0, dot) : key;
+          const ext = dot > key.lastIndexOf('/') ? key.slice(dot) : '';
+          for (let n = 1; e2e.driveByName[key]; n++) key = stem + '%20(' + n + ')' + ext;
+        }
         // conflictBehavior=fail on a name that is taken is a 409, as Graph answers; nothing is replaced.
         if (/conflictBehavior=fail/.test(parsed.search || '') && e2e.driveByName[key]) {
           return Promise.resolve(json(409, { error: { code: 'nameAlreadyExists' } }));
@@ -402,6 +419,10 @@ function installE2EHooks() {
           const gone = e2e.driveItems[id];
           if (gone && gone.__key) delete e2e.driveByName[gone.__key];
           e2e.driveDeletes = (e2e.driveDeletes || []).concat([id]);
+          // scenario.driveKeepOnDelete: Graph answers 204 and the file is still there (the case Undo must not call a removal).
+          if (scenario.driveKeepOnDelete) {
+            return Promise.resolve(empty(204));
+          }
           delete e2e.driveItems[id];
           return Promise.resolve(empty(204));
         }
@@ -861,6 +882,14 @@ async function boot() {
 
   harness.storage = async function storage() {
     return evalWorker(() => new Promise((resolve) => chrome.storage.local.get(null, resolve)));
+  };
+
+  // The mocked OneDrive as it stands: the item names still there (by id), so a test can tell which file an Undo removed.
+  harness.driveFiles = async function driveFiles() {
+    return evalWorker(() => {
+      const e = globalThis.__glanceE2e || {};
+      return Object.keys(e.driveItems || {}).map((id) => ({ id: id, name: e.driveItems[id].name }));
+    });
   };
 
   harness.apiCalls = async function apiCalls() {
