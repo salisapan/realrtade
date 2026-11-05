@@ -150,3 +150,11 @@ One more state of the chat card, drawn with the existing canonical Do It compone
 - While the reply is still a draft, or the sent reply only holds ("אחזור אליך", "let me check") or only thanks, the card stays as the open loop. No new card.
 - No action needed from the person; the card shows the close and offers Undo.
 - Undo: reopens the loop. The sent mail is never touched (sent mail: Undo unavailable). If the person changed the loop since, the card says Undo unavailable.
+## C2 — move that meeting (added 2026-11-03)
+
+- Module `flow-trial-extension/core/calendar-move.js`, switch `CALENDAR_MOVE_PROOF`. Map row C2.
+- When: a mail asks to move a named slot to another named slot, and the person's calendar has exactly one event of their own at the old slot, with no other guests.
+- Line: `הזזת ביומן: <title> ל-<date> <HH:MM>` / `Move on your calendar: <title> to <date> <HH:MM>`.
+- One step: the calendar. Choice: Do It. After the read-back: Handled with the new time.
+- Undo: puts the old time back. If the person changed the event since, the card says Undo unavailable.
+- No card when the event has guests, belongs to someone else, repeats, or two events share the old slot.
