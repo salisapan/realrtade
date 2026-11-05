@@ -424,6 +424,15 @@ console.log('\n--- one Undo after reload ---\n');
     /bodyText: text/.test(outlookSrc));
   const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
   const storage = fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8');
+  {
+    const row = { kind: 'written', connectorId: 'onedriveFile', system: 'microsoft/onedrive', externalId: 'f1', messageId: 'graph-id', threadId: 'conv-1',
+      writtenLine: 'Saved plan (1).pdf to OneDrive', fetchedBack: true, receiptStatus: 'Handled.' };
+    const got = Proof.savedFileReceipt([row], { messageIds: ['owa-id', 'graph-id'], fileNames: ['plan.pdf'], subject: '' });
+    check('a file OneDrive renamed to "(1)" is still the saved attachment, so the card stays Handled', Boolean(got));
+    const viaThread = Proof.taskReceiptFromLog([row], { messageIds: ['owa-id'], threadIds: ['conv-1'], fileNames: ['plan.pdf'] });
+    check('the same renamed row still matches by thread and file name after a reload', Boolean(viaThread));
+    check('a different file in that mail does not match', !Proof.savedFileReceipt([row], { messageIds: ['graph-id'], fileNames: ['other.pdf'] }));
+  }
   check('Undo rewrites the OneDrive Activity row',
     storage.indexOf('markOnedriveFileUndone') > 0 && popup.indexOf('markOnedriveFileUndone') > 0 &&
     page.indexOf('markOnedriveFileUndone') > 0);

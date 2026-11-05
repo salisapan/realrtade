@@ -15,12 +15,14 @@ function localIso(y, month, day, hour, minute) {
   return new Date(y, month - 1, day, hour, minute, 0, 0).toISOString();
 }
 
-async function openAsk(glance, conv, msg, extra) {
-  await glance.seedOutlook();
+async function openAsk(glance, conv, msg, extra, opts) {
+  opts = opts || {};
+  const subject = opts.subject || 'Vendor agreement';
+  await glance.seedOutlook(opts.seed);
   await glance.setScenario(Object.assign({
     inboxFilterFails: true,
     inbox: [{
-      id: msg, conversationId: conv, subject: 'Vendor agreement', receivedDateTime: localIso(TD.y, TD.m, TD.d, 14, 1),
+      id: msg, conversationId: conv, subject: subject, receivedDateTime: localIso(TD.y, TD.m, TD.d, 14, 1),
       from: { emailAddress: { name: 'flow', address: S.SENDER } }, hasAttachments: true,
       internetMessageId: '<' + msg + '@mail.test>'
     }],
@@ -34,9 +36,9 @@ async function openAsk(glance, conv, msg, extra) {
     confirmConversation: true,
     live: true,
     id: conv,
-    subject: 'Vendor agreement',
+    subject: subject,
     senderEmail: S.SENDER,
-    body: 'Please save the attached PDF to OneDrive by Friday.',
+    body: opts.body || 'Please save the attached PDF to OneDrive by Friday.',
     receivedLabel: TD.dmy + ' 14:01',
     attachments: [{ shownName: NAME, titleName: NAME, sizeLabel: '1 KB' }]
   });
@@ -132,4 +134,51 @@ test('two quick clicks on Do It write one file', async ({ glance }) => {
   expect((await fileCalls(glance)).puts).toHaveLength(1);
   const bag = await glance.storage();
   expect((bag.log || []).filter((e) => e && e.kind === 'written' && e.connectorId === 'onedriveFile')).toHaveLength(1);
+});
+
+test('after Do It the card stays Handled across a reload and a reopen, never back to the proposed Do It', async ({ glance }) => {
+  test.setTimeout(150000);
+  const page = await openAsk(glance, 'AQQKGlanceE2EAskReload', 'AQMkGlanceE2EAskReload');
+  const pane = page.locator(PANE);
+  await expect(pane.locator('.flow-chip-host')).toBeVisible({ timeout: 30000 });
+  await pane.locator('button.flow-chip').click();
+  await expect(pane.locator('.flow-chip-handled')).toBeVisible({ timeout: 30000 });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(pane.locator('.flow-chip-handled')).toBeVisible({ timeout: 30000 });
+  await page.waitForTimeout(4000);
+  await expect(pane.locator('.flow-chip-handled')).toBeVisible();
+  await expect(pane.locator('button.flow-chip')).toHaveCount(0);
+  expect((await fileCalls(glance)).puts).toHaveLength(1);
+});
+
+test('with a name already taken, the renamed file card is still Handled after a reload, with its View link', async ({ glance }) => {
+  test.setTimeout(150000);
+  const page = await openAsk(glance, 'AQQKGlanceE2EAskRen', 'AQMkGlanceE2EAskRen',
+    { drivePreexisting: ['Glance/' + NAME] },
+    { subject: 'Supplier contract \u2013 OneDrive', seed: { glanceUiLanguage: 'he' }, body: 'היי, נא לשמור את ה-PDF המצורף ב-OneDrive עד יום שישי.' });
+  const pane = page.locator(PANE);
+  await expect(pane.locator('.flow-chip-host')).toBeVisible({ timeout: 30000 });
+  await pane.locator('button.flow-chip').click();
+  await expect(pane.locator('.flow-chip-handled')).toBeVisible({ timeout: 30000 });
+  const renamed = 'vendor-agreement-2026 (1).pdf';
+  await expect(pane.locator('.flow-chip-host')).toContainText(renamed);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(pane.locator('.flow-chip-handled')).toBeVisible({ timeout: 30000 });
+  await page.waitForTimeout(4000);
+  await expect(pane.locator('.flow-chip-handled')).toBeVisible();
+  await expect(pane.locator('button.flow-chip')).toHaveCount(0);
+  // The same saved record paints the same receipt: the saved name, and a way to open it.
+  await expect(pane.locator('.flow-chip-host')).toContainText(renamed);
+  await expect(pane.locator('.flow-chip-host')).toContainText('טופל');
+  const bag = await glance.storage();
+  const rows = (bag.log || []).filter((e) => e.kind === 'written' && e.connectorId === 'onedriveFile');
+  expect(rows).toHaveLength(1);
+  expect(rows[0].receiptStatus).toBe('טופל.');
+  // Activity says Handled (טופל) for the same record, never an ongoing label.
+  const popup = await glance.openPopup();
+  await popup.locator('button.tab[data-tab="log"]').click();
+  const kind = popup.locator('#log-list .log-kind, .panel.active .log-kind');
+  await expect(kind.first()).toHaveText('טופל');
+  await expect(popup.locator('.panel.active')).not.toContainText('שוטף');
+  expect((await fileCalls(glance)).puts).toHaveLength(1);
 });

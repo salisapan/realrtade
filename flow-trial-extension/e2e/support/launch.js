@@ -954,6 +954,7 @@ async function boot() {
       e.drafts = {};
       e.driveItems = {};
       e.driveByName = {};
+      e.driveSeeded = {};
       e.seq = 1;
       delete e.httpOrigin;
       if (globalThis.FlowGoogleLaneAccount && globalThis.FlowGoogleLaneAccount.forget) globalThis.FlowGoogleLaneAccount.forget();
