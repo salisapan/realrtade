@@ -1,0 +1,23 @@
+// Side-effect load order for the on-device judge stack (must match regress-144 + graph-mail).
+import '../core/domains.js';
+import '../core/extract.js';
+import '../core/judgment.js';
+import '../core/source-text.js';
+import '../core/google-closes.js';
+import '../core/close-families.js';
+import '../core/fact-reply.js';
+import '../core/channel.js';
+import '../core/follow-up.js';
+import '../core/name-match.js';
+import '../core/intent.js';
+import '../core/file-attach.js';
+import '../core/actions.js';
+import '../core/system-notice.js';
+import '../core/resolution.js';
+import '../core/draft-reply.js';
+import '../core/quiet-metrics.js';
+import '../core/request-types.js';
+import '../core/commitment-title.js';
+import '../core/display-copy.js';
+import '../core/incoming-judge.js';
+import '../core/graph-mail.js';

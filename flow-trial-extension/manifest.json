@@ -41,6 +41,7 @@
         "core/build-stamp.js",
         "core/fact-reply.js",
         "core/close-families.js",
+        "core/name-match.js",
         "core/intent.js",
         "core/file-attach.js",
         "core/actions.js",
