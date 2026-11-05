@@ -88,6 +88,7 @@ import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/teams-answer-close.js'; // classic: sets globalThis.FlowTeamsAnswerClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
 import './google-lane-host.js';
@@ -4139,8 +4140,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack, teams: CONNECTORS.teamsAnswerReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file', teams: 'teams/chat-message' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -4568,6 +4569,58 @@ async function docusignCheck(payload) {
 async function docusignRelease(payload) {
   const r = await docusignCloseEngine().release((payload || {}).key);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'docusign', closeType: 'signature' });
+  return r;
+}
+
+/* ------------------------------------------------ Teams chat answer (Graph), with a proof */
+// docs/glance-ai/connectors/teams.md. READ-ONLY: Glance reads one chat the person linked to one loop; it never posts, edits or deletes a message.
+// It uses the Outlook connection the person already made, and only the Chat.Read scope the Connect screen's Teams box already asks.
+// Everything here is behind config/connectors.public.js (teamsAnswerReadBack), off.
+
+const TEAMS_ANSWER_LEDGER_KEY = 'teamsAnswerLedger';
+
+function teamsAnswerEngine() {
+  return globalThis.FlowTeamsAnswerClose.create({
+    graph: graphJson,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(TEAMS_ANSWER_LEDGER_KEY))[TEAMS_ANSWER_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(TEAMS_ANSWER_LEDGER_KEY))[TEAMS_ANSWER_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [TEAMS_ANSWER_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+// Chat.Read must be among the scopes the person's Microsoft sign-in actually holds; otherwise nothing is asked and nothing is read.
+async function teamsChatGranted() {
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const Cal = globalThis.FlowOutlookCalendar;
+  const scopes = (Cal && Cal.scopesFromToken) ? Cal.scopesFromToken(session.token) : session.token.grantedScopes;
+  const list = Array.isArray(scopes) ? scopes : (typeof scopes === 'string' ? scopes.split(/[\s,]+/) : []);
+  const has = list.some((s) => String(s || '').replace(/^https:\/\/graph\.microsoft\.com\//i, '').toLowerCase() === 'chat.read');
+  return has ? { ok: true } : { ok: false, reason: 'chat-not-granted' };
+}
+
+// payload: { key, chatId (a chat id or a Teams chat link), askedAtIso, direction: "mine" | "theirs" }
+async function teamsAnswerCheck(payload) {
+  const started = Date.now();
+  const granted = await teamsChatGranted();
+  if (!granted.ok) return { ok: false, reason: granted.reason };
+  const r = await teamsAnswerEngine().check(payload || {});
+  if (r.closed) await noteConnectorOutcome('handled', started, { connector: 'teams', closeType: 'answer' });
+  else if (r.reason === 'verify_failed') await noteConnectorOutcome('readback_failed', started, { connector: 'teams', closeType: 'answer' });
+  return r;
+}
+
+async function teamsAnswerRelease(payload) {
+  const r = await teamsAnswerEngine().release((payload || {}).key);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'teams', closeType: 'answer' });
   return r;
 }
 
@@ -6993,6 +7046,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     if (!CONNECTORS.dropboxReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
     return reply(sendResponse, msg.type === 'flow:dropbox-save' ? dropboxSave(msg.payload) : dropboxUndo(msg.payload));
+  }
+
+  // Teams chat answer (read-only): link one chat to one loop and read it for the person's own answer; release stops watching. Off = not live.
+  if (msg.type === 'flow:teams-answer-check' || msg.type === 'flow:teams-answer-release') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (!CONNECTORS.teamsAnswerReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
+    return reply(sendResponse, msg.type === 'flow:teams-answer-check' ? teamsAnswerCheck(msg.payload) : teamsAnswerRelease(msg.payload));
   }
 
   // DocuSign (read-only): link one envelope to one loop and read its status; release stops watching. Off = not live.
