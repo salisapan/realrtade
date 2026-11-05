@@ -17,10 +17,10 @@ function onHomepage(e) {
     var next = loadPrefetch_();
     if (next) savePrefetch_(next);
     else clearPrefetch_();
-    return [render_(Glance.cards.homepage(next, lang))];
+    return [render_(Glance.cards.homepage(next, lang, buildSha_()))];
   } catch (err) {
     console.error(err && err.message ? err.message : err);
-    return [render_(Glance.cards.homepage(null, lang))];
+    return [render_(Glance.cards.homepage(null, lang, buildSha_()))];
   }
 }
 
@@ -43,13 +43,30 @@ function onGmailMessageOpen(e) {
       planId: decision.planId,
       calendarService: calendarService
     });
-    if (!decision.speak) return [render_(Glance.cards.quiet(lang))];
+    if (!decision.speak) return [render_(silenceCard_(decision, opened.messageId, lang))];
     return [render_(Glance.cards.proposal(decision, opened.messageId, lang))];
   } catch (err) {
     errorLog_(err);
     var snap = err && err.read ? err.read : read;
     logOpen_(snap, { speak: false, reason: 'error', planId: null, calendarService: calendarReady_() });
     return [render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'open'))];
+  }
+}
+
+function onRemindMe(e) {
+  var lang = Glance.i18n.locale(localeOf_(e));
+  var job;
+  try {
+    job = stageRemindMe_(e, lang);
+  } catch (err) {
+    return finishDoError_(err, lang);
+  }
+  if (job.card) return job.card;
+  requireScopesNow_(job.scopes);
+  try {
+    return job.write();
+  } catch (err) {
+    return finishDoError_(err, lang);
   }
 }
 
@@ -111,12 +128,137 @@ function stageDoIt_(e, lang) {
   }
   var decision = judgeOpen_(opened, e);
   planLog_(decision, opened.messageId);
-  if (!decision.speak) return { card: update_(render_(Glance.cards.quiet(lang))) };
+  if (!decision.speak) return { card: update_(render_(silenceCard_(decision, opened.messageId, lang))) };
   return {
     scopes: scopesForKind_(decision.kind),
     write: function () {
       return finishDecision_(decision, opened, opened.messageId, lang, timeZoneOf_(e));
     }
+  };
+}
+
+function stageRemindMe_(e, lang) {
+  var openedRead = emptyRead_(e);
+  var opened = readOpen_(e, openedRead);
+  if (!opened) throw readFail_('open', openedRead);
+  var existing = readUndo_(opened.messageId);
+  if (existing && existing.view) {
+    return { card: update_(render_(Glance.cards.proof(existing.view, lang, { messageId: opened.messageId, undo: true }))) };
+  }
+  var title = remindTitle_(opened, lang);
+  return {
+    scopes: scopesForKind_('task'),
+    write: function () {
+      return finishCreate_({
+        title: title,
+        due: null,
+        notes: notesFor_(opened),
+        listId: glanceTaskList_(),
+        timeZone: timeZoneOf_(e)
+      }, opened.messageId, lang);
+    }
+  };
+}
+
+function silenceCard_(decision, messageId, lang) {
+  if (decision && decision.reason === 'dropped' && (decision.droppedPlanId || decision.planId)) {
+    return Glance.cards.spottedUnsupported(decision, messageId, lang);
+  }
+  return Glance.cards.quiet(lang, decision && decision.reason);
+}
+
+function remindTitle_(opened, lang) {
+  var subject = Glance.intent.sanitizeTitle(opened && opened.subject);
+  var body = Glance.intent.sanitizeTitle(opened && opened.body);
+  var he = lang === 'he' || /[\u0590-\u05FF]/.test((subject || '') + (body || ''));
+  if (subject) return subject;
+  if (body) {
+    var line = String(body).split('\n').map(function (row) { return row.trim(); }).filter(Boolean)[0] || '';
+    if (line) return Glance.intent.sanitizeTitle(line);
+  }
+  return he ? 'לחזור להודעה' : 'Follow up on this email';
+}
+
+function buildSha_() {
+  try {
+    if (typeof GLANCE_BUILD_SHA !== 'undefined' && GLANCE_BUILD_SHA) return String(GLANCE_BUILD_SHA);
+  } catch (err) { /* optional */ }
+  return '';
+}
+
+function readerEmailFromEvent_(e) {
+  if (!e) return '';
+  if (e.userEmail) return String(e.userEmail).trim().toLowerCase();
+  var common = e.commonEventObject;
+  if (common && common.userEmail) return String(common.userEmail).trim().toLowerCase();
+  return '';
+}
+
+function activeUserEmail_(e) {
+  try {
+    if (typeof Session !== 'undefined' && Session.getActiveUser) {
+      var email = Session.getActiveUser().getEmail();
+      if (email) return String(email).trim().toLowerCase();
+    }
+  } catch (err) { /* add-on sandbox */ }
+  return readerEmailFromEvent_(e);
+}
+
+function readerDisplayNameFromHeaders_(userEmail, toRaw, ccRaw) {
+  var want = String(userEmail || '').trim().toLowerCase();
+  if (!want) return '';
+  var found = '';
+  function scan(raw) {
+    String(raw || '').split(/\s*(?:,|;)\s*/).forEach(function (part) {
+      if (!part) return;
+      var parsed = parseFrom_(part.trim());
+      if (parsed.email && parsed.email.toLowerCase() === want && parsed.name) found = parsed.name;
+    });
+  }
+  scan(toRaw);
+  scan(ccRaw);
+  return found;
+}
+
+function parseRecipientList_(raw) {
+  var out = [];
+  String(raw || '').split(/\s*(?:,|;)\s*/).forEach(function (part) {
+    if (!part) return;
+    var parsed = parseFrom_(part.trim());
+    if (parsed.email) {
+      var local = parsed.email.split('@')[0] || '';
+      out.push({ name: parsed.name || '', email: parsed.email.toLowerCase(), localPart: local.toLowerCase() });
+    }
+  });
+  return out;
+}
+
+function readerContext_(toRaw, ccRaw, e) {
+  var email = activeUserEmail_(e);
+  var display = readerDisplayNameFromHeaders_(email, toRaw, ccRaw);
+  if (!display && email) {
+    var local = email.split('@')[0] || '';
+    if (local) {
+      display = local.replace(/[._-]+/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+    }
+  }
+  var ownAddresses = email ? [email] : [];
+  var ownNames = [];
+  if (typeof FlowIntent !== 'undefined' && FlowIntent.readerNamesFrom) {
+    ownNames = FlowIntent.readerNamesFrom({
+      displayName: display,
+      userName: display,
+      profile: null,
+      knownNames: ownAddresses
+    });
+  }
+  return {
+    userName: display || null,
+    ownNames: ownNames,
+    ownAddresses: ownAddresses,
+    readerEmail: email || null,
+    toRecipients: parseRecipientList_(toRaw),
+    ccRecipients: parseRecipientList_(ccRaw)
   };
 }
 
@@ -205,9 +347,23 @@ function judgeOpen_(opened, e) {
   var now = new Date();
   var timeZone = timeZoneOf_(e);
   var engine = function (raw) { return engineHit_(raw, opened, now); };
-  var decision = Glance.intent.resolveTask(opened.body, { now: now, timeZone: timeZone, engine: engine });
-  if (!decision.speak && opened.subject) {
-    decision = Glance.intent.resolveTask(opened.subject, { now: now, timeZone: timeZone, engine: engine });
+  var resolveCtx = {
+    now: now,
+    timeZone: timeZone,
+    engine: engine,
+    userName: opened.userName || null,
+    ownNames: opened.ownNames || null,
+    readerEmail: opened.readerEmail || null,
+    toRecipients: opened.toRecipients || [],
+    ccRecipients: opened.ccRecipients || []
+  };
+  var decision = Glance.intent.silence('no-plan', null);
+  var body = String(opened.body || '').trim();
+  if (body) {
+    decision = Glance.intent.resolveTask(opened.body, resolveCtx);
+  }
+  if (!decision.speak && decision.reason !== 'dropped' && opened.subject) {
+    decision = Glance.intent.resolveTask(opened.subject, resolveCtx);
   }
   return decision;
 }
@@ -221,12 +377,21 @@ function engineHit_(text, opened, now) {
       subject: opened.subject || '',
       sender: { email: opened.fromEmail || null, name: opened.fromName || null },
       to: opened.toList || [],
+      toRecipients: opened.toRecipients || [],
+      ccRecipients: opened.ccRecipients || [],
       ownAddresses: opened.ownAddresses || [],
+      userName: opened.userName || null,
+      ownNames: opened.ownNames || [],
+      readerEmail: opened.readerEmail || null,
+      namesWaitDone: Boolean(opened.readerEmail),
       now: now,
       surface: 'gmail',
-      attachmentCount: 0
+      attachmentCount: opened.attachmentCount == null ? 0 : opened.attachmentCount,
+      inbound: true
     });
-    if (!judged || !judged.show) return { intent: judged ? judged.intent : null, plan: null };
+    if (!judged || !judged.show) {
+      return { intent: judged ? judged.intent : null, plan: null, reason: judged ? judged.reason : null };
+    }
     return { intent: judged.intent, plan: judged.process };
   }
   if (typeof Glance.classify !== 'function' || typeof Glance.plan !== 'function') return null;
@@ -399,6 +564,7 @@ function readOpen_(e, read) {
   var subject;
   var fromRaw;
   var toRaw;
+  var attachmentCount = 0;
   try {
     plain = String(message.getPlainBody() || '');
     read.plainBodyLength = plain.length;
@@ -408,12 +574,32 @@ function readOpen_(e, read) {
     var parsed = parseFrom_(fromRaw);
     read.from = parsed.email;
     toRaw = typeof message.getTo === 'function' ? message.getTo() : '';
+    var ccRaw = typeof message.getCc === 'function' ? message.getCc() : '';
     read.isSelf = isSelfMail_(parsed.email, toRaw);
+    if (typeof message.getAttachments === 'function') {
+      var attachments = message.getAttachments();
+      attachmentCount = attachments && attachments.length ? attachments.length : 0;
+    }
   } catch (err) {
     throw readFail_('body', read, err);
   }
   var from = parseFrom_(fromRaw);
   var threadId = e.gmail.threadId ? String(e.gmail.threadId) : '';
+  var toList = emailsIn_(toRaw);
+  var reader = readerContext_(toRaw, ccRaw, e);
+  var ownAddresses = reader.ownAddresses.slice();
+  if (read.isSelf && from.email) {
+    var fromLower = String(from.email).trim().toLowerCase();
+    if (fromLower && ownAddresses.indexOf(fromLower) < 0) ownAddresses.push(fromLower);
+  }
+  if (typeof FlowIntent !== 'undefined' && FlowIntent.readerNamesFrom) {
+    reader.ownNames = FlowIntent.readerNamesFrom({
+      displayName: reader.userName,
+      userName: reader.userName,
+      profile: null,
+      knownNames: ownAddresses
+    });
+  }
   return {
     messageId: read.messageId,
     threadId: threadId,
@@ -423,7 +609,15 @@ function readOpen_(e, read) {
     subject: read.subject,
     fromName: from.name,
     fromEmail: from.email,
-    isSelf: read.isSelf
+    isSelf: read.isSelf,
+    toList: toList,
+    ownAddresses: ownAddresses,
+    userName: reader.userName,
+    ownNames: reader.ownNames,
+    readerEmail: reader.readerEmail,
+    toRecipients: reader.toRecipients,
+    ccRecipients: reader.ccRecipients,
+    attachmentCount: attachmentCount
   };
 }
 
@@ -784,7 +978,7 @@ function render_(model) {
     var widget = widgets[i];
     if (widget.type === 'text') section.addWidget(text_(widget.text));
     if (widget.type === 'button' && widget.action === 'authorize') section.addWidget(authButton_(widget));
-    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo')) {
+    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo' || widget.action === 'onRemindMe')) {
       section.addWidget(button_(widget));
     }
   }

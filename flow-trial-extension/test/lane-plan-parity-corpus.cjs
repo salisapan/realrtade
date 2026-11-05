@@ -142,6 +142,13 @@ for (const row of fix.plans) {
       { g: g, o: o, reason: [got.g && got.g.reason, got.o && got.o.reason] });
     continue;
   }
+  if (row.id === 'hold') {
+    check('gmail and outlook hold parity: ' + row.text,
+      got.g && got.g.show === true && got.o && got.o.show === true &&
+      g && o && g.id === 'hold' && o.id === 'hold',
+      { g: g, o: o, reason: [got.g && got.g.reason, got.o && got.o.reason] });
+    continue;
+  }
   check('gmail plan, outlook quiet: ' + row.text,
     got.g && got.g.show === true && got.o && got.o.show === false && got.o.reason === 'no-draft-close' &&
     g && g.id === row.id,

@@ -301,7 +301,7 @@ console.log('\n--- OneDrive save reaches a card, and a drop still has a reason -
   const shown = plan([one]);
   const kinds = shown.incoming[0] && shown.incoming[0].process && shown.incoming[0].process.steps.map((s) => s.kind);
   check('one PDF on a OneDrive save is an incoming card',
-    shown.incoming.length === 1 && kinds && kinds[0] === 'onedriveFile' && kinds[1] === 'outlookDraft' &&
+    shown.incoming.length === 1 && kinds && kinds.length === 1 && kinds[0] === 'onedriveFile' &&
     shown.incoming[0].process.steps[0].label === 'OneDrive' && shown.diagnostics.length === 0,
     { incoming: shown.incoming.map((x) => x.subject), kinds, diagnostics: shown.diagnostics });
   const two = theirs('od2', SAVE, 0.1, 'Gate two files');

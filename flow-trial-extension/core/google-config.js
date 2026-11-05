@@ -6,9 +6,9 @@
 // lbihckfmoffgjjlnneoeaehbhoonfenh.
 //
 // Allowed scopes, and nothing else: openid, email, profile, drive.file,
-// calendar.events, tasks, forms.body (a new form, behind GOOGLE_FORMS). Docs and Sheets are used only
-// on a file Glance created or the person picked. A gmail.* scope is refused
-// here. Gmail is read and filled on the Gmail page. Glance never presses Send.
+// calendar.events, tasks. Docs and Sheets are used only on a file Glance created
+// or the person picked. A gmail.* scope is refused here. Gmail is read and filled
+// on the Gmail page. Glance never presses Send.
 const FlowGoogleConfig = (() => {
   const CLIENT_ID = '93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com';
   const EXTENSION_ID = 'lbihckfmoffgjjlnneoeaehbhoonfenh';
@@ -18,15 +18,26 @@ const FlowGoogleConfig = (() => {
   const SCOPE_DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
   const SCOPE_CALENDAR = 'https://www.googleapis.com/auth/calendar.events';
   const SCOPE_TASKS = 'https://www.googleapis.com/auth/tasks';
-  const SCOPE_FORMS = 'https://www.googleapis.com/auth/forms.body';
+  const SCOPE_USERINFO_EMAIL = 'https://www.googleapis.com/auth/userinfo.email';
+  const SCOPE_USERINFO_PROFILE = 'https://www.googleapis.com/auth/userinfo.profile';
+  const SCOPE_GMAIL_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose';
+  const SCOPE_DRIVE_READONLY = 'https://www.googleapis.com/auth/drive.readonly';
+  const SCOPE_CONTACTS_READONLY = 'https://www.googleapis.com/auth/contacts.readonly';
   const SCOPES = [
     SCOPE_OPENID,
-    SCOPE_EMAIL,
-    SCOPE_PROFILE,
+    SCOPE_USERINFO_EMAIL,
+    SCOPE_USERINFO_PROFILE,
     SCOPE_DRIVE_FILE,
     SCOPE_CALENDAR,
+    SCOPE_TASKS
+  ];
+  const OAUTH_SCOPE_SET_EXACT = [
+    SCOPE_CALENDAR,
     SCOPE_TASKS,
-    SCOPE_FORMS
+    SCOPE_DRIVE_FILE,
+    SCOPE_OPENID,
+    SCOPE_USERINFO_PROFILE,
+    SCOPE_USERINFO_EMAIL
   ];
 
   function scopeList(scopes) {
@@ -46,6 +57,7 @@ const FlowGoogleConfig = (() => {
     if (/gmail/i.test(s) || /mail\.google/i.test(s) || /Mail\.Send/i.test(s)) return 'gmail-scope';
     if (/drive\.readonly/i.test(s) || /\/auth\/drive$/i.test(s)) return 'drive-wide';
     if (/\/auth\/documents/i.test(s) || /\/auth\/spreadsheets/i.test(s)) return 'docs-scope';
+    if (/contacts\.readonly/i.test(s) || /\/auth\/contacts/i.test(s)) return 'contacts-scope';
     if (SCOPES.indexOf(s) < 0) return 'not-allowed';
     return '';
   }
@@ -81,6 +93,18 @@ const FlowGoogleConfig = (() => {
     }
     if (hasScope(scopes, needed) === false) return { ok: false, reason: missingReason };
     return null;
+  }
+
+  function mailboxDriveSearchAllowed(scopes) {
+    return hasScope(scopes, SCOPE_DRIVE_READONLY) === true;
+  }
+
+  function gmailDraftApiAllowed(scopes) {
+    return hasScope(scopes, SCOPE_GMAIL_COMPOSE) === true;
+  }
+
+  function oauthScopeSetExact() {
+    return OAUTH_SCOPE_SET_EXACT.slice();
   }
 
   function proofOf(system, externalId, url, verifiedAt) {
@@ -130,6 +154,13 @@ const FlowGoogleConfig = (() => {
     SCOPE_DRIVE_FILE: SCOPE_DRIVE_FILE,
     SCOPE_CALENDAR: SCOPE_CALENDAR,
     SCOPE_TASKS: SCOPE_TASKS,
+    SCOPE_CONTACTS_READONLY: SCOPE_CONTACTS_READONLY,
+    SCOPE_GMAIL_COMPOSE: SCOPE_GMAIL_COMPOSE,
+    SCOPE_DRIVE_READONLY: SCOPE_DRIVE_READONLY,
+    OAUTH_SCOPE_SET_EXACT: OAUTH_SCOPE_SET_EXACT,
+    mailboxDriveSearchAllowed: mailboxDriveSearchAllowed,
+    gmailDraftApiAllowed: gmailDraftApiAllowed,
+    oauthScopeSetExact: oauthScopeSetExact,
     scopeList: scopeList,
     refusalReason: refusalReason,
     refused: refused,
@@ -142,5 +173,5 @@ const FlowGoogleConfig = (() => {
   };
 })();
 
+if (typeof globalThis !== 'undefined') globalThis.FlowGoogleConfig = FlowGoogleConfig;
 if (typeof module !== 'undefined') module.exports = { FlowGoogleConfig };
-else if (typeof globalThis !== 'undefined') globalThis.FlowGoogleConfig = FlowGoogleConfig;

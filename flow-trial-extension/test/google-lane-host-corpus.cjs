@@ -66,15 +66,15 @@ const sandbox = {
     }
   }
 };
-// The account probe (Gmail profile) is answered here for every fetch the
+// The account probe (openid/userinfo email) is answered here for every fetch the
 // checks below install, so the counted calls are the lane's own.
 {
   let inner = sandbox.fetch;
-  const profile = /\/gmail\/v1\/users\/me\/profile/;
-  const answer = { ok: true, status: 200, text: async () => '{"emailAddress":"host@example.com"}', json: async () => ({ emailAddress: 'host@example.com' }) };
+  const userinfo = /\/oauth2\/v3\/userinfo/;
+  const answer = { ok: true, status: 200, text: async () => '{"email":"host@example.com"}', json: async () => ({ email: 'host@example.com' }) };
   Object.defineProperty(sandbox, 'fetch', {
     configurable: true,
-    get: () => (url, init) => (profile.test(String(url)) ? Promise.resolve(answer) : inner(url, init)),
+    get: () => (url, init) => (userinfo.test(String(url)) ? Promise.resolve(answer) : inner(url, init)),
     set: (fn) => { inner = fn; }
   });
 }
@@ -83,7 +83,7 @@ vm.createContext(sandbox);
 
 const cores = [
   'google-config.js', 'google-account.js', 'google-calendar.js', 'google-tasks.js', 'google-drive.js',
-  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-drafts.js', 'google-proof.js'
+  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-drafts.js', 'google-proof.js', 'google-contacts.js'
 ];
 for (const f of cores) {
   vm.runInContext(fs.readFileSync(path.join(EXT, 'core', f), 'utf8'), sandbox, { filename: f });
@@ -105,7 +105,20 @@ check('background.js imports the lane host once', imports.length === 1, imports.
 
 const gmail = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
 check('Hold It, Task, Save file, Doc and Sheet send flow:google-write', /type: 'flow:google-write'/.test(gmail) && /googleHold:/.test(gmail) === false && /calendar: 'googleHold'/.test(gmail) && /googleTask: 'googleLaneTask'/.test(gmail) && /driveFile: 'googleDriveSave'/.test(gmail) && /driveDoc: 'googleDoc'/.test(gmail) && /driveSheet: 'googleSheetAppend'/.test(gmail));
-check('Draft reply sends flow:gmail-compose, and with no reply open creates the draft through the drafts API (no contacts lookup, no contacts scope)', /type: 'flow:gmail-compose'/.test(gmail) && !/flow:google-contacts/.test(gmail) && /googleReplyDraft/.test(gmail) && /gmailDraft: 'gmailCompose'/.test(gmail));
+check('Draft reply with compose open uses flow:gmail-compose DOM fill', /type: 'flow:gmail-compose'/.test(gmail) && /gmailDraft: 'gmailCompose'/.test(gmail));
+const saveReplyDraftSlice = gmail.slice(
+  gmail.indexOf('async function saveReplyDraft'),
+  gmail.indexOf('async function sendGmailCompose(payload)')
+);
+const sendGmailComposeSlice = gmail.slice(
+  gmail.indexOf('async function sendGmailCompose(payload)'),
+  gmail.indexOf('async function sendLaneUndo')
+);
+check('Compose closed routes through saveReplyDraft and googleReplyDraft',
+  /connectorId: 'googleReplyDraft'/.test(saveReplyDraftSlice)
+  && /if \(!composeBodyOpen\(\)\) return saveReplyDraft/.test(sendGmailComposeSlice));
+check('RD2: saveReplyDraft does not use gmailCompose connector', !/connectorId: 'gmailCompose'/.test(saveReplyDraftSlice), saveReplyDraftSlice.slice(0, 200));
+check('G8 contacts is a separate chip (flow:google-contacts-plan in the lane host, not mixed into the reply-draft path)', /flow:google-contacts-plan/.test(hostSrc) && /showGoogleContactsChip/.test(gmail) && !/gmailDraft[\s\S]{0,200}flow:google-contacts/.test(gmail));
 check('the card Undo sends flow:google-undo', /type: 'flow:google-undo'/.test(gmail));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
@@ -416,6 +429,35 @@ async function main() {
   delete stored.googleWebAuth;
   const cleanView = vm.runInContext('laneGoogleStatus', sandbox)(null, null, '', null, {});
   check('a clean state shows Connect', cleanView.connected === false && cleanView.needsReconnect === false && cleanView.label === 'Connect Google', cleanView);
+
+  stored.googleGrantedScopes = {
+    version: [
+      'openid',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/tasks'
+    ].join('\n'),
+    status: 'granted'
+  };
+  const probeFetches = [];
+  vm.runInContext('FlowGoogleLaneAccount.forget()', sandbox);
+  Object.defineProperty(sandbox, 'fetch', {
+    configurable: true,
+    value: async (url, init) => {
+      probeFetches.push({ url: String(url), init: init || {} });
+      if (/oauth2\/v3\/userinfo/.test(String(url))) {
+        const profile = { email: 'host@example.com' };
+        return { ok: true, status: 200, text: async () => JSON.stringify(profile), json: async () => profile };
+      }
+      return { ok: false, status: 404, text: async () => '' };
+    }
+  });
+  const probed = await vm.runInContext('FlowGoogleLaneAccount.accountOf("ya29.nocompose-probe")', sandbox);
+  check('accountOfToken uses userinfo and matches the tab without gmail.compose on the grant',
+    probed === 'host@example.com'
+    && probeFetches.some((c) => /oauth2\/v3\/userinfo/.test(c.url))
+    && !probeFetches.some((c) => /gmail\.googleapis\.com/.test(c.url)),
+    probeFetches.map((c) => c.url));
 
   if (failures) {
     console.log('\n' + failures + ' failed');
