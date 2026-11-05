@@ -11,7 +11,8 @@
 // Nothing here closes, writes or sends: the host shows the card, and every step runs on the person's click.
 //
 // Switches: everything rides on the router's aiPrimary (off). aiKindCheckV1 (off) adds core/kind-check.js on each model answer.
-// aiTier0GuardV1 (off) runs core/tier0-guard.js on the mail first: an injection or fraud-shaped money gets no card at all. With it off read() returns { used:false } and calls nothing, so the host
+// aiTier0GuardV1 (off) runs core/tier0-guard.js on the mail first: an injection or fraud-shaped money gets no card at all.
+// aiTier0QuietV1 (off) runs core/tier0-quiet.js on the engine's own card: a hedge, an undecided sender or a met deadline stays quiet. With it off read() returns { used:false } and calls nothing, so the host
 // keeps today's path byte for byte. aiPlanV1 (off) adds the plan and the watch; aiRelevanceV1 (off) and aiDeviceTier1 (off) are read by
 // the router and the device adapter. Portable: no chrome.*, no DOM, no network; every capability is injected.
 const FlowAiEngine = (() => {
@@ -22,6 +23,7 @@ const FlowAiEngine = (() => {
   const router = () => sibling(typeof FlowUnderstandingRouter !== 'undefined' ? FlowUnderstandingRouter : null, './understanding-router.js', 'FlowUnderstandingRouter');
   const planner = () => sibling(typeof FlowModelPlan !== 'undefined' ? FlowModelPlan : null, './model-plan.js', 'FlowModelPlan');
   const guard = () => sibling(typeof FlowTier0Guard !== 'undefined' ? FlowTier0Guard : null, './tier0-guard.js', 'FlowTier0Guard');
+  const quiet = () => sibling(typeof FlowTier0Quiet !== 'undefined' ? FlowTier0Quiet : null, './tier0-quiet.js', 'FlowTier0Quiet');
   const kinds = () => sibling(typeof FlowKindCheck !== 'undefined' ? FlowKindCheck : null, './kind-check.js', 'FlowKindCheck');
   const floor = () => sibling(typeof FlowAiFloor !== 'undefined' ? FlowAiFloor : null, './ai-floor.js', 'FlowAiFloor');
 
@@ -61,7 +63,13 @@ const FlowAiEngine = (() => {
       cloudConsent: mail.cloudConsent === true, tier0: mail.tier0 || {} }, deps, flags);
     const base = { used: true, tier: r.tier, reason: r.reason || null, trace: r.trace, calls: r.calls, watch: null };
     if (!r.step || r.step === 'SILENT') return Object.assign(base, { card: null });
-    if (r.tier === 0) return Object.assign(base, { card: { source: 'engine', step: r.step } });
+    if (r.tier === 0) {
+      // aiTier0QuietV1 (off): the engine's own card stays quiet on a hedge, an undecided sender, or a deadline already met.
+      const Q = quiet();
+      const why = Q && Q.enabled(flags) ? Q.check({ text: mail.text, subject: mail.subject }, r.step) : null;
+      if (why) return Object.assign(base, { card: null, reason: why });
+      return Object.assign(base, { card: { source: 'engine', step: r.step } });
+    }
     const card = { source: 'model', step: r.step, proposal: r.proposal, plan: null, rows: [] };
     const P = planner();
     if (P && P.enabled(flags)) {
