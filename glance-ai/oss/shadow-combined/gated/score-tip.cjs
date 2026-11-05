@@ -103,9 +103,12 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const gg = c.gold.step;
   // A model card on a mail that wants a different step (counted as a hit above), and the file cards that still wait on core/suggest-save.js.
   const wrongStep = model.filter((r) => { const gd = goldOf(r.c); return gd && gd !== 'SILENT' && gd !== r.out.card.step; }).map((r) => r.c.id + ':' + r.out.card.step + '≠' + goldOf(r.c));
   const save = model.filter((r) => r.out.card.suggestSave), saveGold = save.filter((r) => goldOf(r.c) === 'file_save').length;
-  md += `\nModel cards: ${model.length} (planned ${planned}, carried by the follow loop ${watched}); model cards on a gold-silent mail: ${wrongModel.length}${wrongModel.length ? ' (' + wrongModel.join(', ') + ')' : ''}. Mails that reached the cloud tier: ${cloud}/${rows.length}.\nModel cards with a different step than the label: ${wrongStep.length}${wrongStep.length ? ' (' + wrongStep.join(', ') + ')' : ''}. File cards handed to suggest-save (shown only if it finds the real attachment): ${save.length}, of which the label is a file save: ${saveGold}.\n`;
+  // Model cards whose words the person would read still carry a mask placeholder ([DATE_1], [CLIENT_NAME_2]...).
+  const PH = /\[[A-Z][A-Z_]*_\d+\]/;
+  const placeholders = model.filter((r) => PH.test(String((r.out.card.proposal && r.out.card.proposal.askSpan) || '')) || PH.test(String((r.out.watch && r.out.watch.what) || '')) || (r.out.card.rows || []).some((x) => PH.test(JSON.stringify(x)))).length;
+  md += `\nModel cards: ${model.length} (planned ${planned}, carried by the follow loop ${watched}); model cards on a gold-silent mail: ${wrongModel.length}${wrongModel.length ? ' (' + wrongModel.join(', ') + ')' : ''}. Mails that reached the cloud tier: ${cloud}/${rows.length}.\nModel cards with a different step than the label: ${wrongStep.length}${wrongStep.length ? ' (' + wrongStep.join(', ') + ')' : ''}. File cards handed to suggest-save (shown only if it finds the real attachment): ${save.length}, of which the label is a file save: ${saveGold}.\nModel cards that would show the person a mask placeholder: ${placeholders}/${model.length}.\n`;
   R.cardSteps = Object.fromEntries(model.map((r) => [r.c.id, r.out.card.step + (r.out.card.proposal && r.out.card.proposal.kind === 'promise_by_me' ? ':own-promise' : '') + (r.out.card.plan ? ':' + r.out.card.plan.processId : '') + (r.out.watch ? ':' + r.out.watch.direction : '')]));
-  R.model = { cards: model.length, planned, watched, cloud, wrongModel, wrongStep, suggestSave: save.length, suggestSaveGold: saveGold };
+  R.model = { placeholders, cards: model.length, planned, watched, cloud, wrongModel, wrongStep, suggestSave: save.length, suggestSaveGold: saveGold };
   fs.writeFileSync(path.join(__dirname, OUT + '-tables.md'), md);
   fs.writeFileSync(path.join(__dirname, OUT + '-results.json'), JSON.stringify(R, null, 1) + '\n');
   console.log(md);

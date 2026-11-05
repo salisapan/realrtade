@@ -17,3 +17,4 @@ Spec labels. Tier 2 = cached Qwen3.5-4B answers, real device mask, the productio
 
 Model cards: 64 (planned 47, carried by the follow loop 32); model cards on a gold-silent mail: 0. Mails that reached the cloud tier: 227/796.
 Model cards with a different step than the label: 1 (v2syn-1100:task≠calendar). File cards handed to suggest-save (shown only if it finds the real attachment): 17, of which the label is a file save: 17.
+Model cards that would show the person a mask placeholder: 0/64.
