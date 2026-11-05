@@ -142,6 +142,14 @@ One more state of the chat card, drawn with the existing canonical Do It compone
 - No action needed from the person; the card shows the close and offers Undo.
 - Undo: reopens the chase. If the person changed the loop since, the card says Undo unavailable.
 
+## E3 — your reply was really sent (added 2026-11-02)
+
+- Module `flow-trial-extension/core/reply-sent.js`, switch `REPLY_SENT_CLOSE`. Map row E3.
+- When: the person sent a reply in the thread of an ask they owed, and it answers.
+- Line: `ענית. הלולאה נסגרה.` / `You replied. Loop closed.` The loop moves to closed (kept).
+- While the reply is still a draft, or the sent reply only holds ("אחזור אליך", "let me check") or only thanks, the card stays as the open loop. No new card.
+- No action needed from the person; the card shows the close and offers Undo.
+- Undo: reopens the loop. The sent mail is never touched (sent mail: Undo unavailable). If the person changed the loop since, the card says Undo unavailable.
 ## C2 — move that meeting (added 2026-11-03)
 
 - Module `flow-trial-extension/core/calendar-move.js`, switch `CALENDAR_MOVE_PROOF`. Map row C2.
