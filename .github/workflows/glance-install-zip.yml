@@ -2,10 +2,23 @@ name: Glance install zip
 
 on:
   push:
+    branches: [main, release-approved]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "flow-trial-extension/**"
+      - "glance-gmail-addon/**"
+      - "scripts/**"
+      - "flow-landing/netlify/functions/download-trial-zip/**"
+      - ".github/workflows/glance-install-zip.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   package:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
