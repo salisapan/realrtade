@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "chatLanes": {
+    "all": { "enabled": false },
+    "whatsapp": { "enabled": false },
+    "messenger": { "enabled": false },
+    "instagram": { "enabled": false }
+  },
+  "signature": "NOngbfFjd+B78XJOLqZweD96kR8buNHolppP0aGN0Ll4HoOsMZn51mJQwRq9h8z4qZiJ0MgaTlg9v09NhvyU7w=="
+}

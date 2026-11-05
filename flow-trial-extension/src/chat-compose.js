@@ -27,9 +27,27 @@ const FlowChatCompose = (() => {
     el.textContent = body;
   }
 
+  function normalizeBody(text) {
+    return String(text || '').replace(/[\r\n]+/g, ' ').trim();
+  }
+
+  function draftHash(text) {
+    const body = normalizeBody(text);
+    let h = 0;
+    for (let i = 0; i < body.length; i++) h = ((h << 5) - h + body.charCodeAt(i)) | 0;
+    return 'd' + (h >>> 0).toString(16);
+  }
+
+  function threadIdHash(threadId) {
+    const t = String(threadId || '');
+    let h = 0;
+    for (let i = 0; i < t.length; i++) h = ((h << 5) - h + t.charCodeAt(i)) | 0;
+    return 't' + (h >>> 0).toString(16);
+  }
+
   // Returns { ok, sends: false, reason }. Never sends.
   function insertDraft(el, text) {
-    const body = String(text || '').replace(/[\r\n]+/g, ' ').trim();
+    const body = normalizeBody(text);
     if (!el || !body) return { ok: false, sends: false, reason: el ? 'empty' : 'no-box' };
     if (textOf(el).trim()) return { ok: false, sends: false, reason: 'composer-not-empty' };
     try { if (typeof el.focus === 'function') el.focus(); } catch (e) { /* the box can still take the text */ }
@@ -48,9 +66,9 @@ const FlowChatCompose = (() => {
 
   // Undo of a draft: the box is emptied only while it still holds exactly the words Glance put there. A box the person typed in is left alone.
   function clearIfUnchanged(el, text) {
-    const body = String(text || '').replace(/[\r\n]+/g, ' ').trim();
+    const body = normalizeBody(text);
     if (!el || !body) return { ok: false, reason: el ? 'empty' : 'no-box' };
-    const now = textOf(el).replace(/[\r\n]+/g, ' ').trim();
+    const now = normalizeBody(textOf(el));
     if (!now) return { ok: true, reason: 'already-empty' };
     if (now !== body) return { ok: false, reason: 'user-edited' };
     writeBox(el, '');
@@ -58,7 +76,36 @@ const FlowChatCompose = (() => {
     return { ok: !textOf(el).trim(), reason: 'cleared' };
   }
 
-  return { insertDraft, clearIfUnchanged };
+  function undoDraft(el, text, expectedHash) {
+    const body = normalizeBody(text);
+    const now = normalizeBody(textOf(el));
+    if (expectedHash && draftHash(now) !== expectedHash) return { ok: false, reason: 'edited', sends: false };
+    return clearIfUnchanged(el, body);
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => { setTimeout(resolve, ms); });
+  }
+
+  async function insertDraftWithProof(el, text, meta) {
+    const body = normalizeBody(text);
+    const wrote = insertDraft(el, body);
+    wrote.sends = false;
+    if (!wrote.ok) return wrote;
+    const m = meta || {};
+    const proof = {
+      surface: m.surface || null,
+      threadIdHash: threadIdHash(m.threadId || ''),
+      draftHash: draftHash(body),
+      ts: Date.now()
+    };
+    await sleep(300);
+    const back = normalizeBody(textOf(el));
+    const fetchedBack = back.indexOf(body) >= 0;
+    return Object.assign({}, wrote, { proof: proof, fetchedBack: fetchedBack, draftText: body, sends: false });
+  }
+
+  return { insertDraft, clearIfUnchanged, undoDraft, insertDraftWithProof, draftHash, threadIdHash, normalizeBody };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatCompose };

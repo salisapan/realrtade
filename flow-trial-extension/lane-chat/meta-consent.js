@@ -23,6 +23,14 @@
     en: 'Chats',
     he: 'צ׳אטים'
   };
+  const DISCLOSURE = {
+    en: 'Glance is an independent product and is not affiliated with Meta or WhatsApp. Chat text you choose to analyze may be sent to Glance’s server to infer intent and plan a draft; it is not kept on your device after the session and is not used to train models. You must be 18 or older. You send every message yourself; Glance never presses Send.',
+    he: 'Glance הוא מוצר עצמאי ואינו קשור ל-Meta או ל-WhatsApp. טקסט צ׳אט שבוחרים לנתח עשוי להישלח לשרת Glance כדי להבין כוונה ולתכנן טיוטה; הוא לא נשמר במכשיר אחרי הסשן ולא משמש לאימון מודלים. עליך להיות בן 18 ומעלה. אתה שולח כל הודעה בעצמך; Glance לא לוחץ על שליחה.'
+  };
+  const AGE_COPY = {
+    en: 'I am 18 or older',
+    he: 'אני בן 18 ומעלה'
+  };
   const ORIGINS = [
     'https://web.whatsapp.com/*',
     'https://www.messenger.com/*',
@@ -225,11 +233,23 @@
     });
   }
 
+  function disclosure(code) {
+    return heLang(code) ? DISCLOSURE.he : DISCLOSURE.en;
+  }
+
+  function ageLabel(code) {
+    return heLang(code) ? AGE_COPY.he : AGE_COPY.en;
+  }
+
   globalThis.FlowMetaConsent = {
     PAGE: PAGE,
     MESSAGE: MESSAGE,
     COPY: COPY,
     ON_COPY: ON_COPY,
+    DISCLOSURE: DISCLOSURE,
+    AGE_COPY: AGE_COPY,
+    disclosure: disclosure,
+    ageLabel: ageLabel,
     ORIGINS: ORIGINS,
     label: label,
     onLabel: onLabel,

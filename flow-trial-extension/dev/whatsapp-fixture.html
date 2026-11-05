@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WhatsApp lane fixture</title>
+</head>
+<body>
+<div id="app">
+  <div id="main" data-glance-chat="direct">
+    <header><span dir="auto" title="Dana Cole">Dana Cole</span></header>
+    <div data-id="false_972501234567@c.us_AAA1">
+      <span class="selectable-text" data-testid="selectable-text">send me the location of the restaurant you were at last week</span>
+    </div>
+    <div data-id="true_972541234567@c.us_BBB2">
+      <span class="selectable-text">sure</span>
+    </div>
+    <footer>
+      <div data-glance-composer="1" contenteditable="true" role="textbox" aria-label="Type a message"></div>
+      <button type="button" aria-label="Send" data-testid="send"></button>
+    </footer>
+  </div>
+</div>
+<script src="../lane-chat/surfaces.js"></script>
+<script src="../src/chat-indicator.js"></script>
+<script src="../src/chat-lane-trigger.js"></script>
+<script src="../core/fact-reply.js"></script>
+<script src="../core/close-chains.js"></script>
+<script src="../src/chat-redact.js"></script>
+<script src="../src/chat-draft.js"></script>
+<script src="../src/chat-compose.js"></script>
+<script src="../src/chat-lane.js"></script>
+<script>
+  window.__glanceChatSurfaces = {
+    whatsapp: {
+      scan: function () {
+        window.__glanceChatDomReads = (window.__glanceChatDomReads || 0) + 1;
+        return { ok: true, reason: 'fixture-scan' };
+      }
+    }
+  };
+</script>
+</body>
+</html>

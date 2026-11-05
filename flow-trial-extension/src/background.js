@@ -45,6 +45,7 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
+import { GLANCE_FLAGS_PUBLIC_JWK, GLANCE_FLAGS_URL } from '../config/glance-flags.public.js';
 import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
@@ -73,8 +74,12 @@ import '../core/outlook-event-call-link.js'; // classic: sets globalThis.FlowOut
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
+import '../lane-chat/surfaces.js'; // LANE_CHAT surface registry (W1)
 import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
+import '../core/chat-kill-switch.js'; // per-user + remote chat kill switch
+import './chat-on-demand.js'; // gesture-only chat lane injection
 // The worker cannot call import(). These are the helpers imported at the top of this file.
+globalThis.__glanceFlagsConfig = { URL: GLANCE_FLAGS_URL, PUBLIC_JWK: GLANCE_FLAGS_PUBLIC_JWK };
 globalThis.__glanceGoogleAuth = {
   GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
   webTokenUsable: webTokenUsable
@@ -597,7 +602,7 @@ const LANE_CHAT = [
   {
     id: 'glance-lane-whatsapp',
     origins: ['https://web.whatsapp.com/*'],
-    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js']
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-redact.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js']
   },
   {
     id: 'glance-lane-messenger',
@@ -613,7 +618,7 @@ const LANE_CHAT = [
       'https://www.business.facebook.com/latest/inbox',
       'https://www.business.facebook.com/latest/inbox/*'
     ],
-    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js']
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-redact.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js']
   },
   {
     id: 'glance-lane-instagram',
@@ -623,7 +628,7 @@ const LANE_CHAT = [
       'https://instagram.com/direct',
       'https://instagram.com/direct/*'
     ],
-    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js']
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-redact.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js']
   }
 ];
 
@@ -640,6 +645,7 @@ function laneChatScripts(lane) {
 const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];
 globalThis.__glanceLaneChatScripts = laneChatScripts;
 globalThis.__glanceLaneChatDefs = LANE_CHAT;
+globalThis.__glanceLaneChatCss = LANE_CHAT_CSS;
 
 async function clearLaneChats() {
   if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
@@ -669,43 +675,14 @@ async function restoreLaneChats() {
     return;
   }
   for (const lane of LANE_CHAT) {
-    try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
-    try {
-      await chrome.scripting.registerContentScripts([{
-        id: lane.id,
-        matches: lane.origins,
-        js: laneChatScripts(lane),
-        css: LANE_CHAT_CSS,
-        runAt: 'document_idle',
-        persistAcrossSessions: true
-      }]);
-    } catch (e) {
-      console.info('[Glance] whyNotShown: lane-not-registered');
-      continue;
-    }
-    if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) continue;
-    let tabs = [];
-    try { tabs = await chrome.tabs.query({ url: lane.origins }); } catch (e) { tabs = []; }
-    for (const tab of tabs || []) {
-      if (!tab || typeof tab.id !== 'number') continue;
-      let alive = false;
-      try {
-        const reply = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => Boolean(window.__glanceLaneChat)
-        });
-        alive = Array.isArray(reply) && reply.some((row) => row && row.result === true);
-      } catch (e) { alive = false; }
-      if (alive) continue;
-      try {
-        await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: LANE_CHAT_CSS });
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: laneChatScripts(lane) });
-      }
-      catch (e) { console.info('[Glance] whyNotShown: lane-not-injected'); }
-    }
+    try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* legacy persistent lane */ }
+  }
+  if (typeof FlowChatOnDemand !== 'undefined' && FlowChatOnDemand.registerTriggerScripts) {
+    try { await FlowChatOnDemand.registerTriggerScripts(chrome); } catch (e) { console.info('[Glance] whyNotShown: chat-trigger-not-registered'); }
   }
 }
 
+if (typeof FlowChatOnDemand !== 'undefined' && FlowChatOnDemand.wire) FlowChatOnDemand.wire(chrome);
 dropLegacyWhatsApp();
 restoreSurfaces();
 restoreLaneChats();
