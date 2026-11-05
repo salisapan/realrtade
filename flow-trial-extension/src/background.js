@@ -73,6 +73,7 @@ import '../core/outlook-event-call-link.js'; // classic: sets globalThis.FlowOut
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
+import * as whatsappShareSw from './whatsapp-share-sw.js'; // W2 share intake + wa.me lane (WHATSAPP_SHARE_INTAKE, off)
 import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
 // The worker cannot call import(). These are the helpers imported at the top of this file.
 globalThis.__glanceGoogleAuth = {
@@ -7013,6 +7014,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:chat-task-target') {
     return reply(sendResponse, chatTaskTarget(msg));
+  }
+
+  // W2: pasted or shared WhatsApp export → on-device judge; reply Do It opens wa.me with draft (never sends).
+  if (msg.type === 'flow:open-whatsapp-share-intake') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    const url = chrome.runtime.getURL('lane-chat/share-intake.html');
+    return reply(sendResponse, chrome.tabs.create({ url: url, active: true }).then(() => ({ ok: true })).catch(() => ({ ok: false })));
+  }
+  if (msg.type === 'flow:whatsapp-share-intake') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, whatsappShareSw.whatsappShareIntake(msg.payload || {}));
+  }
+  if (msg.type === 'flow:whatsapp-share-wame-open') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, whatsappShareSw.whatsappShareWameOpen(msg.payload || {}));
+  }
+  if (msg.type === 'flow:whatsapp-share-undo') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, whatsappShareSw.whatsappShareUndo());
+  }
+  if (msg.type === 'flow:whatsapp-share-kill-status') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, whatsappShareSw.whatsappShareKillStatus());
+  }
+  if (msg.type === 'flow:whatsapp-share-model-consent') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, whatsappShareSw.whatsappShareModelConsent(msg.given === true));
   }
 
   if (msg.type === 'flow:event-link-plan') {

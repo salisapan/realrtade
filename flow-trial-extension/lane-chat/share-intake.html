@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Share to Glance — WhatsApp</title>
+  <link rel="stylesheet" href="../popup/fonts.css">
+  <link rel="stylesheet" href="../src/chip.css">
+  <link rel="stylesheet" href="share-intake.css">
+</head>
+<body>
+  <main>
+    <div data-lang="en">
+      <h1>Share to Glance</h1>
+      <p class="lead">Paste a WhatsApp chat export or forwarded message. Glance reads it on your device, offers the usual card, and never sends for you. A reply opens WhatsApp with a prefilled draft — you press Send.</p>
+    </div>
+    <div data-lang="he" hidden dir="rtl">
+      <h1>שיתוף ל-Glance</h1>
+      <p class="lead">הדביקו ייצוא צ׳אט WhatsApp או הודעה שהועברה. Glance קורא במכשיר, מציע את הכרטיס הרגיל, ולא שולח בשבילכם. תשובה פותחת WhatsApp עם טיוטה — אתם לוחצים שליחה.</p>
+    </div>
+    <div id="consent" hidden>
+      <p data-lang="en"><strong>Model disclosure.</strong> If a deeper step runs, masked text may be sent to a server-side model (zero retention). Recognition here is on-device first. Glance is not affiliated with WhatsApp or Meta.</p>
+      <p data-lang="he" hidden><strong>גילוי מודל.</strong> אם רץ שלב עמוק, טקסט ממוסך עשוי לעבור למודל בשרת (ללא שמירה). הזיהוי כאן מתחיל במכשיר. Glance לא קשור ל-WhatsApp או Meta.</p>
+      <button type="button" class="primary" id="consent-ok">I understand</button>
+    </div>
+    <div id="drop">
+      <label for="paste" data-lang="en">Chat text</label>
+      <label for="paste" data-lang="he" hidden>טקסט הצ׳אט</label>
+      <textarea id="paste" placeholder="Paste export or forwarded message…"></textarea>
+    </div>
+    <div class="actions">
+      <button type="button" class="primary" id="analyze">Analyze</button>
+      <button type="button" class="ghost" id="clear">Clear</button>
+    </div>
+    <p id="note" aria-live="polite"></p>
+    <div id="card-host"></div>
+    <div id="receipt" class="receipt" hidden></div>
+  </main>
+  <script src="../core/display-copy.js"></script>
+  <script src="../src/chip-host.js"></script>
+  <script src="chat-kill-switch.js"></script>
+  <script src="share-intake.js"></script>
+</body>
+</html>
