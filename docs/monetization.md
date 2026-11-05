@@ -170,9 +170,13 @@ classification" of whole messages stays off for everyone (`REMOTE_CLASSIFY = fal
    `glance-assist` also needs its model keys (`ANTHROPIC_API_KEY`,
    `XAI_API_KEY`, `GEMINI_API_KEY`).
    **Do not set `PRO_PUBLIC=1` yet.**
-5. **Supabase.** Restore the `flow-ai` project (it is paused), then apply
-   `supabase/migrations/20261001000000_glance_pro_licenses.sql` (and
-   `20260928170000_landing_lead_schema.sql` if it was not applied).
+5. **Supabase.** The `flow-ai` project (`zjquktirlrhbqcnkfaok`) is ACTIVE
+   (confirmed 2026-10-06). Apply
+   `supabase/migrations/20261001000000_glance_pro_licenses.sql` and
+   `20261004000000_glance_ai_usage.sql` if not already present (both applied
+   2026-10-06). Also confirm `20260928170000_landing_lead_schema.sql`
+   (`waitlist.ref_code`, `confirmed_at`, `leads`).
+   **Do not Netlify-deploy production until the owner explicitly approves.**
 6. **Test with your own key.** `LICENSE_SECRET=... node scripts/issue-comp-license.js you@x.com`
    prints a key and one SQL line to run. Paste the key in the Glance panel.
    Open a real Gmail thread: confirm Draft-It and an attachment summary work.

@@ -142,24 +142,43 @@ footer.site a{color:var(--muted)}
 (function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
 </script>
 <!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
   gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
 </script>
+<link rel="stylesheet" href="/assets/site-nav.css">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site">
   <div class="wrap">
     <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async"></a>
-    <nav>
+    <nav class="site-bar">
+      <div class="site-links">
+        <a href="/trial.html" data-nav="glance">Glance</a>
+        <a href="/#organization" data-nav="flow">Flow</a>
+        <a href="/pricing.html" data-nav="pricing">Pricing</a>
+        <a href="/security.html" data-nav="security">Security</a>
+        <a href="/contact.html" data-nav="contact">Contact</a>
+      </div>
+      <a class="doit sm nav-get" href="/trial.html" data-ga="nav_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-nav="cta">Get Glance</span></a>
       <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
         <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
       </button>
       
+      <button class="lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
       <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
@@ -364,5 +383,6 @@ footer.site a{color:var(--muted)}
 })();
 </script>
 <script src="/assets/flow-premium.js" defer></script>
+<script src="/assets/site-nav.js" defer></script>
 </body>
 </html>

@@ -52,6 +52,12 @@ import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
+import '../core/connect-ecosystem.js'; // classic: sets globalThis.FlowConnectEcosystem (C1)
+import '../core/profile-hook.js'; // classic: sets globalThis.FlowProfileHook (C1 learn-signal hook)
+import '../core/graph-mail.js'; // classic: sets globalThis.FlowGraphMail (Outlook Graph sync)
+import '../core/outlook-sync.js'; // classic: sets globalThis.FlowOutlookSync (ecosystem Graph sync when OWA closed)
+import '../src/outlook.js'; // classic: sets globalThis.FlowOutlook
+import { connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras, requestMicrosoftOptionalScopes } from './connect-ecosystem-sw.js';
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
 import '../core/day-words.js'; // classic: sets globalThis.FlowDayWords (extract.js makes the day forms people write explicit with it)
 import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)
@@ -1832,6 +1838,9 @@ async function clearCachedChromeGoogleTokens() {
 }
 
 async function disconnectConnector(connectorId) {
+  if (connectorId === 'microsoft' || connectorId === 'meta') {
+    return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector, disableSurface: disableSurface });
+  }
   const STORAGE_KEYS = {
     hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
     googleTasks: 'googleTasksAuth'
@@ -1857,6 +1866,10 @@ async function disconnectConnector(connectorId) {
       'glanceOwnNames'
     ]));
     googleNamesFilled = false;
+    const hook = globalThis.FlowProfileHook;
+    if (hook && typeof hook.onDisconnect === 'function') {
+      try { hook.onDisconnect('google'); } catch (e) { /* profile store not wired */ }
+    }
     return { ok: true };
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
@@ -3836,7 +3849,7 @@ async function gmailDraftUndo(ref) {
 // content-gmail.js can't open chrome.windows itself (that API isn't exposed
 // to content scripts), and the picker has to live in its own extension page
 // rather than be loaded into the Gmail tab — Gmail's own CSP would be the
-// one deciding whether https://apis.google.com's gapi loader is even
+// one deciding whether Google's hosted gapi loader is even
 // allowed to run there, and there is no reason to depend on that. So the
 // content script asks this worker to open the window, and this worker
 // remembers which Gmail tab asked, keyed by the requestId the content
@@ -3848,6 +3861,9 @@ async function openDrivePicker(payload, sender) {
   const requestId = payload && payload.requestId;
   const tabId = sender && sender.tab && sender.tab.id;
   if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
+  if (!(typeof FlowBuild !== 'undefined' && FlowBuild.PICKER_BUNDLED)) {
+    return { ok: false, unavailable: true };
+  }
 
   const win = await chrome.windows.create({
     url: chrome.runtime.getURL('picker/picker.html') + '?requestId=' + encodeURIComponent(requestId),
@@ -5033,6 +5049,74 @@ const OUTLOOK_AUTH_KEY = 'outlookAuth';
 const OUTLOOK_STATE_KEY = 'outlookSync';
 const OUTLOOK_KEEPALIVE_ALARM = 'glance-outlook-keepalive';
 const OUTLOOK_KEEPALIVE_MINUTES = 30;
+const OUTLOOK_OWA_URLS = ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'];
+
+let outlookEcosystemRunner = null;
+
+function outlookEcosystemRunnerDeps() {
+  const storage = {
+    get: async () => chrome.storage.local.get(null),
+    set: async (bag) => chrome.storage.local.set(bag),
+    getWatches: async () => {
+      const b = await chrome.storage.local.get('glanceWatches');
+      return (b && b.glanceWatches) || [];
+    },
+    getIdentityGraph: async () => {
+      const b = await chrome.storage.local.get('glanceIdentityGraph');
+      return (b && b.glanceIdentityGraph) || { parties: {} };
+    },
+    observeIdentity: async () => null,
+    updateWatch: async () => null,
+    upsertWatch: async (x) => x,
+    recordOutcomeLabel: async () => true
+  };
+  return {
+    storage,
+    cfg: globalThis.FlowOutlookConfig,
+    auth: globalThis.FlowOutlookAuth,
+    plan: globalThis.FlowOutlookSync && globalThis.FlowOutlookSync.plan,
+    fetch: (u, i) => fetch(u, i),
+    redirectUri: () => chrome.identity.getRedirectURL(),
+    launch: outlookLaunchInteractive,
+    launchSilent: outlookLaunchSilent,
+    permissions: chrome.permissions,
+    send: async (m) => {
+      try { return await chrome.runtime.sendMessage(m); } catch (e) { return null; }
+    },
+    random: (n) => crypto.getRandomValues(new Uint8Array(n)),
+    sha256: (b) => crypto.subtle.digest('SHA-256', b),
+    now: () => Date.now(),
+    planDeps: {
+      extract: globalThis.FlowExtract || null,
+      intent: globalThis.FlowIntent || null,
+      factReply: globalThis.FlowFactReply || null,
+      actions: globalThis.FlowActions || null
+    },
+    actions: globalThis.FlowActions || null,
+    identity: globalThis.FlowIdentity || null,
+    followUp: globalThis.FlowFollowUp || null
+  };
+}
+
+async function outlookEcosystemSync(opts) {
+  const o = opts || {};
+  let owaOpen = false;
+  try {
+    const tabs = await chrome.tabs.query({ url: OUTLOOK_OWA_URLS });
+    (tabs || []).forEach((tab) => {
+      if (tab && tab.id) {
+        owaOpen = true;
+        chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-rescan' }).catch(() => {});
+      }
+    });
+  } catch (e) { /* OWA may be closed */ }
+  if (owaOpen) return { ok: true, mode: 'rescan' };
+  const O = globalThis.FlowOutlook;
+  if (!O || typeof O.create !== 'function' || !globalThis.FlowOutlookSync) return { ok: false, error: 'not-configured', mode: 'graph' };
+  outlookEcosystemRunner = outlookEcosystemRunner || O.create(outlookEcosystemRunnerDeps());
+  const r = await outlookEcosystemRunner.sync({ force: Boolean(o.force) });
+  return Object.assign({ mode: 'graph' }, r || {});
+}
 
 // ---- the durable Outlook session (core/outlook-auth.js session) -----------------------------------------------
 // The service worker keeps the Microsoft session alive on its own: an alarm every 30 minutes (alarms survive the worker
@@ -5087,6 +5171,7 @@ async function outlookConsentScope(msg) {
     return { ok: false, reason: 'not-configured' };
   }
   const scope = String((msg && msg.scope) || '');
+  if (scope === 'Contacts.Read' || scope === 'Chat.Read') return { ok: false, reason: 'scope-refused' };
   const todoScope = scope === 'Tasks.ReadWrite';
   const calendarScope = scope === 'Calendars.ReadWrite';
   if (!todoScope && !calendarScope) return { ok: false, reason: 'scope-refused' };
@@ -6859,8 +6944,13 @@ async function connectorStatus() {
     laneUndo: reconnectBag.glanceLaneUndo || null,
     scopesGranted: scopesGranted
   });
+  const ecoBag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY]);
+  const ecoSnap = await ecosystemStatusExtras(Object.assign({}, reconnectBag, ecoBag, { googleTasks: googleTasks }));
   return {
     googleTasks: googleTasks,
+    google: ecoSnap.google,
+    microsoft: ecoSnap.microsoft,
+    meta: ecoSnap.meta,
     hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID)
@@ -6964,8 +7054,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => ({ ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
   }
 
+  if (msg.type === 'flow:microsoft-optional-scopes') {
+    if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
+    const bucket = msg.bucket || msg.optionalBucket;
+    return reply(sendResponse, requestMicrosoftOptionalScopes(bucket, { launchInteractive: outlookLaunchInteractive }));
+  }
+
   if (msg.type === 'flow:connect') {
-    if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
+    const ecoConnector = msg.connectorId === 'googleTasks' || msg.connectorId === 'microsoft' || msg.connectorId === 'meta';
+    if (ecoConnector) {
+      return reply(sendResponse, glanceSwitchOn('CONNECT_ECOSYSTEM').then((ecoOn) => {
+        if (ecoOn) {
+          const interactive = msg.connectorId === 'googleTasks' ? googleConnectWantsInteractive(sender) : true;
+          return connectEcosystemConnector(msg.connectorId, {
+            connectGoogleTasks: (force) => connectGoogleTasks(force !== false ? interactive : false),
+            launchInteractive: outlookLaunchInteractive,
+            enableSurface: enableSurface,
+            syncOutlook: (syncOpts) => outlookEcosystemSync(syncOpts)
+          });
+        }
+        if (msg.connectorId === 'googleTasks') {
+          return connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true }));
+        }
+        return { ok: false, reason: 'connector-not-live' };
+      }));
+    }
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
