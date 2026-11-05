@@ -92,9 +92,15 @@ const FlowUnderstandingRouter = (() => {
     if (!t0.possible) { trace.push('tier0:nothing'); return out('SILENT', 0, { reason: 'no-possible-intention' }); }
     if (!U) return out('SILENT', 0, { reason: 'no-validator' });
 
-    const decide = (v, tier) => {
+    const decide = (v, tier, unmask) => {
       if (!v.ok) return out('SILENT', tier, { reason: 'invalid:' + v.reason, drops: v.drops });
-      const p = KC ? KC.proposal(U, v.understanding, pctx) : U.proposal(v.understanding, pctx);
+      let p = KC ? KC.proposal(U, v.understanding, pctx) : U.proposal(v.understanding, pctx);
+      // A Tier 2 answer quotes the masked text: its quoted words go back to the person's own words before the floor, the plan and the
+      // card see them ("…the signed lease [DATE_1]?" -> "…the signed lease by Friday?"). The dates were already read unmasked.
+      if (unmask && p.step !== 'SILENT') {
+        const back = (x) => { if (typeof x !== 'string') return x; try { const y = unmask(x); return typeof y === 'string' && y ? y : x; } catch (e) { return x; } };
+        p = Object.assign({}, p, { askSpan: back(p.askSpan), evidence: back(p.evidence) });
+      }
       if (p.step === 'SILENT') return out('SILENT', tier, { reason: 'model:' + p.reason, understanding: v.understanding, drops: v.drops });
       const f = floor(p, input, deps);
       if (!f.pass) return out('SILENT', tier, { reason: f.reason, proposal: p, understanding: v.understanding, drops: v.drops });
@@ -122,7 +128,7 @@ const FlowUnderstandingRouter = (() => {
     const a = await ask(deps.tier2, m.text, ms);
     const v = a.ok ? U.validate(a.answer, m.text, Object.assign({ unmask: typeof m.unmask === 'function' ? m.unmask : undefined }, vopts)) : { ok: false, reason: a.reason, drops: [] };
     trace.push('tier2:' + (a.ok ? (v.ok ? 'answered' : 'invalid') : a.reason));
-    return decide(v, 2);
+    return decide(v, 2, typeof m.unmask === 'function' ? m.unmask : null);
   }
 
   return { SWITCH, RELEVANCE_SWITCH, DEFAULTS, TIMEOUT_MS, enabled, route };

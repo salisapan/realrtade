@@ -206,6 +206,7 @@
   "ctrl-he-4": "draft:reply-track:mine"
  },
  "model": {
+  "placeholders": 0,
   "cards": 64,
   "planned": 47,
   "watched": 32,
