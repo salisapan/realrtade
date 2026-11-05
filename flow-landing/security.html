@@ -163,28 +163,28 @@ footer.site a{color:var(--muted)}
   <div class="wrap">
     <span class="eyebrow">Trust</span>
     <h1 class="title">Security &amp; Architecture</h1>
-    <div class="updated">Last updated: September 30, 2026</div>
+    <div class="updated">Last updated: October 26, 2026</div>
     <article>
-<p class="note">Flow is in pre-release. This page describes intended architecture. SSO, the audit log, and Flow-Edge are part of the deployment offer (roadmap) &mdash; not capabilities marked live in the product today. For current status in writing: <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
+<p class="note">Flow is in pre-release. Flow-Edge and the Masked Secure Cloud are available today, per engagement. SSO and the audit log are part of the deployment offer (roadmap) &mdash; not capabilities live in the product today. For current status in writing: <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
 <p class="lead">Flow is built for organizations that cannot send raw sensitive data to a third-party model &mdash; legal, healthcare, finance, insurance, and government. This page describes how the system is designed, so your security team can evaluate it without a call.</p>
 
-<h2>1. Planned Deployment Models</h2>
-<p>The most important security decision is where processing happens. Flow is planned for two deployment models, per engagement &mdash; not as live product toggles today:</p>
+<h2>1. Deployment Models</h2>
+<p>The most important security decision is where processing happens. Flow offers two deployment models, chosen per engagement:</p>
 <div class="cards two">
   <div class="card">
     <h3>Masked Secure Cloud</h3>
-    <p>Processing is designed for a managed environment, with personally identifiable and confidential fields masked <b>before</b> processing. That is the architecture; deployment status is closed in the project, not a live toggle today.</p>
+    <p>Processing runs in a managed environment, with personally identifiable and confidential fields masked <b>before</b> processing. Available today, per engagement.</p>
   </div>
   <div class="card">
-    <h3>Flow-Edge (Fully Local) &mdash; roadmap</h3>
-    <p>When policy requires that data not leave the network, this is the deployment path designed into the engagement &mdash; not a cloud configuration with a flag, and not a live product toggle today.</p>
+    <h3>Flow-Edge (Fully Local)</h3>
+    <p>When policy requires that data not leave the network, Flow-Edge is the deployment path: chosen per engagement, not a cloud configuration with a flag. Available today.</p>
   </div>
 </div>
-<p>If your obligations make cloud processing untenable &mdash; export-controlled manufacturing data, NERC CIP-scoped operational systems, classified or CUI-adjacent government work &mdash; Flow-Edge (roadmap) is the deployment path designed into the engagement, not a configuration flag on a cloud product.</p>
+<p>If your obligations make cloud processing untenable &mdash; export-controlled manufacturing data, NERC CIP-scoped operational systems, classified or CUI-adjacent government work &mdash; Flow-Edge is the deployment path designed into the engagement, not a configuration flag on a cloud product.</p>
 
 <h2>2. Data Masking</h2>
 <p>In the masked-cloud model, sensitive fields are designed to be identified and replaced with structure-preserving placeholders before processing. The model is designed to operate on the masked representation, with the mapping back to real values staying under your control, so a prompt, a log, or a model provider is not meant to receive the underlying identifier. Deployment status is closed in the engagement &mdash; not a live product toggle today.</p>
-<p>Masking is a mitigation, not a substitute for architecture. Where the requirement is "this data must not leave the building," the deployment path designed into the engagement is Flow-Edge (roadmap). We will say that directly rather than offer a cloud deployment with extra controls as if it were the same thing.</p>
+<p>Masking is a mitigation, not a substitute for architecture. Where the requirement is "this data must not leave the building," the deployment path is Flow-Edge. We will say that directly rather than offer a cloud deployment with extra controls as if it were the same thing.</p>
 
 <h2>3. Zero-Retention Processing</h2>
 <p>Flow is designed so that content processed through the engine is not retained for model training and is not persisted beyond the life of the task that required it. "Zero-retention" is a claim worth verifying with any vendor &mdash; including us. We wrote a guide on <a href="/blog/zero-retention-ai-architecture.html">how to verify a vendor's zero-retention claim</a>, and we expect you to apply it to Flow.</p>
