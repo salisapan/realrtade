@@ -4,7 +4,9 @@
 // finds one answer, place a draft in the message box. The person sends it.
 // What it never does: press Enter, click Send, react, mark as read, open a thread, or touch a group.
 (() => {
+  if (window.__glanceLaneChat) return;
   if (typeof FlowInstagramParse === 'undefined') return;
+  window.__glanceLaneChat = { observers: 0, autoReads: 0 };
   const P = FlowInstagramParse;
   const DEBOUNCE_MS = 1200;
   const MAX_ROWS = 40;
@@ -147,9 +149,6 @@
     maybeDraft(main, list, party, direct);
   }
 
-  function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
-  new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
-  schedule();
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
   globalThis.__glanceChatSurfaces.instagram = { scan: scan };
 })();

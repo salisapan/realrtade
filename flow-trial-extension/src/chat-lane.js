@@ -10,13 +10,18 @@ const FlowChatLane = (() => {
   }
 
   function ask(type, payload) {
+    let body = payload;
+    if (globalThis.__glanceChatRedactActive && typeof FlowChatRedact !== 'undefined') {
+      const names = globalThis.__glanceChatRedactNames || [];
+      body = FlowChatRedact.outbound(body, { names: names });
+    }
     return new Promise((resolve) => {
       if (!runtimeAlive()) {
         resolve({ ok: false, reason: 'invalidated' });
         return;
       }
       try {
-        chrome.runtime.sendMessage({ type: type, payload: payload }, (r) => {
+        chrome.runtime.sendMessage({ type: type, payload: body }, (r) => {
           let err = null;
           try { err = chrome.runtime && chrome.runtime.lastError; } catch (e) { resolve({ ok: false, reason: 'invalidated' }); return; }
           if (!runtimeAlive()) { resolve({ ok: false, reason: 'invalidated' }); return; }

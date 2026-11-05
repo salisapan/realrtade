@@ -20,6 +20,7 @@ const CARRY_IMPORT = /^import \{ CARRY \} from '\.\.\/config\/carry\.public\.js'
 const CONNECTORS_IMPORT = /^import \{ CONNECTORS \} from '\.\.\/config\/connectors\.public\.js';\r?\n/m;
 const LANE_HOST_IMPORT = /^import '\.\/google-lane-host\.js';\r?\n/m;
 const CLASSIC_IMPORT = /^import '((?:\.\.\/core|\.\.\/lane-chat|\.)\/[\w-]+\.js)';[^\n]*\r?\n/gm;
+const CHAT_ON_DEMAND_IMPORT = /^import \{ installChatOnDemand \} from '\.\/chat-on-demand\.js';\r?\n/m;
 const HYBRID_IMPORTS = /^import \{ HYBRID \} from '\.\.\/config\/hybrid\.public\.js';\r?\nimport '\.\/hybrid-sw\.js';[^\n]*\r?\n/m;
 
 function backgroundScript() {
@@ -34,7 +35,7 @@ function backgroundScript() {
   // Classic scripts imported for their side effect (they set a global): inline them, with their CommonJS export line
   // turned into the same global assignment they make in the service worker.
   const classic = [];
-  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '').replace(LANE_HOST_IMPORT, '').replace(CONNECTORS_IMPORT, '').replace(CARRY_IMPORT, '');
+  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '').replace(LANE_HOST_IMPORT, '').replace(CONNECTORS_IMPORT, '').replace(CARRY_IMPORT, '').replace(CHAT_ON_DEMAND_IMPORT, 'function installChatOnDemand() {}\n');
   bg = bg.replace(CLASSIC_IMPORT, (line, rel) => {
     const file = path.join(root, 'src', rel);
     const src = fs.readFileSync(file, 'utf8');
