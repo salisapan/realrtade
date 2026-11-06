@@ -236,3 +236,61 @@ Fix: `authPass` must be `true`; the corpus fixtures now say so. Refunds, money s
 - `money-arrived` needs its host to pass `authPass` from the mail's authentication results before `MONEY_ARRIVED` can be useful. That is part of wiring it, not a change to make here.
 
 Tests: `node flow-trial-extension/test/red-team-corpus.cjs` (sections 8–11 are run 3; 165 checks in all). `test/money-arrived-corpus.cjs` fixtures now pass `authPass: true`.
+
+## Run 4: 2026-11-06
+
+**Branch** `claude/redteam-2026-11-06`, built on the latest working branch (`7a2987e6`) with runs 1–3 merged in. Run 3's draft PR #249 is still open and unmerged. #184, the stack the 25/10 freeze waits on, is still open. This run carries all four runs and stays a draft. Targets this week are what shipped since run 3 and is not in an open PR:
+- `core/reply-sent.js` (`REPLY_SENT_CLOSE` off): close the reply you owed once you really sent it.
+- `core/calendar-move.js` (`CALENDAR_MOVE_PROOF` off): move a meeting, proven.
+- `core/tier0-guard.js` (`aiTier0GuardV1` off): the injection guard on the engine's own card.
+
+### Attacks run: 30. Broke Glance: 27. Fixed: 27. Still open: none new
+
+| Area | Run | Broke | Fixed | Where |
+|---|---|---|---|---|
+| The reply I owed: a sent message that is not the answer | 14 | 13 | 13 | `core/reply-sent.js` |
+| Moving a meeting that is not an ordinary event of the person's own | 8 | 7 | 7 | `core/calendar-move.js` |
+| The engine's own card: injection and fraud evasions | 8 | 7 | 7 | `core/tier0-guard.js` |
+
+**The worst one.** `reply-sent` closed "the reply you owed Dana" on any message the person sent in the thread that was not a bare "thanks" or "I'll get back to you". That included the person's own out-of-office auto-reply, which Gmail's vacation responder sends inside the thread from the person's address. It also included a forward of Dana's ask to a colleague, and «אשלח מחר בבוקר». Each became "You replied. Loop closed." with a fetched-back proof, so the loop was never reminded about again.
+
+### 1. The reply I owed
+
+| Sent in the thread, after the ask | Before | After |
+|---|---|---|
+| "Automatic reply: I am out of the office until November 10…", «מענה אוטומטי: אני מחוץ למשרד…», a message the host marks Auto-Submitted | close | silent (`auto-reply`) |
+| "---------- Forwarded message ---------" to a colleague | close | silent (`forwarded`) |
+| "Yossi, can you handle this one?" to Yossi only, when the loop knows the asker and the host says who it went to | close | silent (`not-to-asker`) |
+| "Thanks a lot! 🙂", «תודה רבה רבה!!» | close | silent (`ack-only`) |
+| "I'll send it tomorrow.", "Will send by Friday", «אשלח מחר בבוקר», "Forwarding this to my accountant", «בטיפול», «מעביר לרואה החשבון שלי» | close | `hold` (the host may offer it as the person's own promise, row E2) |
+| The answer itself, «כן, אני מאשר. נתראה ביום חמישי», "No, we can't make it this week", "I'll be there at 10", an answer with the asker in Cc, an answer when the host gives no recipients | close | unchanged |
+
+The read-back (`close`) checks the same two things again: an automatic reply, and the asker missing from the recipients.
+
+### 2. Moving a meeting
+
+`calendar-move` already refused a recurring event, someone else's event and an event with guests. It still moved:
+- an event with no organizer field;
+- an event whose guest list the calendar left out (`attendeesOmitted`, so the guests are there but unseen, and they would not be told);
+- a flight or booking Gmail put on the calendar (`eventType: fromGmail`);
+- an out-of-office or focus-time block;
+- a locked event;
+- a private copy of someone else's event.
+
+All of these are silent now. The person's own plain event with no guests still moves.
+
+### 3. The engine's own card
+
+`tier0-guard` copied the lab's patterns without run 3's folding. A zero-width mark, Cyrillic or full-width letters, spaced letters or a paraphrase still got the engine's own card, and spaced-out «g i f t c a r d s» was not fraud. It now uses `core/ai-floor.js` (`injected`, `fold`), so the model floor and the engine's own card read injections the same way.
+
+### 4. A behaviour kept as it was
+
+`core/ai-host.js` (new on the base) refuses the cloud when a local Israeli phone survives the mask. With run 1's masking, the phone is now a placeholder, so the cloud would have been asked. The masked text leaks nothing, but that is less silent than before. The host now checks the original text too, so its refusal is exactly what it was (`test/ai-host-corpus.cjs`, "an Israeli phone … the cloud is never asked").
+
+### 5. Still open
+
+- From run 2: the chat judge (`core/incoming-judge.js`, still changed by open PRs #227, #228, #229 and #245) offers on an injected ask, an ask aimed at @someone else, and a «Forwarded message» line. This is already on PR #77.
+- From run 1: the by-design text-only closes («בוצע», «סגור», "Sent it on WhatsApp") are still waiting for the owner.
+- `money-arrived` needs `authPass` from its host, and `reply-sent` needs `to`/`cc` (or Graph recipients) and `autoSubmitted` from its host, to use the new checks fully. Without recipients it behaves as before.
+
+Tests: `node flow-trial-extension/test/red-team-corpus.cjs` (sections 12–14 are run 4; 201 checks in all).
