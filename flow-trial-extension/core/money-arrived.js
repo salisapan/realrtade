@@ -51,6 +51,9 @@ const FlowMoneyArrived = (() => {
   const IN_EN = /\b(?:you(?:'ve| have)? (?:just )?(?:received|got) (?:a |an )?(?:payment|transfer|money|deposit)?|you(?:'ve| have)? got money|payment (?:received|has been received)|(?:sent|paid) you\b|has sent you|deposit(?:ed)? (?:of|to your account)|incoming (?:transfer|payment|wire)|funds (?:received|have arrived|arrived)|money (?:is )?(?:on its way|has arrived) to you|credited to your account)/i;
   const IN_HE = /(?:התקבלה (?:העברה|הפקדה|העברת כספים)|קיבלת (?:העברה|תשלום|כסף)?|זוכה חשבונך|זיכוי (?:ב|ל)?חשבון|העברה נכנסת|הפקדה (?:ל|ב)חשבון|הועבר(?:ו)? (?:אליך|לחשבונך)|שלח(?:ה)? לך)/;
   const OUT_OR_FAIL = /\b(?:you sent|you paid|you(?:'ve| have) sent|payment to\b|charged|debited|withdrawal|outgoing|refund(?:ed)? to\b|requested (?:money|a payment)|request(?:ed)? from you|is requesting|pending|on hold|failed|declined|cancel(?:l)?ed|reversed|could not be|unsuccessful|offer|promo|discount code|win\b)\b|(?:שלחת|שילמת|חויב|חיוב|העברה יוצאת|משיכה|ממתינה|בהמתנה|נכשלה|נדחתה|בוטלה|לא בוצעה|ביקש(?:ה)? ממך|בקשת תשלום|מבצע|הטבה|הנחה)/i;
+  // Money that is not yet yours, or is not a payment (red team 2026-10-30): a refund or chargeback coming back, a Bit/PayBox transfer that still
+  // waits for you to accept it, and a credit that will land on a later day.
+  const NOT_YET_IN = /\b(?:refund(?:ed|s)?|chargeback|reimburse(?:d|ment)?|cash\s*back|accept\s+(?:the|this|your)\s+(?:payment|transfer|money)|awaiting\s+(?:your\s+)?(?:approval|acceptance|confirmation)|to\s+(?:accept|claim)\s+(?:it|the\s+money|the\s+payment)|will\s+be\s+(?:credited|deposited|available|transferred|released)|(?:available|credited)\s+(?:on|from|by)\s+\S+\s*\d)\b|(?:החזר(?:\s+כספי)?|זיכוי\s+(?:בגין|עבור)\s+(?:החזר|ביטול)|יש\s+לאשר|לאשר\s+את\s+(?:קבלת\s+)?(?:ה)?(?:כסף|העברה|תשלום)|ממתינ(?:ה|ים)?\s+לאישור|יזוכה|יועבר(?:ו)?\s+(?:ב|עד)|יהיה\s+זמין)/i;
   const PAYER_EN = /\b(?:from|by)\s+([A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){0,3})/;
   const PAYER_EN_SENT = /\b([A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){0,3})\s+(?:sent|paid) you\b/;
   const PAYER_HE = /(?:מאת|מ-|מ־|מהלקוח|ממשלם)\s*([֐-׿][֐-׿"׳'-]+(?:\s+[֐-׿][֐-׿"׳'-]+){0,2})/;
@@ -102,10 +105,13 @@ const FlowMoneyArrived = (() => {
   function readNotice(mail) {
     mail = mail || {};
     if (!allowedSender(mail.from)) return { kind: 'ignore', reason: 'sender-not-allowlisted' };
-    if (mail.authPass === false) return { kind: 'block', reason: 'auth-failed' };
+    // Fail closed (red team 2026-10-30): a host that did not read DKIM/SPF passes no authPass, and a spoofed "payment received" from
+    // no-reply@bit.co.il then closed the loop. Only a notice the host saw pass authentication counts.
+    if (mail.authPass !== true) return { kind: 'block', reason: mail.authPass === false ? 'auth-failed' : 'auth-unknown' };
     const body = clean((mail.subject || '') + '. ' + (mail.text || ''));
     if (!(IN_EN.test(body) || IN_HE.test(body))) return { kind: 'ignore', reason: 'not-money-in' };
     if (OUT_OR_FAIL.test(body)) return { kind: 'block', reason: 'out-or-not-final' };
+    if (NOT_YET_IN.test(body)) return { kind: 'block', reason: 'not-final-or-refund' };
     const money = moneyHits(body);
     const distinct = money.filter((m, i) => money.findIndex((x) => x.value === m.value && x.currency === m.currency) === i);
     if (distinct.length === 0) return { kind: 'block', reason: 'no-amount' };
@@ -120,7 +126,7 @@ const FlowMoneyArrived = (() => {
   }
 
   function words(name) {
-    return String(name || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter((w) => w.length >= 2);
+    return String(name || '').toLowerCase().replace(/["'׳״’]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter((w) => w.length >= 2);
   }
 
   // A named payer must share a word with the loop's counterpart (name or the
@@ -149,9 +155,15 @@ const FlowMoneyArrived = (() => {
       // Another script: compare consonant skeletons ("דנה כהן" ~ "Dana Cohen").
       const a = words(payer).map(skeleton).filter((k) => k.length >= 2);
       const b = mine.map(skeleton).filter((k) => k.length >= 2);
-      return a.some((k) => b.indexOf(k) >= 0);
+      // Counted on the words, not the skeletons: a short surname («לוי» -> 'l') drops out of the skeletons and must not lower the bar.
+      const needX = words(payer).length >= 2 && words(c.name).length >= 2 ? 2 : 1;
+      return a.filter((k) => b.indexOf(k) >= 0).length >= needX;
     }
-    return words(payer).some((w) => mine.indexOf(w) >= 0);
+    // A shared first name is not the same person (red team 2026-10-30: «דנה לוי שלחה לך 500 ₪» closed Dana Cohen's loop). When both sides
+    // carry two or more name words, two of them must match; one word is enough only when one side has just one.
+    const pw = words(payer);
+    const need = pw.length >= 2 && words(c.name).length >= 2 ? 2 : 1;
+    return pw.filter((w) => mine.indexOf(w) >= 0).length >= need;
   }
 
   function openPayment(loop) {
