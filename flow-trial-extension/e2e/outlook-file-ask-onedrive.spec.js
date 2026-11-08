@@ -18,6 +18,7 @@ function localIso(y, month, day, hour, minute) {
 async function openAsk(glance, conv, msg, extra, opts) {
   opts = opts || {};
   const subject = opts.subject || 'Vendor agreement';
+  const fileName = opts.fileName || NAME;
   await glance.seedOutlook(opts.seed, opts.auth);
   await glance.setScenario(Object.assign({
     inboxFilterFails: true,
@@ -28,7 +29,7 @@ async function openAsk(glance, conv, msg, extra, opts) {
     }],
     sent: [],
     messages: {},
-    attachments: { [msg]: [{ id: 'att-va', name: NAME, contentType: 'application/pdf', size: 634, isInline: false }] },
+    attachments: { [msg]: [{ id: 'att-va', name: fileName, contentType: 'application/pdf', size: 634, isInline: false }] },
     conversation: [],
     mailboxSettings: { timeFormat: 'HH:mm', timeZone: 'UTC' }
   }, extra || {}));
@@ -40,7 +41,7 @@ async function openAsk(glance, conv, msg, extra, opts) {
     senderEmail: S.SENDER,
     body: opts.body || 'Please save the attached PDF to OneDrive by Friday.',
     receivedLabel: TD.dmy + ' 14:01',
-    attachments: [{ shownName: NAME, titleName: NAME, sizeLabel: '1 KB' }]
+    attachments: [{ shownName: fileName, titleName: fileName, sizeLabel: '1 KB' }]
   });
 }
 
@@ -300,3 +301,51 @@ test('the primary Microsoft card visibly requests missing Outlook page access an
   await expect(access).toBeEnabled();
   expect((await fileCalls(glance)).puts).toHaveLength(0);
 });
+
+// Single-message mail-only fixtures already passed on the failed SHA. The missing
+// boundary was the full-thread picker: a later, longer quiet signed-copy message
+// replaced this save ask before decideFromText could count its attachment.
+for (const filesGranted of [false, true]) {
+  test('Supplier ask survives a longer quiet thread tail with OneDrive unchecked, Files grant ' + filesGranted, async ({ glance }) => {
+    const conv = 'AQQKLiveSupplierTail';
+    const msg = 'AQMkLiveSupplierEarlier';
+    const tail = {
+      id: 'AQMkLiveSupplierLater', conversationId: conv, subject: 'Supplier contract – OneDrive',
+      from: { emailAddress: { name: 'moshe', address: S.SENDER } },
+      toRecipients: [{ emailAddress: { address: 'glance.salisapan@outlook.com' } }],
+      receivedDateTime: localIso(TD.y, TD.m, TD.d, 18, 12), hasAttachments: true,
+      body: { contentType: 'text', content: 'Hi, Attached is the signed supplier contract for November. This is the final signed copy with all the signatures and the full agreement. Thanks' }
+    };
+    const page = await openAsk(glance, conv, msg, { conversation: [tail] }, {
+      auth: { files: filesGranted, tasks: false }, subject: 'Supplier contract – OneDrive',
+      fileName: 'supplier-contract-nov.pdf',
+      body: 'Hi,\nPlease save the attached contract to OneDrive by Sunday.\nThanks'
+    });
+    const popup = await openOutlookPanel(glance);
+    const box = popup.locator('[data-glance-connect="microsoft"] [data-glance-service="onedrive"]').first();
+    await box.uncheck();
+    await expect(box).not.toBeChecked();
+    const pane = page.locator(PANE);
+    const card = pane.locator('.flow-chip-host');
+    await expect(pane.locator('[data-glance-dest]').first()).toHaveText('OneDrive > Glance');
+    // Not merely any card: this is the earlier open ask, not the quiet tail.
+    await expect(card).toHaveAttribute('data-glance-message', new RegExp(msg));
+    await expect(pane.locator('.flow-step-list .act-check')).toHaveCount(1);
+    await expect(pane.locator('[data-glance-consent="files"]')).toHaveCount(filesGranted ? 0 : 1);
+    const calls = await glance.apiCalls();
+    expect(calls.some((c) => c.method === 'GET' && c.url.includes('/messages/' + msg + '/attachments'))).toBe(true);
+    expect(calls.some((c) => c.method === 'GET' && c.url.includes('/messages/' + tail.id + '/attachments'))).toBe(false);
+    expect((await fileCalls(glance)).puts).toHaveLength(0);
+    expect((await fileCalls(glance)).drafts).toHaveLength(0);
+    expect(await glance.flows()).toHaveLength(0);
+    if (!filesGranted) {
+      await mockFilesConsent(glance);
+      await pane.locator('[data-glance-consent="files"] button').click();
+      await expect.poll(async () => (await glance.storage()).outlookAuth.token.grantedScopes).toContain('Files.ReadWrite');
+      await expect(pane.locator('[data-glance-consent="files"]')).toHaveCount(0);
+      await expect(pane.locator('button.flow-chip')).toBeVisible();
+      expect((await fileCalls(glance)).puts).toHaveLength(0);
+      expect((await fileCalls(glance)).drafts).toHaveLength(0);
+    }
+  });
+}

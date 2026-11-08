@@ -5409,7 +5409,7 @@
     return { ok: false, rows: [] };
   }
 
-  function threadJudgeRow(pane, ownAddresses) {
+  function threadJudgeRow(pane, ownAddresses, attachmentCounts) {
     return {
       isOwn: (row) => {
         const a = row && row.from && row.from.emailAddress && row.from.emailAddress.address;
@@ -5453,6 +5453,8 @@
           now: new Date(),
           threadUrl: location.href,
           surface: 'outlook',
+          attachmentCount: attachmentCounts.get(row && row.id) || 0,
+          hasThreadAttachment: attachmentCounts.get(row && row.id) === 1,
           to: useTo,
           cc: useCc,
           ownAddresses: ownAddresses || null,
@@ -5511,8 +5513,22 @@
     }
     if (!fetched.ok || !fetched.rows.length) return { ok: false, pane: pane };
     const picker = typeof FlowOutlookThreadV1 !== 'undefined' ? FlowOutlookThreadV1 : null;
+    // The thread picker runs before decideFromText. A save ask needs its own verified
+    // attachment count here too; otherwise every save row is quiet and a longer
+    // signed-copy/FYI tail replaces the open ask before its file card can paint.
+    // These are Mail reads, independent of the OneDrive selection or Files grant.
+    const attachmentCounts = new Map();
+    for (const row of fetched.rows) {
+      const prepared = typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge
+        ? FlowIncomingJudge.prepareForJudge(graphBodyText(row)) : graphBodyText(row);
+      const ownText = typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText
+        ? FlowGraphMail.ownText(prepared) : prepared;
+      if (!row.id || typeof FlowGoogleCloses === 'undefined' || !FlowGoogleCloses.needsOneAttachment(ownText)) continue;
+      const files = await graphValues('/me/messages/' + encodeURIComponent(row.id) + '/attachments?$select=id,isInline', 'thread-save-count');
+      if (Array.isArray(files)) attachmentCounts.set(row.id, files.filter((a) => a && a.isInline !== true && !/itemAttachment/i.test(String(a['@odata.type'] || ''))).length);
+    }
     const picked = picker && picker.pickJudgmentMessage
-      ? picker.pickJudgmentMessage(fetched.rows, threadJudgeRow(pane, ownAddresses))
+      ? picker.pickJudgmentMessage(fetched.rows, threadJudgeRow(pane, ownAddresses, attachmentCounts))
       : null;
     if (!picked || !picked.row) return { ok: false, pane: pane };
     const rowPane = paneFromGraphRow(picked.row, {
