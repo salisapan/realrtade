@@ -44,6 +44,11 @@ ok('docusign tick = relay sign-in + its two hosts, nothing else; all five connec
   assert.strictEqual(C.stepsFor(['notion', 'asana', 'jira', 'linear', 'docusign']).steps.length, 11);
   assert.ok(C.selectAll().indexOf('docusign') >= 0);
 });
+ok('trello tick = Trello’s own authorize page (no relay, no secret) + its one API host, nothing else; it is in select all', () => {
+  const r = C.stepsFor(['trello']);
+  assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-implicit:trello', 'host-permission:https://api.trello.com/*']);
+  assert.ok(C.selectAll().indexOf('trello') >= 0); assert.strictEqual(C.byId('trello').state, 'experimental');
+});
 ok('dropbox tick = a PKCE sign-in (no relay, no secret) + its two API hosts, nothing else', () => {
   const r = C.stepsFor(['dropbox']);
   assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-pkce:dropbox', 'host-permission:https://api.dropboxapi.com/*', 'host-permission:https://content.dropboxapi.com/*']);

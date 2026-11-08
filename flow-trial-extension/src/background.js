@@ -88,6 +88,7 @@ import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/trello-close.js'; // classic: sets globalThis.FlowTrelloClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
 import './google-lane-host.js';
@@ -1833,7 +1834,7 @@ async function clearCachedChromeGoogleTokens() {
 
 async function disconnectConnector(connectorId) {
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth', trello: 'trelloAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -1861,7 +1862,7 @@ async function disconnectConnector(connectorId) {
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : connectorId === 'trello' ? [key, 'trelloLedger'] : key);
   return { ok: true };
 }
 
@@ -4139,8 +4140,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack, trello: CONNECTORS.trelloReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file', trello: 'trello/card' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -4292,6 +4293,96 @@ async function asanaReadBackWrite(p) {
 async function asanaReadBackUndo(ref) {
   const r = await asanaCloseEngine().undo(ref);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'asana' });
+  return r;
+}
+
+/* --------------------------------------------------------- Trello, with a proof */
+// docs/glance-ai/connectors/trello.md. One card in the list the person chose, read back; Undo archives it (never deletes) unless the person changed it.
+// Everything here is behind config/connectors.public.js (trelloReadBack, trelloOAuth), both off. Trello has no OAuth 2 and no client secret: the app key is
+// public and the person authorises it for their own account, so there is no relay.
+
+const TRELLO_API = 'https://api.trello.com/1';
+const TRELLO_AUTH_BASE = 'https://trello.com/1/authorize';
+const TRELLO_LEDGER_KEY = 'trelloLedger';
+
+async function getTrelloAuth() {
+  const { trelloAuth } = await chrome.storage.local.get('trelloAuth');
+  return trelloAuth || null;
+}
+
+// A board link is https://trello.com/b/<8 characters>/<name>; the 8-character id alone also works.
+function parseTrelloBoard(input) {
+  const t = String(input || '').trim();
+  if (/^[A-Za-z0-9]{8}$/.test(t)) return t;
+  const m = t.match(/^https:\/\/trello\.com\/b\/([A-Za-z0-9]{8})(?:[/?#]|$)/);
+  return m ? m[1] : null;
+}
+
+// "Connect Trello": Trello returns the token in the URL fragment of the return URL and does not echo a state, so a random state rides in the return URL's
+// query and is checked here. The token is asked with scope read,write (the least that creates and archives a card) and is kept on the device only.
+async function connectTrello(boardInput, listInput) {
+  if (!CONNECTORS.trelloOAuth) throw new Error('Connect Trello is not switched on in this build.');
+  const apiKey = publicClientId(OAUTH_PUBLIC.trelloApiKey);
+  if (!apiKey || !/^[0-9a-f]{32}$/.test(apiKey)) throw new Error('Trello sign-in isn’t configured on this build yet.');
+  const board = parseTrelloBoard(boardInput);
+  if (!board) throw new Error('That doesn’t look like a Trello board link — open the board and copy the URL.');
+  const listName = String(listInput || '').trim();
+  if (!listName || listName.length > 100) throw new Error('Type the name of the list the cards should go into.');
+  const state = randomOAuthState();
+  const returnUrl = chrome.identity.getRedirectURL() + '?state=' + state;
+  const resultUrl = await chrome.identity.launchWebAuthFlow({ url: TRELLO_AUTH_BASE + '?expiration=never&name=Glance&scope=read,write&response_type=token&callback_method=fragment&key=' + encodeURIComponent(apiKey) + '&return_url=' + encodeURIComponent(returnUrl), interactive: true });
+  const u = new URL(resultUrl);
+  if (u.searchParams.get('state') !== state) throw new Error('Trello authorization could not be verified. Please try connecting again.');
+  const token = new URLSearchParams(String(u.hash || '').replace(/^#/, '')).get('token');
+  if (!token || !/^[A-Za-z0-9]{20,100}$/.test(token)) throw new Error('Trello did not return a token.');
+  const hdr = { Authorization: 'OAuth oauth_consumer_key="' + apiKey + '", oauth_token="' + token + '"', Accept: 'application/json' };
+  const res = await fetch(TRELLO_API + '/boards/' + board + '/lists?filter=open&fields=name', { headers: hdr });
+  if (res.status === 401) throw new Error('Trello did not accept the token.');
+  if (res.status === 403 || res.status === 404) throw new Error('Trello signed you in but cannot open that board — check the link and that you are a member.');
+  if (!res.ok) throw new Error('Trello returned ' + res.status + '.');
+  const lists = await res.json();
+  const hit = (Array.isArray(lists) ? lists : []).filter((l) => l && /^[0-9a-f]{24}$/.test(String(l.id)) && String(l.name || '').trim().toLowerCase() === listName.toLowerCase());
+  if (hit.length !== 1) throw new Error(hit.length ? 'Two lists on that board have that name — rename one, then connect again.' : 'That board has no open list with that name.');
+  await chrome.storage.local.set({ trelloAuth: { token: token, apiKey: apiKey, listId: String(hit[0].id), listName: String(hit[0].name).slice(0, 100), via: 'oauth' } });
+  return { title: String(hit[0].name).slice(0, 100) };
+}
+
+function trelloCloseEngine() {
+  return globalThis.FlowTrelloClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getTrelloAuth,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(TRELLO_LEDGER_KEY))[TRELLO_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(TRELLO_LEDGER_KEY))[TRELLO_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [TRELLO_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function trelloReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await trelloCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'trello:'), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'trello', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'trello', lang: lang });
+    return { ok: true, where: 'Trello', target: 'your list', written: 'Added to Trello.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'trello', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Trello' };
+}
+
+async function trelloReadBackUndo(ref) {
+  const r = await trelloCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'trello' });
   return r;
 }
 
@@ -6819,6 +6910,7 @@ const WRITERS = {
   attachmentSave: attachmentSaveWrite
 };
 if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
+if (CONNECTORS.trelloReadBack) WRITERS.trello = trelloReadBackWrite;
 if (CONNECTORS.jiraReadBack) WRITERS.jira = jiraReadBackWrite;
 if (CONNECTORS.linearReadBack) WRITERS.linear = linearReadBackWrite;
 const UNDOERS = {
@@ -6832,6 +6924,7 @@ const UNDOERS = {
   attachmentSave: attachmentSaveUndo
 };
 if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
+if (CONNECTORS.trelloReadBack) UNDOERS.trello = trelloReadBackUndo;
 if (CONNECTORS.jiraReadBack) UNDOERS.jira = jiraReadBackUndo;
 if (CONNECTORS.linearReadBack) UNDOERS.linear = linearReadBackUndo;
 
@@ -6972,6 +7065,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'docusign') return reply(sendResponse, connectDocusignOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'jira') return reply(sendResponse, connectJiraOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'trello') return reply(sendResponse, connectTrello(msg.board, msg.list).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'asana') return reply(sendResponse, connectAsanaOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));

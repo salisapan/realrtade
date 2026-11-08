@@ -29,7 +29,7 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 | 8 | Microsoft Teams via Graph | the answer arrived in the chat | same Entra app as Outlook, no secret | not started |
 | 9 | Slack via its official API | the answer arrived in the DM | OAuth2 + secret (relay); app review for distribution | not started |
 | 10 | Stripe (PayPal after it) | the payment arrived | OAuth + secret (relay) | not started |
-| 11 | Trello | a card exists | API key + token flow, not OAuth2 | not started |
+| 11 | Trello | a card exists | API key + token flow, not OAuth2 (no secret, no relay) | **ready, waiting for owner** (2026-11-08): [doc](connectors/trello.md); built and tested against a mock; DRAFT PR #264; switches `trelloReadBack`, `trelloOAuth` off. Waiting: Trello app key (`OAUTH_PUBLIC.trelloApiKey`), `api.trello.com` host, unverified vendor facts (`connectors/trello.md` §9, above all the return-URL state), destination chooser (row 80) |
 | 12 | Monday | an item exists | OAuth2 | not started |
 | 13 | ClickUp | a task exists | OAuth2 | not started |
 | 14 | Box | the file is saved | OAuth2 + secret (relay) | not started |
