@@ -5494,13 +5494,20 @@
     }
     const paneBodyLen = String(pane.text || '').trim().length;
     const paneSubjectLen = String(pane.subject || '').trim().length;
+    // The page's own row stands in when Graph gave no thread. It carries a Graph
+    // message id only when the page had one. A conversation id (the usual OWA
+    // address) is not a message: used as one, the save count reads files on a
+    // conversation, fails, and the open ask goes quiet as attachment-count-unread.
+    const pageItemId = pane.itemId && !isConversationId(pane.itemId) ? String(pane.itemId) : '';
+    let pageRowOnly = false;
     if ((!fetched.ok || !fetched.rows.length)
         && pane.idSource !== 'url-stale'
         && (paneBodyLen >= 20 || paneSubjectLen >= 8 || (pane.attachments && pane.attachments.length))) {
+      pageRowOnly = true;
       fetched = {
         ok: true,
         rows: [{
-          id: pane.itemId || pane.pathId || 'open-pane',
+          id: pageItemId || 'open-pane',
           conversationId: conv || pane.conversationId || null,
           subject: pane.subject || '',
           receivedDateTime: pane.receivedDateTime || '',
@@ -5523,7 +5530,7 @@
         ? FlowIncomingJudge.prepareForJudge(graphBodyText(row)) : graphBodyText(row);
       const ownText = typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText
         ? FlowGraphMail.ownText(prepared) : prepared;
-      if (!row.id || typeof FlowGoogleCloses === 'undefined' || !FlowGoogleCloses.needsOneAttachment(ownText)) continue;
+      if (!row.id || (pageRowOnly && !pageItemId) || typeof FlowGoogleCloses === 'undefined' || !FlowGoogleCloses.needsOneAttachment(ownText)) continue;
       const files = await graphValues('/me/messages/' + encodeURIComponent(row.id) + '/attachments?$select=id,isInline', 'thread-save-count');
       if (Array.isArray(files)) attachmentCounts.set(row.id, files.filter((a) => a && a.isInline !== true && !/itemAttachment/i.test(String(a['@odata.type'] || ''))).length);
     }
@@ -5537,6 +5544,9 @@
       raw: pane.rawUrlId || pane.pathId || null,
       itemId: picked.row.id
     }, 'thread-read');
+    // No Graph message id yet: decideFromText resolves one from the conversation
+    // or the inbox list before it counts files.
+    if (rowPane && pageRowOnly && !pageItemId) rowPane.itemId = null;
     const paneTextBefore = String(pane.text || '').trim();
     const graphBody = String(rowPane.text || '').trim();
     const graphSubject = String(rowPane.subject || '').trim();
