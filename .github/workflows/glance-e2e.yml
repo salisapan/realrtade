@@ -14,7 +14,8 @@ on:
 jobs:
   e2e:
     name: e2e (${{ matrix.tz }} shard ${{ matrix.shard }}/3)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, where Playwright 1.55.1 cannot install Chromium.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -86,7 +87,8 @@ jobs:
   # gate100 from failing the workflow while the classifier gaps close. Remove it to make 100/100 a hard gate.
   gate100:
     name: gate100
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, where Playwright 1.55.1 cannot install Chromium.
+    runs-on: ubuntu-24.04
     continue-on-error: true
     timeout-minutes: 10
     env:
@@ -118,7 +120,8 @@ jobs:
 
   merge-reports:
     name: Merge Playwright reports
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, where Playwright 1.55.1 cannot install Chromium.
+    runs-on: ubuntu-24.04
     needs: e2e
     if: always()
     steps:
@@ -166,7 +169,8 @@ jobs:
   # proves them with the lane switch on and does not block merge.
   e2e-meta-lanes-future:
     name: e2e Meta chat lanes (non-blocking, META_CHAT_LANES on)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, where Playwright 1.55.1 cannot install Chromium.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     continue-on-error: true
     env:
