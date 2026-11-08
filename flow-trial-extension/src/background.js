@@ -353,8 +353,49 @@ function recoverOutlookTab(probe) {
   // script. Only a ping the existing script answers means it is still live.
   if (probe && probe.pingOk) return 'rescan';
   if (probe && probe.hasPage && probe.refreshShown) return 'leave';
+  // A removed extension leaves DOM marks behind, but its replacement may have
+  // a fresh isolated world. Only existing declarations make reinjection unsafe.
+  if (probe && probe.hasPage && probe.readerGlobals === false) return 'inject';
   if (probe && probe.hasPage) return 'ask';
   return 'inject';
+}
+
+// The old reader may be dead, so it cannot paint its own refresh line. Put
+// recovery in the open mail, not only a badge or the panel's Settings tab.
+async function showOutlookRefreshOnPage(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: () => {
+        const visible = Array.from(document.querySelectorAll('[data-glance-refresh]'))
+          .some((node) => Boolean(node.getBoundingClientRect().height));
+        if (visible) return;
+        const mount = document.querySelector('#ReadingPaneContainerId') || document.querySelector('[role="main"]') || document.body;
+        if (!mount) return;
+        let notice = document.querySelector('[data-glance-background-refresh]');
+        if (!notice) {
+          const he = /^he/i.test(document.documentElement.lang || '') || document.documentElement.dir === 'rtl';
+          notice = document.createElement('div');
+          notice.setAttribute('data-glance-refresh', '1');
+          notice.setAttribute('data-glance-background-refresh', '1');
+          notice.setAttribute('role', 'alert');
+          notice.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;margin:8px 0;background:#f5f5f7;color:#1d1d1f;font:14px/1.5 system-ui,sans-serif;border-radius:10px;box-sizing:border-box;';
+          const text = document.createElement('span');
+          text.textContent = he ? 'כדי להפעיל את Glance כאן, רענן את Outlook.' : 'Refresh Outlook to reconnect Glance in this tab.';
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.setAttribute('data-glance-refresh-btn', '1');
+          button.textContent = he ? 'רענן' : 'Refresh';
+          button.style.cssText = 'border:0;border-radius:8px;background:#0071e3;color:white;padding:8px 16px;font:inherit;cursor:pointer;';
+          // Never reload automatically: an unsent draft must survive until the
+          // person explicitly chooses to refresh this tab.
+          button.addEventListener('click', () => location.reload());
+          notice.append(text, button);
+        }
+        mount.prepend(notice);
+      }
+    });
+  } catch (e) { /* stored flag + badge remain when page access is unavailable */ }
 }
 
 async function noteOutlookNeedsRefresh(tabId) {
@@ -372,6 +413,7 @@ async function noteOutlookNeedsRefresh(tabId) {
       }
     }
   } catch (e) { /* the popup still reads the stored flag */ }
+  await showOutlookRefreshOnPage(tabId);
   console.warn('Glance: outlook tab ' + tabId + ' needs a manual refresh');
 }
 
@@ -439,13 +481,13 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
         await clearOutlookNeedsRefresh(tab.id);
         continue;
       }
-      let seen = { globals: false, refreshShown: false };
+      let seen = { globals: false, refreshShown: false, readerGlobals: true };
       try {
         const probe = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           func: () => {
-            // DOM only. This function runs in a new isolated world, so
-            // chrome.runtime.id here is the new extension, not the page script.
+            // Inspect DOM marks and declarations separately. This isolated world
+            // can be fresh even though the document retains the old marker.
             let line = null;
             let marked = false;
             try {
@@ -454,16 +496,25 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
               marked = Boolean(root && root.getAttribute('data-glance-outlook')) ||
                 Boolean(document.querySelector('.flow-chip-host, .flow-why-not'));
             } catch (e) { line = null; marked = false; }
-            return { globals: marked || Boolean(line), refreshShown: Boolean(line) };
+            return {
+              globals: marked || Boolean(line),
+              refreshShown: Boolean(line && line.getBoundingClientRect().height),
+              // Unlike chrome.runtime.id, these are declarations in THIS world,
+              // not a claim that an old page reader is still connected.
+              readerGlobals: typeof FLOW_DOMAINS !== 'undefined' || typeof FlowStorage !== 'undefined'
+                || typeof FlowOwaParse !== 'undefined' || typeof FlowChipHost !== 'undefined'
+                || Boolean(globalThis.__glanceOutlookPage)
+            };
           }
         });
         seen = (probe && probe[0] && probe[0].result) || seen;
-      } catch (e) { seen = { globals: false, refreshShown: false }; }
+      } catch (e) { seen = { globals: false, refreshShown: false, readerGlobals: true }; }
       const action = recoverOutlookTab({
         windowType: windowType,
         pingOk: false,
-        hasPage: Boolean(seen.globals),
-        refreshShown: Boolean(seen.refreshShown)
+        hasPage: Boolean(seen.globals || seen.readerGlobals),
+        refreshShown: Boolean(seen.refreshShown),
+        readerGlobals: seen.readerGlobals
       });
       if (action === 'rescan') {
         try {
@@ -476,7 +527,7 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
         continue;
       }
       if (action === 'leave') {
-        await clearOutlookNeedsRefresh(tab.id);
+        await noteOutlookNeedsRefresh(tab.id);
         continue;
       }
       if (action === 'ask') {
@@ -486,6 +537,9 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
       try {
         if (script.css && script.css.length) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: script.css });
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
+        const pong = await chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-ping' });
+        if (!(pong && pong.ok)) throw new Error('Outlook reader did not start');
+        await clearOutlookNeedsRefresh(tab.id);
         n++;
       } catch (e) {
         // A second inject cannot redeclare the dead script. Leave the tab.
