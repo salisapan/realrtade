@@ -1226,6 +1226,23 @@ for (const row of [
   });
 }
 
+for (const outcome of ['cancelled', 'missing-grant']) {
+  await ok('OneDrive incremental consent ' + outcome + ' preserves the mail-only token', async () => {
+    const old = { accessToken: 'mail-only', grantedScopes: ['Mail.Read', 'Mail.ReadWrite'] };
+    const { dispatch, sandbox, stored } = loadBackgroundMessageHarness({
+      stored: { outlookAuth: { token: old, requestedScopes: ['Mail.Read', 'Mail.ReadWrite'] } }
+    });
+    vm.runInContext(outcome === 'cancelled'
+      ? "FlowOutlookAuth.signIn = async () => ({ok:false,error:'cancelled'});"
+      : "FlowOutlookAuth.signIn = async () => ({ok:true,token:{accessToken:'no-files',grantedScopes:['Mail.Read','Mail.ReadWrite']}});", sandbox);
+    const result = await dispatch({ type: 'flow:outlook-consent-scope', scope: 'Files.ReadWrite' });
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.reason, outcome === 'cancelled' ? 'cancelled' : 'files-not-granted');
+    assert.strictEqual(stored.outlookAuth.token.accessToken, 'mail-only');
+    assert.ok(!stored.outlookAuth.token.grantedScopes.includes('Files.ReadWrite'));
+  });
+}
+
 await ok('K3e: MailboxSettings.Read, Sites.ReadWrite.All and Files.ReadWrite.All are still refused as their own consent', async () => {
   const { dispatch } = loadBackgroundMessageHarness();
   for (const scope of ['MailboxSettings.Read', 'Sites.ReadWrite.All', 'Files.ReadWrite.All', 'Mail.Send']) {

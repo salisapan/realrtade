@@ -90,7 +90,7 @@ FlowOutlookConfig.connectServiceUi = function connectServiceUi(svc, ctx) {
   const serviceGranted = calendarGranted || has;
   if (required) return { checked: true, disabled: true, granted: serviceGranted || true };
   if (tokenStatus === 'valid' || tokenStatus === 'expired' || tokenStatus === 'missing-scope') {
-    return { checked: false, disabled: false, granted: serviceGranted };
+    return { checked: Boolean(svc && svc.id === 'onedrive' && serviceGranted), disabled: false, granted: serviceGranted };
   }
   const checked = svc && svc.defaultOn === true;
   return { checked: Boolean(checked), disabled: false, granted: serviceGranted };

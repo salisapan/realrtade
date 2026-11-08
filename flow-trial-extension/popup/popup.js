@@ -49,6 +49,8 @@
   let openPaintGen = 0;
   let connectorPaintGen = 0;
   let surfaceGen = 0;
+  // Keep unsubmitted choices across mailbox/status paints, not in the grant store.
+  const microsoftScopeChoices = new Map();
   // Bumps on every glanceWhyCurrent write. A refresh that started earlier
   // must not paint over the value this listener already applied.
   let whyRev = 0;
@@ -610,6 +612,39 @@
     return (token && token.grantedScopes) || [];
   }
 
+  async function offerOutlookPageAccess(card, err) {
+    const origins = FlowOutlook.OWA_ORIGINS;
+    try {
+      if (await chrome.permissions.contains({ origins })) {
+        if (state && state.surfaces && state.surfaces.outlook && state.surfaces.outlook.enabled) return;
+        const r = await send({ type: 'flow:surface-enable', id: 'outlook' });
+        if (!r || !r.ok) throw new Error('surface-registration');
+        return;
+      }
+    } catch (e) {
+      err.textContent = 'לא הצלחתי להפעיל את הכרטיס בעמוד Outlook.';
+      err.hidden = false;
+    }
+    const button = el('button', 'ghost sm', 'הצג את Glance בתוך Outlook');
+    button.type = 'button';
+    button.setAttribute('data-glance-outlook-access', '1');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        if (!await chrome.permissions.request({ origins })) throw new Error('permission');
+        const r = await send({ type: 'flow:surface-enable', id: 'outlook' });
+        if (!r || !r.ok) throw new Error('surface-registration');
+        button.remove();
+        err.hidden = true;
+      } catch (e) {
+        button.disabled = false;
+        err.textContent = 'כדי להציג כרטיס על המייל, צריך לאפשר גישה ל-Outlook באינטרנט.';
+        err.hidden = false;
+      }
+    });
+    card.appendChild(button);
+  }
+
   // Reconnect pre-tick: Calendar counts as granted when Calendars.ReadWrite is already
   // on the token; MailboxSettings.Read is added on the next Connect if missing.
   function outlookReconnectServiceGranted(svc, granted) {
@@ -689,6 +724,10 @@
     ];
     const granted = grantedOutlookScopes();
     const connectCtx = { granted: granted, tokenStatus: tokenStatus };
+    const auth = state && state.outlookAuth;
+    const choiceKey = tokenStatus + ':' + ((auth && auth.account && auth.account.address) || 'new');
+    const choices = microsoftScopeChoices.get(choiceKey) || {};
+    microsoftScopeChoices.set(choiceKey, choices);
     const boxes = {};
     services.forEach((svc) => {
       const lab = document.createElement('label');
@@ -699,7 +738,8 @@
       const ui = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.connectServiceUi === 'function')
         ? FlowOutlookConfig.connectServiceUi(svc, connectCtx)
         : { checked: Boolean(svc.required || svc.id === 'mail'), disabled: Boolean(svc.required || svc.id === 'mail'), granted: false };
-      box.checked = ui.checked;
+      box.checked = !ui.granted && Object.prototype.hasOwnProperty.call(choices, svc.id) ? choices[svc.id] : ui.checked;
+      box.addEventListener('change', () => { choices[svc.id] = box.checked; });
       box.disabled = ui.disabled;
       if (ui.granted) lab.setAttribute('data-glance-granted', '1');
       boxes[svc.id] = box;
@@ -740,6 +780,12 @@
           if (!box || !box.checked || box.disabled) return false;
           return (svc.scopes || []).some((sc) => granted.indexOf(sc) < 0);
         });
+        if (!add.length) {
+          btn.disabled = false; setBtnLabel(btn, 'הוסף הרשאה');
+          err.textContent = 'סמן את השירות שברצונך לחבר.';
+          err.hidden = false;
+          return;
+        }
         for (let i = 0; i < add.length; i++) {
           const scopes = add[i].scopes || [];
           for (let j = 0; j < scopes.length; j++) {
@@ -778,6 +824,7 @@
     });
     card.appendChild(btn);
     card.appendChild(err);
+    if (tokenStatus === 'valid') offerOutlookPageAccess(card, err);
     const calendarPolicy = state && state.glanceCalendarConsent;
     if (calendarPolicy && calendarPolicy.mode === 'always' && calendarPolicy.revoked !== true) {
       card.appendChild(el('p', 'conn-note', 'הרשאת יומן: תמיד'));

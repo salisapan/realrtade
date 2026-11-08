@@ -18,7 +18,7 @@ function localIso(y, month, day, hour, minute) {
 async function openAsk(glance, conv, msg, extra, opts) {
   opts = opts || {};
   const subject = opts.subject || 'Vendor agreement';
-  await glance.seedOutlook(opts.seed);
+  await glance.seedOutlook(opts.seed, opts.auth);
   await glance.setScenario(Object.assign({
     inboxFilterFails: true,
     inbox: [{
@@ -181,4 +181,122 @@ test('with a name already taken, the renamed file card is still Handled after a 
   await expect(kind.first()).toHaveText('טופל');
   await expect(popup.locator('.panel.active')).not.toContainText('שוטף');
   expect((await fileCalls(glance)).puts).toHaveLength(1);
+});
+
+
+async function openOutlookPanel(glance) {
+  const popup = await glance.openPopup();
+  // A side panel's active tab is Outlook, not this harness's extension tab.
+  await popup.addInitScript(() => {
+    const query = chrome.tabs.query.bind(chrome.tabs);
+    chrome.tabs.query = (q) => query(q.active && q.currentWindow ? { url: ['https://outlook.live.com/*'] } : q);
+  });
+  await popup.reload();
+  await popup.locator('button.tab[data-tab="setup"]').click();
+  return popup;
+}
+
+async function mockFilesConsent(glance, grant = true) {
+  await glance.evaluateWorker((allow) => {
+    const e = globalThis.__glanceE2e;
+    e.flows = [];
+    e.launchWebAuthFlow = async (details) => {
+      e.flows.push(details);
+      if (!allow) throw new Error('cancelled');
+      const url = new URL(details.url);
+      e.filesConsentScopes = url.searchParams.get('scope');
+      return url.searchParams.get('redirect_uri') + '?code=files-test&state=' + url.searchParams.get('state');
+    };
+    const original = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      if (String(url).startsWith('https://login.microsoftonline.com/') && String(url).endsWith('/token')) {
+        return new Response(JSON.stringify({ access_token: 'AT-files', refresh_token: 'RT-files', expires_in: 3600, scope: e.filesConsentScopes }), { status: 200 });
+      }
+      return original(url, init);
+    };
+  }, grant);
+}
+
+test('Supplier ask stays a file card with an explicit consent step on a mail-only connection', async ({ glance }) => {
+  const page = await openAsk(glance, 'AQQKMailOnlyAsk', 'AQMkMailOnlyAsk', {}, {
+    auth: { files: false, tasks: false }, subject: 'Supplier contract – OneDrive',
+    body: 'Hi, Attached is the signed supplier contract for November. Please save it to OneDrive by Sunday. Thanks'
+  });
+  const pane = page.locator(PANE);
+  await expect(pane.locator('.flow-chip-host')).toBeVisible({ timeout: 30000 });
+  await expect(pane.locator('[data-glance-dest]').first()).toHaveText('OneDrive > Glance');
+  await expect(pane.locator('[data-glance-consent="files"]')).toBeVisible();
+  expect((await fileCalls(glance)).puts).toHaveLength(0);
+  await mockFilesConsent(glance);
+  await pane.locator('button.flow-chip').click();
+  expect((await glance.flows()).length).toBe(0);
+  expect((await fileCalls(glance)).puts).toHaveLength(0);
+  await pane.locator('[data-glance-consent="files"] button').click();
+  await expect.poll(async () => (await glance.storage()).outlookAuth.token.grantedScopes).toContain('Files.ReadWrite');
+  await expect(pane.locator('[data-glance-consent="files"]')).toHaveCount(0);
+  expect((await fileCalls(glance)).puts).toHaveLength(0);
+  await expect(pane.locator('button.flow-chip')).toBeVisible();
+});
+
+test('Settings keeps selected OneDrive through refresh, opens Files consent and shows grant checked', async ({ glance }) => {
+  await openAsk(glance, 'AQQKSettingsFiles', 'AQMkSettingsFiles', {}, { auth: { files: false, tasks: false } });
+  await mockFilesConsent(glance);
+  const popup = await openOutlookPanel(glance);
+  const card = popup.locator('[data-glance-connect="microsoft"]').first();
+  const box = card.locator('[data-glance-service="onedrive"]');
+  await box.check();
+  await glance.evaluateWorker(async () => {
+    await chrome.storage.local.set({ outlookSync: { lastSyncAt: Date.now() } });
+  });
+  await popup.waitForTimeout(1000);
+  await expect(box).toBeChecked();
+  await card.locator('button').filter({ hasText: 'הוסף הרשאה' }).click();
+  await expect.poll(async () => (await glance.flows()).length).toBe(1);
+  const flow = (await glance.flows())[0];
+  expect(flow.interactive).toBe(true);
+  expect(new URL(flow.url).searchParams.get('scope').split(' ').sort()).toEqual(['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite', 'Files.ReadWrite'].sort());
+  await expect.poll(async () => (await glance.storage()).outlookAuth.token.grantedScopes).toContain('Files.ReadWrite');
+  await expect(box).toBeChecked();
+  expect((await fileCalls(glance)).puts).toHaveLength(0);
+});
+
+test('FYI do-not-save remains quiet with Files scope missing', async ({ glance }) => {
+  const page = await openAsk(glance, 'AQQKMailOnlyFYI', 'AQMkMailOnlyFYI', {}, {
+    auth: { files: false, tasks: false }, subject: 'Vendor agreement – FYI',
+    body: "Hi, Please don't save the attachment, it's for reference only. Thanks"
+  });
+  await page.waitForTimeout(6000);
+  await expect(page.locator(PANE + ' .flow-chip-host')).toHaveCount(0);
+  expect((await fileCalls(glance)).puts).toHaveLength(0);
+});
+
+
+test('cancelling inline OneDrive consent keeps the ask visible and saves nothing', async ({ glance }) => {
+  const page = await openAsk(glance, 'AQQKFilesCancel', 'AQMkFilesCancel', {}, { auth: { files: false } });
+  const pane = page.locator(PANE);
+  await expect(pane.locator('[data-glance-consent="files"]')).toBeVisible();
+  await mockFilesConsent(glance, false);
+  await pane.locator('[data-glance-consent="files"] button').click();
+  await expect(pane.locator('[data-glance-consent="files"] button')).toBeEnabled();
+  await expect(pane.locator('.flow-chip-host')).toContainText('No file was saved.');
+  expect((await glance.storage()).outlookAuth.token.grantedScopes).not.toContain('Files.ReadWrite');
+  expect((await fileCalls(glance)).puts).toHaveLength(0);
+});
+
+test('the primary Microsoft card visibly requests missing Outlook page access and explains denial', async ({ glance }) => {
+  await openAsk(glance, 'AQQKPageAccess', 'AQMkPageAccess');
+  const popup = await openOutlookPanel(glance);
+  await popup.addInitScript(() => {
+    const contains = chrome.permissions.contains.bind(chrome.permissions);
+    chrome.permissions.contains = (p) => (p.origins || []).some((o) => o.includes('outlook.live.com')) ? Promise.resolve(false) : contains(p);
+    chrome.permissions.request = async () => false;
+  });
+  await popup.reload();
+  const card = popup.locator('[data-glance-connect="microsoft"]').first();
+  const access = card.locator('[data-glance-outlook-access]');
+  await expect(access).toBeVisible();
+  await access.click();
+  await expect(card.locator('.conn-err')).toContainText('צריך לאפשר גישה');
+  await expect(access).toBeEnabled();
+  expect((await fileCalls(glance)).puts).toHaveLength(0);
 });

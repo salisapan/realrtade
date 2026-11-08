@@ -1382,6 +1382,13 @@
         return;
       }
     }
+    if (earlySteps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'attachmentSave'))) {
+      const stNow = await FlowStorage.get();
+      if (!filesGranted(stNow)) {
+        paintIfCurrent(token, function () { paintFilesConsent(host); });
+        return;
+      }
+    }
     doItInFlight = true;
     try {
     paintIfCurrent(token, function () { FlowChipHost.setChipState(chip, 'flow-chip-pending', pageChrome().closing); });
@@ -3521,11 +3528,44 @@
     if (ask) ask.remove();
   }
 
+  function filesGranted(st) {
+    return typeof FlowOnedriveFile !== 'undefined' && FlowOnedriveFile.hasWriteScope(calendarScopes(st)) === true;
+  }
+
+  function paintFilesConsent(host) {
+    if (paintDepth <= 0 || !host || host.querySelector('[data-glance-consent="files"]')) return;
+    const row = FlowChipHost.el('div', 'flow-chip-consent');
+    row.setAttribute('data-glance-consent', 'files');
+    const he = pageUiLang() === 'he';
+    row.appendChild(FlowChipHost.el('span', 'flow-chip-label', he ? 'צריך הרשאה ל-OneDrive' : 'OneDrive permission is needed'));
+    const button = FlowChipHost.el('button', 'flow-chip-consent-btn capture-secondary', he ? 'אפשר OneDrive' : 'Allow OneDrive');
+    button.type = 'button';
+    button.addEventListener('click', async () => {
+      if (ignoreStaleClick(host)) return;
+      const token = captureMailToken();
+      button.disabled = true;
+      const r = await send({ type: 'flow:outlook-consent-scope', scope: 'Files.ReadWrite' });
+      if (!mailTokenLive(token)) return;
+      paintIfCurrent(token, function () {
+        if (r && r.ok) {
+          row.remove();
+          // Granting access is not permission to save. Keep Do It as a separate click.
+        } else {
+          button.disabled = false;
+          paintHint(host, he ? 'ההרשאה ל-OneDrive לא נוספה. לא נשמר קובץ.' : 'OneDrive permission was not added. No file was saved.');
+        }
+      });
+    });
+    row.appendChild(button);
+    host.appendChild(row);
+  }
+
   function paintMissingScope(host, ctx, st) {
     if (!host || !ctx || !ctx.process) return;
     const steps = ctx.process.steps || [];
     const taskOnly = steps.length > 0 && steps.every((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     const hold = ctx.process.id === 'hold' || (ctx.intent && ctx.intent.personalClose === 'calendar-hold');
+    if (steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'attachmentSave')) && !filesGranted(st)) paintFilesConsent(host);
     if (hold && calendarAsk(st)) paintCalendarConsent(host, ctx);
     if (taskOnly && todoAsk(st)) paintTodoConsent(host, ctx);
   }

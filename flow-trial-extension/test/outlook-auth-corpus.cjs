@@ -63,6 +63,8 @@ const REDIRECT = 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/';
     const onedriveValid = C.connectServiceUi({ id: 'onedrive', defaultOn: true, scopes: ['Files.ReadWrite'] }, { tokenStatus: 'valid', granted: ['Mail.ReadWrite'] });
     check('when connected, granted scopes show as ticked without defaultOn inventing OneDrive',
       onedriveValid.checked === false && onedriveValid.granted === false, onedriveValid);
+    const driveGranted = C.connectServiceUi(driveSvc, { tokenStatus: 'valid', granted: staleGrants });
+    check('OneDrive stays checked only after Files.ReadWrite was actually granted', driveGranted.checked === true && driveGranted.granted === true, driveGranted);
     const calGranted = C.connectServiceUi({ id: 'calendar', scopes: ['Calendars.ReadWrite'] }, { tokenStatus: 'valid', granted: staleGrants });
     check('when connected, calendar granted is a label not a pre-ticked box', calGranted.checked === false && calGranted.granted === true, calGranted);
     const pickedIds = C.connectIdsFromChecked(C.CONNECT_SERVICES, (id) => id === 'calendar' || id === 'mail');

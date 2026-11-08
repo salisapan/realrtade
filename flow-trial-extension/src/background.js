@@ -5281,6 +5281,8 @@ async function outlookEcosystemSync(opts) {
 // new 24 hours starts before the old one ends. Every token lives in chrome.storage.local, so nothing depends on this worker
 // staying awake. One run at a time (outlookSessionBusy), so two surfaces never renew at once.
 function outlookLaunchInteractive(url) {
+  const hooked = glanceE2eWebAuthFlow({ url, interactive: true });
+  if (hooked && typeof hooked.then === 'function') return hooked.then((r) => r || null, () => null);
   return new Promise((resolve) => {
     try {
       chrome.identity.launchWebAuthFlow({ url, interactive: true }, (r) => {
