@@ -175,6 +175,8 @@ if (Resolution.attestsPayment('receipt') !== true || Resolution.attestsPayment('
 if (Resolution.attestsPayment('contract') !== false || Resolution.attestsPayment('quote') !== false || Resolution.attestsPayment('signed-copy') !== false) fail('deliverable is not a receipt');
 if (J.silencesReceipt('Please send the receipt.') !== true) fail('receipt silence');
 if (J.silencesReceipt('If you can, send me the signed contract today.') !== false) fail('contract was silenced as a receipt');
+if (J.silencesOwnedDeliverable('If you can, send me the signed contract today.') !== true) fail('contract owned deliverable silence');
+if (J.silencesOwnedDeliverable('Please send the receipt.') !== true) fail('receipt is an owned deliverable');
 
 const ariaNames = Intent.readerNamesFrom({ profile: null, displayName: '', knownNames: ['Sali Sapan'] });
 if (ariaNames.indexOf('Sali Sapan') === -1) fail('aria name missing ' + ariaNames.join(','));
@@ -220,6 +222,7 @@ if (!waited || waited.namesPending || waited.type) fail('names wait should judge
 const gmail = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
 if (/FlowResolution\.owns\(/.test(gmail)) fail('content-gmail still classifies a receipt on its own');
 if (!/FlowIncomingJudge\.silencesReceipt\(/.test(gmail)) fail('content-gmail does not ask the shared judge');
+if (!/FlowIncomingJudge\.silencesOwnedDeliverable\(/.test(gmail)) fail('content-gmail does not ask the shared judge for owned deliverables');
 
 console.log('ok negation-conditional ' + rows.length + ' cc-only-quiet ' + ccHeld);
 console.log(JSON.stringify(fixed));

@@ -555,5 +555,27 @@ console.log('\n--- Do It must not treat a file-on-hold as a blank template ---\n
     !/googleClose && !ctx\.intent\.googleClose\.copyAttachment && typeof FlowGoogleCloses/.test(gmail));
 }
 
+console.log('\n--- threadTarget: which message of a thread is the ask ---\n');
+{
+  const T = FlowGoogleCloses.threadTarget;
+  const own = 'me@gmail.com';
+  const ask = { emails: ['dana@meridian.com', own] };
+  const folded = { emails: ['dana@meridian.com', own], bodyless: true };
+  const copy = { emails: [own, 'info@theflow-ai.com'] };
+  const fwd = { emails: [own, 'lawyer@firm.com'] };
+  const reply = { emails: [own, 'dana@meridian.com'] };
+  const eq = (a, i, w) => a.index === i && a.why === w;
+  check('an ask then a copy to info@ targets the ask', eq(T([ask, copy], own), 0, ''), T([ask, copy], own));
+  check('a folded ask then a copy to info@ targets the folded ask and says it is collapsed', eq(T([folded, copy], own), 0, 'ask-collapsed'), T([folded, copy], own));
+  check('an ask then a Fwd: copy to a third party targets the ask', eq(T([ask, fwd], own), 0, ''), T([ask, fwd], own));
+  check('an ask then your reply to the asker is answered', eq(T([ask, reply], own), -1, 'no-incoming-message'), T([ask, reply], own));
+  check('a reply that also copies others is still an answer', eq(T([ask, { emails: [own, 'dana@meridian.com', 'boss@x.com'] }], own), -1, 'no-incoming-message'));
+  check('your reply older than a new ask does not close it', eq(T([ask, reply, { emails: ['dana@meridian.com', own] }], own), 2, ''));
+  check('only your own copies means no incoming message', eq(T([copy, fwd], own), -1, 'no-incoming-message'));
+  check('an empty thread or no own address means no incoming message', eq(T([], own), -1, 'no-incoming-message') && eq(T([ask], ''), -1, 'no-incoming-message'));
+  check('a note to yourself is the target', eq(T([{ emails: [own, own] }], own), 0, ''));
+  check('the newest message from someone else wins over an older one', eq(T([ask, { emails: ['lee@x.com', own] }, copy], own), 1, ''));
+}
+
 console.log('\n' + (failures ? failures + ' FAILED' : 'All passed'));
 process.exit(failures ? 1 : 0);
