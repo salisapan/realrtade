@@ -121,6 +121,18 @@ const FLOW_CONNECTORS = [
     ]
   },
   {
+    id: 'trello',
+    label: 'Trello',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Adds one card to the Trello list you choose and reads it back before it counts as handled. Undo archives it and leaves a card you changed alone. Off in this build; needs a Trello app key (docs/glance-ai/connectors/trello.md).',
+    fields: [
+      { key: 'board', label: 'Board URL', placeholder: 'https://trello.com/b/…', type: 'text' },
+      { key: 'list', label: 'List name', placeholder: 'To do', type: 'text' }
+    ]
+  },
+  {
     id: 'jira',
     label: 'Jira',
     kind: 'Work management',
