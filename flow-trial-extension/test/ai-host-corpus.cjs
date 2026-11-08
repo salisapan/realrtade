@@ -71,7 +71,10 @@ const EN = 'Hi Sali,\nCould you send me the signed lease by Friday? We need it f
   {
     const s = server();
     const out = await H.readMail(ALL, mail(EN + '\n054-1234567'), SILENT, { post: s.post, identity: { installId: 'install-abcdef12' } });
-    check('an Israeli phone the mask leaves in place: the cloud is never asked', s.seen.length === 0 && out.card === null, { seen: s.seen.length, reason: out.reason });
+    check('an Israeli phone in the signature is masked: the cloud reads the mail without it', s.seen.length === 1 && !/054|1234567/.test(s.seen[0]) && /\[PHONE_\d+\]/.test(s.seen[0]) && out.card && out.card.step === 'draft', { seen: s.seen, reason: out.reason });
+    const s2 = server();
+    const bare = await H.readMail(ALL, mail(EN + '\n0541234567'), SILENT, { post: s2.post, identity: { installId: 'install-abcdef12' } });
+    check('a bare unseparated Israeli number (the mask leaves bare 10-digit runs alone): the cloud is never asked', s2.seen.length === 0 && bare.card === null, { seen: s2.seen.length, reason: bare.reason });
     const direct = await s.post({ action: 'understand-read', maskedText: 'Could you call me at 054-1234567 [DATE_1]?', today: '2026-10-07', installId: 'install-abcdef12' });
     check('...and the server refuses it too, nothing charged', direct.status === 422 && direct.body.code === 'pii', direct);
   }

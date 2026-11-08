@@ -89,7 +89,8 @@ const MODELS = {
 const EXECUTE_ORDER = ['mistralLarge', 'llama70b', 'sonnet', 'grokStrong', 'deepseek'];
 
 const EMAIL_LEAK = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
-const PHONE_LEAK = /\+\d{1,3}[-.\s]?\(?\d{1,4}\)?(?:[-.\s]?\d{2,4}){1,4}|(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/;
+// The third branch is the Israeli local form ("054-1234567", "(03) 555-1234"), the same one core/privacyShield.js now masks.
+const PHONE_LEAK = /\+\d{1,3}[-.\s]?\(?\d{1,4}\)?(?:[-.\s]?\d{2,4}){1,4}|(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}|\(?\b0(?:[23489]|5\d|7[2-9])\)?[-.\s]\d{3}[-.\s]?\d{4}\b/;
 const MONEY_LEAK = /(?:\$|€|£|₪|₹)\s?\d|\b\d[\d.,]*\s?(?:USD|EUR|GBP|ILS|NIS)\b|\b(?:USD|EUR|GBP|ILS|NIS)\s?\d/i;
 const ISO_LEAK = /\b\d{4}-\d{2}-\d{2}\b/;
 const MONTH_LEAK = /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}\b/i;
