@@ -60,5 +60,6 @@ Until one basis reaches 200, the best verdict is "better on spec labels" and `pr
 ## What waits on the owner
 
 - 200 owner-verified labels (`glance-ai/labeling/`): today 0. This is what makes step 4 able to promote. Path A (his own use) is the way to get them without hand labelling.
+- Two-pass agreement labels (the alternative basis): 265 as of 2026-10-13 (batch-003 174 + batch-004 91), so step 4 can now decide on that basis; its verdicts so far are HOLD (`glance-ai/labeling/BATCH-004.md`).
 - The spend approval for one GPU run (cap $30, `gpu-estimate.md`).
 - A decision on undated reply asks ("send the deck asap"): act (today's labels) or silence (today's device). The 61 rows wait on it.
