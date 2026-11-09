@@ -1850,12 +1850,18 @@ function glanceUiCopy(kind) {
     return rows;
   }
 
-  // A folded row opens with a click on the row. Once per row, so a row that
-  // does not open is reported as it is and not clicked again.
+  // A folded row opens with a click inside the row. Live Gmail (9/11) ignores a
+  // click whose target is the div.kv row itself; a click on its content
+  // (.adf / .gs / the snippet .iA) opens it. Once per row, so a row that does
+  // not open is reported as it is and not clicked again.
+  function foldedClickTarget(node) {
+    if (!node || !node.querySelector) return node;
+    return node.querySelector('.adf, .gs, .iA') || node.firstElementChild || node;
+  }
   function openFoldedRow(node) {
     if (!node || node.getAttribute('data-glance-folded-click') === '1') return false;
     node.setAttribute('data-glance-folded-click', '1');
-    try { node.click(); return true; } catch (e) { return false; }
+    try { foldedClickTarget(node).click(); return true; } catch (e) { return false; }
   }
 
   async function scanReadingPane() {
