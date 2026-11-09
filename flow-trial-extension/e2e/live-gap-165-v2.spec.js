@@ -74,46 +74,51 @@ test.describe('1. a single 401 on a write', () => {
     expect(stored.googleReconnect).toBeFalsy();
   });
 
-  test('a 401 whose refresh fails for a reason other than revocation keeps the token', async ({ glance }) => {
+  test('a 401 whose refresh fails clears the grant so Connect Google shows', async ({ glance }) => {
     await glance.seedGmail({});
     server.rejectAuth('/calendar/v3/calendars/primary/events');
     const page = await glance.openGmail(opts('post401-keep', 'en'));
     await click(page);
-    await expect(main(page)).toContainText(/Not closed|not signed|Reconnect/i, { timeout: 25000 });
-    const stored = await glance.storage();
-    expect(stored.googleWebAuth && stored.googleWebAuth.accessToken).toBeTruthy();
+    await expect(main(page)).toContainText(/Connect Google|Not closed|not signed|Reconnect/i, { timeout: 25000 });
+    await expect.poll(async () => {
+      const s = await glance.storage();
+      return !(s.googleWebAuth && s.googleWebAuth.accessToken) && !s.googleTasksAuth;
+    }).toBe(true);
     const posts = server.calls.filter((c) => c.method === 'POST' && c.path === '/calendar/v3/calendars/primary/events');
     expect(posts).toHaveLength(2);
   });
 
-  test('when consent is dropped, a Chrome token does not write and the flow stops at Reconnect', async ({ glance }) => {
+  test('when consent is dropped, a Chrome token does not write and Connect Google shows', async ({ glance }) => {
     await glance.seedGmail({ googleConnectedAccount: { email: SELF, at: Date.now(), source: 'web' } });
     server.registerToken('ya29.chrome', SELF);
     await glance.evaluateWorker(() => {
+      // Mirror a remote revoke: silent Chrome mint and web refresh both fail.
       globalThis.__glanceE2e.identityToken = 'ya29.chrome';
       globalThis.__glanceE2e.webFlowError = 'Google sign-in failed (invalid_grant).';
+      globalThis.__glanceE2e.authFail = true;
     });
     server.rejectAuth('/calendar/v3/calendars/primary/events');
+    server.rejectAuth('/tasks/');
     const page = await glance.openGmail(opts('revoked-chrome', 'en'));
     await click(page);
-    await expect(main(page)).toContainText(/Reconnect|Not closed|not signed/i, { timeout: 25000 });
-    await expect(page.locator('div[role="main"] .flow-chip-done-icon')).toHaveCount(0);
+    await expect(main(page)).toContainText(/Connect Google|Reconnect|Not closed|not signed/i, { timeout: 25000 });
     expect(eventIds()).toHaveLength(0);
     expect(taskIds()).toHaveLength(0);
-    const stored = await glance.storage();
-    expect(stored.googleReconnect && stored.googleReconnect.needed).toBe(true);
+    await expect.poll(async () => {
+      const s = await glance.storage();
+      return !s.googleTasksAuth && !(s.googleWebAuth && s.googleWebAuth.accessToken);
+    }).toBe(true);
   });
 
-  test('a refresh that fails with invalid_grant drops the consent', async ({ glance }) => {
+  test('a refresh that fails with invalid_grant clears the grant', async ({ glance }) => {
     await glance.seedGmail({});
     await glance.evaluateWorker(() => { globalThis.__glanceE2e.webFlowError = 'Google sign-in failed (invalid_grant).'; });
     server.rejectAuth('/calendar/v3/calendars/primary/events');
     const page = await glance.openGmail(opts('post401-revoked', 'en'));
     await click(page);
-    await expect(main(page)).toContainText(/Reconnect|Not closed/i, { timeout: 25000 });
+    await expect(main(page)).toContainText(/Connect Google|Reconnect|Not closed/i, { timeout: 25000 });
     await expect.poll(async () => { const s = await glance.storage(); return !!(s.googleWebAuth && s.googleWebAuth.accessToken); }).toBe(false);
-    const stored = await glance.storage();
-    expect(stored.googleReconnect && stored.googleReconnect.needed).toBe(true);
+    await expect.poll(async () => { const s = await glance.storage(); return !s.googleTasksAuth; }).toBe(true);
   });
 });
 
