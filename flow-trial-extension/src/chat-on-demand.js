@@ -103,12 +103,12 @@ const FlowChatOnDemand = (() => {
   }
 
   async function invokeScan(api, tabId, surfaceKey, world) {
-    const scanResult = await execute(api, tabId, world, (key) => {
+    const scanResult = await execute(api, tabId, world, async (key) => {
       const row = (window.__glanceChatSurfaces || {})[key];
       if (!row || typeof row.scan !== 'function') return { ok: false, reason: 'no-scan' };
       let draft = { ok: false, reason: 'no-scan' };
-      try { draft = row.scan({ gesture: true }) || { ok: true }; } catch (e) { return { ok: false, reason: 'scan-threw' }; }
-      try { if (typeof row.followScan === 'function') row.followScan({ gesture: true }); } catch (e2) { /* follow is optional */ }
+      try { draft = await row.scan({ gesture: true }) || { ok: true }; } catch (e) { return { ok: false, reason: 'scan-threw' }; }
+      try { if (typeof row.followScan === 'function') await row.followScan({ gesture: true }); } catch (e2) { /* follow is optional */ }
       return draft;
     }, [surfaceKey]);
     const first = scanResult && scanResult[0] ? scanResult[0].result : null;
