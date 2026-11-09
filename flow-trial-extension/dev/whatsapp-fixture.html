@@ -38,6 +38,13 @@
       }
     }
   };
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (!msg || msg.type !== 'flow:fixture-scan') return;
+      const row = window.__glanceChatSurfaces && window.__glanceChatSurfaces.whatsapp;
+      sendResponse(row && typeof row.scan === 'function' ? row.scan({ gesture: true }) : { ok: false, reason: 'no-scan' });
+    });
+  }
 </script>
 </body>
 </html>

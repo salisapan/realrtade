@@ -94,7 +94,7 @@ globalThis.FlowChatOnDemand = {
   check('killed surfaces skip trigger registration', registered.indexOf('glance-lane-whatsapp-trigger') < 0);
 
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
-  check('manifest activeTab', manifest.permissions.indexOf('activeTab') >= 0);
+  check('v1 permissions do not gain activeTab', manifest.permissions.indexOf('activeTab') < 0);
   check('kill switch polls every 6h', FlowChatKillSwitch.POLL_MINUTES === 360);
   check('flags URL', FlowChatKillSwitch.canonicalPayload(flagsFile).length > 10);
 
