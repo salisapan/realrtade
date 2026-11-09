@@ -6978,6 +6978,11 @@ const FlowIntent = (() => {
     if (isDecision && contingent) return stayQuiet('hedge');
     if (isDecision && settled && (isPast || !(facts.date && facts.date.iso))) return stayQuiet('hedge');
     if (isDecision && facts.money && amountIsAmbiguous(text)) return stayQuiet('hedge');
+    // "We need to cancel the <call> on Tuesday at 3pm" is a cancelled time slot, not a deal outcome to log. LOST reads
+    // "cancel the" as "not going ahead", so a cancel with a clock time used to become a Log-it task at that time.
+    // Only a decision that rests on that cancel alone (no commit, execution or dispute) and names a clock is held quiet.
+    if (isDecision && s.flags.lost && !s.flags.commit && !s.flags.executed && !s.flags.dispute && clock && hasResolvedDate &&
+        /\bcancel(?:l?ing|l?ed)?\b/i.test(text)) return stayQuiet('hedge');
 
     // --- 4. DECISION_TO_LOG: an outcome someone reported — the chip's original job. ---
     if (isDecision) {
