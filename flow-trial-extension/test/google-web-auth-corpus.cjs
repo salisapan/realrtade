@@ -683,6 +683,8 @@ async function run() {
     check('that 401 retry never calls interactive true', interactiveCalls(env.calls).length === 0, env.calls);
     check('that 401 retry did try prompt=none',
       env.calls.some((c) => c.indexOf('WEB prompt=none interactive=false') === 0), env.calls);
+    check('that 401 clears the stored Google grant',
+      env.stored.googleTasksAuth == null && env.stored.googleWebAuth == null, env.stored);
   }
 
   console.log('\n--- disconnect invalidates an in-flight consent window ---\n');
@@ -832,7 +834,7 @@ async function run() {
     const session = await restarted.fn('refreshGoogleSession')();
     const afterRestart = await restarted.fn('connectorStatus')();
     check('a new service worker keeps a stored token that is still inside expiresAt when silent getAuthToken fails', session && session.ok === true && session.source === 'stored' && session.token === 'ya29.kept' && restarted.stored.googleWebAuth && restarted.stored.googleWebAuth.accessToken === 'ya29.kept', { session, auth: restarted.stored.googleWebAuth });
-    check('that unexpired token does not ask again and the panel is not Reconnect', restarted.calls.filter((c) => c === 'GET_AUTH true').length === 0 && !restarted.calls.some((c) => c.indexOf('WEB prompt=') === 0) && restarted.calls.filter((c) => c === 'GET_AUTH false').length === 1 && restarted.stored.googleReconnect == null && afterRestart && afterRestart.googleTasks && afterRestart.googleTasks.needsReconnect === false && afterRestart.googleTasks.connected === true, { calls: restarted.calls, panel: afterRestart && afterRestart.googleTasks, reconnect: restarted.stored.googleReconnect });
+    check('that unexpired token does not ask again and the panel is not Reconnect', restarted.calls.filter((c) => c === 'GET_AUTH true').length === 0 && !restarted.calls.some((c) => c.indexOf('WEB prompt=') === 0) && restarted.calls.filter((c) => c === 'GET_AUTH false').length >= 1 && restarted.calls.filter((c) => c === 'GET_AUTH false').length <= 2 && restarted.stored.googleReconnect == null && afterRestart && afterRestart.googleTasks && afterRestart.googleTasks.needsReconnect === false && afterRestart.googleTasks.connected === true, { calls: restarted.calls, panel: afterRestart && afterRestart.googleTasks, reconnect: restarted.stored.googleReconnect });
     const lapsed = load({
       getAuthTokenError: 'The user is not signed in.',
       webToken: 'ya29.silent-new',
@@ -890,7 +892,7 @@ async function run() {
     check('Reconnect is set only when silent getAuthToken and silent launchWebAuthFlow both fail',
       failed && failed.ok === false &&
       gone.calls.filter((c) => c === 'GET_AUTH true').length === 0 &&
-      gone.calls.filter((c) => c === 'GET_AUTH false').length === 1 &&
+      gone.calls.filter((c) => c === 'GET_AUTH false').length >= 1 &&
       gone.calls.some((c) => c.indexOf('WEB prompt=none interactive=false') === 0) &&
       gone.stored.googleReconnect && gone.stored.googleReconnect.needed === true &&
       failedPanel && failedPanel.googleTasks && failedPanel.googleTasks.needsReconnect === true,
@@ -909,6 +911,33 @@ async function run() {
     check('connector status hides Connected while a write needs reconnect',
       status && status.googleTasks && status.googleTasks.connected === false && status.googleTasks.needsReconnect === true && status.googleTasks.reconnectLabel === 'חבר מחדש את Google',
       status && status.googleTasks);
+  }
+
+
+  console.log('\n--- revoked grant: tokeninfo on popup status clears Connected ---\n');
+  {
+    const env = load({
+      chromeToken: 'ya29.dead',
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_REVOKED' },
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.dead', source: 'chrome', expiresAt: Date.now() + 3600e3 },
+        googleGrantedScopes: {
+          version: scopeVersionOf(SCOPES),
+          status: 'granted',
+          source: 'chrome',
+          at: 1
+        }
+      },
+      routes: [[/\/oauth2\/v3\/tokeninfo/, { reply: res(400, { error: 'invalid_token', error_description: 'Invalid Value' }) }]]
+    });
+    const before = await env.fn('connectorStatus')();
+    check('tokeninfo invalid_token clears googleTasksAuth', env.stored.googleTasksAuth == null, env.stored);
+    check('tokeninfo invalid_token clears googleWebAuth', env.stored.googleWebAuth == null, env.stored);
+    check('tokeninfo invalid_token clears ever-connected', env.stored.googleEverConnected == null, env.stored);
+    check('popup status is Connect (not Connected, not Reconnect)',
+      before && before.googleTasks && before.googleTasks.connected === false && before.googleTasks.needsReconnect === false,
+      before && before.googleTasks);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

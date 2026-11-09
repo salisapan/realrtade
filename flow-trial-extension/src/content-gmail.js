@@ -5815,7 +5815,10 @@ function glanceUiCopy(kind) {
           // longer holds.
           const gone = new Set(result.undoneIds);
           const left = succeeded.concat(extra).filter((r) => !gone.has(r.action.id));
-          writeLaneUndoRow(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(left), { partial: left.length < results.length, total: results.length }, ctx.laneIds);
+          // Hand-offs and skipped steps never count toward "partial" — only
+          // real attempted writes do (same rule as the close receipt).
+          const counted = results.filter((r) => r && r.action && !(r.response && r.response.skipped) && !draftHandOff(r));
+          writeLaneUndoRow(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(left), { partial: left.length < counted.length, total: counted.length }, ctx.laneIds);
           FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
           FlowStorage.calibrate('undo', ctx.intent.type);
           // The full close is no longer true, so a later message in this
@@ -5955,7 +5958,19 @@ function glanceUiCopy(kind) {
     });
     if (meetingNote) bookkeeping.push(meetingNote);
     noteLaneOutcome(results);
-    bookkeeping.push(rememberLaneUndo(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(succeeded.concat(extra)), ctx.laneIds, { total: results.length }));
+    // A compose hand-off (preview that closes nothing) is still one entry in
+    // `results`, but it is not a failed write. Counting it as total made a
+    // full Drive save remount as "טופל חלקית" when only the Drive step was
+    // stored for Undo. Match the receipt: hand-offs and skips do not count,
+    // and a full close never stores partial.
+    {
+      const undoSteps = laneUndoStepsOf(succeeded.concat(extra));
+      const counted = results.filter((r) => r && r.action && !(r.response && r.response.skipped) && !draftHandOff(r));
+      const meta = (typeof FlowReceipt !== 'undefined' && FlowReceipt.laneUndoStoreMeta)
+        ? FlowReceipt.laneUndoStoreMeta({ full: copy.full, storedCount: undoSteps.length, attemptedCount: counted.length })
+        : (copy.full ? { total: undoSteps.length } : { total: Math.max(counted.length, undoSteps.length) });
+      bookkeeping.push(rememberLaneUndo(ctx.legacyMessageId || ctx.messageId, undoSteps, ctx.laneIds, meta));
+    }
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a

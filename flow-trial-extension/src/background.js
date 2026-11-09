@@ -2267,22 +2267,104 @@ async function refreshGoogleSession() {
   return { ok: false, source: null, token: '' };
 }
 
-// Google ends a grant with invalid_grant, or says it was revoked. Nothing
-// else a refresh can say (no window, no session, offline) ends it.
+// Google ends a grant with invalid_grant / invalid_token, or says it was
+// revoked. Nothing else a refresh can say (no window, no session, offline)
+// ends it.
 function googleRefreshRevoked(err) {
-  return /invalid_grant|revoked/i.test(String((err && err.message) || err || ''));
+  return /invalid_grant|invalid_token|revoked/i.test(String((err && err.message) || err || ''));
+}
+
+// Remote revoke (myaccount.google.com/connections) leaves googleTasksAuth and
+// a cached Chrome token in place, so the popup still says Connected until
+// someone clicks Disconnect. Clear the same keys Disconnect clears, then the
+// panel and the card show Connect Google again. No new scopes.
+async function clearGoogleAuthForRevocation(reason) {
+  invalidateGoogleWebAuthFlight();
+  try { await clearCachedChromeGoogleTokens(); } catch (e) { /* already empty */ }
+  await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([
+    'googleTasksAuth',
+    GOOGLE_WEB_AUTH_STORAGE_KEY,
+    GOOGLE_RECONNECT_STORAGE_KEY,
+    GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+    GOOGLE_GRANTED_SCOPES_KEY,
+    'googleProfile',
+    'googleConnectedAccount',
+    'glanceOwnNames'
+  ]));
+  googleNamesFilled = false;
+  try {
+    const hook = globalThis.FlowProfileHook;
+    if (hook && typeof hook.onDisconnect === 'function') hook.onDisconnect('google');
+  } catch (e) { /* profile store not wired */ }
+  return { cleared: true, reason: String(reason || 'revoked') };
+}
+
+function googleTokenInfoSaysRevoked(data, status) {
+  if (status === 401) return true;
+  if (!data || typeof data !== 'object') return false;
+  const err = String(data.error || data.error_description || '');
+  return /invalid_token|invalid_grant|revoked/i.test(err);
+}
+
+// Cheap check for the popup: one tokeninfo call on the token we already hold.
+// No new scopes. A dead grant clears storage so Connect Google shows; a
+// network blip leaves the stored grant alone.
+async function probeGoogleAuthStillValid() {
+  let bag = {};
+  try {
+    bag = await chrome.storage.local.get([
+      'googleTasksAuth',
+      GOOGLE_WEB_AUTH_STORAGE_KEY,
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY
+    ]);
+  } catch (e) { return { ok: true, probed: false }; }
+  if (!googleHadAccount(bag)) return { ok: true, probed: false };
+  let token = '';
+  try {
+    const cred = await getGoogleAccessToken(false);
+    token = (cred && cred.token) || '';
+  } catch (e) {
+    if (googleRefreshRevoked(e)) {
+      await clearGoogleAuthForRevocation('revoked');
+      return { ok: false, probed: true, cleared: true, reason: 'revoked' };
+    }
+    // getAuthToken can fail for offline / sign-in off without a revoke.
+    return { ok: true, probed: true, softFail: true };
+  }
+  if (!token) {
+    await clearGoogleAuthForRevocation('not signed in');
+    return { ok: false, probed: true, cleared: true, reason: 'not signed in' };
+  }
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(token));
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (googleTokenInfoSaysRevoked(data, res.status) || (res.status === 400 && googleTokenInfoSaysRevoked(data, 401))) {
+      const why = (data && (data.error || data.error_description)) || 'invalid_token';
+      await clearGoogleAuthForRevocation(why);
+      try { if (token) await removeCachedGoogleAuthToken(token); } catch (e) { /* already gone */ }
+      return { ok: false, probed: true, cleared: true, reason: String(why) };
+    }
+    if (!res.ok) return { ok: true, probed: true, softFail: true, status: res.status };
+    return { ok: true, probed: true };
+  } catch (e) {
+    if (googleRefreshRevoked(e)) {
+      await clearGoogleAuthForRevocation('revoked');
+      return { ok: false, probed: true, cleared: true, reason: 'revoked' };
+    }
+    return { ok: true, probed: true, softFail: true };
+  }
 }
 
 // One silent refresh after a 401, then the caller retries once. Web tokens
 // use prompt=none. Chrome tokens use getAuthToken({ interactive: false }).
-// Neither opens a consent window. The stored token is kept when the refresh
-// fails: a 401 can be a single bad answer. Consent is dropped only when the
-// refresh itself says the grant is gone. A null result means: retry once
-// with the token already in hand.
+// Neither opens a consent window. A single 401 before refresh is not enough
+// to drop consent; invalid_grant / invalid_token / revoked on the refresh
+// (or a 401 that survives the retry) clears the stored Google auth so the
+// popup shows Connect Google.
 async function refreshLaneCredential(cred) {
   const revoked = async () => {
-    if (cred && cred.source === 'web') await clearGoogleWebAuth();
-    await markGoogleReconnect('revoked');
+    await clearGoogleAuthForRevocation('revoked');
     return { revoked: true, token: '', source: cred && cred.source };
   };
   if (cred && cred.source === 'web') {
@@ -2315,15 +2397,24 @@ globalThis.FlowGoogleAccess = {
   },
   retry(cred) {
     return refreshLaneCredential(cred);
+  },
+  clearRevoked(reason) {
+    return clearGoogleAuthForRevocation(reason);
+  },
+  probeValid() {
+    return probeGoogleAuthStillValid();
   }
 };
 
 async function rememberGoogleAuthResult(res) {
   if (!res) return res;
-  if (res.status === 401) await markGoogleReconnect('401');
-  else if (res.status === 403) await markGoogleReconnect('missing scope');
-  // A later 2xx leaves googleReconnect set. clearGoogleReconnect runs only
-  // after Connect stores a new token.
+  if (res.status === 401) {
+    // Survived the silent refresh+retry: the grant is gone. Clear so the
+    // popup does not keep saying Connected until Disconnect is clicked.
+    await clearGoogleAuthForRevocation('401');
+  } else if (res.status === 403) {
+    await markGoogleReconnect('missing scope');
+  }
   return res;
 }
 
@@ -7239,6 +7330,9 @@ async function connectorStatus() {
   const sf = await getSalesforceAuth();
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
+  // Popup open: if we still claim a Google grant, ask tokeninfo once. A
+  // remote revoke leaves storage looking Connected otherwise.
+  try { await probeGoogleAuthStillValid(); } catch (e) { /* status below still reads storage */ }
   const gt = await getGoogleTasksAuth();
   const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, 'googleLaneWarning', 'glanceLaneUndo', 'glanceHostLanguage', 'glanceUiLanguage']);
   let uiLang = reconnectBag.glanceUiLanguage || reconnectBag.glanceHostLanguage || '';
