@@ -207,6 +207,9 @@ const FlowCloseFamilies = (() => {
     const t = String(raw || '');
     if (/\bdon'?t\s+forget\b/i.test(t)) return true;
     if (/\bno\s+ne+d\s+to\s+reply\b/i.test(t)) return true;
+    // "אל תשכח להגיד לנו כשזה מוכן" is a notify-when-done tail on a send ask,
+    // not a negation of the work in the same sentence.
+    if (/אל\s+תשכח(?:י|ו)?\s+ל(?:הגיד|הודיע|עדכן)\s+ל(?:נו|י|כם|ך)(?:\s|$|[,،.!?])/.test(t)) return true;
     return false;
   }
   // "don't save" / "no need to save" is the file gate's own quiet.

@@ -13,7 +13,7 @@ function parseDomFile(name) {
   const html = raw.split('=== (1) outerHTML ===')[1].split('=== (2) aria-label ===')[0].trim();
   const aria = raw.split('=== (2) aria-label ===')[1].split('=== (3)')[0].trim();
   const cleaned = html
-    .replace(/<div class="flow-chip-host"[\s\S]*?<\/div>/gi, '')
+    .replace(/<div class="flow-chip-host"[\s\S]*?<\/div>\s*<\/div>/gi, '')
     .replace(/\sdata-glance-[a-z-]+="[^"]*"/gi, '');
   let detailsTable = '';
   const ajB = cleaned.match(/<div class="ajB">[\s\S]*?<\/div>\s*<\/div>/i);
@@ -105,11 +105,19 @@ function liveGmailPage(opts) {
         });
       });`
     : '';
+  if (o.messageId) {
+    mutate += `var __m=document.querySelector('[data-legacy-message-id="${o.messageId}"]');var __a=document.querySelector('.a3s');if(__m&&__a&&!__m.contains(__a))__m.appendChild(__a);`;
+  }
   const accountLabel = main.aria.replace(/\s+/g, ' ').trim();
+  const afterMainMutate = (o.liveMutate === 'toOnlyMe' || o.liveMutate === 'emptyTo-ccOnlyMe') && mutate
+    ? '<script>' + mutate + '</script>'
+    : '';
+  const tailMutate = afterMainMutate ? '' : mutate;
   return '<!doctype html><html lang="' + lang + '"><head><meta charset="utf-8"><title>' + esc(title) + '</title></head><body>' +
     '<a class="gb_d" aria-label="' + esc(accountLabel) + '" href="#"></a>' +
     main.html +
-    '<script>' + mutate + wireToggle + '</script></body></html>';
+    afterMainMutate +
+    '<script>' + wireToggle + tailMutate + '</script></body></html>';
 }
 
 function loadCases() {

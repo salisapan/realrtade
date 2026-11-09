@@ -1,0 +1,10 @@
+{
+  "name": "glance-gmail-addon",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-bundle.js",
+    "deploy:stamp": "node scripts/build-bundle.js --deploy",
+    "check:bundle": "node scripts/check-core-bundle.cjs",
+    "deploy": "node scripts/build-bundle.js --deploy && node scripts/check-core-bundle.cjs --deploy && clasp push && node scripts/build-bundle.js"
+  }
+}

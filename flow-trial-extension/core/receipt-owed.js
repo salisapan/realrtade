@@ -39,7 +39,9 @@ const FlowReceiptOwed = (() => {
   const COMBINED = /חשבונית\s*מס[\s\-\/]*קבלה|חשבונית[\s\-\/]+קבלה|\binvoice[\s\-\/]*receipt\b|\btax invoice[\s\-\/]+receipt\b/i;
   const RECEIPT_FILE = /(?:^|[^א-ת])קבל(?:ה|ות)(?=$|[^א-ת])|\breceipts?\b|(?:^|[_\-\s.])receipt/i;
   const RECEIPT_WORD = /(?:^|[^א-ת])קבל(?:ה|ות)(?=$|[^א-ת])|\breceipts?\b/i;
-  const ISSUED = /\b(?:was sent|has been sent|sent to|was issued|has been issued|issued (?:to|for))\b|(?:נשלחה|נשלח|הופקה|הופק|יצאה)/i;
+  const ISSUED = /\b(?:was sent|has been sent|sent to|was issued|has been issued|issued (?:to|for)|(?:was |has been )?(?:emailed|delivered) to)\b|(?:נשלחה|נשלח|הופקה|הופק|יצאה)/i;
+  // The same invoicing systems also deliver a SUPPLIER's receipt to the person: that is money the person paid, not proof.
+  const TO_ME = /\b(?:sent you|has sent you|you(?:'ve| have) received|for you from)\b|(?:שלח(?:ה)? לך|שלחו לך|קיבלת (?:קבלה|מסמך)|נשלחה אליך|נשלח אליך)/i;
   const DRAFT = /\b(?:draft|preview|not (?:yet )?(?:issued|sent))\b|(?:טיוט|טרם הופק|טרם נשלח|לא הופק|לא נשלח|תצוגה מקדימה)/i;
   const CANCELLED = /\b(?:cancel(?:l)?ed|void(?:ed)?|credit note|refund)\b|(?:בוטל|מבוטל|ביטול|חשבונית זיכוי|זיכוי)/i;
   const PROMISE = /\b(?:i(?:'ll| will)|will send|tomorrow|later|next week|soon)\b|(?:אשלח|אוציא|אפיק|מחר|בהמשך|בשבוע הבא)/i;
@@ -62,12 +64,18 @@ const FlowReceiptOwed = (() => {
     return Boolean(d) && ISSUERS.some((s) => d === s || d.endsWith('.' + s));
   }
   // A Hebrew name may carry a one-letter prefix in running text: «אל דנה», «לדנה», «מדנה».
+  // The payer is named when the copy carries their address, their whole name as a phrase, or every distinctive word of a
+  // name that has at least two. "Maya Studio" is not named by "Maya Levi": one distinctive word is never enough.
   function namesPayer(owed, text) {
-    const toks = tokens(owed.payer);
-    if (!toks.length) return false;
+    const raw = String(text || '').toLowerCase();
+    if (owed.email && raw.indexOf(String(owed.email).trim().toLowerCase()) >= 0) return true;
     const words = norm(text).split(' ');
-    const hit = (tok) => words.some((w) => w === tok || (/^[א-ת]/.test(tok) && /^[לבמהו]/.test(w) && w.slice(1) === tok));
-    return toks.every(hit);
+    const full = norm(owed.payer).split(' ').filter(Boolean);
+    const at = (i, tok) => words[i] === tok || (/^[א-ת]/.test(tok) && /^[לבמהו]/.test(words[i] || '') && words[i].slice(1) === tok);
+    if (full.length) for (let i = 0; i + full.length <= words.length; i++) { if (at(i, full[0]) && full.slice(1).every((t, k) => words[i + 1 + k] === t)) return true; }
+    const toks = tokens(owed.payer);
+    if (toks.length < 2) return false;
+    return toks.every((tok) => words.some((w, i) => at(i, tok)));
   }
   const sameAmount = (a, b) => Math.abs(a - b) <= Math.max(0.5, a * 0.005);
   function amountsIn(text) {
@@ -153,7 +161,7 @@ const FlowReceiptOwed = (() => {
       return { verdict: 'close', kind: 'own' };
     }
     if (msg.dir !== 'in' || msg.authPass === false || !trustedIssuer(msg.fromEmail)) return null;
-    if (!RECEIPT_WORD.test(text) || !ISSUED.test(text) || DRAFT.test(text) || CANCELLED.test(text)) return null;
+    if (!RECEIPT_WORD.test(text) || !ISSUED.test(text) || DRAFT.test(text) || CANCELLED.test(text) || TO_ME.test(text)) return null;
     if (!namesPayer(owed, text)) return null;
     if (amountFits(owed, text) === false) return null;
     return { verdict: 'close', kind: 'issuer' };
@@ -181,6 +189,17 @@ const FlowReceiptOwed = (() => {
   }
   // Reopen / Undo of a close: back to open, proof dropped.
   function reopenPatch() { return { status: 'open', closedAs: null, closedAt: null, proof: null, releaseReason: null }; }
+  // Add a newly owed receipt to the list once: a payment loop that is reopened and closed again owes no second receipt.
+  function merge(owedList, owed) {
+    const list = Array.isArray(owedList) ? owedList.slice() : [];
+    if (!owed || list.some((x) => x && x.id === owed.id)) return list;
+    list.push(owed);
+    return list;
+  }
+  // The payment loop was reopened (Undo of "paid"): an owed receipt still open for it goes away; one already sent stays.
+  function withdraw(owedList, loopId) {
+    return (Array.isArray(owedList) ? owedList : []).filter((x) => !(x && x.status === 'open' && String(x.fromLoop) === String(loopId)));
+  }
   // Owed receipts past their chase day, oldest first.
   function due(owedList, now) {
     const today = iso(new Date(typeof now === 'number' ? now : Date.now()));
@@ -188,7 +207,7 @@ const FlowReceiptOwed = (() => {
       .sort((a, b) => a.chaseIso.localeCompare(b.chaseIso));
   }
 
-  return { SWITCH, SWITCH_DEFAULT, owe, evidenceFor, judge, closePatch, releasePatch, reopenPatch, due, doneText, trustedIssuer };
+  return { SWITCH, SWITCH_DEFAULT, owe, evidenceFor, judge, closePatch, releasePatch, reopenPatch, due, merge, withdraw, doneText, trustedIssuer, namesPayer };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowReceiptOwed };
