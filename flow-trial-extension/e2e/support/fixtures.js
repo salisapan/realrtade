@@ -92,8 +92,9 @@ function threadHeaderAttrs(o, threadId) {
 
 // A conversation of several messages, oldest first. Each entry: { messageId, senderEmail,
 // senderName, to, cc, body, collapsed }. A collapsed entry is the one-line row Gmail paints
-// for an older message: the sender's address and a snippet, no body. Clicking it opens
-// the message, the way Gmail does. The newest entry is open unless it says collapsed.
+// for an older message: the sender's address and a snippet, no body. A click inside it
+// opens the message, the way Gmail does; live Gmail (9/11) ignores a click whose target
+// is the div.kv row itself, so this fixture does too. The newest entry is open unless it says collapsed.
 function gmailThreadHtml(o) {
   const ownEmail = o.ownEmail || 'me@x.com';
   const threadId = o.threadId || 't-thread';
@@ -121,9 +122,10 @@ function gmailThreadHtml(o) {
   }
   function folded(m) {
     return '<div class="kv" role="listitem" aria-expanded="false" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(m.messageId) + '"' +
-      ' data-open="' + esc(open(m)) + '" onclick="this.outerHTML=this.getAttribute(\'data-open\')">' +
+      ' data-open="' + esc(open(m)) + '" onclick="if (event.target !== this) this.outerHTML=this.getAttribute(\'data-open\')">' +
+      '<div class="adf ads"><div class="gs">' +
       '<span class="yP" email="' + esc(m.senderEmail || 'dana@acme.com') + '" name="' + esc(m.senderName || 'Dana') + '">' + esc(m.senderName || 'Dana') + '</span>' +
-      '<span class="y2">' + esc(String(m.body || '').slice(0, 40)) + '</span></div>';
+      '<div class="iA g6">' + esc(String(m.body || '').slice(0, 40)) + '</div></div></div></div>';
   }
   const rows = (o.thread || []).map((m) => (m.collapsed ? folded(m) : open(m))).join('');
   const titleEmail = o.titleEmail || ownEmail;

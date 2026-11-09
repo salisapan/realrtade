@@ -535,6 +535,8 @@ async function resolveExistingTaskList() {
 // The owner's off switches live in one storage object. A missing key is off.
 async function laneSwitchOn(name) {
   try {
+    // A Chrome Web Store install (Chrome adds update_url) never turns a Labs switch on, whatever storage says.
+    if (chrome.runtime && typeof chrome.runtime.getManifest === 'function' && (chrome.runtime.getManifest() || {}).update_url) return false;
     const bag = await chrome.storage.local.get({ glanceSwitches: {} });
     return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
   } catch (e) { return false; }

@@ -183,8 +183,14 @@ const ConnectEcosystemUI = (function () {
     return false;
   }
 
+  // A Chrome Web Store install (Chrome adds update_url to the manifest) never turns a Labs switch on,
+  // whatever storage says. Unpacked/dev installs have no update_url and keep Labs working.
+  function glanceLabsLocked() {
+    try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
+  }
   async function switchOn() {
     try {
+      if (glanceLabsLocked()) return false;
       const bag = await chrome.storage.local.get({ glanceSwitches: {} });
       return !!(bag.glanceSwitches && bag.glanceSwitches[SWITCH] === true);
     } catch (e) {

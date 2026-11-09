@@ -74,6 +74,11 @@ function glanceUiCopy(kind) {
 }
 
 (function flowGmailWatcher() {
+  // A Chrome Web Store install (Chrome adds update_url to the manifest) never turns a Labs switch on,
+  // whatever storage says. Unpacked/dev installs have no update_url and keep Labs working.
+  function glanceLabsLocked() {
+    try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
+  }
   // A second injection in this same world must not start another watcher.
   // After an update the old world is gone, so this guard is false and the
   // new files run. The service worker removes leftover chips first.
@@ -1616,7 +1621,7 @@ function glanceUiCopy(kind) {
     // A known service's notice with a deadline and a preventing action is a task with the date (core/system-notice.js).
     // Off unless glanceSwitches.SYSTEM_NOTICE is true.
     let noticeOn = false;
-    try { const bag = await chrome.storage.local.get({ glanceSwitches: {} }); noticeOn = !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); } catch (e) { noticeOn = false; }
+    try { const bag = await chrome.storage.local.get({ glanceSwitches: {} }); noticeOn = !glanceLabsLocked() && !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); } catch (e) { noticeOn = false; }
     if (noticeOn && typeof FlowSystemNotice !== 'undefined' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.noticeIntent === 'function' && base && base.inbound !== false) {
       const notice = FlowSystemNotice.detect({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now });
       if (notice) return FlowIncomingJudge.noticeIntent(FlowIntent, notice);
@@ -1627,7 +1632,7 @@ function glanceUiCopy(kind) {
     if (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.bookingNotice === 'function' && base && base.inbound !== false && ctx.senderIsUser !== true) {
       let bag = null;
       try { bag = await chrome.storage.local.get({ glanceSwitches: {} }); } catch (e) { bag = null; }
-      const sw = (bag && bag.glanceSwitches) || {};
+      const sw = (!glanceLabsLocked() && bag && bag.glanceSwitches) || {};
       const judgeIn = { text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null };
       if (sw.BOOKING_NOTICE === true) {
         const gone = await cancelledHoldIntent(prepared, ctx.senderEmail);
@@ -1845,12 +1850,18 @@ function glanceUiCopy(kind) {
     return rows;
   }
 
-  // A folded row opens with a click on the row. Once per row, so a row that
-  // does not open is reported as it is and not clicked again.
+  // A folded row opens with a click inside the row. Live Gmail (9/11) ignores a
+  // click whose target is the div.kv row itself; a click on its content
+  // (.adf / .gs / the snippet .iA) opens it. Once per row, so a row that does
+  // not open is reported as it is and not clicked again.
+  function foldedClickTarget(node) {
+    if (!node || !node.querySelector) return node;
+    return node.querySelector('.adf, .gs, .iA') || node.firstElementChild || node;
+  }
   function openFoldedRow(node) {
     if (!node || node.getAttribute('data-glance-folded-click') === '1') return false;
     node.setAttribute('data-glance-folded-click', '1');
-    try { node.click(); return true; } catch (e) { return false; }
+    try { foldedClickTarget(node).click(); return true; } catch (e) { return false; }
   }
 
   async function scanReadingPane() {
@@ -3326,7 +3337,7 @@ function glanceUiCopy(kind) {
   async function showFullDocumentChip(message, c) {
     try {
       const st = await FlowStorage.get();
-      if (!(st && st.glanceSwitches && st.glanceSwitches.FULL_DOCUMENT_CLOSE === true)) return false;
+      if (glanceLabsLocked() || !(st && st.glanceSwitches && st.glanceSwitches.FULL_DOCUMENT_CLOSE === true)) return false;
     } catch (e) { return false; }
     const lang = mailLanguage({ bodyText: c.text });
     let styleSummary = null;
@@ -4302,7 +4313,7 @@ function glanceUiCopy(kind) {
     if (userContextSwitchOn != null) return userContextSwitchOn;
     try {
       const st = await FlowStorage.get();
-      userContextSwitchOn = !!(st && st.glanceSwitches && st.glanceSwitches.USER_CONTEXT_WRITER === true);
+      userContextSwitchOn = !glanceLabsLocked() && !!(st && st.glanceSwitches && st.glanceSwitches.USER_CONTEXT_WRITER === true);
     } catch (e) { userContextSwitchOn = false; }
     return userContextSwitchOn;
   }
