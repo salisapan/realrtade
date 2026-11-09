@@ -1611,18 +1611,11 @@ function launchGoogleWebAuthFlow(details) {
   });
 }
 
+// The Google consent is the manifest's six scopes and nothing else. No Labs switch adds a
+// scope (contacts.readonly is never requested; test/scope-allowlist-corpus.cjs pins this).
 async function googleManifestScopes() {
   const oauth2 = chrome.runtime.getManifest().oauth2;
-  const base = googleOAuthScopesFrom(oauth2 && oauth2.scopes);
-  const bag = await chrome.storage.local.get({ glanceSwitches: {} });
-  const flags = bag.glanceSwitches || {};
-  const G = globalThis.FlowGoogleContacts;
-  if (G && typeof G.oauthScopesForSwitch === 'function') {
-    G.oauthScopesForSwitch(flags).forEach((scope) => {
-      if (scope && base.indexOf(scope) < 0) base.push(scope);
-    });
-  }
-  return base;
+  return googleOAuthScopesFrom(oauth2 && oauth2.scopes);
 }
 
 async function readGoogleWebAuth() {
