@@ -68,6 +68,7 @@ jobs:
           node test/display-144-followups-corpus.cjs
           node test/connect-ecosystem-corpus.cjs
           node test/whatsapp-legal-corpus.cjs
+          node test/whatsapp-share-intake-corpus.cjs
       - name: Install Chromium
         working-directory: flow-trial-extension
         run: npx playwright install --with-deps chromium

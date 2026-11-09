@@ -82,15 +82,26 @@ console.log('\n--- never auto-send ---\n');
     check(rel + ' has no send simulation', hits.length === 0, hits);
   }
   check('wame open uses tabs.create only', /chrome\.tabs\.create/.test(fs.readFileSync(path.join(ROOT, 'src/whatsapp-share-sw.js'), 'utf8')));
+  const shareJs = fs.readFileSync(path.join(ROOT, 'lane-chat/share-intake.js'), 'utf8');
+  check('wa.me opens only from the Do It click', /onDoIt:\s*\(\)\s*=>\s*\{\s*onDoIt\(\);\s*\}/.test(shareJs) && shareJs.indexOf('whatsapp-share-wame-open') > 0);
+  const sw = fs.readFileSync(path.join(ROOT, 'src/whatsapp-share-sw.js'), 'utf8');
+  check('wa.me open says it does not send', /sends:\s*false/.test(sw));
+  const killSrc = fs.readFileSync(path.join(ROOT, 'lane-chat/chat-kill-switch.js'), 'utf8');
+  check('share switch is off unless the person turns it on', /WHATSAPP_SHARE_INTAKE/.test(killSrc) && /glanceSwitches\[SWITCH\] === true/.test(killSrc));
+  const killCtx = vm.createContext({ console, Date, Promise, fetch });
+  killCtx.globalThis = killCtx;
+  vm.runInContext(killSrc, killCtx, { filename: 'chat-kill-switch.js' });
+  killCtx.FlowWhatsAppShareKill.blocked().then((off) => {
+    check('missing switch blocks the share lane', off.blocked === true && off.reason === 'switch-off', off);
+    console.log('\n--- background wiring ---\n');
+    const bg = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf8');
+    check('background handles flow:whatsapp-share-intake', /flow:whatsapp-share-intake/.test(bg));
+    check('background imports whatsapp-share-sw', /whatsapp-share-sw/.test(bg));
+    console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
+    console.log('TOTAL FAILURES: ' + failures);
+    process.exit(failures ? 1 : 0);
+  }).catch((err) => {
+    console.log('FAIL: share kill switch', err && err.message);
+    process.exit(1);
+  });
 }
-
-console.log('\n--- background wiring ---\n');
-{
-  const bg = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf8');
-  check('background handles flow:whatsapp-share-intake', /flow:whatsapp-share-intake/.test(bg));
-  check('background imports whatsapp-share-sw', /whatsapp-share-sw/.test(bg));
-}
-
-console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
-console.log('TOTAL FAILURES: ' + failures);
-process.exit(failures ? 1 : 0);

@@ -80,8 +80,8 @@ import '../core/outlook-event-call-link.js'; // classic: sets globalThis.FlowOut
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
-import * as whatsappShareSw from './whatsapp-share-sw.js'; // W2 share intake + wa.me lane (WHATSAPP_SHARE_INTAKE, off)
 import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
+import * as whatsappShareSw from './whatsapp-share-sw.js'; // W2 share intake + wa.me lane (WHATSAPP_SHARE_INTAKE, off)
 import '../lane-chat/surfaces.js'; // LANE_CHAT surface registry (W1)
 import '../core/chat-kill-switch.js'; // per-user + remote chat kill switch
 import '../core/whatsapp-web-gate.js'; // WhatsApp Web read flag, default off

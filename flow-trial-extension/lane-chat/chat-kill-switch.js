@@ -53,5 +53,5 @@ const FlowChatKillSwitch = (() => {
   return { SWITCH, USER_KEY, GLOBAL_KEY, blocked, refreshGlobalKill };
 })();
 
-if (typeof module !== 'undefined') module.exports = { FlowChatKillSwitch };
-else if (typeof globalThis !== 'undefined') globalThis.FlowChatKillSwitch = FlowChatKillSwitch;
+if (typeof module !== 'undefined') module.exports = { FlowWhatsAppShareKill: FlowChatKillSwitch };
+if (typeof globalThis !== 'undefined') globalThis.FlowWhatsAppShareKill = FlowChatKillSwitch;

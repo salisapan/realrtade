@@ -22,7 +22,7 @@ import '../lane-chat/chat-redact.js';
 const CONSENT_KEY = 'whatsappShareModelConsentAt';
 
 async function shareKillBlocked() {
-  const K = globalThis.FlowChatKillSwitch;
+  const K = globalThis.FlowWhatsAppShareKill;
   if (!K || typeof K.blocked !== 'function') return { blocked: true, reason: 'not-configured' };
   return K.blocked();
 }
