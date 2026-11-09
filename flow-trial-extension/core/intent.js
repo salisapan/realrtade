@@ -264,7 +264,9 @@ const FlowIntent = (() => {
   // "what" for a REQUEST, not re-tested for detection. A second, narrower
   // copy of "what counts as a request" here previously meant the detected
   // request and the quoted sentence could disagree.
-  const REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE, FlowJudgment.FOLLOW_UP_ASK, FlowJudgment.FOLLOW_UP_ASK_HE];
+  const BASE_REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE, FlowJudgment.FOLLOW_UP_ASK, FlowJudgment.FOLLOW_UP_ASK_HE].filter(Boolean);
+  // The two new ask patterns join only for a message with no sign of quoted or forwarded text (FlowJudgment.newAskOpen).
+  const OPEN_REQUEST_PATTERNS = BASE_REQUEST_PATTERNS.concat([FlowJudgment.IMPERATIVE_ASK_HE, FlowJudgment.ADD_TASK_ASK].filter(Boolean));
   // The sentence a dated commitment is quoting — the sender's own delivery
   // promise, or the agreement word. Used only after REQUEST has already
   // declined the message, so this doesn't steal an explicit ask.
@@ -1206,6 +1208,9 @@ const FlowIntent = (() => {
 
   function classify(text, ctx) {
     ctx = ctx || {};
+    // Read on the raw message (ctx.rawText when the caller trimmed it, e.g. a phone signature), before any cut: one sign of quoted or forwarded text keeps the new ask patterns off.
+    const askGate = { newAskOpen: typeof FlowJudgment.newAskOpen === 'function' && FlowJudgment.newAskOpen(typeof ctx.rawText === 'string' ? ctx.rawText : text, ctx.subject) };
+    const REQUEST_PATTERNS = askGate.newAskOpen ? OPEN_REQUEST_PATTERNS : BASE_REQUEST_PATTERNS;
     text = FlowJudgment.newContent(text);
     // «האם תוכל לשלוח...?» and «האם אפשר לקבל...?» are the polite ask, the same as «תוכל לשלוח...?» and «אפשר לקבל...?». Only these two
     // openings: «האם אפשר לשלוח לך» asks whether the writer may send, and «האם שלחת» asks for a status.
@@ -1231,7 +1236,7 @@ const FlowIntent = (() => {
         facts.date = slot.date;
       }
     }
-    const s = FlowJudgment.score(text, domain, facts);
+    const s = FlowJudgment.score(text, domain, facts, askGate);
     // A bad deadline drops only the date. The reply stays, with no due date
     // and no quick-pick. A meeting conflict keeps both choices for the card.
     if (facts.date && (facts.date.contradictsWeekday || facts.date.invalidDate) && s.flags.handoff) {
