@@ -68,7 +68,8 @@ test('connected settings show granted scopes and can add one', async ({ glance }
   const todo = popup.locator('[data-glance-service="todo"]');
   await expect(calendar.first()).toBeVisible();
   await expect(calendar.first()).not.toBeChecked();
-  await expect(todo.first()).toBeChecked();
+  await expect(todo.first()).not.toBeChecked();
+  await expect(popup.locator('label[data-glance-granted] [data-glance-service="todo"]').first()).toBeVisible();
   await expect(popup.getByText('שמירת זמן ביומן').first()).toBeVisible();
   await expect(popup.locator('[data-glance-add-scope="1"]')).toBeVisible();
   await expect(popup.locator('#statusPill')).toHaveText('מחובר');
@@ -96,6 +97,7 @@ test('a hold card shows the time in the card text, and a dateless hold is not a 
     body: HOLD_BODY
   });
   const title = page.locator('#ReadingPaneContainerId .gs-intent, #ReadingPaneContainerId .flow-chip-process-name').first();
+  await expect(title).toBeVisible({ timeout: 20000 });
   await expect(title).toHaveText(hold.title);
   const when = page.locator('#ReadingPaneContainerId [data-glance-when]');
   await expect(when).toBeVisible();
@@ -125,7 +127,8 @@ test('the why line is one line for the current mail and hides when a card shows'
   });
   const why = silent.locator('#ReadingPaneContainerId .flow-why-not');
   await expect(why).toHaveCount(1);
-  await expect(why).toContainText('לא זוהתה בקשה');
+  await expect(why).toHaveAttribute('data-glance-why', /.+/);
+  await expect(why).toHaveText('');
   const show = await glance.openOutlook({
     id: S.MSG_SHOW,
     subject: 'Transfer',

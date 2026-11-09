@@ -30,10 +30,18 @@ test('Gmail: a subject-only mail from someone else stays quiet', async ({ glance
 });
 
 test('Outlook: a subject-only note to self is the task Renew the domain', async ({ glance }) => {
-  await glance.seedOutlook({}, {});
-  await glance.setScenario({ inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] });
+  await glance.seedOutlook({ glanceSwitches: { TASK_ASK: true } }, {});
+  await glance.setScenario({
+    inbox: [], sent: [], messages: {}, attachments: {}, conversation: [],
+    me: {
+      mail: S.ME,
+      userPrincipalName: S.ME,
+      proxyAddresses: ['SMTP:' + S.ME, 'smtp:' + S.SENDER],
+      otherMails: [S.SENDER]
+    }
+  });
   const page = await glance.openOutlook({
-    id: 'AQMkSubjSelf', subject: SUBJECT, senderEmail: S.ME, to: [S.ME], body: ''
+    id: 'AQMkSubjSelf', subject: SUBJECT, senderEmail: S.SENDER, to: [S.SENDER], body: ''
   });
   const card = page.locator('#ReadingPaneContainerId .flow-chip-host');
   await expect(card).toBeVisible({ timeout: 10000 });

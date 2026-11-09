@@ -12,10 +12,10 @@
 // question never act here until there is a labelled set of real chats to measure them on (docs/multi-platform.md).
 (() => {
   if (typeof FlowFollow === 'undefined' || typeof FlowWhatsAppParse === 'undefined') return;
+  if (window.__glanceWhatsAppFollowLane) return;
+  window.__glanceWhatsAppFollowLane = true;
   const P = FlowWhatsAppParse;
-  const DEBOUNCE_MS = 1200;
   const MAX_ROWS = 40;
-  let timer = null;
   let lastReportedHealth = null;
 
   function chatPane() { return document.getElementById('main'); }
@@ -47,9 +47,18 @@
     try { chrome.runtime.sendMessage({ type: 'flow:surface-health', id: 'whatsapp', ok, reason: reason || null }, () => void chrome.runtime.lastError); } catch (e) { /* the page may be closing */ }
   }
 
-  function scan() {
+  function scan(opts) {
+    const G = globalThis.FlowWhatsAppWebGate;
+    const env = {
+      flag: globalThis.__glanceWhatsAppWebRead === true,
+      consent: globalThis.__glanceWhatsAppWebConsent === true,
+      userOff: globalThis.__glanceWhatsAppUserOff === true,
+      remoteOff: globalThis.__glanceWhatsAppRemoteOff === true
+    };
+    const decision = (G && G.readAllowed) ? G.readAllowed(env, opts) : { ok: false, reason: 'flag-off' };
+    if (!decision.ok) return decision;
     const main = chatPane();
-    if (!main) return;                                  // no chat open: nothing to read, nothing to report
+    if (!main) return { ok: false, reason: 'no-chat' };
     const list = rows(main);
     if (!list.length) { report(false, 'no-messages-recognised'); return; }
     const ids = list.map((n) => n.getAttribute('data-id'));
@@ -77,11 +86,11 @@
       attachmentsOf: () => []
     };
     FlowFollow.consider(ctx).catch((e) => console.error('[Glance] WhatsApp follow-up check failed', e));
+    return { ok: true };
   }
 
-  function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
-
-  const app = document.getElementById('app') || document.body;
-  new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
-  schedule();
+  globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
+  const prev = globalThis.__glanceChatSurfaces.whatsapp || {};
+  prev.followScan = scan;
+  globalThis.__glanceChatSurfaces.whatsapp = prev;
 })();

@@ -9,14 +9,31 @@ const FlowChatLane = (() => {
     catch (e) { return false; }
   }
 
-  function ask(type, payload) {
+  function redactOutbound(type, payload, input) {
+    if (typeof FlowChatRedact === 'undefined') return payload || {};
+    const names = [];
+    if (input && input.sender && input.sender.name) names.push(input.sender.name);
+    if (input && input.counterpart && input.counterpart.name) names.push(input.counterpart.name);
+    const bag = FlowChatRedact.redactObject(payload || {}, { names: names });
+    if (type === 'flow:chat-evidence' && bag && bag.query) {
+      const med = FlowChatRedact.medicalCheck(payload && payload.query);
+      if (med.level === 'warn') bag.__medical = med;
+    }
+    return bag;
+  }
+
+  function ask(type, payload, input) {
+    const outbound = redactOutbound(type, payload, input);
+    if (outbound && outbound.__medical && outbound.__medical.level === 'warn') {
+      return Promise.resolve({ ok: false, reason: 'medical', medical: outbound.__medical });
+    }
     return new Promise((resolve) => {
       if (!runtimeAlive()) {
         resolve({ ok: false, reason: 'invalidated' });
         return;
       }
       try {
-        chrome.runtime.sendMessage({ type: type, payload: payload }, (r) => {
+        chrome.runtime.sendMessage({ type: type, payload: outbound }, (r) => {
           let err = null;
           try { err = chrome.runtime && chrome.runtime.lastError; } catch (e) { resolve({ ok: false, reason: 'invalidated' }); return; }
           if (!runtimeAlive()) { resolve({ ok: false, reason: 'invalidated' }); return; }
@@ -58,11 +75,11 @@ const FlowChatLane = (() => {
     let evidence = Object.prototype.hasOwnProperty.call(i, 'evidence') ? i.evidence : null;
     if (evidence == null && detected && detected.fetch) {
       if (detected.kind === 'fact') {
-        const reply = await ask('flow:fact-sources', detected.fact || {});
+        const reply = await ask('flow:fact-sources', detected.fact || {}, i);
         if (reply && reply.reason === 'invalidated') return { ok: false, sends: false, reason: 'invalidated' };
         evidence = bagFromFact(detected, reply);
       } else {
-        const reply = await ask('flow:chat-evidence', detected.fetch);
+        const reply = await ask('flow:chat-evidence', detected.fetch, i);
         if (reply && reply.reason === 'invalidated') return { ok: false, sends: false, reason: 'invalidated' };
         evidence = (reply && reply.evidence) || { connected: { calendar: false }, events: null };
       }
@@ -73,7 +90,10 @@ const FlowChatLane = (() => {
       try { console.info('[Glance] whyNotShown: ' + reason); } catch (e) { /* the console can be missing */ }
       return { ok: false, sends: false, reason: reason, judged: judged };
     }
-    const wrote = FlowChatCompose.insertDraft(box, judged.draft);
+    const meta = { surface: i.channel || i.surface, threadId: i.threadId || i.key || null };
+    const wrote = typeof FlowChatCompose.insertDraftWithProof === 'function'
+      ? await FlowChatCompose.insertDraftWithProof(box, judged.draft, meta)
+      : FlowChatCompose.insertDraft(box, judged.draft);
     wrote.sends = false;
     wrote.judged = judged;
     return wrote;

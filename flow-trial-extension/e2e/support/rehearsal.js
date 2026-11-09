@@ -18,6 +18,11 @@ function whatsappHtml(text, opts) {
 // builder the service worker uses), as after the one Meta consent.
 async function registerWhatsApp(glance) {
   return glance.evaluateWorker(async () => {
+    await chrome.storage.local.set({
+      glanceWhatsAppWebRead: true,
+      glanceWhatsAppWebConsent: true,
+      glanceChatKillRemote: { off: {}, fetchedAt: Date.now(), neverFetched: false, valid: true }
+    });
     const lane = globalThis.__glanceLaneChatDefs.find((l) => l.id === 'glance-lane-whatsapp');
     const id = 'glance-lane-whatsapp-e2e';
     try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* first run */ }

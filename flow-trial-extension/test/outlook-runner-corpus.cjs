@@ -625,7 +625,7 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
       synced.ok === true && attGets.length === 1 && /\/messages\/save1\/attachments/.test(attGets[0].url),
       attGets.map((c) => c.url));
     check('that save is the OneDrive card, not outlook:attachments-unread',
-      saveKinds && saveKinds[0] === 'onedriveFile' && saveKinds.indexOf('outlookDraft') >= 0 && !diags.some((d) => d && d.conversationId === 'csave' && d.reason === 'outlook:attachments-unread'),
+      saveKinds && saveKinds.length === 1 && saveKinds[0] === 'onedriveFile' && !diags.some((d) => d && d.conversationId === 'csave' && d.reason === 'outlook:attachments-unread'),
       { kinds: saveKinds, diags: diags.filter((d) => d && d.conversationId === 'csave') });
     check('the commitment is Microsoft To Do only, with Google disconnected',
       todoKinds && todoKinds.length === 1 && todoKinds[0] === 'outlookTask' && !ok.w.store.googleTasksAuth && !ok.w.calls.some((c) => /googleapis/.test(c.url)) && !ok.w.calls.some((c) => /createReply/.test(c.url)),

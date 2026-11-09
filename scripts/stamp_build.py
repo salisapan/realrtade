@@ -24,6 +24,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXTENSION_ROOT = REPO_ROOT / "flow-trial-extension"
 STAMP_RE = re.compile(r"(const STAMP = ')[^']*(';)")
+PICKER_BUNDLED_RE = re.compile(r"(const PICKER_BUNDLED = )(true|false)(;)")
 VERSION_NAME_RE = re.compile(r'^\s*"version_name"\s*:.*\n', re.M)
 VERSION_RE = re.compile(r'^(\s*)"version"\s*:\s*"([^"]+)"\s*,?\s*\n', re.M)
 
@@ -55,27 +56,32 @@ def stamp_manifest(text: str, sha: str) -> str:
     return cleaned[: version.end()] + line + cleaned[version.end():]
 
 
-def stamp_build_js(text: str, sha: str) -> str:
+def stamp_build_js(text: str, sha: str, picker_bundled: bool) -> str:
     if not STAMP_RE.search(text):
         raise ValueError("core/build-stamp.js has no STAMP constant")
-    return STAMP_RE.sub(lambda m: m.group(1) + sha + m.group(2), text, count=1)
+    text = STAMP_RE.sub(lambda m: m.group(1) + sha + m.group(2), text, count=1)
+    if not PICKER_BUNDLED_RE.search(text):
+        raise ValueError("core/build-stamp.js has no PICKER_BUNDLED constant")
+    flag = "true" if picker_bundled else "false"
+    return PICKER_BUNDLED_RE.sub(lambda m: m.group(1) + flag + m.group(3), text, count=1)
 
 
-def stamped_bytes(rel: str, data: bytes, sha: str) -> bytes:
+def stamped_bytes(rel: str, data: bytes, sha: str, picker_bundled: bool = False) -> bytes:
     """The bytes a build ships for `rel`. Every other file is returned unchanged."""
     if not valid(sha):
         raise ValueError(f"not a usable build stamp: {sha!r}")
     if rel == "manifest.json":
         return stamp_manifest(data.decode("utf-8"), sha).encode("utf-8")
     if rel == "core/build-stamp.js":
-        return stamp_build_js(data.decode("utf-8"), sha).encode("utf-8")
+        return stamp_build_js(data.decode("utf-8"), sha, picker_bundled).encode("utf-8")
     return data
 
 
 def stamp_tree(root: Path, sha: str) -> None:
+    picker_bundled = (root / "picker" / "picker.html").is_file()
     for rel in ("manifest.json", "core/build-stamp.js"):
         path = root / rel
-        path.write_bytes(stamped_bytes(rel, path.read_bytes(), sha))
+        path.write_bytes(stamped_bytes(rel, path.read_bytes(), sha, picker_bundled=picker_bundled))
 
 
 def main(argv: list[str] | None = None) -> int:
