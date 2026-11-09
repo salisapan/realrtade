@@ -47,19 +47,20 @@
     return null;
   }
 
-  function lastInbound(list) {
-    for (let i = list.length - 1; i >= 0; i--) {
-      const parsed = P.parseDataId(list[i].getAttribute('data-id') || '');
-      if (parsed && !parsed.fromMe) return list[i];
-    }
-    return null;
-  }
-
-  async function maybeDraft(main, list) {
-    const last = lastInbound(list);
+  function maybeDraft(main, list) {
+    const last = list[list.length - 1];
     if (!last) return { ok: false, reason: 'no-inbound' };
     const parsed = P.parseDataId(last.getAttribute('data-id') || '');
-    if (!parsed) return { ok: false, reason: 'unparsed' };
+    if (parsed && parsed.fromMe) {
+      const mine = textOf(last);
+      const mineKey = (last.getAttribute('data-id') || '') + '\n' + mine;
+      if (typeof FlowChatTaskCard !== 'undefined') {
+        FlowChatTaskCard.sync(mineKey);
+        if (mine && !quoted(last)) FlowChatTaskCard.offer({ text: mine, channel: 'whatsapp', oneToOne: true, group: false, fromMe: true, own: true, quoted: false, sender: { name: P.partyFromChat(title(main), list.map((n) => n.getAttribute('data-id'))).name }, key: mineKey, now: Date.now() }).catch(() => {});
+      }
+      return { ok: true, sends: false, reason: 'own-message' };
+    }
+    if (!parsed) { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return { ok: false, reason: 'unparsed' }; }
     const text = textOf(last);
     const key = (last.getAttribute('data-id') || '') + '\n' + text;
     if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
@@ -67,7 +68,6 @@
     inflight.add(key);
     const ids = list.map((n) => n.getAttribute('data-id'));
     const party = P.partyFromChat(title(main), ids);
-    const threadId = P.threadIdFor(title(main), ids);
     const input = {
       text: text,
       fromMe: false,
@@ -76,23 +76,17 @@
       quoted: quoted(last),
       channel: 'whatsapp',
       surface: 'whatsapp',
-      threadId: threadId,
+      threadId: P.threadIdFor(title(main), ids),
       now: Date.now(),
       sender: { name: party.name, phone: party.phone },
       key: key
     };
     const box = composerBox(main);
-    try {
-      const r = await FlowChatLane.draftInto(box, input);
+    FlowChatLane.draftInto(box, input).then((r) => {
       if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input, box);
       if (!r || r.reason !== 'no-box') drafted.add(key);
-      return r || { ok: false, reason: 'silence' };
-    } catch (e) {
-      drafted.add(key);
-      return { ok: false, reason: 'error' };
-    } finally {
-      inflight.delete(key);
-    }
+    }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
+    return { ok: true, sends: false };
   }
 
   function scan(opts) {
