@@ -164,8 +164,7 @@
     "notifications",
     "scripting",
     "contextMenus",
-    "offscreen",
-    "activeTab"
+    "offscreen"
   ],
   "commands": {
     "glance-analyze-chat": {

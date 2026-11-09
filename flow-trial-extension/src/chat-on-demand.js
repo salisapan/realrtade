@@ -137,9 +137,19 @@ const FlowChatOnDemand = (() => {
     // gesture in the chat-lane spec. It is not WhatsApp Web and it does not
     // read a person's chats. Production web.whatsapp.com stays behind the gate.
     if (fixture && surfaceKey === 'whatsapp') {
-      // Extension pages share one world with their script tags. MAIN is for web pages.
-      try { return await invokeScan(api, tab.id, 'whatsapp', null); }
-      catch (e) { return { ok: false, reason: 'inject-failed' }; }
+      // The fixture is an extension page. Its scan lives in the page, so the
+      // gesture is a message, not an injected script.
+      return new Promise((resolve) => {
+        try {
+          api.tabs.sendMessage(tab.id, { type: 'flow:fixture-scan' }, (r) => {
+            let err = null;
+            try { err = api.runtime && api.runtime.lastError; } catch (e) { err = e; }
+            if (err) { resolve({ ok: false, reason: 'inject-failed' }); return; }
+            if (!r || r.ok === false) resolve({ ok: false, reason: (r && r.reason) || 'no-scan', scan: r });
+            else resolve({ ok: true, scan: r });
+          });
+        } catch (e) { resolve({ ok: false, reason: 'inject-failed' }); }
+      });
     }
     if (surfaceKey === 'whatsapp') {
       const decision = await whatsappGate(api);
