@@ -221,7 +221,7 @@ check('the Gmail card calls the shared resolver', gmailSrc.indexOf('FlowCloseCha
 const needsYouSrc = gmailSrc.slice(gmailSrc.indexOf('function injectNeedsYou'), gmailSrc.indexOf('function injectCreateCard'));
 const displaySrc = fs.readFileSync(path.join(ROOT, 'core/display-copy.js'), 'utf8');
 check('the needs-you chip drafts a holding reply and does not say Do It', /glanceChrome\(\)\.holdingReply/.test(needsYouSrc) && /holdingReply: 'Draft a holding reply'/.test(displaySrc) && /holdingReply: 'טיוטת תשובת ביניים'/.test(displaySrc) && !/flow-chip-do-label', 'Do It'/.test(needsYouSrc) && /type: 'flow:follow-draft'/.test(gmailSrc) && /glanceChrome\(\)\.draftReadyNotSent/.test(gmailSrc) && /draftReadyNotSent: 'Draft ready\. Not sent\.'/.test(displaySrc));
-check('the close chip stays Do It', /function injectChip[\s\S]*flow-chip-do-label', glanceChrome\(\)\.doIt/.test(gmailSrc) && /doIt: 'Do It'/.test(displaySrc));
+check('the close chip stays Do It', /function injectChip[\s\S]*flow-chip-do-label', ctx\.needsGoogleConnect \? glanceShow\(glanceUiCopy\('connectGoogle'\)\) : glanceChrome\(\)\.doIt/.test(gmailSrc) && /doIt: 'Do It'/.test(displaySrc) && /connectGoogle: 'Connect Google'/.test(displaySrc));
 check('manifest loads the shared text cut and the close chain', scripts.indexOf('core/source-text.js') > scripts.indexOf('core/judgment.js') && scripts.indexOf('core/close-chains.js') > scripts.indexOf('core/resolution.js'));
 check('popup loads both', popup.indexOf('core/source-text.js') > popup.indexOf('core/judgment.js') && popup.indexOf('core/close-chains.js') > popup.indexOf('core/file-attach.js'));
 
