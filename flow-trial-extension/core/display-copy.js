@@ -276,6 +276,14 @@ const FlowDisplay = (() => {
     return '';
   }
 
+  function localCallTopic(phrase, lang) {
+    const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
+    if (!raw || uiLangFrom({ setting: lang }) !== 'he') return raw;
+    if (/[\u0590-\u05FF]/.test(raw)) return raw;
+    const he = translateCallTopic(raw);
+    return he || raw;
+  }
+
   function hebrewCallAbout(phrase, extra) {
     const raw = String(phrase || '').replace(/\s+/g, ' ').trim();
     if (/[\u0590-\u05FF]/.test(raw)) return 'שיחה בנושא ' + raw;
@@ -393,11 +401,19 @@ const FlowDisplay = (() => {
         return { title: intent.label, sentence: p.closingLine || '', fileCard: false, logIt: true };
       }
       const titled = commitmentTitle({ text: extra && (extra.bodyText || extra.text), intent: intent });
-      const title = titled || ((intent && intent.label && !genericLabel(intent.label)) ? intent.label : '') || (intent && intent.label) || name || 'Log It';
+      let title = titled || ((intent && intent.label && !genericLabel(intent.label)) ? intent.label : '') || (intent && intent.label) || name || 'Log It';
+      if (!titled && title && /[\u0590-\u05FF]/.test(title)) {
+        title = title.replace(/^(?:היי|הי|שלום)\s*,\s*/, '').trim();
+      }
       return { title: title, sentence: p.closingLine || '', fileCard: false, logIt: true };
     }
     if (id === 'attach-invite' || (intent && intent.inviteFile)) {
       return { title: (intent && intent.label) || name, sentence: null, fileCard: false, logIt: false };
+    }
+    // An invitation mail: the card asks to accept it, and says so in the mail's language.
+    if (id === 'accept-invite') {
+      const blob0 = String((extra && (extra.bodyText || extra.text)) || '');
+      return { title: /[\u0590-\u05FF]/.test(blob0) ? 'לאשר את ההזמנה?' : 'Accept the invitation?', sentence: null, fileCard: false, logIt: false };
     }
     // A calendar hold is a meeting. The button stays Hold It / השהה.
     if (id === 'hold') {
@@ -454,12 +470,31 @@ const FlowDisplay = (() => {
     'suggest:attachments-unread': 'לא הצלחתי לקרוא את הקבצים המצורפים',
     'suggest:too-large': 'הקובץ המצורף גדול מדי לשמירה',
     'scan-skipped': 'עדיין קורא את המייל',
-    'names-pending': 'ממתין לשם'
+    'no-outcome': 'אין החלטה למייל הזה',
+    'names-pending': 'ממתין לשם',
+    // A file or contract ask Glance cannot search Drive for in v1 (no drive.readonly) is named, never silent.
+    'file': 'הבקשה דורשת קובץ מה-Drive. אי אפשר לחפש אותו בגרסה הזו, ולכן לא נכתב דבר',
+    'file-chain-not-run': 'הבקשה דורשת קובץ מה-Drive. אי אפשר לחפש אותו בגרסה הזו, ולכן לא נכתב דבר',
+    'drive-search-unavailable-v1': 'הבקשה דורשת קובץ מה-Drive. אי אפשר לחפש אותו בגרסה הזו, ולכן לא נכתב דבר',
+    'drive-not-granted': 'הבקשה דורשת קובץ מה-Drive. אי אפשר לחפש אותו בגרסה הזו, ולכן לא נכתב דבר',
+    'drive-search-failed': 'הבקשה דורשת קובץ מה-Drive. החיפוש נכשל, ולכן לא נכתב דבר',
+    'thread-read-failed': 'לא הצלחתי לקרוא את כל השרשור. לא נכתב דבר',
+    'contacts-unavailable': 'חיפוש כתובת באנשי הקשר לא זמין בגרסה הזו, ולכן לא נכתב דבר'
+  };
+  const WHY_EN = {
+    'file': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
+    'file-chain-not-run': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
+    'drive-search-unavailable-v1': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
+    'drive-not-granted': 'This asks for a file from Drive, and Drive search is not available in this version. Nothing was written.',
+    'drive-search-failed': 'This asks for a file from Drive, and the search failed. Nothing was written.',
+    'thread-read-failed': "Couldn't read the whole thread. Nothing was written.",
+    'contacts-unavailable': 'Looking up an address in Contacts is not available in this version. Nothing was written.'
   };
 
-  function whyNotShownLine(reason) {
+  function whyNotShownLine(reason, lang) {
     let r = String(reason || '');
     r = r.replace(/^(?:page:|quiet:|outlook:)/, '');
+    if (lang === 'en' && WHY_EN[r]) return WHY_EN[r];
     if (WHY_HE[r]) return WHY_HE[r];
     const bare = r.replace(/^outlook-/, '');
     if (WHY_HE[bare]) return WHY_HE[bare];
@@ -519,6 +554,14 @@ const FlowDisplay = (() => {
     return which === 'en' ? ('until ' + day) : ('עד ' + day);
   }
 
+  // A deadline that already passed. The card keeps the original day and says it is overdue.
+  function overdueDateLine(iso, lang) {
+    const which = arguments.length >= 2 ? uiLangFrom({ setting: lang }) : 'he';
+    const day = localeDay(iso, which);
+    if (!day) return '';
+    return which === 'en' ? ('Overdue · ' + day) : ('עבר המועד · ' + day);
+  }
+
   // Chrome (buttons, headings, receipts) follows the UI language. The action
   // title stays in the mail's language. A stored setting wins, then
   // the host page language, then chrome.i18n.getUILanguage, then
@@ -545,6 +588,7 @@ const FlowDisplay = (() => {
       draftReady: 'Draft ready.',
       draftReadyLong: 'Reply draft ready in Outlook Drafts. Not sent.',
       draftReadyNotSent: 'Draft ready. Not sent.',
+      composeDraftOpened: 'Draft opened in compose. You send it.',
       draftWithFile: 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.',
       draftRemoved: 'Reply draft removed. Not sent.',
       draftGone: 'Draft was already gone. Nothing left to undo.',
@@ -581,7 +625,17 @@ const FlowDisplay = (() => {
       notWired: 'That action isn’t wired up yet.',
       couldntComplete: 'Couldn’t complete that action.',
       composeClosed: 'Open Reply first. Glance does not press Send.',
+      missingPermission: 'Google is missing permission for this action. Reconnect Google with the required access.',
       composeEmpty: 'The compose window is still empty.',
+      driveFileScope: 'Glance can’t open that Drive file with the access in this version. Use a thread attachment, or a file Glance already saved for you.',
+      plannerGroupConsentWhy: 'Planner needs read access to your work groups so Glance can list your plans. This is separate from your main Microsoft sign-in and is only asked when you use Planner.',
+      plannerTodoFallbackAdmin: 'Your organization has to approve Planner access. Glance added this to Microsoft To Do instead.',
+      plannerTodoFallbackDenied: 'Planner access wasn’t granted. Glance added this to Microsoft To Do instead.',
+      googleContactAnswerTitle: "Answer with {name}'s address",
+      googleContactForwardTitle: 'Forward to {name}',
+      googleContactNotFound: 'No contact matched that name in Google Contacts.',
+      googleContactChoose: 'Which {name} did you mean?',
+      googleContactCopy: 'Copy',
       skippedEarlier: 'Skipped — an earlier step in this process didn’t complete.',
       todoUiCache: 'Microsoft To Do can keep that task on screen for about two minutes. A reload shows it gone.',
       notAllGone: 'Not all of it is gone. Undo again to remove what’s left.',
@@ -697,6 +751,7 @@ const FlowDisplay = (() => {
       draftReady: 'טיוטה מוכנה.',
       draftReadyLong: 'טיוטת תשובה מוכנה. לא נשלח.',
       draftReadyNotSent: 'הטיוטה מוכנה. לא נשלח.',
+      composeDraftOpened: 'הטיוטה מוכנה בחלון ההודעה. אתה שולח.',
       draftWithFile: 'טיוטת תשובה מוכנה, עם הקובץ. לא נשלח.',
       draftRemoved: 'טיוטת התשובה הוסרה. לא נשלח.',
       draftGone: 'הטיוטה כבר לא שם. אין מה לבטל.',
@@ -733,7 +788,17 @@ const FlowDisplay = (() => {
       notWired: 'הפעולה הזו עדיין לא מחוברת.',
       couldntComplete: 'לא הצלחתי להשלים את הפעולה.',
       composeClosed: 'פתח קודם תשובה. Glance לא לוחץ על שליחה.',
+      missingPermission: 'חסרה הרשאה ל-Google לפעולה הזו. חבר מחדש את Google עם ההרשאות הנדרשות.',
       composeEmpty: 'חלון הכתיבה עדיין ריק.',
+      driveFileScope: 'Glance עדיין לא יכול לפתוח את קובץ Drive הזה עם ההרשאות בגרסה הזו. השתמש בקובץ מצורף בשרשור, או בקובץ ש-Glance כבר שמר עבורך.',
+      plannerGroupConsentWhy: 'Planner צריך הרשאת קריאה לקבוצות העבודה שלך כדי ש-Glance יוכל להציג את התוכניות. זה נפרד מהחיבור הראשי ל-Microsoft ונשאל רק כשמשתמשים ב-Planner.',
+      plannerTodoFallbackAdmin: 'הארגון שלך צריך לאשר גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.',
+      plannerTodoFallbackDenied: 'לא ניתנה גישה ל-Planner. Glance הוסיף את זה ל-Microsoft To Do במקום.',
+      googleContactAnswerTitle: 'לענות עם הכתובת של {name}',
+      googleContactForwardTitle: 'להעביר ל{name}',
+      googleContactNotFound: 'לא נמצא איש קשר בשם הזה באנשי הקשר.',
+      googleContactChoose: 'איזו {name} התכוונת?',
+      googleContactCopy: 'העתק',
       skippedEarlier: 'דולג — שלב קודם בתהליך לא הושלם.',
       todoUiCache: 'ב-Microsoft To Do המשימה יכולה להישאר על המסך כשתי דקות. אחרי רענון היא נעלמת.',
       notAllGone: 'לא הכול הוסר. בטל שוב כדי להסיר את מה שנשאר.',
@@ -878,6 +943,21 @@ const FlowDisplay = (() => {
     return CHROME[uiLangFrom({ setting: lang })] || CHROME.en;
   }
 
+  function fillName(template, name) {
+    return String(template || '').replace(/\{name\}/g, String(name || '').trim());
+  }
+
+  function googleContactTitle(mode, name, lang) {
+    const L = chrome(lang);
+    const key = mode === 'forward' ? 'googleContactForwardTitle' : 'googleContactAnswerTitle';
+    return fillName(L[key] || CHROME.en[key], name);
+  }
+
+  function googleContactChoose(name, lang) {
+    const L = chrome(lang);
+    return fillName(L.googleContactChoose || CHROME.en.googleContactChoose, name);
+  }
+
   // The primary button follows the plan and the UI language. A To Do
   // task says Do It. A calendar hold says Hold It.
   function actionLabel(process, lang) {
@@ -993,6 +1073,9 @@ const FlowDisplay = (() => {
       const nouns = nounsHe(m[1], false);
       return nouns ? nouns[0] + ' עדיין שם. בטל שוב כדי להסיר.' : raw;
     }
+    m = raw.match(/^Saved (.+?) to OneDrive$/i);
+    if (m) return 'נשמר ' + m[1] + ' ב-OneDrive';
+    if (raw === 'Save the file?') return 'לשמור את הקובץ?';
     return raw;
   }
 
@@ -1046,11 +1129,13 @@ const FlowDisplay = (() => {
 
   function readClock(bag) {
     if (!bag) return null;
-    const dateIso = bag.dateIso || (bag.date && bag.date.iso) || null;
+    const dateIso = bag.dateIso || bag.overdueIso || (bag.date && bag.date.iso) || null;
     const hour = bag.hour != null ? bag.hour : (bag.time && bag.time.hour);
     const minute = bag.minute != null ? bag.minute : (bag.time && bag.time.minute);
     if (!dateIso) return null;
-    return { dateIso: dateIso, hour: hour, minute: minute };
+    const out = { dateIso: dateIso, hour: hour, minute: minute };
+    if (!bag.dateIso && bag.overdueIso) out.overdue = true;
+    return out;
   }
 
   function holdClockFrom(ctx) {
@@ -1085,14 +1170,23 @@ const FlowDisplay = (() => {
 
   // What Glance writes (a calendar event, a Google Task, a To Do) is titled
   // exactly as the card shows it. A hold keeps the sentence it closes.
+  function mailContentLang(ctx) {
+    const blob = String((ctx && (ctx.bodyText || ctx.text || ctx.body)) || '');
+    if (/[\u0590-\u05FF]/.test(blob)) return 'he';
+    if (ctx && ctx.intent && ctx.intent.lang === 'he') return 'he';
+    return 'en';
+  }
+
   function artifactTitle(lang, ctx, title) {
     const raw = title == null ? '' : String(title);
     if (!raw) return raw;
     const hold = ctx && (ctx.glanceChain === 'calendar-hold' || (ctx.process && ctx.process.id === 'hold'));
     if (hold) return raw;
+    const contentLang = mailContentLang(ctx);
+    const headingLang = contentLang === 'he' || uiLangFrom({ setting: lang }) === 'he' ? 'he' : lang;
     const p = ctx && ctx.process;
-    if (p && (p.id === 'file-it' || p.id === 'suggest-save' || /file it/i.test(String(p.name || '')))) return localizeHeading(lang, SAVE_TITLE, ctx);
-    return localizeHeading(lang, raw, ctx);
+    if (p && (p.id === 'file-it' || p.id === 'suggest-save' || /file it/i.test(String(p.name || '')))) return localizeHeading(contentLang === 'he' ? 'he' : headingLang, SAVE_TITLE, ctx);
+    return localizeHeading(headingLang, raw, ctx);
   }
 
   function activityMetric(lang, text) {
@@ -1168,17 +1262,21 @@ const FlowDisplay = (() => {
     namesDiagFrom: namesDiagFrom,
     namesDiagLine: namesDiagLine,
     cardDateLine: cardDateLine,
+    overdueDateLine: overdueDateLine,
     holdWhenLine: holdWhenLine,
     holdCardText: holdCardText,
     holdClockFrom: holdClockFrom,
     cardTitle: cardTitle,
     artifactTitle: artifactTitle,
+    localCallTopic: localCallTopic,
     localizeHeading: localizeHeading,
     activityMetric: activityMetric,
     uiLangFrom: uiLangFrom,
     ageLine: ageLine,
     namesPendingLine: namesPendingLine,
     chrome: chrome,
+    googleContactTitle: googleContactTitle,
+    googleContactChoose: googleContactChoose,
     actionLabel: actionLabel,
     fillChrome: fillChrome,
     showChrome: showChrome

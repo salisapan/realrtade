@@ -496,6 +496,9 @@
   cursor: pointer;
   padding: 6px 0;
   min-height: 32px;
+  /* A two-letter label (בטל) is a 24px target at the card edge; the card scales on hover and moves it from
+     under the pointer. 44px is the touch-target floor. */
+  min-width: 44px;
   border: none;
   background: none;
   border-radius: 0;

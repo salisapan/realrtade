@@ -1,0 +1,23 @@
+{
+  "_about": "Product why code -> the gate set's why label(s) it satisfies. A case that expects no card passes when the visible why the product shows (Outlook data-glance-why, Gmail 'scan skip: <code>') maps to the expected label. One product code may satisfy several labels where the product does not tell them apart; those rows are the ones to review with the set's owner.",
+  "map": {
+    "no-chip-candidate": ["no-ask"],
+    "intent-null": ["no-ask"],
+    "short-text": ["short-text", "no-ask"],
+    "too-short": ["short-text", "no-ask"],
+    "noise": ["automated"],
+    "automated": ["automated"],
+    "audience": ["audience"],
+    "names-pending": ["audience"],
+    "hedge": ["hedge", "audience", "resolution"],
+    "resolution": ["resolution"],
+    "past-date": ["past-date"],
+    "note-to-self": ["no-incoming-message"],
+    "no-incoming-message": ["no-incoming-message"],
+    "file": ["drive-unavailable"],
+    "file-chain-not-run": ["drive-unavailable"],
+    "drive-search-unavailable-v1": ["drive-unavailable"],
+    "drive-not-granted": ["drive-unavailable"],
+    "drive-search-failed": ["drive-unavailable"]
+  }
+}

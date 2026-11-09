@@ -92,5 +92,48 @@ check('reopen puts it back open with no proof', back.status === 'open' && back.p
 const d = R.due([dana, Object.assign({}, dana2, { chaseIso: '2026-10-30' }), Object.assign({}, dana, { id: 'x', status: 'closed' })], new Date('2026-11-02T09:00:00').getTime());
 check('due lists open ones past their chase day, oldest first', d.length === 2 && d[0].id === dana2.id, d.map((x) => x.id));
 
+console.log('--- Wednesday edge cases (Hebrew and English) ---');
+const maya = R.owe(loop({ id: 't9', lang: 'en', counterpart: { email: 'maya@mayastudio.co.il', name: 'Maya Studio' }, amount: { value: 2000, currency: 'ILS' }, what: 'payment for the retainer' }), ON);
+const ic = (text, extra) => Object.assign({ dir: 'in', fromEmail: 'no-reply@icount.co.il', text }, extra || {});
+check('"emailed to Maya Studio" is an issued receipt', Boolean(R.judge([maya], ic('Receipt 0048 for ₪2,000 has been emailed to Maya Studio.'), ON)));
+check('"delivered to" too', Boolean(R.judge([maya], ic('Your receipt was delivered to Maya Studio.'), ON)));
+check('one distinctive word is not the payer ("Maya Levi" is not "Maya Studio")', R.judge([maya], ic('Receipt 0049 for ₪2,000 was sent to Maya Levi.'), ON) === null);
+check('the payer\'s address in the copy names them', Boolean(R.judge([maya], ic('Receipt 0050 was sent to maya@mayastudio.co.il'), ON)));
+check('a supplier\'s receipt delivered to the person by the same system is not proof (English)', R.judge([maya], ic('Maya Studio has sent you a receipt for ₪2,000.'), ON) === null);
+check('…nor in Hebrew («שלחה לך קבלה»)', R.judge([dana], iss('דנה כהן שלחה לך קבלה על סך 3,850 ₪'), ON) === null);
+check('«נשלחה אליך» is to the person, not to the payer', R.judge([dana], iss('קבלה מדנה כהן נשלחה אליך'), ON) === null);
+check('a VAT figure next to the right total still fits', Boolean(R.judge([dana], iss('קבלה על סך 3,850 ₪ (מתוכם מע"מ 587 ₪) נשלחה אל דנה כהן'), ON)));
+check('a decimal total fits («3,850.00 ₪»)', Boolean(R.judge([dana], iss('קבלה על סך 3,850.00 ₪ נשלחה אל דנה כהן'), ON)));
+check('half of the amount (an installment) stays open', R.judge([dana], iss('קבלה על סך 1,925 ₪ נשלחה אל דנה כהן'), ON) === null);
+check('a receipt sent with several files counts when one is the receipt', Boolean(R.judge([dana], { dir: 'out', toEmail: 'dana.cohen@gmail.com', text: 'מצורפים', attachments: ['לוגו סופי.png', 'קבלה_0045.pdf'] }, ON)));
+check('a plural «קבלות» file counts', Boolean(R.judge([dana], { dir: 'out', toEmail: 'dana.cohen@gmail.com', text: 'מצורף', attachments: ['קבלות אוקטובר.pdf'] }, ON)));
+check('«קבלת קהל» in a file name is not a receipt', R.judge([dana], { dir: 'out', toEmail: 'dana.cohen@gmail.com', text: 'מצורף', attachments: ['שעות קבלת קהל.pdf'] }, ON) === null);
+check('a receipt with a refund in the message stays open', R.judge([maya], { dir: 'out', toEmail: 'maya@mayastudio.co.il', text: 'Here is the receipt for the refund.', attachments: ['receipt.pdf'] }, ON) === null);
+check('a dollar amount in the message is another amount', R.judge([maya], { dir: 'out', toEmail: 'maya@mayastudio.co.il', text: 'Attached is the receipt for $2,000.', attachments: ['receipt.pdf'] }, ON) === null);
+let list = R.merge([], dana);
+list = R.merge(list, R.owe(loop(), ON));
+check('a payment loop closed twice (reopened and closed again) owes one receipt', list.length === 1);
+check('a different loop adds a second one', R.merge(list, dana2).length === 2);
+const sentOne = Object.assign({}, dana2, { status: 'closed', closedAs: 'delivered' });
+const after = R.withdraw([dana, sentOne], 't1');
+check('Undo of "paid" withdraws the open receipt for that loop only', after.length === 1 && after[0].id === dana2.id);
+check('a receipt already sent stays after Undo of its loop', R.withdraw([sentOne], 't3').length === 1);
+check('a 4-digit number with no currency is not read as another amount', Boolean(R.judge([dana], { dir: 'out', toEmail: 'dana.cohen@gmail.com', text: 'מצורפת קבלה מס 2026 על הלוגו', attachments: ['קבלה.pdf'] }, ON)));
+
+console.log('--- real-user A/B: dormant, counts only ---');
+const { FlowPmfMetrics: P } = require('../core/pmf-metrics.js');
+check('the receipt-owed experiment exists with arms A and B', P.EXPERIMENTS['receipt-owed'] && P.EXPERIMENTS['receipt-owed'].arms.join() === 'A,B');
+check('no arm without the switch (null = behave as today, count nothing)', P.assignVariant('install-12345678', 'receipt-owed', {}) === null && P.assignVariant('install-12345678', 'receipt-owed', { enabled: false }) === null);
+const arm1 = P.assignVariant('install-12345678', 'receipt-owed', { enabled: true });
+check('the same install always gets the same arm', ['A', 'B'].indexOf(arm1) >= 0 && arm1 === P.assignVariant('install-12345678', 'receipt-owed', { enabled: true }));
+let ab = {};
+['receipt_paid_close', 'receipt_paid_close', 'receipt_owed_opened', 'receipt_owed_opened', 'receipt_sent_seen', 'receipt_owed_past_due'].forEach((e) => { ab = P.foldAbEvent(ab, 'receipt-owed', 'B', e); });
+ab = P.foldAbEvent(ab, 'receipt-owed', 'A', 'receipt_paid_close');
+ab = P.foldAbEvent(ab, 'receipt-owed', 'B', 'a free-text event never counts');
+const snap = P.abSnapshot(ab, 'receipt-owed');
+check('per-arm rates with their n: receipts sent per paid loop', snap.B.receiptPaid === 2 && snap.B.receiptSent === 0.5 && snap.B.receiptPastDue === 0.5 && snap.A.receiptPaid === 1 && snap.A.receiptSent === 0, snap);
+check('a rate on zero is null, never 0', snap.A.receiptPastDue === null && snap.B.receiptWrongClose === 0 && P.abSnapshot({}, 'receipt-owed').B.receiptSent === null);
+check('an unknown event changes nothing', Object.keys(snap.B.counts).length === 4);
+
 console.log(failures ? '\n' + failures + ' FAILED' : '\nall receipt-owed checks passed');
 process.exit(failures ? 1 : 0);

@@ -3,6 +3,7 @@
 // browser on Messenger only. A delivery window, a cancelled booking, a payment and a chat from the person themself are the checks.
 const { test, expect } = require('./support/harness');
 const { whatsappHtml, registerWhatsApp, SEND_URL } = require('./support/rehearsal');
+const { sameDayIso } = require('./support/frozen-date');
 
 const CARD = '#glance-chat-task .flow-chip-host';
 const events = (glance) => glance.evaluateWorker(() => Object.values(globalThis.__glanceE2e.outlookEvents));
@@ -178,7 +179,11 @@ test('WhatsApp, CHAT_TASK_CARD on: a plain chat line shows nothing', async ({ gl
 // Meta Business Suite shares the Messenger lane (same files, the business inbox addresses): a customer writing to the person's page.
 const fs = require('fs');
 const path = require('path');
-const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8');
+// The lane drops a chat row older than 14 days (STALE_MS) or in the future, and it reads the real clock
+// (a page shim cannot reach the content script). So the fixture's row dates are yesterday, computed
+// from today, not a literal date that goes stale.
+const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8')
+  .replace(/2026-10-14/g, sameDayIso(-1));
 const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
 test('Business Suite, CHAT_TASK_CARD on: a customer\'s payment ask on the page inbox is one To Do task, nothing is sent', async ({ glance }) => {
