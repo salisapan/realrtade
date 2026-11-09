@@ -20,7 +20,7 @@ test('on-demand scan increments read counter once and never clicks send', async 
     if (btn) btn.addEventListener('click', () => { window.__glanceSendClicks = (window.__glanceSendClicks || 0) + 1; });
   });
   const triggered = await glance.evaluateWorker(async () => {
-    const tabs = await chrome.tabs.query({ url: 'chrome-extension://*/*' });
+    const tabs = await chrome.tabs.query({});
     const tab = tabs.find((t) => t.url && t.url.indexOf('whatsapp-fixture.html') >= 0);
     if (!tab) return { ok: false, reason: 'no-tab' };
     return globalThis.FlowChatOnDemand.run(chrome, tab, { surface: 'whatsapp', source: 'test' });

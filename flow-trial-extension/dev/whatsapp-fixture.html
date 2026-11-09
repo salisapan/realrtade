@@ -23,19 +23,12 @@
 <script src="../lane-chat/surfaces.js"></script>
 <script src="../src/chat-indicator.js"></script>
 <script src="../src/chat-lane-trigger.js"></script>
-<script src="../core/fact-reply.js"></script>
-<script src="../core/close-chains.js"></script>
-<script src="../src/chat-redact.js"></script>
-<script src="../src/chat-draft.js"></script>
-<script src="../src/chat-compose.js"></script>
-<script src="../src/chat-lane.js"></script>
 <script>
-  window.__glanceChatSurfaces = {
-    whatsapp: {
-      scan: function () {
-        window.__glanceChatDomReads = (window.__glanceChatDomReads || 0) + 1;
-        return { ok: true, reason: 'fixture-scan' };
-      }
+  window.__glanceChatSurfaces = window.__glanceChatSurfaces || {};
+  window.__glanceChatSurfaces.whatsapp = {
+    scan: function () {
+      window.__glanceChatDomReads = (window.__glanceChatDomReads || 0) + 1;
+      return { ok: true, reason: 'fixture-scan' };
     }
   };
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
@@ -46,5 +39,11 @@
     });
   }
 </script>
+<script src="../core/fact-reply.js"></script>
+<script src="../core/close-chains.js"></script>
+<script src="../src/chat-redact.js"></script>
+<script src="../src/chat-draft.js"></script>
+<script src="../src/chat-compose.js"></script>
+<script src="../src/chat-lane.js"></script>
 </body>
 </html>
