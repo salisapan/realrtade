@@ -8,10 +8,10 @@
 // or touch a group. The person sends the draft. A draft is not a closed loop.
 (() => {
   if (typeof FlowWhatsAppParse === 'undefined' || typeof FlowChatLane === 'undefined') return;
+  if (window.__glanceWhatsAppDraftLane) return;
+  window.__glanceWhatsAppDraftLane = true;
   const P = FlowWhatsAppParse;
-  const DEBOUNCE_MS = 1200;
   const MAX_ROWS = 40;
-  let timer = null;
   const drafted = new Set();
   const inflight = new Set();
 
@@ -94,21 +94,29 @@
     }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
   }
 
-  function scan() {
+  function scan(opts) {
+    const G = globalThis.FlowWhatsAppWebGate;
+    const env = {
+      flag: globalThis.__glanceWhatsAppWebRead === true,
+      consent: globalThis.__glanceWhatsAppWebConsent === true,
+      userOff: globalThis.__glanceWhatsAppUserOff === true,
+      remoteOff: globalThis.__glanceWhatsAppRemoteOff === true
+    };
+    const decision = (G && G.readAllowed) ? G.readAllowed(env, opts) : { ok: false, reason: 'flag-off' };
+    if (!decision.ok) return decision;
     const main = chatPane();
-    if (!main) return;
-    if (main.getAttribute('data-glance-chat') === 'group') return;
+    if (!main) return { ok: false, reason: 'no-chat' };
+    if (main.getAttribute('data-glance-chat') === 'group') return { ok: false, reason: 'group' };
     const list = rows(main);
-    if (!list.length) return;
+    if (!list.length) return { ok: false, reason: 'no-messages' };
     const ids = list.map((n) => n.getAttribute('data-id'));
-    if (!P.isOneToOne(ids)) return;
+    if (!P.isOneToOne(ids)) return { ok: false, reason: 'not-1to1' };
     maybeDraft(main, list);
+    return { ok: true, sends: false };
   }
 
-  function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
-  const app = document.getElementById('app') || document.body;
-  if (app) new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
-  schedule();
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
-  globalThis.__glanceChatSurfaces.whatsapp = { scan: scan };
+  const prev = globalThis.__glanceChatSurfaces.whatsapp || {};
+  prev.scan = scan;
+  globalThis.__glanceChatSurfaces.whatsapp = prev;
 })();

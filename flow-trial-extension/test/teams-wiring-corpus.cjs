@@ -99,7 +99,7 @@ function sandbox(opts) {
   check('attendees stay empty and the refusal for invites is kept before the Teams fields', w.indexOf("reason: 'refused'") < w.indexOf('isOnlineMeeting = true'));
   check('the Teams fields are set only inside the switch check', /const teams = await outlookTeamsWanted\(params\.callText\);\s*if \(teams\) \{\s*body\.isOnlineMeeting = true;\s*body\.onlineMeetingProvider = 'teamsForBusiness';\s*\}/.test(w));
   check('no link read back: the event is deleted and no Handled is returned', /if \(!joinUrl\) \{[\s\S]*method: 'DELETE'[\s\S]*reason: 'teams-link-failed'/.test(w));
-  check('the snapshot for Undo is taken after the link exists', w.indexOf('outlookTeamsJoinUrl(event.id)') < w.indexOf('outlookEventRead(event.id)'));
+  check('the snapshot for Undo is taken after the link exists', w.indexOf('outlookTeamsJoinUrl(event.id)') < w.indexOf('outlookEventRead(event.id,'));
   check('the receipt says Teams only with a join link', /\(joinUrl \? ' · Teams' : ''\)/.test(w));
   check('switch default is off in the module', T.SWITCH_DEFAULT === false && /glanceSwitches/.test(bg));
   const content = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');

@@ -2,6 +2,8 @@
 // HTTP server. The service worker's fetch stand-in is not the proof.
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
+const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
+const { testIfGmailCompose, testIfDriveReadonly, gmailComposeInManifest, driveReadonlyInManifest } = bindV1ScopeGates(test);
 const S = require('./support/sentences');
 
 const QUOTE = 'Please prepare a quote for Dana Cole at $3,900, titled "14th floor".';
@@ -29,10 +31,12 @@ test.afterAll(async () => {
 
 test.beforeEach(async ({ glance }) => {
   server.reset();
-  server.setAccount('me@x.com');
-  await glance.evaluateWorker((origin) => {
+  server.setAccount(S.GMAIL_ME);
+  await glance.evaluateWorker(({ origin, account }) => {
     globalThis.__glanceE2e.httpOrigin = origin;
-  }, server.origin);
+    globalThis.__glanceE2e.tokenAccounts = globalThis.__glanceE2e.tokenAccounts || {};
+    globalThis.__glanceE2e.tokenAccounts['ya29.e2e'] = account;
+  }, { origin: server.origin, account: S.GMAIL_ME });
 });
 
 function wrote(method, part) {
@@ -56,15 +60,19 @@ async function uncheck(page, id) {
 }
 
 async function open(glance, opts) {
-  await glance.seedGmail(opts.seed || {});
-  return glance.openGmail(opts.mail);
+  await glance.seedGmail(Object.assign({
+    googleConnectedAccount: { email: S.GMAIL_ME, at: Date.now(), source: 'web' }
+  }, opts.seed || {}));
+  const mail = Object.assign({ senderEmail: S.SENDER, senderName: 'flow' }, opts.mail || {});
+  return glance.openGmail(mail);
 }
 
-test('A reply draft is a real drafts.create read back by id, nothing calls the people API, and Undo deletes it', async ({ glance }) => {
+test('v1 without gmail.compose: no drafts.create on Do It', async ({ glance }) => {
+  expect(gmailComposeInManifest).toBe(false);
   const page = await open(glance, {
     mail: {
-      messageId: 'm-people',
-      threadId: 't-people',
+      messageId: 'm-no-compose',
+      threadId: 't-no-compose',
       subject: 'Transfer',
       senderEmail: S.SENDER,
       senderName: 'flow',
@@ -73,16 +81,55 @@ test('A reply draft is a real drafts.create read back by id, nothing calls the p
   });
   await uncheck(page, 'task');
   await clickDoIt(page);
-  await expect.poll(() => wrote('POST', '/gmail/v1/users/me/drafts')).toBe(true);
-  const id = server.last.draft;
-  await expect.poll(() => server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
-  expect(server.calls.some((c) => c.path.indexOf('people.googleapis') >= 0 || c.path.indexOf('/v1/people') >= 0)).toBe(false);
-  expect(server.drafts[id].message.threadId).toBe('t-people');
-  expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
-  await page.locator('div[role="main"] button.flow-chip-undo').click();
-  await expect.poll(() => server.calls.some((c) => c.method === 'DELETE' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
-  expect(server.drafts[id]).toBeUndefined();
+  await page.waitForTimeout(2000);
+  expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
 });
+
+testIfGmailCompose(
+  'A reply draft is a real drafts.create read back by id, nothing calls the people API, and Undo deletes it',
+  async ({ glance }) => {
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-people',
+        threadId: 't-people',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await expect.poll(() => wrote('POST', '/gmail/v1/users/me/drafts')).toBe(true);
+    const id = server.last.draft;
+    await expect.poll(() => server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
+    expect(server.calls.some((c) => c.path.indexOf('people.googleapis') >= 0 || c.path.indexOf('/v1/people') >= 0)).toBe(false);
+    expect(server.drafts[id].message.threadId).toBe('t-people');
+    expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
+    await page.locator('div[role="main"] button.flow-chip-undo').click();
+    await expect.poll(() => server.calls.some((c) => c.method === 'DELETE' && c.path.indexOf('/drafts/' + id) >= 0)).toBe(true);
+    expect(server.drafts[id]).toBeUndefined();
+  },
+  async ({ glance }) => {
+    expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-people-off',
+        threadId: 't-people-off',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await page.waitForTimeout(2000);
+    expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
+    expect(server.calls.some((c) => c.path.indexOf('people.googleapis') >= 0 || c.path.indexOf('/v1/people') >= 0)).toBe(false);
+    expect(server.calls.some((c) => c.path.indexOf('/messages/send') >= 0 || c.path.indexOf('/drafts/send') >= 0)).toBe(false);
+  }
+);
 
 test('Calendar Hold It posts to the local server, reads the event back, and Undo deletes it', async ({ glance }) => {
   const page = await open(glance, {
@@ -307,7 +354,9 @@ test('Sheets Undo refuses after the row is edited and leaves it', async ({ glanc
   expect(server.sheet(id).row).toEqual(edited);
 });
 
-test('A pre-filled Reply keeps To, Subject, signature, and the quote, and the body is inserted above them', async ({ glance }) => {
+testIfGmailCompose(
+  'A pre-filled Reply keeps To, Subject, signature, and the quote, and the body is inserted above them',
+  async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-reply',
@@ -346,9 +395,35 @@ test('A pre-filled Reply keeps To, Subject, signature, and the quote, and the bo
   await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   await expect(body.locator('[data-glance-draft]')).toHaveText('Typed by the person');
   await expect(body.locator('.gmail_signature')).toHaveText('Best, Ada');
-});
+  },
+  async ({ glance }) => {
+    expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-reply-off',
+        threadId: 't-reply-off',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT,
+        composeReply: true,
+        composeTo: S.SENDER,
+        composeSubject: 'Re: Transfer',
+        signature: 'Best, Ada',
+        quoted: 'Could you confirm the transfer by Friday?'
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await page.waitForTimeout(2000);
+    expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
+    await expect(page.locator('div[role="main"]')).not.toContainText('Compose filled');
+  }
+);
 
-test('Compose fill writes the Gmail window, reads it back, and Undo clears it', async ({ glance }) => {
+testIfGmailCompose(
+  'Compose fill writes the Gmail window, reads it back, and Undo clears it',
+  async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-compose',
@@ -370,9 +445,31 @@ test('Compose fill writes the Gmail window, reads it back, and Undo clears it', 
   await page.locator('div[role="main"] button.flow-chip-undo').click();
   await expect(page.locator('div[role="main"]')).toContainText('Nothing was sent');
   await expect(body).toHaveText('');
-});
+  },
+  async ({ glance }) => {
+    expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-compose-off',
+        threadId: 't-compose-off',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT,
+        compose: true
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await page.waitForTimeout(2000);
+    expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
+    await expect(page.locator('div[role="main"]')).not.toContainText('Compose filled');
+  }
+);
 
-test('Compose Undo refuses after the person types and leaves their text', async ({ glance }) => {
+testIfGmailCompose(
+  'Compose Undo refuses after the person types and leaves their text',
+  async ({ glance }) => {
   const page = await open(glance, {
     mail: {
       messageId: 'm-compose-edit',
@@ -394,7 +491,27 @@ test('Compose Undo refuses after the person types and leaves their text', async 
   await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   await expect(body).toHaveText('Edited by the person');
   expect(server.calls.slice(before).filter((c) => c.method !== 'GET').length).toBe(0);
-});
+  },
+  async ({ glance }) => {
+    expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
+    const page = await open(glance, {
+      mail: {
+        messageId: 'm-compose-edit-off',
+        threadId: 't-compose-edit-off',
+        subject: 'Transfer',
+        senderEmail: S.SENDER,
+        senderName: 'flow',
+        body: DRAFT,
+        compose: true
+      }
+    });
+    await uncheck(page, 'task');
+    await clickDoIt(page);
+    await page.waitForTimeout(2000);
+    expect(wrote('POST', '/gmail/v1/users/me/drafts')).toBe(false);
+    await expect(page.locator('div[role="main"]')).not.toContainText('Compose filled');
+  }
+);
 
 test('A task card posts to the local server, reads the task back, and Undo deletes it', async ({ glance }) => {
   const page = await open(glance, {
@@ -459,10 +576,11 @@ function jerusalemToUtcIso(y, m, d, hour) {
   utc = wall - (wallOf(utc) - utc);
   return new Date(utc).toISOString().replace(/\.000Z$/, 'Z');
 }
-const HEBREW_HOLD = 'פגישה ביום ' + HE_DAYS[THURSDAY.getDay()] + ' ' + THURSDAY.getDate() + '/' + (THURSDAY.getMonth() + 1) + ' בשעה 14:00';
+// Numeric date only — weekday name + d/m can disagree across TZ when the module loads vs when the lane parses.
+const HEBREW_HOLD = 'פגישה ב-' + THURSDAY.getDate() + '/' + (THURSDAY.getMonth() + 1) + ' בשעה 14:00';
 const HEBREW_HOLD_UTC = jerusalemToUtcIso(THURSDAY.getFullYear(), THURSDAY.getMonth() + 1, THURSDAY.getDate(), 14);
 
-test('Hebrew weekday date and hour posts one Jerusalem hold at 14:00 Jerusalem time', async ({ glance }) => {
+test('Hebrew numeric date and hour posts one Jerusalem hold at 14:00 Jerusalem time', async ({ glance }) => {
   const page = await open(glance, {
     seed: { glanceTimeZone: 'Asia/Jerusalem' },
     mail: {

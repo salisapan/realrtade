@@ -24,30 +24,32 @@
     he: 'צ׳אטים'
   };
   const DISCLOSURE = {
-    en: 'Glance is an independent product and is not affiliated with Meta or WhatsApp. Chat text you choose to analyze may be sent to Glance’s server to infer intent and plan a draft; it is not kept on your device after the session and is not used to train models. You must be 18 or older. You send every message yourself; Glance never presses Send.',
-    he: 'Glance הוא מוצר עצמאי ואינו קשור ל-Meta או ל-WhatsApp. טקסט צ׳אט שבוחרים לנתח עשוי להישלח לשרת Glance כדי להבין כוונה ולתכנן טיוטה; הוא לא נשמר במכשיר אחרי הסשן ולא משמש לאימון מודלים. עליך להיות בן 18 ומעלה. אתה שולח כל הודעה בעצמך; Glance לא לוחץ על שליחה.'
+    en: 'Glance reads only the chat you have open, including messages from other people, and only after you click. It does not prefetch other chats and it does not scroll the list. That text may be sent to AI providers working for Glance to plan the close. It is kept for that session and then deleted. It is not used to train models. Glance is not approved by WhatsApp, and use on WhatsApp Web can put your WhatsApp account at risk. You are the only one who sends. Glance never sends. Withdraw this in Connections: Disconnect turns the reading off. You must be 18 or older.',
+    he: 'Glance קורא רק את הצ׳אט הפתוח, כולל הודעות של אנשים אחרים, ורק אחרי לחיצה. הוא לא טוען צ׳אטים מראש ולא גולל את הרשימה. הטקסט עשוי להישלח לספקי AI של Glance כדי לתכנן את הסגירה. הוא נשמר לסשן הזה ונמחק אחר כך. הוא לא משמש לאימון מודלים. Glance אינו מאושר על ידי WhatsApp, ושימוש ב-WhatsApp Web עלול לסכן את חשבון ה-WhatsApp. רק אתה שולח. Glance לא שולח. אפשר לחזור בך בחיבורים: ניתוק מכבה את הקריאה. עליך להיות בן 18 ומעלה.'
   };
   const AGE_COPY = {
-    en: 'I am 18 or older',
-    he: 'אני בן 18 ומעלה'
+    en: 'I understand this and I am 18 or older',
+    he: 'הבנתי את זה ואני בן 18 ומעלה'
   };
-  const ORIGINS = [
-    'https://web.whatsapp.com/*',
-    'https://www.messenger.com/*',
-    'https://messenger.com/*',
-    'https://www.facebook.com/messages',
-    'https://www.facebook.com/messages/*',
-    'https://facebook.com/messages',
-    'https://facebook.com/messages/*',
-    'https://business.facebook.com/latest/inbox',
-    'https://business.facebook.com/latest/inbox/*',
-    'https://www.business.facebook.com/latest/inbox',
-    'https://www.business.facebook.com/latest/inbox/*',
-    'https://www.instagram.com/direct',
-    'https://www.instagram.com/direct/*',
-    'https://instagram.com/direct',
-    'https://instagram.com/direct/*'
-  ];
+  const ORIGINS = (typeof FlowConnectEcosystem !== 'undefined' && FlowConnectEcosystem.META_ORIGINS)
+    ? FlowConnectEcosystem.META_ORIGINS.slice()
+    : [
+      'https://web.whatsapp.com/*',
+      'https://www.messenger.com/*',
+      'https://messenger.com/*',
+      'https://www.facebook.com/messages',
+      'https://www.facebook.com/messages/*',
+      'https://facebook.com/messages',
+      'https://facebook.com/messages/*',
+      'https://business.facebook.com/latest/inbox',
+      'https://business.facebook.com/latest/inbox/*',
+      'https://www.business.facebook.com/latest/inbox',
+      'https://www.business.facebook.com/latest/inbox/*',
+      'https://www.instagram.com/direct',
+      'https://www.instagram.com/direct/*',
+      'https://instagram.com/direct',
+      'https://instagram.com/direct/*'
+    ];
 
   function label(code) {
     const raw = String(code || '').toLowerCase();
@@ -95,8 +97,18 @@
     return link;
   }
 
+  function clearReadConsent(api) {
+    const chromeApi = api || globalThis.chrome;
+    try {
+      if (chromeApi && chromeApi.storage && chromeApi.storage.local && chromeApi.storage.local.remove) {
+        chromeApi.storage.local.remove(['glanceWhatsAppWebRead', 'glanceWhatsAppWebConsent']);
+      }
+    } catch (e) { /* withdraw is best-effort */ }
+  }
+
   function disconnect(chromeApi) {
     const api = chromeApi || globalThis.chrome;
+    clearReadConsent(api);
     if (!api || !api.permissions || typeof api.permissions.remove !== 'function') {
       return Promise.resolve({ ok: false });
     }
@@ -108,9 +120,21 @@
         resolve({ ok: ok !== false });
       }
       try {
-        const result = api.permissions.remove({ origins: ORIGINS.slice() }, done);
+        const result = api.permissions.remove({ origins: ORIGINS.slice() }, (ok) => {
+          const hook = globalThis.FlowProfileHook;
+          if (hook && typeof hook.onDisconnect === 'function') {
+            try { hook.onDisconnect('meta'); } catch (e) { /* profile store not wired */ }
+          }
+          done(ok);
+        });
         if (result && typeof result.then === 'function') {
-          result.then(done, () => done(false));
+          result.then((ok) => {
+            const hook = globalThis.FlowProfileHook;
+            if (hook && typeof hook.onDisconnect === 'function') {
+              try { hook.onDisconnect('meta'); } catch (e) { /* profile store not wired */ }
+            }
+            done(ok);
+          }, () => done(false));
         }
       } catch (e) {
         done(false);
@@ -255,6 +279,7 @@
     onLabel: onLabel,
     paintLink: paintLink,
     paintConnection: paintConnection,
-    open: open
+    open: open,
+    disconnect: disconnect
   };
 })();

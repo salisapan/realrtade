@@ -59,8 +59,8 @@ const FlowGoogleCloses = (() => {
   const SHEET_MUTATE = /\b(?:update|edit|change|append|add a row)\b|עדכן|תעדכן|תוסיף\s+שורה/i;
   // Drive and OneDrive are the same one-file save. "our shared files" is not:
   // this write lands in the person's own OneDrive, not a shared library.
-  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
-  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
+  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:please\s+)?(?:save|store|upload|file)\b(?:\s+\w+){0,6}\s+(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b|\b(?:save|file|store)\s+(?:it|them|this|that|the\s+attach\w+)(?=\s+(?:in|into|to)\s+(?:the\s+|our\s+|my\s+)?(?:[\w-]+\s+){0,3}folder\b|\s*(?:[.!?,;\n]|$)|\s+(?:and|so)\b)|\b(?:save|file|store)\b[^.!?\n]{0,50}\b(?:in|into|to)\s+(?:the\s+|our\s+|my\s+)?(?:[\w-]+\s+){0,3}folder\b/i;
+  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,60}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*google\s*drive|google\s*drive|ל[-\u05BE]?\s*(?:google\s+)?drive|לדרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)|(?:תשמור|תשמרי|שמור|תתייק|תתייקי|לשמור|לתייק)(?:\s+(?:אותן|אותו|אותם|אותה|את\s+[^\s,.!?]+))?(?=\s+[בל]תיקי[יה]|\s*(?:[.,!?\n]|$)|\s+ו)/i;
   // A refusal of that save is silence. The negation has to govern the verb
   // in the same clause, so a different "no need to" does not hide a real save.
   // "ned" and "צרכי" are the typos of need and צריך. "don't forget to save"
@@ -352,7 +352,10 @@ const FlowGoogleCloses = (() => {
       return { silence: true };
     }
 
-    if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
+    const inboundAttachedCopy = input.attachmentCount === 1 &&
+      /\battached is\b/i.test(text) &&
+      /\bsigned (?:pdf|copy|scan|form)\b/i.test(text);
+    if (SAVE_EN.test(text) || SAVE_HE.test(text) || inboundAttachedCopy) {
       if (refusesSave(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
@@ -391,6 +394,30 @@ const FlowGoogleCloses = (() => {
       const match = fileMatchOf(input);
       if (!match) return { wait: term };
       if (match !== 'one') {
+        if (match === 'none' && input.driveSearchUnavailable && destination === 'calendar' && input.dateIso && input.hasClock) {
+          const lang = hebrewText(text) ? 'he' : 'en';
+          const close = {
+            family: 'B',
+            personalClose: 'file-on-hold',
+            artifact: null,
+            kind: null,
+            copyAttachment: false,
+            destination: 'calendar',
+            fileTerm: term,
+            slots: [],
+            filled: {},
+            missing: [],
+            chat: false,
+            lang: lang,
+            templateName: null,
+            logo: null,
+            intro: null,
+            what: whatFrom(text)
+          };
+          close.cardLine = 'Putting ' + term + ' on the calendar.';
+          close.cardLineHe = 'שם את ' + term + ' ביומן.';
+          return { close: close };
+        }
         const creatable = artifactForTerm(term);
         if (match === 'none' && creatable && destination) {
           if (destination === 'calendar' && (!input.dateIso || !input.hasClock)) return { silence: true };
@@ -647,6 +674,43 @@ const FlowGoogleCloses = (() => {
     return -1;
   }
 
+  // Which message of an open conversation is the ask, and is it still open?
+  // rows[i] = { emails: [sender, ...every other address on the row], bodyless }.
+  // bodyless is a collapsed older message: its address is known, its words are not.
+  // The target is the newest message from someone other than the account.
+  // A message the account wrote counts as an answer only when it is a real reply:
+  // the asker is among its recipients. An auto-forward copy to info@, a copy to another
+  // alias of yours or a forward to third parties is not one and is ignored.
+  // Result: { index, why }. index -1 means stay quiet, and why says so.
+  // why: 'no-incoming-message', 'ask-collapsed' (index points at
+  // the collapsed row, the caller opens it) or '' (judge rows[index]).
+  function threadTarget(rows, ownEmail) {
+    const own = String(ownEmail || '').trim().toLowerCase();
+    const list = Array.isArray(rows) ? rows : [];
+    if (!own || !list.length) return { index: -1, why: 'no-incoming-message' };
+    const lowered = (row) => (row && Array.isArray(row.emails) ? row.emails : [])
+      .map((e) => String(e || '').trim().toLowerCase());
+    const newest = list.length - 1;
+    if (!(list[newest] && list[newest].bodyless) && noteToSelf(lowered(list[newest]), own)) {
+      return { index: newest, why: '' };
+    }
+    let target = -1;
+    for (let i = newest; i >= 0; i--) {
+      const sender = lowered(list[i])[0] || '';
+      // A row whose sender cannot be read is judged, as messageToJudge does; only the account's own rows are skipped.
+      if (sender !== own) { target = i; break; }
+    }
+    if (target < 0) return { index: -1, why: 'no-incoming-message' };
+    const asker = lowered(list[target])[0];
+    for (let j = target + 1; j < list.length; j++) {
+      const emails = lowered(list[j]);
+      if (emails[0] !== own) continue;
+      if (emails.slice(1).indexOf(asker) >= 0) return { index: -1, why: 'no-incoming-message' };
+    }
+    if (list[target].bodyless) return { index: target, why: 'ask-collapsed' };
+    return { index: target, why: '' };
+  }
+
   // Exactly one name match. Zero or two-plus is not a file we may use.
   function pickOneFile(files, term) {
     const hits = [];
@@ -674,6 +738,7 @@ const FlowGoogleCloses = (() => {
     pickOneFile: pickOneFile,
     noteToSelf: noteToSelf,
     messageToJudge: messageToJudge,
+    threadTarget: threadTarget,
     MAX_CHAT_TURNS: MAX_CHAT_TURNS,
     FIELD_CAP: FIELD_CAP,
     ARTIFACTS: ARTIFACTS

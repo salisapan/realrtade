@@ -47,7 +47,7 @@ test('a connected Outlook save goes Verifying then Handled on the Graph message'
     messages: {},
     attachments: { [msg]: pdf('att-nw', 'northwind-agreement-signed.pdf', 3072) },
     conversation: [],
-    mailboxSettings: { timeFormat: 'HH:mm' }
+    mailboxSettings: { timeFormat: 'HH:mm', timeZone: 'UTC' }
   });
   const page = await glance.openOutlook({
     confirmConversation: true,
@@ -154,7 +154,7 @@ test('10:05 and 22:05 on one subject stay unresolved without a 24-hour proof', a
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
-    mailboxSettings: { timeFormat: 'h:mm tt' },
+    mailboxSettings: { timeFormat: 'h:mm tt', timeZone: 'UTC' },
     inbox: [
       inboxRow(morning, conv, 'Northwind agreement - signed PDF', localIso(TD.y, TD.m, TD.d, 10, 5)),
       inboxRow(evening, conv, 'Northwind agreement - signed PDF', localIso(TD.y, TD.m, TD.d, 22, 5))
@@ -214,7 +214,7 @@ test('a OneDrive save with no file permission says reconnect and does not offer 
     messages: {},
     attachments: { [msg]: pdf('att-nw', 'northwind-agreement-signed.pdf', 3072) },
     conversation: [],
-    mailboxSettings: { timeFormat: 'HH:mm' }
+    mailboxSettings: { timeFormat: 'HH:mm', timeZone: 'UTC' }
   });
   const page = await glance.openOutlook({
     confirmConversation: true,

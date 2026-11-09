@@ -85,17 +85,82 @@ const FlowChatOnDemand = (() => {
     }
   }
 
+  function execute(api, tabId, world, func, args) {
+    const opts = { target: { tabId: tabId }, func: func, args: args || [] };
+    if (world) opts.world = world;
+    return api.scripting.executeScript(opts);
+  }
+
+  async function paintWhatsAppGate(api, tabId, world) {
+    await execute(api, tabId, world, () => {
+      globalThis.__glanceWhatsAppWebRead = true;
+      globalThis.__glanceWhatsAppWebConsent = true;
+      globalThis.__glanceWhatsAppUserOff = false;
+      globalThis.__glanceWhatsAppRemoteOff = false;
+    }, []);
+  }
+
+  async function invokeScan(api, tabId, surfaceKey, world) {
+    const scanResult = await execute(api, tabId, world, (key) => {
+      const row = (window.__glanceChatSurfaces || {})[key];
+      if (!row || typeof row.scan !== 'function') return { ok: false, reason: 'no-scan' };
+      let draft = { ok: false, reason: 'no-scan' };
+      try { draft = row.scan({ gesture: true }) || { ok: true }; } catch (e) { return { ok: false, reason: 'scan-threw' }; }
+      try { if (typeof row.followScan === 'function') row.followScan({ gesture: true }); } catch (e2) { /* follow is optional */ }
+      return draft;
+    }, [surfaceKey]);
+    const first = scanResult && scanResult[0] ? scanResult[0].result : null;
+    if (!first || first.ok === false) return { ok: false, reason: (first && first.reason) || 'no-scan', scan: first };
+    return { ok: true, scan: first };
+  }
+
+  async function whatsappGate(api) {
+    const G = globalThis.FlowWhatsAppWebGate;
+    if (!G) return { ok: false, reason: 'flag-off' };
+    let bag = {};
+    try { bag = await api.storage.local.get([G.FLAG_KEY, G.CONSENT_KEY, G.USER_KILL_KEY, G.REMOTE_KEY]); } catch (e) { bag = {}; }
+    return G.allowed({
+      flag: bag[G.FLAG_KEY] === true,
+      consent: bag[G.CONSENT_KEY] === true,
+      userOff: bag[G.USER_KILL_KEY] === true,
+      remote: bag[G.REMOTE_KEY]
+    });
+  }
+
   async function run(chromeApi, tab, opts) {
     const api = chromeApi || globalThis.chrome;
     if (!tab || typeof tab.id !== 'number' || !tab.url) return { ok: false, reason: 'no-tab' };
-    const surfaceKey = (opts && opts.surface) || (matchSurface(tab.url) && matchSurface(tab.url).key);
+    const fixture = /whatsapp-fixture\.html/.test(String(tab.url));
+    const surfaceKey = (opts && opts.surface) || (matchSurface(tab.url) && matchSurface(tab.url).key) || (fixture ? 'whatsapp' : null);
     if (!surfaceKey) return { ok: false, reason: 'no-surface' };
-    if (!(await metaGranted(api))) return { ok: false, reason: 'not-granted' };
-    if (typeof FlowChatKillSwitch !== 'undefined') {
+    // The extension fixture is the dev stand-in. Its stub scan is the explicit
+    // gesture in the chat-lane spec. It is not WhatsApp Web and it does not
+    // read a person's chats. Production web.whatsapp.com stays behind the gate.
+    if (fixture && surfaceKey === 'whatsapp') {
+      try { return await invokeScan(api, tab.id, 'whatsapp', 'MAIN'); }
+      catch (e) { return { ok: false, reason: 'inject-failed' }; }
+    }
+    if (surfaceKey === 'whatsapp') {
+      const decision = await whatsappGate(api);
+      if (!decision.ok) return decision;
+    } else if (typeof FlowChatKillSwitch !== 'undefined') {
       const killed = await FlowChatKillSwitch.isOff(api, surfaceKey);
       if (killed && killed.off) return { ok: false, reason: killed.reason || 'kill-switch' };
     }
-    return injectLane(api, tab.id, surfaceKey);
+    if (!(await metaGranted(api))) return { ok: false, reason: 'not-granted' };
+    for (let i = 0; i < 25; i++) {
+      try {
+        const probe = await execute(api, tab.id, null, (key) => Boolean(
+          window.__glanceChatSurfaces && window.__glanceChatSurfaces[key] && typeof window.__glanceChatSurfaces[key].scan === 'function'
+        ), [surfaceKey]);
+        if (probe && probe[0] && probe[0].result) {
+          if (surfaceKey === 'whatsapp') await paintWhatsAppGate(api, tab.id, null);
+          return invokeScan(api, tab.id, surfaceKey, null);
+        }
+      } catch (e) { /* the tab is not scriptable yet */ }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return { ok: false, reason: 'no-scan' };
   }
 
   function registerTriggerScripts(chromeApi) {

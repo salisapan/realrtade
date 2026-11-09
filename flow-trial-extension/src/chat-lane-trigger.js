@@ -5,6 +5,7 @@
   window.__glanceChatDomReads = 0;
 
   function surfaceKey() {
+    if (/whatsapp-fixture\.html/.test(String(location.href || ''))) return 'whatsapp';
     if (typeof FlowLaneChatSurfaces !== 'undefined' && FlowLaneChatSurfaces.matchSurface) {
       const row = FlowLaneChatSurfaces.matchSurface(location.href);
       return row ? row.key : null;

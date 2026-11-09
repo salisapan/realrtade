@@ -301,12 +301,14 @@ function panel(store) {
   const oldHost = host;
   const oldHash = host && host.getAttribute('data-glance-card');
   if (oldHost) oldHost.remove();
+  // A deadline a few days after today, so the fixture does not age out once a fixed calendar date is past.
+  const dueSoon = new Date(Date.now() + 5 * 86400e3).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   showMail(shown.doc, shown.w, {
     id: 'MSG-SHOW-111',
     subject: 'Q3 summary confirm',
     toHtml: 'אל: <span>' + ME + '</span>',
     ccHtml: '',
-    bodyHtml: lines('Hi,\nCan you reply and confirm whether the board pack will be ready by November 2?\nThanks,\nFlow'),
+    bodyHtml: lines('Hi,\nCan you reply and confirm whether the board pack will be ready by ' + dueSoon + '?\nThanks,\nFlow'),
     fromTitle: 'Flow <' + FLOW + '>'
   });
   await settle(shown);
@@ -536,6 +538,29 @@ function panel(store) {
       spec.indexOf('commitDecision') > 0 &&
       /another conversation is not adopted/.test(spec) &&
       /does not cross messages/.test(spec));
+  }
+
+  check('paintWhyNot strips page: before reason-code hide set',
+    /raw\.indexOf\('page:'\) === 0/.test(outlookSrc) && /code === 'intent-null'/.test(outlookSrc));
+  {
+    const dom = new JSDOM('<div id="slot"></div>', { pretendToBeVisual: true, runScripts: 'outside-only' });
+    const ctx = dom.getInternalVMContext();
+    const fn = outlookSrc.match(/function paintWhyNot\([\s\S]*?\n  \}/);
+    vm.runInContext(
+      'var paintDepth = 1;\n'
+      + 'function whyNotText() { return "לא זוהתה בקשה"; }\n'
+      + (fn ? fn[0] : '') + '\n'
+      + 'const slot = document.createElement("div");\n'
+      + 'paintWhyNot(slot, "page:intent-null");\n'
+      + 'const line = slot.querySelector(".flow-why-not");\n'
+      + 'if (!line || line.textContent !== "") throw new Error("page:intent-null visible: " + (line && line.textContent));\n'
+      + 'if (!line || line.getAttribute("data-glance-why") !== "page:intent-null") throw new Error("attr");\n'
+      + 'paintWhyNot(slot, "page:unknown-reason");\n'
+      + 'if (!slot.querySelector(".flow-why-not").textContent) throw new Error("unknown hidden");\n',
+      ctx
+    );
+    check('paintWhyNot functional: page:intent-null hidden, unknown reasons visible (Q1 guard)', true);
+    dom.window.close();
   }
 
   console.log('\nTOTAL FAILURES:', failures);
