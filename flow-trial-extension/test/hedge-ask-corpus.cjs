@@ -35,7 +35,12 @@ const quiet = [
   'Sali, can you send me the report? No pressure.',
   'Sali, can you get back to me about the proposal? I\'m not sure yet what we will do.',
   'Sali, can you send me the file? Only if you have time.',
-  'Sali, would it make sense to chat sometime next week? No pressure.'
+  'Sali, would it make sense to chat sometime next week? No pressure.',
+  // still tentative: softener without a contrasting but/however/אבל and without a deadline
+  'Sali, no pressure, can you send me the report when you can?',
+  'Sali, only if you have time, could you look at the draft?',
+  'סאלי, אין לחץ, תוכל לשלוח לי את הדוח כשתוכל?',
+  'סאלי, אם יסתדר, תשלח לי את הקובץ.'
 ];
 for (const surface of ['gmail', 'outlook']) for (const t of quiet) {
   const r = judge(t, surface);
@@ -58,7 +63,25 @@ const shows = [
   'Sali, can you send me the report? Maybe we can also grab coffee later.',
   'Sali, can you send me the signed contract? If possible today.',
   'סאלי, תוכל לשלוח לי את הדוח? ייתכן שאאחר קצת לפגישה.',
-  'סאלי, תוכל לשלוח לי את הדוח? רק אם יש לך את הגרסה הסופית.'
+  'סאלי, תוכל לשלוח לי את הדוח? רק אם יש לך את הגרסה הסופית.',
+  // softener then but/however/אבל into an explicit ask: firm even without a date
+  'Sali, no pressure, but please send the deck.',
+  'Sali, no pressure, but can you send me the report?',
+  'No pressure, but please send me the file.',
+  'Sali, no rush, however could you send the invoice?',
+  'סאלי, אין לחץ, אבל בבקשה תשלח לי את המצגת.',
+  'סאלי, אין לחץ, אבל תוכל לשלוח לי את הדוח?',
+  'אין לחץ, אבל בבקשה תשלח לי את הקובץ.',
+  // softener with an explicit future deadline: firm (with or without but)
+  'No pressure, but please send the deck by Friday',
+  'Sali, no pressure, but please send the deck by Friday.',
+  'Sali, no pressure, please send the deck by Friday.',
+  'Sali, no rush, but can you send the file by Monday?',
+  'Sali, only if you have time, could you send the proposal by Thursday?',
+  'אין לחץ, אבל בבקשה תשלח לי את המצגת עד יום שישי',
+  'סאלי, אין לחץ, אבל בבקשה תשלח לי את המצגת עד יום שישי.',
+  'סאלי, אין לחץ, תשלח לי את הדוח עד מחר.',
+  'סאלי, בלי לחץ, אבל תוכל לשלוח לי את ההצעה עד יום חמישי?'
 ];
 for (const surface of ['gmail', 'outlook']) for (const t of shows) {
   const r = judge(t, surface);
