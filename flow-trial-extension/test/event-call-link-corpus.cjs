@@ -191,6 +191,11 @@ const io = (c) => ({ calendar: c.api, sleep: async () => {} });
   check('the person deleted the event: nothing to undo', (await L.undo(r.ref, io(c))).ok === true);
   check('a ref that is not Glance\'s is refused', (await L.undo({ eventId: 'E9' }, io(makeCal()))).reason === 'not-ours');
 
+  // A weekday name is counted from the person's own calendar day. At 01:00 on Thursday in Israel it is still
+  // Wednesday in UTC; "Thursday" there is next week's Thursday, not today (CI was red in that window on 5/11).
+  if (new Date('2026-11-04T23:00:00Z').getDate() === 5) {
+    check('weekday counts from the local day, not UTC', L.dayOf('the Thursday sync', new Date('2026-11-04T23:00:00Z')) === '2026-11-12', L.dayOf('the Thursday sync', new Date('2026-11-04T23:00:00Z')));
+  }
   console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
   process.exit(failures ? 1 : 0);
 })();

@@ -27,7 +27,8 @@ __pycache__/
 flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip
 flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip.partial
 
-# Apps Script project id from clasp create. The example file is the template.
+# clasp login token — never commit
+glance-gmail-addon/.clasprc.json
 glance-gmail-addon/.clasp.json
 
 # Editor directories and files
@@ -76,3 +77,6 @@ glance-ai/model/shadow-pkg/bench/out/
 
 # Graphify local AST graph (large HTML/JSON/cache). Rebuilt on demand; not committed.
 graphify-out/
+flow-trial-extension/blob-report/
+flow-trial-extension/test-results-gate100/
+flow-trial-extension/gate100-results.json

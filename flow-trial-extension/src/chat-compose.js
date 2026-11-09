@@ -83,10 +83,6 @@ const FlowChatCompose = (() => {
     return clearIfUnchanged(el, body);
   }
 
-  function sleep(ms) {
-    return new Promise((resolve) => { setTimeout(resolve, ms); });
-  }
-
   async function insertDraftWithProof(el, text, meta) {
     const body = normalizeBody(text);
     const wrote = insertDraft(el, body);
@@ -99,7 +95,8 @@ const FlowChatCompose = (() => {
       draftHash: draftHash(body),
       ts: Date.now()
     };
-    await sleep(300);
+    // Read the box back in this turn. A timer would not resolve in the corpora,
+    // which replace setTimeout, and the words are already in the box.
     const back = normalizeBody(textOf(el));
     const fetchedBack = back.indexOf(body) >= 0;
     return Object.assign({}, wrote, { proof: proof, fetchedBack: fetchedBack, draftText: body, sends: false });

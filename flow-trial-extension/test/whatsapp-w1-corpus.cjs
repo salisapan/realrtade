@@ -14,11 +14,11 @@ const draftSrc = fs.readFileSync(path.join(ROOT, 'src/content-whatsapp-draft.js'
 const waSrc = fs.readFileSync(path.join(ROOT, 'src/content-whatsapp.js'), 'utf8');
 check('draft lane has no MutationObserver', !/MutationObserver/.test(draftSrc));
 check('follow lane has no MutationObserver', !/MutationObserver/.test(waSrc));
-check('scan requires gesture', /gesture !== true/.test(draftSrc));
+check('scan requires gesture', /readAllowed\(/.test(draftSrc));
 
 const dom = new (require('jsdom').JSDOM)(fs.readFileSync(path.join(ROOT, 'test/fixtures/chat/whatsapp-w1-en-place.html'), 'utf8'), { runScripts: 'outside-only', url: 'https://web.whatsapp.com/' });
 const ctx = dom.window;
-['../core/fact-reply.js', '../core/close-chains.js', '../src/chat-redact.js', '../src/chat-draft.js', '../src/chat-compose.js', '../src/chat-lane.js', '../src/whatsapp-parse.js'].forEach((f) => {
+['core/whatsapp-web-gate.js', 'core/fact-reply.js', 'core/close-chains.js', 'src/chat-redact.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js'].forEach((f) => {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: path.basename(f) });
 });
 ctx.chrome = { runtime: { sendMessage: () => {}, id: 'x' } };

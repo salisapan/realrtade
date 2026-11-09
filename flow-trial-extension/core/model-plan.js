@@ -47,12 +47,14 @@ const FlowModelPlan = (() => {
     const base = { label, confidence: 'high', source: 'model', signals: {}, entities: { what, requestWhat: what, dateIso: p.due || null, hour: t ? t.hour : null, minute: t ? t.minute : null } };
     if (p.step === 'calendar') return Object.assign(base, { type: 'event' });
     if (p.step === 'draft') return Object.assign(base, { type: 'request' });
+    if (p.step === 'task' && p.kind === 'promise_by_me') return Object.assign(base, { type: 'commitment' }); // the person's own promise: Follow-through
     if (p.step === 'task') return Object.assign(base, { type: 'followup' }); // the sender promised: Glance tracks it (Log It)
     return null; // file_save is suggest-save's decision on the real attachment list, not a model plan
   }
 
   // What really closes it, per anchor (docs/true-close.md §7; proof-of-close.js).
-  function doneWhen(anchorKind, step) {
+  function doneWhen(anchorKind, step, kind) {
+    if (kind === 'promise_by_me') return { kind: 'promise-kept', proof: 'a message the person sent in this thread that delivers it', notCompletion: 'the task or the prepared draft' };
     if (anchorKind === 'draft') return { kind: 'reply-sent', proof: 'a message the person sent in this thread', notCompletion: 'the prepared draft' };
     if (anchorKind === 'calendar') return { kind: 'event-exists', proof: 'the event read back from the calendar', notCompletion: 'a hold the person did not keep' };
     if (step === 'task') return { kind: 'promised-arrived', proof: 'the promised item or reply arrived', notCompletion: 'the tracking task' };
@@ -66,6 +68,7 @@ const FlowModelPlan = (() => {
     const FU = followUp();
     const now = todayIso ? Date.parse(todayIso + 'T12:00:00') : Date.now();
     const t = todayIso || new Date(now).toISOString().slice(0, 10);
+    if (p.step === 'task' && p.kind === 'promise_by_me') return { checkOn: p.due && p.due >= t ? p.due : t, then: 'remind' };
     if (p.step === 'task') {
       const on = FU ? FU.chaseDate(FU.KINDS.REPLY, p.due || null, now) : (p.due && p.due >= t ? p.due : t);
       return { checkOn: on, then: 'chase' };
@@ -78,6 +81,7 @@ const FlowModelPlan = (() => {
   // Carry until closed: a close only the model found is carried by the same loop as every other one.
   //   ask of you    -> direction 'mine' (you owe the answer, subtype owe:reply); closes when your reply goes out.
   //   promise to you -> direction 'theirs' (they owe it); chased until the promised thing arrives.
+  //   your own promise (kind promise_by_me, core/kind-check.js) -> direction 'mine', subtype owe:promise; looked at on its day.
   //   meeting        -> no watch: it closes on the calendar (doneWhen event-exists).
   // msg: { threadId, messageId, subject, counterpart:{email,name}, channel }. No thread, no watch.
   function toWatch(plan, p, msg, now) {
@@ -85,7 +89,8 @@ const FlowModelPlan = (() => {
     if (!FU || !plan || !p || !msg || !msg.threadId) return null;
     if (p.step !== 'draft' && p.step !== 'task') return null;
     const t = typeof now === 'number' ? now : Date.now();
-    const mine = p.step === 'draft';
+    const own = p.step === 'task' && p.kind === 'promise_by_me';
+    const mine = p.step === 'draft' || own;
     const what = String(p.askSpan || '').replace(/\s+/g, ' ').trim().slice(0, 140);
     if (!what) return null;
     const todayIso = FU.isoDay(new Date(t));
@@ -93,7 +98,7 @@ const FlowModelPlan = (() => {
     const w = FU.buildWatch({
       threadId: msg.threadId, messageId: msg.messageId || null, subject: msg.subject || '', counterpart: msg.counterpart || {}, channel: msg.channel || 'gmail', now: t,
       ask: { kind: FU.KINDS.REPLY, what, deadlineIso: p.due || null, chaseIso, lang: /[\u0590-\u05FF]/.test(what) ? 'he' : 'en',
-        subtype: mine ? 'owe:reply' : 'promised', tier: 'model', direction: mine ? 'mine' : 'theirs' }
+        subtype: own ? 'owe:promise' : (mine ? 'owe:reply' : 'promised'), tier: 'model', direction: mine ? 'mine' : 'theirs' }
     });
     return Object.assign(w, { closeWhen: plan.doneWhen ? plan.doneWhen.kind : null, planProcess: plan.processId });
   }
@@ -135,14 +140,46 @@ const FlowModelPlan = (() => {
     const steps = process.steps.map((s) => Object.assign({}, s, { needsClick: true }));
     const out = {
       processId: process.id, name: process.name, closingLine: process.closingLine, source: 'model',
-      steps, anchor: g.anchor, doneWhen: doneWhen(p.step, p.step),
+      steps, anchor: g.anchor, doneWhen: doneWhen(p.step, p.step, p.kind),
       carry: carryFor(p, ctx.today), evidence: p.evidence || null, closes: false
     };
     const rows = L && typeof L.rowsFor === 'function' ? L.rowsFor(Object.assign({}, process, { steps }), { lang: ctx.lang, memory: ctx.executionMemory }) : [];
     return { used: true, plan: out, rows };
   }
 
-  return { SWITCH, DEFAULTS, ALLOWED_KINDS, MAX_STEPS, enabled, toIntent, gate, plan, doneWhen, carryFor, toWatch, titleFrom };
+  // closeFor(flags, watch, msg, now) -> { none:true } | { patch, close? } : what the newest message in the thread does to a loop toWatch()
+  // opened. The host calls it in place of the follow loop's generic rule for these loops, because that rule closes a 'mine' loop only on a
+  // delivery ("attached", "done"), and an ask of you closes on your real answer (doneWhen reply-sent). Read with the follow loop's own reply
+  // reader (core/follow-up.js classifyReply), so "got it", "I'll check" and an auto-reply never close anything.
+  //   ask of you (owe:reply)       your answer closes it (replied); your "no" closes it (declined, a deliberate release); "I'll send it
+  //                                Thursday" keeps it open and moves the day; an acknowledgement or a question back keeps it open.
+  //   your own promise (owe:promise) a message of yours that delivers it closes it (kept); a new date keeps it open and moves the day.
+  //   their promise (promised)     their message is read by the follow loop's own rules (classifyReply + applyReply).
+  // msg: { isOwn, text (quoted history removed), email, evidence? }. Off with aiPlanV1, like the plan itself.
+  function closeFor(flags, w, msg, now) {
+    const FU = followUp();
+    if (!enabled(flags) || !FU || !w || w.status !== 'waiting' || w.tier !== 'model' || !msg) return { none: true };
+    const t = typeof now === 'number' ? now : Date.now();
+    const text = String(msg.text || '');
+    if (w.subtype === 'promised') {
+      if (msg.isOwn) return { none: true };
+      return FU.applyReply(w, FU.classifyReply(text, w, { now: t, email: msg.email, evidence: msg.evidence }), t);
+    }
+    if (!msg.isOwn) return { none: true }; // the ball is the person's; a message from the other side does not close what the person owes
+    if (w.subtype === 'owe:promise') {
+      if (FU.deliversFor(w, text, msg.evidence || null)) return { patch: FU.closeAsKept(w, t), close: true };
+      const r = FU.classifyReply(text, Object.assign({}, w, { kind: FU.KINDS.REPLY }), { now: t });
+      return r.outcome === 'promised' && r.promisedIso ? { patch: { stage: 'promised', promisedIso: r.promisedIso, chaseIso: r.promisedIso } } : { none: true };
+    }
+    if (w.subtype !== 'owe:reply') return { none: true };
+    const r = FU.classifyReply(text, Object.assign({}, w, { kind: FU.KINDS.REPLY }), { now: t, evidence: msg.evidence });
+    if (r.outcome === 'closed') return { patch: { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'replied' }, close: true };
+    if (r.outcome === 'declined') return { patch: { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'declined' }, close: true };
+    if (r.outcome === 'promised') return { patch: { stage: 'promised', promisedIso: r.promisedIso || null, chaseIso: r.promisedIso || FU.yoursDate(t) } };
+    return { none: true };
+  }
+
+  return { SWITCH, DEFAULTS, ALLOWED_KINDS, MAX_STEPS, enabled, toIntent, gate, plan, doneWhen, carryFor, toWatch, titleFrom, closeFor };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowModelPlan };

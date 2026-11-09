@@ -203,7 +203,7 @@ const FlowChatKillSwitch = (() => {
   }
 
   async function isAllowed(chromeApi, surface) {
-    const row = await isOff(api, surface);
+    const row = await isOff(chromeApi, surface);
     return !(row && row.off);
   }
 

@@ -1,6 +1,8 @@
 // WhatsApp Web draft lane (gesture-only). Injected on demand; never auto-reads.
 (() => {
   if (typeof FlowWhatsAppParse === 'undefined' || typeof FlowChatLane === 'undefined') return;
+  if (window.__glanceWhatsAppDraftLane) return;
+  window.__glanceWhatsAppDraftLane = true;
   const P = FlowWhatsAppParse;
   const MAX_ROWS = 40;
   const drafted = new Set();
@@ -93,8 +95,16 @@
     }
   }
 
-  async function scan(opts) {
-    if (!opts || opts.gesture !== true) return { ok: false, reason: 'no-gesture' };
+  function scan(opts) {
+    const G = globalThis.FlowWhatsAppWebGate;
+    const env = {
+      flag: globalThis.__glanceWhatsAppWebRead === true,
+      consent: globalThis.__glanceWhatsAppWebConsent === true,
+      userOff: globalThis.__glanceWhatsAppUserOff === true,
+      remoteOff: globalThis.__glanceWhatsAppRemoteOff === true
+    };
+    const decision = (G && G.readAllowed) ? G.readAllowed(env, opts) : { ok: false, reason: 'flag-off' };
+    if (!decision.ok) return decision;
     const main = chatPane();
     if (!main) return { ok: false, reason: 'no-chat' };
     if (main.getAttribute('data-glance-chat') === 'group') return { ok: false, reason: 'group' };
@@ -102,9 +112,12 @@
     if (!list.length) return { ok: false, reason: 'no-messages' };
     const ids = list.map((n) => n.getAttribute('data-id'));
     if (!P.isOneToOne(ids)) return { ok: false, reason: 'not-1to1' };
-    return maybeDraft(main, list);
+    maybeDraft(main, list);
+    return { ok: true, sends: false };
   }
 
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
-  globalThis.__glanceChatSurfaces.whatsapp = { scan: scan };
+  const prev = globalThis.__glanceChatSurfaces.whatsapp || {};
+  prev.scan = scan;
+  globalThis.__glanceChatSurfaces.whatsapp = prev;
 })();

@@ -1395,7 +1395,13 @@ const FlowStorage = (() => {
   });
   // "Reset": forget every adjustment and the list that explains them. Counts of outcomes stay (they are metrics).
   const resetLearning = serialize(async function resetLearning() {
-    await set({ intentAdapt: { act: {}, topic: {}, action: {} }, learningLedger: [], styleProfile: null, identityGraph: null });
+    await set({
+      intentAdapt: { act: {}, topic: {}, action: {} },
+      learningLedger: [],
+      styleProfile: null,
+      identityGraph: null,
+      glanceUserContextV0: null
+    });
     return true;
   });
   const setIntentAdapt = serialize(async function setIntentAdapt(a) {

@@ -18,6 +18,7 @@ const cases = loadCases();
 for (const row of cases) {
   test(row.id, async ({ glance }) => {
     const pageOpts = row.page || {};
+    // No scope seed: seedGmail grants exactly the shipped v1 manifest scopes.
     const seed = Object.assign({ onboarded: true, connectorId: 'googleTasks', glanceUiLanguage: row.ui || 'he' }, row.seed || {});
     await glance.seedGmail(seed);
     const html = liveGmailPage(pageOpts);
@@ -69,6 +70,15 @@ for (const row of cases) {
     } else {
       expect(stats.hasCard).toBe(false);
       if (exp.neverInserted) expect(stats.inserts).toBe(0);
+    }
+    if (exp.quietWhy) {
+      // v1 has no drive.readonly, so the file chain cannot show a card. The control still proves the
+      // message was NOT suppressed as Cc/self: the chain ran to the Drive step and stopped, and a visible
+      // line says why (a skipped contract ask is never silent).
+      const marker = page.locator(msgSel + ' .flow-why-not[data-glance-why="' + exp.quietWhy + '"]');
+      await expect(marker).toHaveCount(1, { timeout: exp.quietWhyWithinMs || 8000 });
+      await expect(marker).toBeVisible();
+      expect((await marker.evaluate((el) => el.textContent)).trim().length).toBeGreaterThan(0);
     }
     if (exp.detailsClose) {
       const maxOpens = exp.detailsClose.maxOpens != null ? exp.detailsClose.maxOpens : 1;

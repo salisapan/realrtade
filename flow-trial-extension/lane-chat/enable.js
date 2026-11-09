@@ -14,7 +14,7 @@ const LANES = [
     id: 'whatsapp',
     title: 'WhatsApp',
     origins: ['https://web.whatsapp.com/*'],
-    js: SCRIPTS.concat(['src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'])
+    js: SCRIPTS.concat(['core/whatsapp-web-gate.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'])
   },
   {
     id: 'messenger',
@@ -136,30 +136,16 @@ async function granted(origins) {
 async function registerAll() {
   const scripting = typeof chrome !== 'undefined' && chrome.scripting;
   if (!scripting || !scripting.registerContentScripts) return;
-  const trigger = (typeof FlowLaneChatSurfaces !== 'undefined' && FlowLaneChatSurfaces.TRIGGER_JS)
-    ? ['lane-chat/surfaces.js'].concat(FlowLaneChatSurfaces.TRIGGER_JS)
-    : ['src/chat-indicator.js', 'src/chat-lane-trigger.js'];
-  const rows = (typeof FlowLaneChatSurfaces !== 'undefined' && FlowLaneChatSurfaces.SURFACES)
-    ? FlowLaneChatSurfaces.SURFACES
-    : LANES.map((lane) => ({ id: 'glance-lane-' + lane.id, origins: lane.origins }));
-  const ids = rows.map((lane) => lane.id);
-  try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: ids }); } catch (e) { /* legacy full lane */ }
-  for (const lane of rows) {
-    const tid = lane.id + '-trigger';
-    const surfaceKey = lane.key || String(lane.id || '').replace('glance-lane-', '');
-    try { await scripting.unregisterContentScripts({ ids: [tid] }); } catch (e) { /* first run */ }
-    if (typeof FlowChatKillSwitch !== 'undefined' && FlowChatKillSwitch.isAllowed) {
-      const allowed = await FlowChatKillSwitch.isAllowed(chrome, surfaceKey);
-      if (!allowed) continue;
-    }
-    await scripting.registerContentScripts([{
-      id: tid,
-      matches: lane.origins,
-      js: trigger,
-      runAt: 'document_idle',
-      persistAcrossSessions: true
-    }]);
-  }
+  const ids = LANES.map((lane) => 'glance-lane-' + lane.id);
+  const triggerIds = ids.map((id) => id + '-trigger');
+  try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: ids.concat(triggerIds) }); } catch (e) { /* not registered yet */ }
+  await scripting.registerContentScripts(LANES.map((lane) => ({
+    id: 'glance-lane-' + lane.id,
+    matches: lane.origins,
+    js: lane.js,
+    runAt: 'document_idle',
+    persistAcrossSessions: true
+  })));
 }
 
 function showButton(code) {
@@ -186,16 +172,22 @@ function showButton(code) {
   } catch (e) { /* the page still shows the label */ }
 }
 
+async function rememberReadConsent(code) {
+  const box = doc.getElementById(isHe(code) ? 'meta-age-he' : 'meta-age-en');
+  if (!box || box.checked !== true) return;
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local || !chrome.storage.local.set) return;
+  try {
+    await chrome.storage.local.set({ glanceWhatsAppWebRead: true, glanceWhatsAppWebConsent: true });
+  } catch (e) { /* lanes still register; reading stays off until this write lands */ }
+}
+
 async function turnOn(code) {
-  if (!ageOk(code)) {
-    say(isHe(code) ? 'יש לאשר גיל 18 ומעלה.' : 'Confirm you are 18 or older.');
-    return;
-  }
   if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) { say(cannotAsk(code)); return; }
   let ok = false;
   try { ok = await chrome.permissions.request({ origins: metaOrigins() }); }
   catch (e) { ok = false; }
   if (!ok) { say(staysOff(code)); return; }
+  try { await rememberReadConsent(code); } catch (e) { /* reading stays off */ }
   try { await registerAll(); }
   catch (e) { say(readerFailed(code)); return; }
   if (list) list.replaceChildren();

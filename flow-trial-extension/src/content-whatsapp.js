@@ -1,6 +1,8 @@
 // WhatsApp Web follow-up lane (gesture-only). No background reads.
 (() => {
   if (typeof FlowFollow === 'undefined' || typeof FlowWhatsAppParse === 'undefined') return;
+  if (window.__glanceWhatsAppFollowLane) return;
+  window.__glanceWhatsAppFollowLane = true;
   const P = FlowWhatsAppParse;
   const MAX_ROWS = 40;
   let lastReportedHealth = null;
@@ -35,7 +37,15 @@
   }
 
   function scan(opts) {
-    if (!opts || opts.gesture !== true) return { ok: false, reason: 'no-gesture' };
+    const G = globalThis.FlowWhatsAppWebGate;
+    const env = {
+      flag: globalThis.__glanceWhatsAppWebRead === true,
+      consent: globalThis.__glanceWhatsAppWebConsent === true,
+      userOff: globalThis.__glanceWhatsAppUserOff === true,
+      remoteOff: globalThis.__glanceWhatsAppRemoteOff === true
+    };
+    const decision = (G && G.readAllowed) ? G.readAllowed(env, opts) : { ok: false, reason: 'flag-off' };
+    if (!decision.ok) return decision;
     const main = chatPane();
     if (!main) return { ok: false, reason: 'no-chat' };
     const list = rows(main);
@@ -69,6 +79,7 @@
   }
 
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
-  if (!globalThis.__glanceChatSurfaces.whatsapp) globalThis.__glanceChatSurfaces.whatsapp = {};
-  globalThis.__glanceChatSurfaces.whatsapp.followScan = scan;
+  const prev = globalThis.__glanceChatSurfaces.whatsapp || {};
+  prev.followScan = scan;
+  globalThis.__glanceChatSurfaces.whatsapp = prev;
 })();
