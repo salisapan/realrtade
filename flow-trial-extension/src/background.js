@@ -1519,9 +1519,14 @@ function invalidateGoogleWebAuthFlight() {
 // not open a window. The side panel and the popup have no tab. The popup
 // opened as a normal tab does have one, and it is still our page, so Connect
 // may open a window. A web page, or a sender from another extension, may not.
-function googleConnectWantsInteractive(sender) {
-  if (!sender || !sender.tab) return true;
+// forceInteractive is only for an explicit Connect Google click on a Gmail
+// card (msg.interactive === true). Silent auto-connect never sets it.
+function googleConnectWantsInteractive(sender, forceInteractive) {
   const runtimeId = chrome.runtime && chrome.runtime.id;
+  if (forceInteractive === true) {
+    return Boolean(runtimeId && sender && sender.id === runtimeId);
+  }
+  if (!sender || !sender.tab) return true;
   const url = typeof sender.url === 'string' ? sender.url : '';
   if (!runtimeId || sender.id !== runtimeId) return false;
   return url.indexOf('chrome-extension://' + runtimeId + '/') === 0;
@@ -7392,7 +7397,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (ecoConnector) {
       return reply(sendResponse, glanceSwitchOn('CONNECT_ECOSYSTEM').then((ecoOn) => {
         if (ecoOn) {
-          const interactive = msg.connectorId === 'googleTasks' ? googleConnectWantsInteractive(sender) : true;
+          const interactive = msg.connectorId === 'googleTasks'
+            ? googleConnectWantsInteractive(sender, msg.interactive === true)
+            : true;
           return connectEcosystemConnector(msg.connectorId, {
             connectGoogleTasks: (force) => connectGoogleTasks(force !== false ? interactive : false),
             launchInteractive: outlookLaunchInteractive,
@@ -7401,7 +7408,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           });
         }
         if (msg.connectorId === 'googleTasks') {
-          return connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true }));
+          return connectGoogleTasks(googleConnectWantsInteractive(sender, msg.interactive === true)).then(() => ({ ok: true }));
         }
         return { ok: false, reason: 'connector-not-live' };
       }));
