@@ -2379,6 +2379,14 @@
   async function renderLabs() {
     const host = document.getElementById('labs-list');
     if (!host || typeof FlowLabsSwitches === 'undefined') return;
+    // Store install (update_url): no Labs section, no turn-on buttons. Every switch reads off there anyway.
+    const labsManifest = (chrome.runtime && typeof chrome.runtime.getManifest === 'function') ? chrome.runtime.getManifest() : null;
+    if (FlowLabsSwitches.storeLocked(labsManifest)) {
+      const block = document.getElementById('labsBlock');
+      if (block) { block.hidden = true; block.style.display = 'none'; }
+      host.replaceChildren();
+      return;
+    }
     let bag = {};
     try { bag = ((await chrome.storage.local.get({ glanceSwitches: {} })).glanceSwitches) || {}; } catch (e) { bag = {}; }
     host.replaceChildren();

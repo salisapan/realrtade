@@ -31,6 +31,8 @@ const FlowLabsSwitches = (() => {
   ];
   const IDS = LIST.map((r) => r.id);
   function isOn(bag, id) { return Boolean(bag && bag[id] === true); }
+  // A Chrome Web Store install has update_url in its manifest (Chrome adds it). There Labs is locked: hidden and always off.
+  function storeLocked(manifest) { return Boolean(manifest && manifest.update_url); }
   // The object to store after one row is flipped. Only known ids are written; anything else in the bag is kept as it is.
   function flipped(bag, id, on) {
     const next = Object.assign({}, bag || {});
@@ -43,6 +45,6 @@ const FlowLabsSwitches = (() => {
     IDS.forEach((id) => { next = flipped(next, id, on); });
     return next;
   }
-  return { LIST, IDS, isOn, flipped, all };
+  return { LIST, IDS, isOn, storeLocked, flipped, all };
 })();
 if (typeof module !== 'undefined') module.exports = { FlowLabsSwitches };
