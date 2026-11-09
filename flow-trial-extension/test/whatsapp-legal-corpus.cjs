@@ -93,24 +93,26 @@ const noConsent = w.__glanceChatSurfaces.whatsapp.scan({ gesture: true });
 check('1 a loaded draft script does not read the open chat', mainReads === 0 && noGesture.reason === 'no-gesture' && flagOff.reason === 'flag-off');
 check('4 no read before consent', noConsent.reason === 'no-consent' && mainReads === 0);
 w.__glanceWhatsAppWebConsent = true;
-const once = w.__glanceChatSurfaces.whatsapp.scan({ gesture: true });
-check('1 one gesture reads the open chat once', once.ok === true && once.sends === false && mainReads === 1);
-
-const consentDom = new (require('jsdom').JSDOM)('<div id="host"></div>', { runScripts: 'outside-only', url: 'chrome-extension://glance/popup/popup.html' });
-vm.runInContext(consentSrc, consentDom.window, { filename: 'meta-consent.js' });
-const removed = [];
-consentDom.window.FlowMetaConsent.paintConnection(consentDom.window.document.getElementById('host'), {
-  granted: true,
-  lang: 'en',
-  chrome: {
-    permissions: { remove() { return Promise.resolve(true); } },
-    storage: { local: { remove(keys) { removed.push([].concat(keys)); } } }
-  }
+Promise.resolve(w.__glanceChatSurfaces.whatsapp.scan({ gesture: true })).then((once) => {
+  check('1 one gesture reads the open chat once', once.ok === true && once.sends === false && mainReads === 1);
+  const consentDom = new (require('jsdom').JSDOM)('<div id="host"></div>', { runScripts: 'outside-only', url: 'chrome-extension://glance/popup/popup.html' });
+  vm.runInContext(consentSrc, consentDom.window, { filename: 'meta-consent.js' });
+  const removed = [];
+  consentDom.window.FlowMetaConsent.paintConnection(consentDom.window.document.getElementById('host'), {
+    granted: true,
+    lang: 'en',
+    chrome: {
+      permissions: { remove() { return Promise.resolve(true); } },
+      storage: { local: { remove(keys) { removed.push([].concat(keys)); } } }
+    }
+  });
+  const withdraw = consentDom.window.document.querySelector('button.ghost');
+  check('4 settings shows Disconnect', withdraw && withdraw.textContent === 'Disconnect');
+  withdraw.click();
+  check('4 Disconnect withdraws the read consent', removed.length === 1 && removed[0].indexOf('glanceWhatsAppWebRead') >= 0 && removed[0].indexOf('glanceWhatsAppWebConsent') >= 0);
+  console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
+  process.exit(failures ? 1 : 0);
+}).catch((err) => {
+  console.log('FAIL: gesture scan', err && err.message);
+  process.exit(1);
 });
-const withdraw = consentDom.window.document.querySelector('button.ghost');
-check('4 settings shows Disconnect', withdraw && withdraw.textContent === 'Disconnect');
-withdraw.click();
-check('4 Disconnect withdraws the read consent', removed.length === 1 && removed[0].indexOf('glanceWhatsAppWebRead') >= 0 && removed[0].indexOf('glanceWhatsAppWebConsent') >= 0);
-
-console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
-process.exit(failures ? 1 : 0);

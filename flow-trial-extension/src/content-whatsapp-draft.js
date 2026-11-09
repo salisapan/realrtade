@@ -82,11 +82,14 @@
       key: key
     };
     const box = composerBox(main);
-    FlowChatLane.draftInto(box, input).then((r) => {
+    return FlowChatLane.draftInto(box, input).then((r) => {
       if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input, box);
       if (!r || r.reason !== 'no-box') drafted.add(key);
-    }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
-    return { ok: true, sends: false };
+      return { ok: true, sends: false };
+    }).catch(() => {
+      drafted.add(key);
+      return { ok: false, sends: false, reason: 'error' };
+    }).finally(() => { inflight.delete(key); });
   }
 
   function scan(opts) {
@@ -106,8 +109,7 @@
     if (!list.length) return { ok: false, reason: 'no-messages' };
     const ids = list.map((n) => n.getAttribute('data-id'));
     if (!P.isOneToOne(ids)) return { ok: false, reason: 'not-1to1' };
-    maybeDraft(main, list);
-    return { ok: true, sends: false };
+    return maybeDraft(main, list);
   }
 
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
