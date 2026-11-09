@@ -650,13 +650,92 @@ function scopesRequiredByManifest(manifest, hostSource) {
   return required.sort();
 }
 
+// v1 ceiling. drive.file, openid, profile, and email may be declared only
+// when a write in this host needs them. Restricted Gmail and Drive scopes
+// are never on the list.
+const CASA_RESTRICTED_SCOPE_IDS = [
+  'gmail.modify',
+  'gmail.readonly',
+  'gmail.compose',
+  'gmail.send',
+  'gmail.insert',
+  'gmail.metadata',
+  'gmail.labels',
+  'drive',
+  'drive.readonly',
+  'forms.body',
+  'contacts.readonly',
+  'contacts',
+  'calendar'
+];
+
+function isCasaRestrictedScope(url) {
+  const s = String(url || '').trim();
+  if (!s) return false;
+  if (s === 'https://mail.google.com/') return true;
+  for (let i = 0; i < CASA_RESTRICTED_SCOPE_IDS.length; i++) {
+    const id = CASA_RESTRICTED_SCOPE_IDS[i];
+    if (s === scopeUrl(id) || s === id) return true;
+  }
+  if (/\/auth\/gmail\.(modify|readonly|compose|send|insert|metadata)/.test(s)) return true;
+  if (/\/auth\/drive$/.test(s) || /\/auth\/drive\.readonly$/.test(s)) return true;
+  if (/\/auth\/forms\.body$/.test(s) || /\/auth\/contacts(\.readonly)?$/.test(s)) return true;
+  if (/\/auth\/calendar$/.test(s)) return true;
+  return false;
+}
+
+const GLANCE_APPSSCRIPT_OAUTH_ALLOWLIST = [
+  scopeUrl('calendar.events'),
+  scopeUrl('tasks'),
+  scopeUrl('drive.file'),
+  'openid',
+  scopeUrl('userinfo.profile'),
+  'profile',
+  scopeUrl('userinfo.email'),
+  'email',
+  scopeUrl('script.external_request'),
+  scopeUrl('script.locale'),
+  scopeUrl('gmail.addons.current.message.readonly'),
+  scopeUrl('gmail.addons.execute'),
+  scopeUrl('gmail.addons.current.action.compose')
+].sort();
+
+function auditManifestOAuthScopes(oauthScopes, requiredScopes) {
+  const scopes = oauthScopes.slice().sort();
+  const required = (requiredScopes || []).slice().sort();
+  const restricted = scopes.filter(isCasaRestrictedScope);
+  if (restricted.length) return { ok: false, restricted: restricted, unknown: [], missing: [], extras: [] };
+  const unknown = scopes.filter((url) => GLANCE_APPSSCRIPT_OAUTH_ALLOWLIST.indexOf(url) === -1);
+  if (unknown.length) return { ok: false, restricted: [], unknown: unknown, missing: [], extras: [] };
+  const missing = required.filter((url) => scopes.indexOf(url) === -1);
+  if (missing.length) return { ok: false, restricted: [], unknown: [], missing: missing, extras: [] };
+  const extras = scopes.filter((url) => required.indexOf(url) === -1);
+  if (extras.length) return { ok: false, restricted: [], unknown: [], missing: [], extras: extras };
+  return { ok: true, restricted: [], unknown: [], missing: [], extras: [] };
+}
+
 console.log('\n--- host boundaries ---');
 {
   const manifest = JSON.parse(fs.readFileSync(path.join(addon, 'appsscript.json'), 'utf8'));
   const host = fs.readFileSync(path.join(addon, 'Code.js'), 'utf8');
   const scopes = manifest.oauthScopes.slice().sort();
   const expected = scopesRequiredByManifest(manifest, host);
-  check('every manifest flag has its scope, and there are no extras', JSON.stringify(scopes) === JSON.stringify(expected), { scopes: scopes, expected: expected });
+  const audit = auditManifestOAuthScopes(manifest.oauthScopes, expected);
+  check('manifest declares no restricted scopes', audit.restricted.length === 0, { restricted: audit.restricted });
+  check('manifest declares no scope outside the v1 allowlist', audit.unknown.length === 0, { unknown: audit.unknown });
+  check('every manifest flag has its scope, and there are no extras', audit.ok === true && JSON.stringify(scopes) === JSON.stringify(expected), { scopes: scopes, expected: expected, audit: audit });
+  check('manifest does not declare gmail.modify or script.scriptapp', scopes.indexOf(scopeUrl('gmail.modify')) === -1 && scopes.indexOf(scopeUrl('script.scriptapp')) === -1);
+  [
+    'gmail.modify',
+    'gmail.compose',
+    'gmail.readonly',
+    'drive.readonly',
+    'forms.body',
+    'contacts.readonly'
+  ].forEach((id) => {
+    const mutant = auditManifestOAuthScopes(manifest.oauthScopes.concat([scopeUrl(id)]), expected);
+    check('mutant ' + id + ' is rejected', mutant.ok === false && (mutant.restricted.indexOf(scopeUrl(id)) !== -1 || mutant.unknown.indexOf(scopeUrl(id)) !== -1), mutant);
+  });
   check('useLocaleFromApp requires script.locale', expected.indexOf(scopeUrl('script.locale')) !== -1 && scopes.indexOf(scopeUrl('script.locale')) !== -1);
   check('message open reads the body, not metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
   check('there is no compose scope', !manifest.addOns.gmail.composeTrigger && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) === -1);
@@ -687,6 +766,75 @@ console.log('\n--- host boundaries ---');
   check('host does not patch a task', !/Tasks\.Tasks\.patch|Tasks\.Tasks\.update/.test(host));
   check('host reads the task back through performCreate', host.indexOf('performCreate') !== -1 && host.indexOf('performUndo') !== -1);
   check('host reads an event back through performCreateEvent', host.indexOf('performCreateEvent') !== -1 && host.indexOf('performUndoEvent') !== -1);
+  const restrictedInHost = /https:\/\/www\.googleapis\.com\/auth\/(?:gmail\.(?:modify|compose|readonly|send)|drive\.readonly|forms\.body|contacts(?:\.readonly)?)(?![\w.])/;
+  check('Code.js does not name a restricted scope url', !restrictedInHost.test(host));
+  check('appsscript.json does not name a restricted scope url', !restrictedInHost.test(JSON.stringify(manifest)));
+}
+
+console.log('\n--- no Gmail write surface ---');
+{
+  const tripped = [];
+  function trip(name) { return function () { tripped.push(name); throw new Error('tripwire ' + name); }; }
+  const sandbox = {
+    console,
+    module: undefined,
+    GmailApp: {
+      search: trip('GmailApp.search'),
+      sendEmail: trip('GmailApp.sendEmail'),
+      createDraft: trip('GmailApp.createDraft'),
+      createLabel: trip('GmailApp.createLabel'),
+      getUserLabelByName: trip('GmailApp.getUserLabelByName'),
+      moveThreadsToInbox: trip('GmailApp.moveThreadsToInbox')
+    },
+    MailApp: { sendEmail: trip('MailApp.sendEmail') },
+    ScriptApp: {
+      getProjectTriggers: trip('ScriptApp.getProjectTriggers'),
+      deleteTrigger: trip('ScriptApp.deleteTrigger'),
+      newTrigger: trip('ScriptApp.newTrigger')
+    },
+    PropertiesService: {
+      getUserProperties() { return { getProperty() { return null; }, setProperty() {}, deleteProperty() {} }; },
+      getScriptProperties() { return { getProperty() { return null; } }; }
+    },
+    Session: {
+      getActiveUser() { return { getEmail() { return 'owner@example.com'; } }; },
+      getScriptTimeZone() { return 'Etc/UTC'; }
+    },
+    CalendarApp: { getDefaultCalendar() { return { getTimeZone() { return 'Etc/UTC'; } }; } }
+  };
+  function widget(kind) {
+    const node = { type: kind, text: '' };
+    node.setText = function (value) { node.text = value; return node; };
+    return node;
+  }
+  sandbox.CardService = {
+    newTextParagraph() { return widget('text'); },
+    newTextButton() { return widget('button'); },
+    newCardSection() {
+      const section = { widgets: [] };
+      section.addWidget = function (item) { section.widgets.push(item); return section; };
+      return section;
+    },
+    newCardHeader() {
+      const header = { title: '' };
+      header.setTitle = function (value) { header.title = value; return header; };
+      return header;
+    },
+    newCardBuilder() {
+      const builder = { header: null, sections: [] };
+      builder.setHeader = function (header) { builder.header = header; return builder; };
+      builder.addSection = function (section) { builder.sections.push(section); return builder; };
+      builder.build = function () { return builder; };
+      return builder;
+    }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(addon, 'BuildSha.js'), 'utf8'), sandbox, { filename: 'BuildSha.js' });
+  vm.runInContext(fs.readFileSync(path.join(addon, 'CoreBundle.js'), 'utf8'), sandbox, { filename: 'CoreBundle.js' });
+  vm.runInContext(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8'), sandbox, { filename: 'Code.js' });
+  check('no inbox sweep entry point exists', vm.runInContext("typeof sweep === 'undefined' && typeof GlanceMarker === 'undefined'", sandbox));
+  vm.runInContext('onHomepage({})', sandbox);
+  check('opening the homepage touches no Gmail write call and no trigger', tripped.length === 0, tripped);
 }
 
 console.log('\n--- message path parity ---');
