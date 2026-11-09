@@ -139,17 +139,21 @@ const FlowChatOnDemand = (() => {
     // gesture in the chat-lane spec. It is not WhatsApp Web and it does not
     // read a person's chats. Production web.whatsapp.com stays behind the gate.
     if (fixture && surfaceKey === 'whatsapp') {
-      try { return await invokeScan(api, tab.id, 'whatsapp', 'MAIN'); }
+      // Extension pages share one world with their script tags. MAIN is for web pages.
+      try { return await invokeScan(api, tab.id, 'whatsapp', null); }
       catch (e) { return { ok: false, reason: 'inject-failed' }; }
     }
     if (surfaceKey === 'whatsapp') {
       const decision = await whatsappGate(api);
       if (!decision.ok) return decision;
-    } else if (typeof FlowChatKillSwitch !== 'undefined') {
-      const killed = await FlowChatKillSwitch.isOff(api, surfaceKey);
-      if (killed && killed.off) return { ok: false, reason: killed.reason || 'kill-switch' };
+      // The WhatsApp host alone is enough. A full Meta grant is not required to read the open chat.
+    } else {
+      if (typeof FlowChatKillSwitch !== 'undefined') {
+        const killed = await FlowChatKillSwitch.isOff(api, surfaceKey);
+        if (killed && killed.off) return { ok: false, reason: killed.reason || 'kill-switch' };
+      }
+      if (!(await metaGranted(api))) return { ok: false, reason: 'not-granted' };
     }
-    if (!(await metaGranted(api))) return { ok: false, reason: 'not-granted' };
     for (let i = 0; i < 25; i++) {
       try {
         const probe = await execute(api, tab.id, null, (key) => Boolean(
@@ -245,8 +249,9 @@ const FlowChatOnDemand = (() => {
     if (typeof FlowChatKillSwitch !== 'undefined') {
       FlowChatKillSwitch.wireAlarm(api);
       FlowChatKillSwitch.schedulePoll(api);
-      FlowChatKillSwitch.fetchRemote(api)
-        .catch(() => FlowChatKillSwitch.readRemoteBag(api))
+      // Do not fetch on startup. A load-time fetch is a network call the rest of
+      // the worker did not make, and never-fetched stays off until the alarm.
+      FlowChatKillSwitch.readRemoteBag(api)
         .then(() => FlowChatKillSwitch.applyTriggers(api))
         .catch(() => {});
     } else {
