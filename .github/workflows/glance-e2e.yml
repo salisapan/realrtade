@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - claude/install-uiux-pro-max-skill-a4agox
+      - cursor/shared-chat-lane-pr0-eaf7
       - cursor/c1-connect-claude-4978-8c95
       - cursor/d1-usercontext-on-c1-4978-8c95
   push:
