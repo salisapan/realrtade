@@ -7,6 +7,9 @@
 //   GLANCE_V25=c  v2.6 (2026-10-26): b, plus an undated ask that only says asap / as soon as possible / בהקדם / מיד is labelled SILENT,
 //                 as the device does today (BATCH-005: v2.5b learned 'today' as a deadline and spread it to 'asap'). If the owner
 //                 decides undated asks should act, this is the one line to flip. Writes features-v26/.
+//   GLANCE_V25=d  v2.7 (2026-11-09): c, but the asap negatives are contrast pairs: per template, no more asap-silent rows than
+//                 that template has dated gap positives in the same split (BATCH-007: v2.6 learned the Hebrew reply-with-file
+//                 template as silent and lost 12 dated asks). Writes features-v27/.
 // Labels are template intent, NOT owner-verified.
 'use strict';
 // v2.4 labels: v2.3 (gap-labels-v23.cjs, unchanged) plus two changes found by batch-004 (glance-ai/labeling/BATCH-004.md):
@@ -30,7 +33,7 @@
 // Writes train/features-v24/{train,val,test}.jsonl (+ meta.json) from train/features-v2 and dataset/out-v2/all.jsonl.
 // usage: GLANCE_V25=a|b GLANCE_NOW=2026-10-07T12:00:00+03:00 node train/gap-labels-v25.cjs
 const fs = require('fs'), path = require('path');
-const HERE = __dirname, SRC = path.join(HERE, 'features-v2'), V = ({ b: 'b', c: 'c' })[process.env.GLANCE_V25] || 'a', DST = path.join(HERE, V === 'c' ? 'features-v26' : 'features-v25' + V);
+const HERE = __dirname, SRC = path.join(HERE, 'features-v2'), V = ({ b: 'b', c: 'c', d: 'd' })[process.env.GLANCE_V25] || 'a', DST = path.join(HERE, V === 'c' ? 'features-v26' : V === 'd' ? 'features-v27' : 'features-v25' + V);
 const ALL = path.join(HERE, '..', 'dataset', 'out-v2', 'all.jsonl');
 const { FlowExtract: E } = require(path.join(HERE, '..', '..', '..', 'flow-trial-extension', 'core', 'extract.js'));
 const NOW = new Date(process.env.GLANCE_NOW || '2026-10-07T12:00:00+03:00');
@@ -71,10 +74,21 @@ for (const split of ['train', 'val', 'test']) {
       if ((!d || !d.iso) && !(V !== 'a' && DEADLINE.test(body))) why = 'undated';
       else if (f.scenario === 'meeting' && !(E.parseTime && E.parseTime(body))) why = 'meeting-without-time';
     }
-    if (why === 'undated' && V === 'c' && ASAP.test(body)) { inc(split + ':asap-silent'); out.push(Object.assign({}, f, { y: 'SILENT', ybin: 0, unsure: false, gap: true })); continue; }
+    if (why === 'undated' && (V === 'c' || V === 'd') && ASAP.test(body)) { inc(split + ':asap-silent'); out.push(Object.assign({}, f, { y: 'SILENT', ybin: 0, unsure: false, gap: true })); continue; }
     if (why) { inc(split + ':stays-unsure:' + why.split(':')[0]); out.push(f); continue; }
     inc(split + ':gap-labelled:' + f.scenario);
     out.push(Object.assign({}, f, { y: LABEL[f.scenario], ybin: 1, unsure: false, gap: true }));
+  }
+  if (V === 'd') {
+    // contrast pairs: keep an asap negative only while its template has an unused dated positive in this split
+    const pos = {};
+    out.forEach((x) => { if (x.gap && x.y !== 'SILENT') pos[x.tid] = (pos[x.tid] || 0) + 1; });
+    for (let k = out.length - 1; k >= 0; k--) {
+      const x = out[k];
+      if (!(x.gap && x.y === 'SILENT')) continue;
+      if ((pos[x.tid] || 0) > 0) { pos[x.tid]--; continue; }
+      out[k] = Object.assign({}, x, { y: x.y, unsure: true, gap: false }); inc(split + ':asap-unpaired-back-to-unsure');
+    }
   }
   fs.writeFileSync(path.join(DST, split + '.jsonl'), out.map((x) => JSON.stringify(x)).join('\n') + '\n');
 }
