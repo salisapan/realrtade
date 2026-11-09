@@ -62,6 +62,8 @@ const NOW = new Date('2026-10-15T12:00:00Z');
   const manifest = fs.readFileSync(path.join(root, 'manifest.xml'), 'utf8');
   check('manifest declares Mailbox 1.5', manifest.indexOf('MinVersion="1.5"') !== -1);
   check('manifest has mobile read command surface', manifest.indexOf('MobileMessageReadCommandSurface') !== -1);
+  const v11 = manifest.split('http://schemas.microsoft.com/office/mailappversionoverrides/1.1')[1] || '';
+  check('version 1.1 holds the mobile read button', v11.indexOf('MobileFormFactor') !== -1 && v11.indexOf('MobileMessageReadCommandSurface') !== -1 && v11.indexOf('MobileButton') !== -1);
   check('manifest does not register OnNewMessageCompose (no write without a click)', manifest.indexOf('OnNewMessageCompose') === -1);
   check('manifest is add-in only (MailApp)', manifest.indexOf('xsi:type="MailApp"') !== -1);
 }
@@ -79,6 +81,14 @@ const NOW = new Date('2026-10-15T12:00:00Z');
   const gone = local.filter((r) => !fs.existsSync(path.join(site, 'glance-outlook-addin', 'src', r)));
   check('pack: every local script and style in taskpane.html is in the bundle', local.length >= 3 && gone.length === 0, gone);
   check('pack: checksums written', fs.existsSync(path.join(site, 'glance-outlook-addin', 'SHA256SUMS')));
+}
+
+{
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  check('readme names the add-in id and the mobile command in version 1.1',
+    readme.indexOf('87851e39-e51b-439a-bbf5-459ab69b3615') !== -1 && readme.indexOf('MobileFormFactor') !== -1);
+  check('readme says the bundle is local and the person presses Send',
+    /local bundle/.test(readme) && /does not host/.test(readme) && /You press Send/.test(readme));
 }
 
 if (failures) {
