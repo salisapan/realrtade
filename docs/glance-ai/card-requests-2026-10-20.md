@@ -158,3 +158,12 @@ One more state of the chat card, drawn with the existing canonical Do It compone
 - One step: the calendar. Choice: Do It. After the read-back: Handled with the new time.
 - Undo: puts the old time back. If the person changed the event since, the card says Undo unavailable.
 - No card when the event has guests, belongs to someone else, repeats, or two events share the old slot.
+
+## C3 — cancel that meeting (added 2026-11-10)
+
+- Module `flow-trial-extension/core/calendar-cancel.js`, switch `CALENDAR_CANCEL_PROOF`. Map row C3.
+- When: a mail cancels a named slot, and the person's calendar has exactly one event of their own at that slot, with no other guests.
+- Line: `ביטול ביומן: <title> ב-<date> <HH:MM>` / `Cancel on your calendar: <title> on <date> <HH:MM>`.
+- One step: the calendar. Choice: Do It. After the read-back: Handled, the event is off the calendar.
+- Undo: brings the same event back. If the person changed it since, the card says Undo unavailable.
+- No card when the event has guests, belongs to someone else, repeats, or two events share the slot.
