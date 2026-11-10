@@ -57,11 +57,12 @@ const PROMISE = 'I will send you the signed lease on Friday.';
   const closed = H.onMessage(ALL, c.watch, { isOwn: true, text: 'Sent it to you just now, here is the signed lease.' }, NOW);
   check('the person\'s real answer in the chat closes it', closed.close === true && closed.patch.closedAs === 'replied', closed);
 
-  console.log('\n--- the host keeps the surface ---\n');
+  console.log('\n--- through the host: the surface a surface reports is the one planned for ---\n');
   for (const s of ['gmail', 'outlook', 'whatsapp', 'messenger', 'instagram', 'teams']) {
-    check('mailInput keeps ' + s, H.mailInput({ text: 'x', surface: s }, { show: false }).surface === s);
+    const out = await H.readMail(ALL, { text: ASK, subject: 'x', surface: s, threadId: 'h-' + s, today: '2026-10-07', now: NOW, cloudConsent: false }, { show: false }, { tier1: async () => ask });
+    const want = s === 'gmail' ? 'gmailDraft+googleTask' : s === 'outlook' ? 'outlookDraft+outlookTask' : 'googleTask';
+    check('readMail on ' + s + ': ' + want, kinds(out) === want, kinds(out));
   }
-  check('mailInput maps anything else to gmail', H.mailInput({ text: 'x', surface: 'fax' }, { show: false }).surface === 'gmail');
 
   console.log('\n--- off ---\n');
   check('aiPlanV1 off: no plan on any surface', (await E.read({ text: ASK, today: '2026-10-07', direction: 'inbound', surface: 'whatsapp', tier0: { step: 'SILENT', possible: true } }, { tier1: async () => ask }, { aiPrimary: true })).card.plan === null);

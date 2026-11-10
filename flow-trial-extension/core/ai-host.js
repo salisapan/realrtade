@@ -31,8 +31,6 @@ const FlowAiHost = (() => {
   // An Israeli phone number in the local form survives today's device mask (an open red-team fix, #249). The host refuses to send it;
   // glance-assist refuses it again (understand.js IL_PHONE).
   const IL_PHONE = /(?:^|[^\d])\(?0(?:[23489]|5\d|7[2-9])\)?[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)/;
-  // Gmail (also the Gmail add-on), Outlook (also the Outlook add-in), and the chats. A chat plan has no email draft (core/model-plan.js).
-  const SURFACES = { gmail: true, outlook: true, whatsapp: true, messenger: true, instagram: true, teams: true };
   const COOL_MS = { spend_cap: 6 * 3600 * 1000, quota_used: 6 * 3600 * 1000, unavailable: 30 * 60 * 1000 };
   const isoDay = (t) => new Date(t).toISOString().slice(0, 10);
   const he = (s) => /[֐-׿]/.test(String(s || ''));
@@ -47,7 +45,7 @@ const FlowAiHost = (() => {
     return {
       text: String(raw.text || ''), body: raw.body != null ? String(raw.body) : undefined, subject: String(raw.subject || ''),
       today: raw.today || isoDay(now), now, direction: raw.direction || 'inbound', attachmentCount: Number(raw.attachmentCount || 0),
-      surface: SURFACES[raw.surface] ? raw.surface : 'gmail', lang: he(raw.text) ? 'he' : 'en', cloudConsent: raw.cloudConsent === true,
+      surface: raw.surface === 'outlook' ? 'outlook' : 'gmail', lang: he(raw.text) ? 'he' : 'en', cloudConsent: raw.cloudConsent === true,
       threadId: raw.threadId || null, messageId: raw.messageId || null, counterpart: raw.from || {}, channel: raw.channel || raw.surface || 'gmail',
       tier0: { quiet: step === 'SILENT' ? (decision.quiet || null) : null, step, possible: step === 'SILENT' && !decision.quiet }
     };
