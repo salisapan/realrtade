@@ -1,0 +1,13 @@
+# Pinned training environment for train/train-v2.py (and the v2-family compare scripts).
+# Frozen from the venv of the 2026-11-10 lab rebuild (pip freeze), not upgraded. The routine's earlier env was never pinned, which is why
+# v2.6 could not be reproduced row-for-row on 2026-11-10.
+# Interpreter: CPython 3.13.5 (venv on /usr/bin/python3.13). BLAS/LAPACK: scipy-openblas 0.3.34.106.0, bundled in the numpy/scipy wheels.
+# Install:  python3.13 -m venv .venv && .venv/bin/pip install -r requirements-train.lock.txt
+# Check:    .venv/bin/python train/pinned_env.py      (train-v2.py runs the same check and refuses to train on a mismatch)
+cloudpickle==3.1.2
+joblib==1.6.0
+narwhals==2.28.0
+numpy==2.5.4
+scikit-learn==1.9.1
+scipy==1.18.1
+threadpoolctl==3.8.0

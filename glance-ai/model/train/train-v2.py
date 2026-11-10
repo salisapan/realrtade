@@ -12,6 +12,8 @@ ap = argparse.ArgumentParser(); ap.add_argument('--feat', default='features-v2')
 ap.add_argument('--target', type=float, default=0.0029); ap.add_argument('--strict', dest='mask_unsure', action='store_false'); ap.add_argument('--gate-on-all', dest='gate_unvetoed', action='store_false'); ap.add_argument('--no-oof', dest='oof', action='store_false'); ap.add_argument('--extra', default=None, help='npz with dense extra features per set (e5 experiment)')
 ap.add_argument('--out', default=None, help='artifact directory (default: model/artifacts). Refuses a path that is the shipped artifacts directory, so a dry-run cannot overwrite v2 weights.')
 A = ap.parse_args()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from pinned_env import check as _pin_check; ENV = _pin_check()   # requirements-train.lock.txt
+print('[env] ' + json.dumps(ENV), flush=True)
 HERE = os.path.dirname(os.path.abspath(__file__)); FEAT = os.path.join(HERE, A.feat)
 _default_art = os.path.abspath(os.path.join(HERE, '..', 'artifacts'))
 ART = os.path.abspath(A.out) if A.out else _default_art
@@ -153,7 +155,7 @@ if A.oof:
 pv, _ = decide(va, Xva, tau, per_label=TAUS); pt, ptest = decide(te, Xte, tau, per_label=TAUS); pt_alone, _ = decide(te, Xte, tau, use_veto=False, per_label=TAUS)
 pt_single, _ = decide(te, Xte, tau)
 rep = {'calibration': 'grouped-5fold-OOF(train+val), final fit on train+val' if A.oof else 'val', 'oofSweep': (oof_sweep[::4] if A.oof else None), 'tag': A.tag, 'rows': A.rows, 'feat': A.feat, 'gateC': Cg, 'chooserC': Cc, 'tau': tau, 'target': A.target, 'classes': CL,
-       'tauPerLabel': TAUS, 'val': metrics(va, pv), 'test': metrics(te, pt), 'testSingleTau': metrics(te, pt_single), 'testModelAlone': metrics(te, pt_alone), 'sweep': sweep[::4]}
+       'tauPerLabel': TAUS, 'env': ENV, 'val': metrics(va, pv), 'test': metrics(te, pt), 'testSingleTau': metrics(te, pt_single), 'testModelAlone': metrics(te, pt_alone), 'sweep': sweep[::4]}
 print(json.dumps({k: rep[k] for k in ('tag', 'gateC', 'chooserC', 'tau')}), flush=True)
 for k in ('val', 'test', 'testSingleTau', 'testModelAlone'): print(' ', k, json.dumps({a: (round(b, 4) if isinstance(b, float) else b) for a, b in rep[k].items()}), flush=True)
 json.dump(rep, open(os.path.join(ART, A.tag + '.report.json'), 'w'), indent=1)
