@@ -16,7 +16,7 @@
 const fs = require('fs'), path = require('path');
 const HERE = __dirname, SRC = path.join(HERE, 'features-v2'), DST = path.join(HERE, 'features-v23');
 const ALL = path.join(HERE, '..', 'dataset', 'out-v2', 'all.jsonl');
-const { FlowExtract: E } = require(path.join(HERE, '..', '..', '..', 'flow-trial-extension', 'core', 'extract.js'));
+const GAP_READER = require('./gap-reader/index.cjs'), { FlowExtract: E } = GAP_READER;   // pinned 1fc43b3b reader, see gap-reader/READER.json
 const NOW = new Date(process.env.GLANCE_NOW || '2026-10-07T12:00:00+03:00');
 const read = (p) => fs.readFileSync(p, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
 const LABEL = {
@@ -27,7 +27,7 @@ const GROUP = /\b(?:hi|hello|hey|dear)\s+(?:all|everyone|team|guys|folks)\b|(?:×
 
 const src = {}; for (const r of read(ALL)) src[r.id] = r;
 fs.mkdirSync(DST, { recursive: true });
-fs.copyFileSync(path.join(SRC, 'meta.json'), path.join(DST, 'meta.json'));
+fs.copyFileSync(path.join(SRC, 'meta.json'), path.join(DST, 'meta.json')); GAP_READER.stamp(DST);
 const stats = {};
 const inc = (k) => { stats[k] = (stats[k] || 0) + 1; };
 for (const split of ['train', 'val', 'test']) {

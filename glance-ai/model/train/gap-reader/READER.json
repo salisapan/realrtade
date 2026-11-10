@@ -1,0 +1,8 @@
+{
+  "what": "the date reader the template-intent gap labels (gap-labels-v23/v24/v25) were built with on 2026-10-19; every blind-spot count since then (n=367 on the v2 test split) uses it",
+  "commit": "1fc43b3bc54994e19a790a720cde7f86338c4dc6",
+  "sourcePath": "flow-trial-extension/core/extract.js",
+  "fileLastChangedIn": "3bba620f37aa344bd67471eb8bc44f9e5f446c00",
+  "sha256": "04b0df628ed67355afd124561d2d3bd48e0c7d7514e91818e36b0d47f7f68020",
+  "expectGapRowsV23Test": 367
+}
