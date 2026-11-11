@@ -16,7 +16,7 @@ Rules:
 3. A promise «לפני החג» ("before the holiday") is a task.
 4. "today", «היום», "this week", "by end of week", «סוף השבוע» are deadlines.
 5. "Attach X to the invite" is a draft. A promise to self with a clock time is UNSURE.
-6. A reader's promise with NO date ("as agreed, you will send the invoice asap") is UNSURE.
+6. A reader's promise with NO date ("as agreed, you will send the invoice asap", «התחייבת לשלוח… ASAP») is a task: it reminds the reader of their own commitment, and tracking a commitment is what Glance is for.
 7. "FYI", "no action needed", «לידיעתך», a newsletter or a receipt, an out-of-office reply, a webinar invitation, a meeting that already happened, marketing: SILENT.
 8. If the same text could be two steps, choose the one whose completion CLOSES the loop (a reply is closed by sending the reply; work is closed by doing it).
 
