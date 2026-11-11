@@ -289,6 +289,7 @@ const FlowIncomingJudge = (() => {
       forwarded: i.forwarded === true,
       namesPending: i.namesPending === true,
       namesWaitDone: i.namesWaitDone === true,
+      confirmedAmountSilent: i.confirmedAmountSilent === true,
       readerEmail: i.readerEmail || null
     });
     // The profile names are not cached yet. No card, and not a quiet.

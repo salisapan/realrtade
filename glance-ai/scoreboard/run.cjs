@@ -54,8 +54,7 @@ const J = Object.fromEntries(JUDGED.map(([n, f]) => [n, Object.fromEntries(read(
 // --hard-quiets: the engine's own hard quiets (its silence reason) also veto the model, the way the floor decides in the product: a model may act only where
 // the engine found no intent (`intent-null`) or a soft reason. A = reasons with no act in the agreement labels (hedge, google, own-sender, meeting-veto, onedrive-target-on-gmail);
 // B = A plus quiet:noise and quiet:family. Off by default (the first readings in the records were taken without it).
-const HQ = { A: new Set(['quiet:hedge', 'quiet:google', 'own-sender', 'meeting-veto', 'onedrive-target-on-gmail']) };
-HQ.B = new Set([...HQ.A, 'quiet:noise', 'quiet:family']);
+const HQ = require(path.join(G, 'model', 'runtime', 'hard-quiets.cjs')); // single source of truth for the engine reasons that veto the model
 const HARD = HQ[arg('hard-quiets', '')] || new Set();
 function product(id, m) { // engine (tip) first, unless the lab veto removes it; the model only where the engine is silent (and not hard-quiet)
   const row = byId[id], x = m[id];

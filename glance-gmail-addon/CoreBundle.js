@@ -6929,6 +6929,10 @@ const FlowIntent = (() => {
       return logged;
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {
+      // Owner decision 2026-10-14 (C-1, glance-ai/labeling/owner-rules.md 3b): a mail that only confirms an amount or an approved budget and asks
+      // nothing is silence. The engine still offers the confirmed-amount close by default; this option is the alignment, OFF until the host passes
+      // it (no host does yet, so nothing changes). test/confirmed-amount-silent-corpus.cjs.
+      if (ctx.confirmedAmountSilent === true && !requestEvidence) return stayQuiet('confirmed-amount-no-ask');
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
         what: whatText(text, DATED_COMMIT_PATTERNS) || labelFor(TYPES.DECISION_TO_LOG),
@@ -10047,6 +10051,7 @@ const FlowIncomingJudge = (() => {
       forwarded: i.forwarded === true,
       namesPending: i.namesPending === true,
       namesWaitDone: i.namesWaitDone === true,
+      confirmedAmountSilent: i.confirmedAmountSilent === true,
       readerEmail: i.readerEmail || null
     });
     // The profile names are not cached yet. No card, and not a quiet.

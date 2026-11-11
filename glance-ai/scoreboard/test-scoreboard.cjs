@@ -34,4 +34,10 @@ t('every label travels with its text: the frozen set, the overlay and the ratche
   const fz = fs.readFileSync(path.join(__dirname, '..', 'model', 'train', 'features-frozen', 'frozen.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).id);
   assert.deepStrictEqual(fz, fr.map((r) => r.id), 'the feature export covers exactly the frozen rows, in order');
 });
+t('the engine hard-quiet reasons are one list, and a model may not act under them', () => {
+  const H = require('../model/runtime/hard-quiets.cjs');
+  for (const r of ['quiet:hedge', 'quiet:google', 'own-sender', 'meeting-veto', 'onedrive-target-on-gmail']) assert.strictEqual(H.modelMayAct(r), false, r);
+  for (const r of ['intent-null', 'too-short', 'note-to-self', 'no-draft-close']) assert.strictEqual(H.modelMayAct(r), true, r);
+  assert.strictEqual(H.modelMayAct('quiet:noise'), true); assert.strictEqual(H.modelMayAct('quiet:noise', H.B), false);
+});
 console.log('\n' + n + ' passed');
