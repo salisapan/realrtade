@@ -191,3 +191,8 @@ Proposed numeric targets for the end of Phase 3, on the owner-verified real-mail
 6. Public wording of any comparison.
 
 Recommended first step: **Phase 0, one command that prints the seven numbers on a basis we trust.** Every later claim, including "the best", depends on it.
+
+## 10. Progress log
+
+- **2026-11-11, Phase 0 started (lab, no approval needed).** Built: `glance-ai/scoreboard/run.cjs` (the seven metrics, label sources apart, Wilson intervals, engine-only baseline row, calibration), the frontier-baseline harness (`baseline/make-prompts.cjs` and `ingest.cjs`, no model call, prompts masked), the frozen real-mail set structure (`real-mail/README.md`, `private/` gitignored) and the conventions table (`docs/glance-ai/model-conventions.md`, C-1 to C-17). **First finding, which changes Phase 1:** on the agreement labels the engine alone makes 26 wrong Do Its of 161 silent rows; v2.6 adds none and cuts misses from 35 to 26. Half of the 26 are undated asks (C-4, open owner decision); the other half are engine reads of real sentences, for example a confirmed amount read as a task (C-1). So the "wrong Do It at most 1 in 100" target in §5 is mostly an engine and convention problem, not a small-model problem. Still open in Phase 0: path A's reviewed PR (owner-verified labels), real rows in the frozen set, the actual frontier runs (need a key and a cap).
+
