@@ -1,22 +1,14 @@
-{"id":"v2syn-24489","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"אפשר לשמור את החוזה החתום המצורף לדרייב? יום נעים, Sali"}
-{"id":"v2repo-intent-teacher-eval-2-214-outlook","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"העסקה אושרה בבלוק 18221."}
-{"id":"v2repo-intent-teacher-eval-199-gmail","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"אשלם את ההשתתפות העצמית בדלפק מחר."}
-{"id":"v2rtest-judgment-corpus-1226","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"HE COMMIT: אאשר a priced contract"}
-{"id":"v2syn-2442","gold":"SILENT","engineActs":"file_save","found":"2026-11-11","status":"open","convention":null,"note":"Hi team, Hope your week is going well. Please store the attached file in Google Drive. Man"}
-{"id":"v2rtest-onedrive-file-corpus-1369","gold":"SILENT","engineActs":"file_save","found":"2026-11-11","status":"open","convention":null,"note":"Please save the attached file to Drive."}
-{"id":"v2rtest-privacy-shield-corpus-1504","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"Dana Cole confirmed $3,900 due Sep 7. Call +972-54-123-4567."}
-{"id":"v2syn-9492","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"שלום רב, החלטנו ללכת עם סייברארק עבור הפיילוט; התקציב אושר על ₪89.90. המשך יום טוב, שרה"}
-{"id":"v2syn-23471","gold":"SILENT","engineActs":"calendar","found":"2026-11-11","status":"open","convention":null,"note":"בוקר טוב, אפשר לעשות הדגמה קצרה ב-19 באוקטובר בשעה 9:00? יום נעים, יוסי"}
-{"id":"v2syn-18770","gold":"SILENT","engineActs":"draft","found":"2026-11-11","status":"open","convention":null,"note":"היי לכולם, תאשר לי עד יום ה׳ אם התקציב לרבעון סגור תודה רבה, אבי"}
-{"id":"v2syn-12090","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"Still waiting on the tax form from you, can you send it by end of week? Thanks, Sali"}
-{"id":"v2syn-12759","gold":"SILENT","engineActs":"draft","found":"2026-11-11","status":"open","convention":null,"note":"Dear Sali, Can you loop in finance on the resume today? Cheers"}
-{"id":"v2rtest-learning-ledger-corpus-1284","gold":"SILENT","engineActs":"draft","found":"2026-11-11","status":"open","convention":null,"note":"Still going through the documents, give me a few days."}
-{"id":"v2repo-intent-teacher-eval-2-199-gmail","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"אשלח העתק דרכון מחר אני בעבודה עכשיו"}
-{"id":"v2syn-2462","gold":"SILENT","engineActs":"file_save","found":"2026-11-11","status":"open","convention":null,"note":"Sali, Hope your week is going well. Please store the attached file in Drive. Cheers"}
-{"id":"v2syn-7690","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"לזכור להחזיר את החוזה החתום עד ה-15.10. תודה!"}
-{"id":"v2syn-24170","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"בוקר טוב, אושר תקציב של ₪89 לקליטת העובד החדש תודה, דנה"}
-{"id":"v2repo-intent-gold-145-gmail","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"אשלח הזמנה ליומן ליום שלישי בקרוב."}
-{"id":"v2syn-22767","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"שלום סאלי, לפי מה שסגרנו, אתם מעבירים את הקבלה עד יום חמישי תודה! מיכאל"}
-{"id":"v2repo-intent-teacher-eval-88-gmail","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"We will email the vaccination records tomorrow."}
-{"id":"v2syn-24372","gold":"SILENT","engineActs":"file_save","found":"2026-11-11","status":"open","convention":null,"note":"היי לכולם, שבוע טוב! שמור בבקשה את הקובץ המצורף בגוגל דרייב בברכה, יוסי"}
-{"id":"v2syn-8301","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"בוא ניפגש ביום ג׳ בשעה 15:00 לעבור על קליטת העובד החדש. בתודה, Sali"}
+{"id":"b003-70","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"העסקה אושרה בבלוק 18221."}
+{"id":"b003-89","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"אשלם את ההשתתפות העצמית בדלפק מחר."}
+{"id":"b003-90","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"HE COMMIT: אאשר a priced contract"}
+{"id":"b003-93","gold":"SILENT","engineActs":"file_save","found":"2026-11-11","status":"open","convention":null,"note":"Hi team, Hope your week is going well. Please store the attached file in Google Drive. Man"}
+{"id":"b003-103","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"Dana Cole confirmed $3,900 due Sep 7. Call +972-54-123-4567."}
+{"id":"b003-198","gold":"SILENT","engineActs":"draft","found":"2026-11-11","status":"open","convention":null,"note":"Still going through the documents, give me a few days."}
+{"id":"b004-37","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"נשמח לקבוע call ביום שלישי בשעה 11:15 כדי לדבר על התקציב. בתודה, Sali"}
+{"id":"b004-40","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"אשלח העתק דרכון מחר אני בעבודה עכשיו"}
+{"id":"b004-44","gold":"SILENT","engineActs":"file_save","found":"2026-11-11","status":"open","convention":null,"note":"Sali, Hope your week is going well. Please store the attached file in Drive. Cheers"}
+{"id":"b004-62","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"תשמור את הקובץ המצורף ב-One Drive עד יום ראשון תודה! Sali"}
+{"id":"b005-31","gold":"SILENT","engineActs":"calendar","found":"2026-11-11","status":"open","convention":null,"note":"עומר שלום, אצטרף לשיחה ביום שני ב-13:00 בברכה"}
+{"id":"b005-34","gold":"SILENT","engineActs":"file_save","found":"2026-11-11","status":"open","convention":null,"note":"pls תשמור את הקובץ המצורף בגוגל דרייב"}
+{"id":"b005-40","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"אשלח הזמנה ליומן ליום שלישי בקרוב."}
+{"id":"b006-50","gold":"SILENT","engineActs":"task","found":"2026-11-11","status":"open","convention":null,"note":"We will email the vaccination records tomorrow."}
