@@ -8,7 +8,7 @@ import json, os, sys, time, argparse
 import numpy as np
 from scipy.sparse import csr_matrix
 from sklearn.linear_model import LogisticRegression
-ap = argparse.ArgumentParser(); ap.add_argument('--feat', default='features-v2'); ap.add_argument('--tag', default='v2'); ap.add_argument('--rows', default='all'); ap.add_argument('--no-export', action='store_true')
+ap = argparse.ArgumentParser(); ap.add_argument('--feat', default='features-v2'); ap.add_argument('--tag', default='v2'); ap.add_argument('--rows', default='all'); ap.add_argument('--no-export', action='store_true'); ap.add_argument('--predict-set', dest='predict_set', default=None, help='features jsonl (e.g. features-frozen/frozen.jsonl) to predict with the final model; writes <tag>.extra-preds.jsonl')
 ap.add_argument('--target', type=float, default=0.0029); ap.add_argument('--strict', dest='mask_unsure', action='store_false'); ap.add_argument('--gate-on-all', dest='gate_unvetoed', action='store_false'); ap.add_argument('--no-oof', dest='oof', action='store_false'); ap.add_argument('--extra', default=None, help='npz with dense extra features per set (e5 experiment)')
 ap.add_argument('--out', default=None, help='artifact directory (default: model/artifacts). Refuses a path that is the shipped artifacts directory, so a dry-run cannot overwrite v2 weights.')
 A = ap.parse_args()
@@ -159,6 +159,17 @@ for k in ('val', 'test', 'testSingleTau', 'testModelAlone'): print(' ', k, json.
 json.dump(rep, open(os.path.join(ART, A.tag + '.report.json'), 'w'), indent=1)
 with open(os.path.join(ART, A.tag + '.test-preds.jsonl'), 'w') as fo:
     for r, a, b, c in zip(te, pt, ptest, pt_alone): fo.write(json.dumps({'id': r['id'], 'y': r['y'], 'pred': a, 'predAlone': c, 'p': round(float(b), 4), 'lang': r['lang'], 'scenario': r['scenario'], 'prov': r['prov'], 'eng': r['eng'], 'vb': r['vb'], 'vp': r['vp'], 'rule': r['rule'], 'voc': r['voc'], 'role': r['role']}, ensure_ascii=False) + '\n')
+if A.predict_set:
+    ex_rows = [json.loads(l) for l in open(os.path.join(HERE, A.predict_set)) if l.strip()]
+    ind, ptr = [], [0]
+    for r in ex_rows: ind.extend(r['x']); ptr.append(len(ind))
+    Xex = csr_matrix((np.ones(len(ind), dtype=np.float32), np.array(ind, dtype=np.int64), np.array(ptr)), shape=(len(ex_rows), DIM))
+    nn = np.sqrt(np.asarray(Xex.multiply(Xex).sum(1)).ravel()); nn[nn == 0] = 1
+    Xex = csr_matrix(Xex.multiply(1.0 / nn[:, None]))
+    pe, pe_p = decide(ex_rows, Xex, tau, per_label=TAUS); pe_alone, _ = decide(ex_rows, Xex, tau, use_veto=False, per_label=TAUS)
+    with open(os.path.join(ART, A.tag + '.extra-preds.jsonl'), 'w') as fo:
+        for r, a, b, c in zip(ex_rows, pe, pe_p, pe_alone): fo.write(json.dumps({'id': r['id'], 'pred': a, 'predAlone': c, 'p': round(float(b), 4), 'lang': r['lang'], 'vb': r.get('vb'), 'vp': r.get('vp'), 'tip': r.get('tip'), 'eng': r.get('eng')}) + '\n')
+    print('  extra preds:', len(ex_rows), flush=True)
 if A.no_export: sys.exit(0)
 def q8(W):
     scale = np.abs(W).max(1) / 127.0; scale[scale == 0] = 1
