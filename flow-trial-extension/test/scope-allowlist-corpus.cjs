@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const G = 'https://www.googleapis.com/auth/';
+const pending = [];
 
 const ALLOW = new Set([
   G + 'calendar.events', G + 'tasks', G + 'drive.file',
@@ -202,7 +203,41 @@ check('source scan: no forbidden scope literal anywhere shipped (except refusal 
 const loaders = files.filter((f) => f !== 'core/sheet-row.js' && /sheet-row|FlowSheetRow/.test(read(f)));
 check('core/sheet-row.js is not loaded or referenced by any shipped file or the manifest', loaders.length === 0, loaders);
 
+// Behavior: with every Labs switch on (and GOOGLE_CONTACTS forced on), the scopes the worker asks Google for are exactly the six.
+{
+  const vm = require('vm');
+  const { FlowLabsSwitches: L } = require('../core/labs-switches.js');
+  const { FlowGoogleContacts } = require('../core/google-contacts.js');
+  const bg = read('src/background.js');
+  const start = bg.indexOf('async function googleManifestScopes()');
+  const end = bg.indexOf('\n}\n', start) + 2;
+  const web = read('src/google-web-auth.js');
+  const fnStart = web.indexOf('export function googleOAuthScopesFrom(');
+  const fnEnd = web.indexOf('\n}\n', fnStart) + 2;
+  const manifest = JSON.parse(read('manifest.json'));
+  const SIX = [G + 'calendar.events', G + 'tasks', G + 'drive.file', 'openid', G + 'userinfo.profile', G + 'userinfo.email'];
+  const switches = Object.assign(L.all({}, true), { GOOGLE_CONTACTS: true });
+  const ctx = vm.createContext({
+    FlowGoogleContacts,
+    GOOGLE_OAUTH_SCOPES: [],
+    chrome: {
+      runtime: { getManifest: () => manifest },
+      storage: { local: { get: async () => ({ glanceSwitches: switches }) } }
+    }
+  });
+  check('googleManifestScopes and googleOAuthScopesFrom found in shipped source', start >= 0 && fnStart >= 0);
+  vm.runInContext(web.slice(fnStart, fnEnd).replace(/^export /, '') + '\n' + bg.slice(start, end) + '\nglobalThis.run = googleManifestScopes;', ctx);
+  pending.push(ctx.run().then((scopes) => {
+    const got = Array.from(scopes).slice().sort();
+    check('every Labs switch on (+GOOGLE_CONTACTS): Google scopes requested are exactly the six', JSON.stringify(got) === JSON.stringify(SIX.slice().sort()), got);
+    check('every Labs switch on: contacts.readonly is never requested', !got.some((s) => /contacts/i.test(s)), got);
+  }));
+}
+check('GOOGLE_CONTACTS is not a Labs row (no dead toggle that could ask for contacts)', require('../core/labs-switches.js').FlowLabsSwitches.IDS.indexOf('GOOGLE_CONTACTS') < 0);
+
 check('self-check: the allowlist has exactly 8 spellings', ALLOW.size === 8, Array.from(ALLOW));
 
-console.log(failures ? failures + ' failure(s)' : 'all passed');
-process.exit(failures ? 1 : 0);
+Promise.all(pending).catch((e) => check('async scope checks ran', false, String(e && e.stack || e))).then(() => {
+  console.log(failures ? failures + ' failure(s)' : 'all passed');
+  process.exit(failures ? 1 : 0);
+});

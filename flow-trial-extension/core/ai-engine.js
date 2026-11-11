@@ -12,6 +12,7 @@
 //
 // Switches: everything rides on the router's aiPrimary (off). aiKindCheckV1 (off) adds core/kind-check.js on each model answer.
 // aiTier0GuardV1 (off) runs core/tier0-guard.js on the mail first: an injection or fraud-shaped money gets no card at all.
+// aiCloudWorthV1 (off) runs core/cloud-worth.js first: a mail with no sign of something to do is not read by any model.
 // aiTier0QuietV1 (off) runs core/tier0-quiet.js on the engine's own card: a hedge, an undecided sender or a met deadline stays quiet. With it off read() returns { used:false } and calls nothing, so the host
 // keeps today's path byte for byte. aiPlanV1 (off) adds the plan and the watch; aiRelevanceV1 (off) and aiDeviceTier1 (off) are read by
 // the router and the device adapter. Portable: no chrome.*, no DOM, no network; every capability is injected.
@@ -23,9 +24,15 @@ const FlowAiEngine = (() => {
   const router = () => sibling(typeof FlowUnderstandingRouter !== 'undefined' ? FlowUnderstandingRouter : null, './understanding-router.js', 'FlowUnderstandingRouter');
   const planner = () => sibling(typeof FlowModelPlan !== 'undefined' ? FlowModelPlan : null, './model-plan.js', 'FlowModelPlan');
   const guard = () => sibling(typeof FlowTier0Guard !== 'undefined' ? FlowTier0Guard : null, './tier0-guard.js', 'FlowTier0Guard');
+  const worthy = () => sibling(typeof FlowCloudWorth !== 'undefined' ? FlowCloudWorth : null, './cloud-worth.js', 'FlowCloudWorth');
   const quiet = () => sibling(typeof FlowTier0Quiet !== 'undefined' ? FlowTier0Quiet : null, './tier0-quiet.js', 'FlowTier0Quiet');
   const kinds = () => sibling(typeof FlowKindCheck !== 'undefined' ? FlowKindCheck : null, './kind-check.js', 'FlowKindCheck');
   const floor = () => sibling(typeof FlowAiFloor !== 'undefined' ? FlowAiFloor : null, './ai-floor.js', 'FlowAiFloor');
+
+  // The surfaces a plan knows (core/model-plan.js); anything else is planned as Gmail.
+  const SURFACES = { gmail: true, outlook: true, whatsapp: true, messenger: true, instagram: true, teams: true };
+  // The channel names the app the mail or message came from (core/ai-host.js sets it from the surface); it wins over the surface field.
+  function surfaceOf(mail) { return SURFACES[mail.channel] ? mail.channel : (SURFACES[mail.surface] ? mail.surface : 'gmail'); }
 
   // A host that injects no gate or veto gets the production floor (core/ai-floor.js) bound to this mail. A host gate or veto wins.
   // With no floor available either, Router v2 counts the missing gate as silence.
@@ -59,6 +66,12 @@ const FlowAiEngine = (() => {
       if (why) return { used: true, tier: 0, reason: why, card: null, watch: null, trace: ['guard:' + why.replace(/^guard:/, '')], calls: { tier1: 0, tier2: 0 } };
     }
     deps = withKindCheck(withFloor(deps || {}, mail), flags);
+    // aiCloudWorthV1 (off): the engine is silent and the mail carries no sign of something to do -> no model is asked at all.
+    const W = worthy();
+    const t0 = mail.tier0 || {};
+    if (W && W.enabled(flags) && t0.possible && (!t0.step || t0.step === 'SILENT') && !W.worth({ text: mail.text, subject: mail.subject, attachmentCount: mail.attachmentCount })) {
+      return { used: true, tier: 0, reason: 'no-signal', card: null, watch: null, trace: ['tier0:no-signal'], calls: { tier1: 0, tier2: 0 } };
+    }
     const r = await R.route({ text: mail.text, today: mail.today, attachmentCount: mail.attachmentCount || 0, direction: mail.direction,
       cloudConsent: mail.cloudConsent === true, tier0: mail.tier0 || {} }, deps, flags);
     const base = { used: true, tier: r.tier, reason: r.reason || null, trace: r.trace, calls: r.calls, watch: null };
@@ -73,7 +86,7 @@ const FlowAiEngine = (() => {
     const card = { source: 'model', step: r.step, proposal: r.proposal, plan: null, rows: [] };
     const P = planner();
     if (P && P.enabled(flags)) {
-      const x = P.plan(flags, r.proposal, { text: mail.text, today: mail.today, lang: mail.lang, surface: mail.surface === 'outlook' ? 'outlook' : 'gmail' });
+      const x = P.plan(flags, r.proposal, { text: mail.text, today: mail.today, lang: mail.lang, surface: surfaceOf(mail) });
       if (x.plan) {
         card.plan = x.plan; card.rows = x.rows;
         base.watch = P.toWatch(x.plan, r.proposal, { threadId: mail.threadId, messageId: mail.messageId, subject: mail.subject, counterpart: mail.counterpart, channel: mail.channel || mail.surface },
