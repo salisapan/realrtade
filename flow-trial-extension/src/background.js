@@ -94,6 +94,7 @@ import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/monday-close.js'; // classic: sets globalThis.FlowMondayClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
 import '../core/google-contacts.js';
@@ -1485,6 +1486,51 @@ async function mondayUndo(ref) {
   }
 }
 
+/* ------------------------------------------------ Monday read-back writer, with a proof */
+// docs/glance-ai/connectors/monday.md. Behind config/connectors.public.js (mondayReadBack), off. It uses the Monday connection the person already made
+// (mondayAuth: the OAuth token and the board id above) and adds no sign-in. With the switch on, WRITERS.monday / UNDOERS.monday are the read-back versions
+// below; with it off they are the earlier mondayWrite / mondayUndo, unchanged. It writes only the item's name (not the earlier writer's "update" with the facts).
+
+const MONDAY_LEDGER_KEY = 'mondayLedger';
+
+function mondayCloseEngine() {
+  return globalThis.FlowMondayClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: async () => { const a = await getMondayAuth(); return a && a.access_token && a.boardId ? { token: a.access_token, boardId: String(a.boardId) } : null; },
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(MONDAY_LEDGER_KEY))[MONDAY_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(MONDAY_LEDGER_KEY))[MONDAY_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [MONDAY_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function mondayReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const r = await mondayCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'monday:'), title: title });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'monday', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'monday', lang: lang });
+    return { ok: true, where: 'Monday.com', target: 'the board', written: 'Added to Monday.', ref: r.ref, proof: r.proof, url: null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'monday', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Monday.com' };
+}
+
+async function mondayReadBackUndo(ref) {
+  const r = await mondayCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'monday' });
+  return r;
+}
+
 /* ------------------------------------------------------------ Google Tasks */
 //
 // The MVP write path: no token to paste. chrome.identity.getAuthToken is
@@ -1949,7 +1995,7 @@ async function disconnectConnector(connectorId) {
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : connectorId === 'monday' ? [key, 'mondayLedger'] : key);
   return { ok: true };
 }
 
@@ -4358,8 +4404,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack, monday: CONNECTORS.mondayReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file', monday: 'monday/item' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -7207,7 +7253,7 @@ async function attachmentSaveUndo(ref) {
 }
 
 const WRITERS = {
-  hubspot: hubspotWrite, notion: CONNECTORS.notionReadBack ? notionReadBackWrite : notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
+  hubspot: hubspotWrite, notion: CONNECTORS.notionReadBack ? notionReadBackWrite : notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: CONNECTORS.mondayReadBack ? mondayReadBackWrite : mondayWrite,
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
@@ -7220,7 +7266,7 @@ if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
 if (CONNECTORS.jiraReadBack) WRITERS.jira = jiraReadBackWrite;
 if (CONNECTORS.linearReadBack) WRITERS.linear = linearReadBackWrite;
 const UNDOERS = {
-  hubspot: hubspotUndo, notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
+  hubspot: hubspotUndo, notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: CONNECTORS.mondayReadBack ? mondayReadBackUndo : mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,

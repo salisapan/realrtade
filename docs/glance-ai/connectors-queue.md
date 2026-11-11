@@ -30,7 +30,7 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 | 9 | Slack via its official API | the answer arrived in the DM | OAuth2 + secret (relay); app review for distribution | not started |
 | 10 | Stripe (PayPal after it) | the payment arrived | OAuth + secret (relay) | not started |
 | 11 | Trello | a card exists | API key + token flow, not OAuth2 | not started |
-| 12 | Monday | an item exists | OAuth2 | not started |
+| 12 | Monday | an item exists | OAuth2 (the existing Monday connection; no new sign-in, no relay) | **ready, waiting for owner** (2026-11-11): [doc](connectors/monday.md); built and tested against a mock; DRAFT PR #284; switch `mondayReadBack` off (the earlier writer is unchanged when off). Waiting: the Monday app's `boards:read`/`boards:write` confirmed, `api.monday.com` host, unverified vendor facts (`connectors/monday.md` §9), destination chooser (row 80) |
 | 13 | ClickUp | a task exists | OAuth2 | not started |
 | 14 | Box | the file is saved | OAuth2 + secret (relay) | not started |
 | 15 | Calendly | the meeting is booked | OAuth2 | not started |
