@@ -9,8 +9,8 @@ Lab doc (Phase 0 of `docs/glance-ai/model-upgrade-plan.md`). Every convention th
 | C-1 | A mail that confirms an amount or an approved budget and asks nothing is **silent** («אישרנו 4,200», "Confirming the fee is about $4,200") | owner, 2026-10-14 | decided; the engine still offers a task on a confirmed amount (engine error on the scoreboard) | `glance-ai/labeling/owner-rules.md` 3b |
 | C-2 | An **approximate** amount («בערך», «כ-», "about", "around", "roughly") is not a confirmed amount: silent | lab, 2026-11-08 (extends C-1) | lab; dataset rows added | `glance-ai/model/V23.md` |
 | C-3 | A promise «לפני החג» ("before the holiday") is a **task** | owner, 2026-11-11 | decided; the engine does not yet resolve holiday-relative dates | `V23.md`, gold row `v2syn-22856` |
-| C-4 | An **undated** ask ("send the deck asap", no date) is silent in the labels and in the device today | open owner decision (act or silence) | **open**: 13 of the 26 wrong Do Its of the engine on the agreement labels are this class | `MODEL-TRACK.md` "What waits on the owner", scoreboard |
-| C-5 | "asap", "as soon as possible", «בהקדם», «מיד» are **not** a date | lab, 2026-10-26 | lab | `V23.md` run 2026-10-26 |
+| C-4 | An **undated** ask ("send me the passport scan", "תוכל לשלוח לי את החשבונית?") gets a **Do It**: a draft when it asks for information, a file or an answer back, a task when it asks for work (C-7). Group, Cc and "Hi all" mail stay profile features (C-12) | **owner, 2026-11-11** | decided. Labels: `glance-ai/labeling/owner-convention-overlay.jsonl` (rule-derived, 37 rows, 10 left UNSURE). Engine: acts on 13 of the 21 decided rows today, misses 8; the model path (`core/understanding.js`, off) still says `ask-without-date` and silent | `MODEL-TRACK.md`, `docs/vault/decisions.md` |
+| C-5 | "asap", "as soon as possible", «בהקדם», «מיד» are **not** a date (so a deadline word is never invented), but under C-4 an ask that only says asap still gets a Do It | lab, 2026-10-26; the silence half reversed by C-4, 2026-11-11 | decided | `V23.md` |
 | C-6 | "today", «היום», "this week", "by end of week", «סוף השבוע» **are** a deadline | lab, batch-004 and batch-005 | lab; the engine date reader does not read them all (engine finding) | `BATCH-004.md`, `BATCH-005.md` |
 | C-7 | An ask to do work that is not a reply is a **task**; a request for information or a file back is a **draft** (reply) | lab, batch-005 | lab | `BATCH-005.md` |
 | C-8 | "Attach X to the invite" is a **draft**, not a calendar event and not silence (dataset label only; the runtime veto is unchanged) | lab, 2026-11-08 | lab | `V23.md`, `dataset/v2/build-dataset-v2.cjs` |
@@ -23,7 +23,9 @@ Lab doc (Phase 0 of `docs/glance-ai/model-upgrade-plan.md`). Every convention th
 | C-15 | An approval ask with a deadline («אישור נדרש») is a **task** | owner, 2026-10-24 | decided, shipped | `docs/vault/decisions.md` |
 | C-16 | Labels are never owner-verified unless `ownerVerified: true`; two blind Claude passes that agree are `agreed: true, passes: 2` and never count as owner-verified | owner, 2026-10-11 | decided | `oss/finetune/promote_gate.cjs` |
 | C-17 | Rows copied from a blind label set never go into training; every fix made after looking at a set is declared in the run record | lab rule | active | `docs/human-eval.md` §6, `V23.md` |
+| C-18 | A **promise by the reader with no date** ("As agreed, you will send the invoice asap", "As promised on the call, you will share the tax form asap") is a reminder of the person's own commitment: task or silence? Labelled silent by the two blind passes before C-4 | **open** (owner) | open: three agreement rows (`v2syn-807`, `v2syn-808`, `v2syn-1088`) decide whether v2.8 passes the gate | `V23.md` run 2026-11-11 |
 
 **How to use it.** A new label or a new gap rule cites the id it follows. A disagreement between two passes that no row here settles is a new row marked **open**, and goes to the owner in the next batch note, not into training. When the owner decides an open row, change its status in the same commit and add one line to `docs/vault/decisions.md`.
 
-**Open, in the order they limit the model:** C-4 (undated asks), C-9 (promise to self with a clock time).
+
+**Open, in the order they limit the model:** C-18 (undated promise by the reader), C-9 (promise to self with a clock time).

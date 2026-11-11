@@ -35,16 +35,23 @@ const L = path.join(G, 'labeling');
 const sources = [];
 const agree = path.join(L, 'agreement-gold.jsonl');
 const all = [];
-for (const f of fs.readdirSync(L).filter((f) => /\.jsonl$/.test(f))) {
+for (const f of fs.readdirSync(L).filter((f) => /\.jsonl$/.test(f) && f !== 'owner-convention-overlay.jsonl')) {
   let rows; try { rows = read(path.join(L, f)); } catch (e) { continue; }
   if (!rows.length || !rows[0].id || !('step' in rows[0])) continue;
   rows.forEach((r) => all.push(Object.assign({ _file: f }, r)));
 }
+// owner decisions applied to labels (labeling/owner-convention-overlay.jsonl): a row decided by a convention (today C-4, an undated ask
+// gets a Do It) leaves the source it came from and is reported on its own, because its step is derived by a rule, not blind-labelled.
+const overlayFile = path.join(L, 'owner-convention-overlay.jsonl');
+const overlay = fs.existsSync(overlayFile) ? read(overlayFile) : [];
+const overlaid = new Set(overlay.map((r) => r.id));
 const byId = (rows) => Object.fromEntries(rows.map((r) => [r.id, r]));
-const owner = all.filter((r) => r.ownerVerified === true);
-const agreed = all.filter((r) => r.ownerVerified !== true && r.agreed === true && (r.passes || 0) >= 2);
-const single = all.filter((r) => r.ownerVerified !== true && !(r.agreed === true && (r.passes || 0) >= 2) && /claude-labels/.test(r._file));
-sources.push(['owner-verified', owner], ['two-pass agreement (NOT owner-verified)', agreed], ['single blind pass (Claude, NOT owner-verified)', single]);
+const free = all.filter((r) => !overlaid.has(r.id));
+const owner = free.filter((r) => r.ownerVerified === true);
+const agreed = free.filter((r) => r.ownerVerified !== true && r.agreed === true && (r.passes || 0) >= 2);
+const single = free.filter((r) => r.ownerVerified !== true && !(r.agreed === true && (r.passes || 0) >= 2) && /claude-labels/.test(r._file));
+sources.push(['owner-verified', owner], ['two-pass agreement (NOT owner-verified)', agreed], ['single blind pass (Claude, NOT owner-verified)', single],
+  ['owner-convention, rule-derived (C-4: an undated ask gets a Do It; NOT agreement, NOT owner-verified)', overlay]);
 
 // product order and alone predictions for v2-family test preds, through the existing gate-inputs (same engine, same veto)
 function gateInputs(rows, models) {

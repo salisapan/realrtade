@@ -8,45 +8,45 @@
   },
   {
    "source": "two-pass agreement (NOT owner-verified)",
-   "n": 444,
+   "n": 407,
    "models": {
     "engine-only": {
-     "undatedWrongDoIt": 13,
+     "undatedWrongDoIt": 0,
      "product": {
-      "n": 230,
-      "silent": 161,
+      "n": 205,
+      "silent": 136,
       "act": 69,
-      "wrongDoIt": 26,
+      "wrongDoIt": 13,
       "missed": 35,
       "wrongAction": 8,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 26,
-       "wrongDoIt": 13,
+       "wrongDoIt": 7,
        "missed": 16
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 43,
-       "wrongDoIt": 13,
+       "wrongDoIt": 6,
        "missed": 19
       }
      },
      "alone": {
-      "n": 230,
-      "silent": 161,
+      "n": 205,
+      "silent": 136,
       "act": 69,
       "wrongDoIt": 0,
       "missed": 69,
       "wrongAction": 0,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 26,
        "wrongDoIt": 0,
        "missed": 26
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 43,
        "wrongDoIt": 0,
        "missed": 43
@@ -59,192 +59,192 @@
      }
     },
     "v2": {
-     "undatedWrongDoIt": 16,
+     "undatedWrongDoIt": 2,
      "product": {
-      "n": 230,
-      "silent": 161,
+      "n": 205,
+      "silent": 136,
       "act": 69,
-      "wrongDoIt": 29,
+      "wrongDoIt": 15,
       "missed": 34,
       "wrongAction": 7,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 26,
-       "wrongDoIt": 13,
+       "wrongDoIt": 7,
        "missed": 16
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 43,
-       "wrongDoIt": 16,
+       "wrongDoIt": 8,
        "missed": 18
       }
      },
      "alone": {
-      "n": 230,
-      "silent": 161,
+      "n": 205,
+      "silent": 136,
       "act": 69,
-      "wrongDoIt": 3,
+      "wrongDoIt": 2,
       "missed": 58,
       "wrongAction": 3,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 26,
        "wrongDoIt": 0,
        "missed": 22
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 43,
-       "wrongDoIt": 3,
+       "wrongDoIt": 2,
        "missed": 36
       }
      },
      "calibration": {
-      "n": 230,
-      "ece": 0.159,
-      "brier": 0.205
-     }
-    },
-    "v23": {
-     "undatedWrongDoIt": 16,
-     "product": {
-      "n": 230,
-      "silent": 161,
-      "act": 69,
-      "wrongDoIt": 29,
-      "missed": 31,
-      "wrongAction": 7,
-      "he": {
-       "silent": 62,
-       "act": 26,
-       "wrongDoIt": 13,
-       "missed": 14
-      },
-      "en": {
-       "silent": 99,
-       "act": 43,
-       "wrongDoIt": 16,
-       "missed": 17
-      }
-     },
-     "alone": {
-      "n": 230,
-      "silent": 161,
-      "act": 69,
-      "wrongDoIt": 3,
-      "missed": 56,
-      "wrongAction": 2,
-      "he": {
-       "silent": 62,
-       "act": 26,
-       "wrongDoIt": 0,
-       "missed": 21
-      },
-      "en": {
-       "silent": 99,
-       "act": 43,
-       "wrongDoIt": 3,
-       "missed": 35
-      }
-     },
-     "calibration": {
-      "n": 230,
-      "ece": 0.162,
-      "brier": 0.172
+      "n": 205,
+      "ece": 0.141,
+      "brier": 0.192
      }
     },
     "v26": {
-     "undatedWrongDoIt": 13,
+     "undatedWrongDoIt": 0,
      "product": {
-      "n": 230,
-      "silent": 161,
+      "n": 205,
+      "silent": 136,
       "act": 69,
-      "wrongDoIt": 26,
+      "wrongDoIt": 13,
       "missed": 26,
       "wrongAction": 7,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 26,
-       "wrongDoIt": 13,
+       "wrongDoIt": 7,
        "missed": 13
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 43,
-       "wrongDoIt": 13,
+       "wrongDoIt": 6,
        "missed": 13
       }
      },
      "alone": {
-      "n": 230,
-      "silent": 161,
+      "n": 205,
+      "silent": 136,
       "act": 69,
       "wrongDoIt": 1,
       "missed": 48,
       "wrongAction": 3,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 26,
        "wrongDoIt": 1,
        "missed": 19
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 43,
        "wrongDoIt": 0,
        "missed": 29
       }
      },
      "calibration": {
-      "n": 230,
-      "ece": 0.155,
-      "brier": 0.164
+      "n": 205,
+      "ece": 0.127,
+      "brier": 0.155
+     }
+    },
+    "v28": {
+     "undatedWrongDoIt": 3,
+     "product": {
+      "n": 205,
+      "silent": 136,
+      "act": 69,
+      "wrongDoIt": 16,
+      "missed": 26,
+      "wrongAction": 7,
+      "he": {
+       "silent": 51,
+       "act": 26,
+       "wrongDoIt": 7,
+       "missed": 13
+      },
+      "en": {
+       "silent": 85,
+       "act": 43,
+       "wrongDoIt": 9,
+       "missed": 13
+      }
+     },
+     "alone": {
+      "n": 205,
+      "silent": 136,
+      "act": 69,
+      "wrongDoIt": 3,
+      "missed": 47,
+      "wrongAction": 2,
+      "he": {
+       "silent": 51,
+       "act": 26,
+       "wrongDoIt": 0,
+       "missed": 19
+      },
+      "en": {
+       "silent": 85,
+       "act": 43,
+       "wrongDoIt": 3,
+       "missed": 28
+      }
+     },
+     "calibration": {
+      "n": 205,
+      "ece": 0.144,
+      "brier": 0.163
      }
     }
    }
   },
   {
    "source": "single blind pass (Claude, NOT owner-verified)",
-   "n": 500,
+   "n": 463,
    "models": {
     "engine-only": {
-     "undatedWrongDoIt": 13,
+     "undatedWrongDoIt": 0,
      "product": {
-      "n": 234,
-      "silent": 161,
+      "n": 209,
+      "silent": 136,
       "act": 73,
-      "wrongDoIt": 26,
+      "wrongDoIt": 13,
       "missed": 36,
       "wrongAction": 9,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 27,
-       "wrongDoIt": 13,
+       "wrongDoIt": 7,
        "missed": 16
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 46,
-       "wrongDoIt": 13,
+       "wrongDoIt": 6,
        "missed": 20
       }
      },
      "alone": {
-      "n": 234,
-      "silent": 161,
+      "n": 209,
+      "silent": 136,
       "act": 73,
       "wrongDoIt": 0,
       "missed": 73,
       "wrongAction": 0,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 27,
        "wrongDoIt": 0,
        "missed": 27
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 46,
        "wrongDoIt": 0,
        "missed": 46
@@ -257,147 +257,345 @@
      }
     },
     "v2": {
-     "undatedWrongDoIt": 16,
+     "undatedWrongDoIt": 2,
      "product": {
-      "n": 234,
-      "silent": 161,
+      "n": 209,
+      "silent": 136,
       "act": 73,
-      "wrongDoIt": 29,
+      "wrongDoIt": 15,
       "missed": 35,
       "wrongAction": 8,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 27,
-       "wrongDoIt": 13,
+       "wrongDoIt": 7,
        "missed": 16
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 46,
-       "wrongDoIt": 16,
+       "wrongDoIt": 8,
        "missed": 19
       }
      },
      "alone": {
-      "n": 234,
-      "silent": 161,
+      "n": 209,
+      "silent": 136,
       "act": 73,
-      "wrongDoIt": 3,
+      "wrongDoIt": 2,
       "missed": 59,
       "wrongAction": 3,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 27,
        "wrongDoIt": 0,
        "missed": 22
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 46,
-       "wrongDoIt": 3,
+       "wrongDoIt": 2,
        "missed": 37
       }
      },
      "calibration": {
-      "n": 252,
-      "ece": 0.14,
-      "brier": 0.191
-     }
-    },
-    "v23": {
-     "undatedWrongDoIt": 16,
-     "product": {
-      "n": 234,
-      "silent": 161,
-      "act": 73,
-      "wrongDoIt": 29,
-      "missed": 32,
-      "wrongAction": 8,
-      "he": {
-       "silent": 62,
-       "act": 27,
-       "wrongDoIt": 13,
-       "missed": 14
-      },
-      "en": {
-       "silent": 99,
-       "act": 46,
-       "wrongDoIt": 16,
-       "missed": 18
-      }
-     },
-     "alone": {
-      "n": 234,
-      "silent": 161,
-      "act": 73,
-      "wrongDoIt": 3,
-      "missed": 58,
-      "wrongAction": 2,
-      "he": {
-       "silent": 62,
-       "act": 27,
-       "wrongDoIt": 0,
-       "missed": 22
-      },
-      "en": {
-       "silent": 99,
-       "act": 46,
-       "wrongDoIt": 3,
-       "missed": 36
-      }
-     },
-     "calibration": {
-      "n": 252,
-      "ece": 0.137,
-      "brier": 0.159
+      "n": 227,
+      "ece": 0.121,
+      "brier": 0.179
      }
     },
     "v26": {
-     "undatedWrongDoIt": 13,
+     "undatedWrongDoIt": 0,
      "product": {
-      "n": 234,
-      "silent": 161,
+      "n": 209,
+      "silent": 136,
       "act": 73,
-      "wrongDoIt": 26,
+      "wrongDoIt": 13,
       "missed": 27,
       "wrongAction": 9,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 27,
-       "wrongDoIt": 13,
+       "wrongDoIt": 7,
        "missed": 13
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 46,
-       "wrongDoIt": 13,
+       "wrongDoIt": 6,
        "missed": 14
       }
      },
      "alone": {
-      "n": 234,
-      "silent": 161,
+      "n": 209,
+      "silent": 136,
       "act": 73,
       "wrongDoIt": 1,
       "missed": 50,
       "wrongAction": 4,
       "he": {
-       "silent": 62,
+       "silent": 51,
        "act": 27,
        "wrongDoIt": 1,
        "missed": 20
       },
       "en": {
-       "silent": 99,
+       "silent": 85,
        "act": 46,
        "wrongDoIt": 0,
        "missed": 30
       }
      },
      "calibration": {
-      "n": 252,
-      "ece": 0.131,
-      "brier": 0.152
+      "n": 227,
+      "ece": 0.103,
+      "brier": 0.143
+     }
+    },
+    "v28": {
+     "undatedWrongDoIt": 3,
+     "product": {
+      "n": 209,
+      "silent": 136,
+      "act": 73,
+      "wrongDoIt": 16,
+      "missed": 27,
+      "wrongAction": 9,
+      "he": {
+       "silent": 51,
+       "act": 27,
+       "wrongDoIt": 7,
+       "missed": 13
+      },
+      "en": {
+       "silent": 85,
+       "act": 46,
+       "wrongDoIt": 9,
+       "missed": 14
+      }
+     },
+     "alone": {
+      "n": 209,
+      "silent": 136,
+      "act": 73,
+      "wrongDoIt": 3,
+      "missed": 48,
+      "wrongAction": 3,
+      "he": {
+       "silent": 51,
+       "act": 27,
+       "wrongDoIt": 0,
+       "missed": 19
+      },
+      "en": {
+       "silent": 85,
+       "act": 46,
+       "wrongDoIt": 3,
+       "missed": 29
+      }
+     },
+     "calibration": {
+      "n": 227,
+      "ece": 0.123,
+      "brier": 0.15
+     }
+    }
+   }
+  },
+  {
+   "source": "owner-convention, rule-derived (C-4: an undated ask gets a Do It; NOT agreement, NOT owner-verified)",
+   "n": 37,
+   "models": {
+    "engine-only": {
+     "undatedWrongDoIt": 0,
+     "product": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 8,
+      "wrongAction": 7,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 4
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 4
+      }
+     },
+     "alone": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 21,
+      "wrongAction": 0,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 10
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 11
+      }
+     },
+     "calibration": {
+      "n": 0,
+      "ece": null,
+      "brier": null
+     }
+    },
+    "v2": {
+     "undatedWrongDoIt": 0,
+     "product": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 8,
+      "wrongAction": 7,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 4
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 4
+      }
+     },
+     "alone": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 21,
+      "wrongAction": 0,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 10
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 11
+      }
+     },
+     "calibration": {
+      "n": 25,
+      "ece": null,
+      "brier": null
+     }
+    },
+    "v26": {
+     "undatedWrongDoIt": 0,
+     "product": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 8,
+      "wrongAction": 7,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 4
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 4
+      }
+     },
+     "alone": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 21,
+      "wrongAction": 0,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 10
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 11
+      }
+     },
+     "calibration": {
+      "n": 25,
+      "ece": null,
+      "brier": null
+     }
+    },
+    "v28": {
+     "undatedWrongDoIt": 0,
+     "product": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 8,
+      "wrongAction": 7,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 4
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 4
+      }
+     },
+     "alone": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 21,
+      "wrongAction": 0,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 10
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 11
+      }
+     },
+     "calibration": {
+      "n": 25,
+      "ece": null,
+      "brier": null
      }
     }
    }
