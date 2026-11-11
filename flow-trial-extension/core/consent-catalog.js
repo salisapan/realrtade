@@ -33,6 +33,8 @@ const FlowConsentCatalog = (() => {
       steps: [{ type: 'oauth-relay', vendor: 'notion' }, { type: 'host-permission', origin: 'https://api.notion.com/*' }] },
     { id: 'asana', label: 'Asana', detail: 'Add one task to the Asana project you pick, then read it back. Undo removes it. Nothing else in your workspace is read.', group: 'tasks', state: 'experimental',
       steps: [{ type: 'oauth-relay', vendor: 'asana' }, { type: 'host-permission', origin: 'https://app.asana.com/*' }] },
+    { id: 'monday', label: 'Monday', detail: 'Add one item to the Monday board you pick, then read it back. Undo archives it and leaves an item you renamed alone. Nothing else on your account is read.', group: 'tasks', state: 'experimental',
+      steps: [{ type: 'oauth-exchange', vendor: 'monday' }, { type: 'host-permission', origin: 'https://api.monday.com/*' }] },
     { id: 'jira', label: 'Jira', detail: 'Add one issue to the Jira project you pick, then read it back. Undo removes it when your role allows deleting. Nothing else on your site is read.', group: 'tasks', state: 'experimental',
       steps: [{ type: 'oauth-relay', vendor: 'jira' }, { type: 'host-permission', origin: 'https://api.atlassian.com/*' }] },
     { id: 'linear', label: 'Linear', detail: 'Add one issue to the Linear team you pick, then read it back. Undo removes it. Nothing else in your workspace is read.', group: 'tasks', state: 'experimental',

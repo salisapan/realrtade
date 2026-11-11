@@ -44,6 +44,11 @@ ok('docusign tick = relay sign-in + its two hosts, nothing else; all five connec
   assert.strictEqual(C.stepsFor(['notion', 'asana', 'jira', 'linear', 'docusign']).steps.length, 11);
   assert.ok(C.selectAll().indexOf('docusign') >= 0);
 });
+ok('monday tick = the existing Monday sign-in + its one API host, nothing else; it is in select all', () => {
+  const r = C.stepsFor(['monday']);
+  assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-exchange:monday', 'host-permission:https://api.monday.com/*']);
+  assert.ok(C.selectAll().indexOf('monday') >= 0); assert.strictEqual(C.byId('monday').state, 'experimental');
+});
 ok('dropbox tick = a PKCE sign-in (no relay, no secret) + its two API hosts, nothing else', () => {
   const r = C.stepsFor(['dropbox']);
   assert.deepStrictEqual(r.steps.map((x) => x.type + ':' + (x.vendor || x.origin)), ['oauth-pkce:dropbox', 'host-permission:https://api.dropboxapi.com/*', 'host-permission:https://content.dropboxapi.com/*']);

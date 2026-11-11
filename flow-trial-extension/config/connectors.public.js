@@ -28,8 +28,12 @@
 // jiraOAuth:     "Sign in with Atlassian" (OAuth 2.0 3LO) through the token relay. Needs the relay deployed, JIRA_CLIENT_ID /
 //                JIRA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.jiraClientId set.
 //
+// mondayReadBack: the Monday write goes through core/monday-close.js (one item on the chosen board, read back by id, Undo ARCHIVES it and reads that back; never deletes;
+//                 refuses an item the person renamed). It uses the Monday connection the person already made and adds no sign-in. It writes only the item's name (the earlier
+//                 writer's "update" with the facts is not written). Off = the earlier mondayWrite / mondayUndo, unchanged.
+//
 // asanaReadBack: the Asana write goes through core/asana-close.js (one task in the chosen project, read back, Undo read back).
 //                Off = no Asana writer exists at all (nothing is registered under the id "asana").
 // asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
 //                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false };
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, mondayReadBack: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false };
