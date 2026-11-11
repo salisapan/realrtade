@@ -159,6 +159,8 @@ for k in ('val', 'test', 'testSingleTau', 'testModelAlone'): print(' ', k, json.
 json.dump(rep, open(os.path.join(ART, A.tag + '.report.json'), 'w'), indent=1)
 with open(os.path.join(ART, A.tag + '.test-preds.jsonl'), 'w') as fo:
     for r, a, b, c in zip(te, pt, ptest, pt_alone): fo.write(json.dumps({'id': r['id'], 'y': r['y'], 'pred': a, 'predAlone': c, 'p': round(float(b), 4), 'lang': r['lang'], 'scenario': r['scenario'], 'prov': r['prov'], 'eng': r['eng'], 'vb': r['vb'], 'vp': r['vp'], 'rule': r['rule'], 'voc': r['voc'], 'role': r['role']}, ensure_ascii=False) + '\n')
+import pickle
+pickle.dump({'gate': gate, 'chooser': chooser, 'tau': tau, 'TAUS': TAUS, 'DIM': DIM, 'tag': A.tag}, open(os.path.join(ART, A.tag + '.model.pkl'), 'wb'))  # lab only (gitignored): lets predict-set.py score a new set without retraining
 if A.predict_set:
     ex_rows = [json.loads(l) for l in open(os.path.join(HERE, A.predict_set)) if l.strip()]
     ind, ptr = [], [0]
