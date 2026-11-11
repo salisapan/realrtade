@@ -324,6 +324,8 @@ async function run() {
   {
     check('placeholder tokens are not treated as raw contact data', leaksPii('[EMAIL_1] [PHONE_1] [CURRENCY_VAL_1] [DATE_1]', 'outbound') === false);
     check('a raw email is a leak', leaksPii('see jane.doe@acme.com', 'outbound') === true);
+    check('an Israeli phone in the local form is a leak', leaksPii('Dana 054-1234567', 'outbound') === true && leaksPii('call (03) 555-1234', 'outbound') === true);
+    check('a dashed date is not a phone leak', leaksPii('ref 05-10-2026', 'inbound') === false);
   }
 
   console.log('\n--- handler: 502 has no fake summary; classify silence is 200 ---\n');

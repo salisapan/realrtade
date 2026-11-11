@@ -98,7 +98,12 @@ const FlowPrivacyShield = (() => {
   // reference numbers do not begin with one. It still requires at least two
   // separated groups after the country code, so "+1.5" and a bare "+972"
   // cannot match.
-  const PHONE_PATTERN = /\+\d{1,3}[-.\s]?\(?\d{1,4}\)?(?:[-.\s]?\d{2,4}){1,4}|(?:\+?1[-.\s]?)?\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g;
+  //
+  // A third alternative for the Israeli local form, the way an Israeli signature writes it: "054-1234567", "054 123 4567", "03-5551234",
+  // "(03) 555-1234". Neither branch above matched it (no "+", and 3+7 or 2+7 digits is not the North American 3-3-4), so it reached the
+  // model in full. It starts with a 0 and an Israeli area or mobile prefix and needs a separator after the prefix, so the bare 10-digit
+  // run the note above protects (an invoice or PO number) is still left alone.
+  const PHONE_PATTERN = /\+\d{1,3}[-.\s]?\(?\d{1,4}\)?(?:[-.\s]?\d{2,4}){1,4}|(?:\+?1[-.\s]?)?\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b|\(?\b0(?:[23489]|5\d|7[2-9])\)?[-.\s]\d{3}[-.\s]?\d{4}\b/g;
 
   // A firm/company suffix is the anchor: without one, "capitalized word
   // sequence" catches far too much ordinary text (sentence starts, product

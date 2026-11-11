@@ -51,6 +51,13 @@ console.log('\n--- privacyShield.js: phone numbers outside North America ---\n')
   check('local dashed number still masked', 'My cell is 054-123-4567.', { gone: ['123-4567'] });
   // ...without the looser pattern starting to eat business identifiers.
   check('a bare 10-digit invoice number is left alone', 'Invoice 2125551234 is due.', { kept: ['2125551234'] });
+  // The Israeli local form an Israeli signature uses: no "+", 3+7 or 2+7 digits. It reached the model in full.
+  check('Israeli mobile, local form', 'דנה כהן\n054-1234567', { gone: ['1234567', '054'] });
+  check('Israeli mobile, spaced', 'Call me on 054 123 4567.', { gone: ['4567'] });
+  check('Israeli landline in brackets', 'Office (03) 555-1234, ext 2.', { gone: ['555-1234'] });
+  check('Israeli landline, dashed', 'Office 03-5551234.', { gone: ['5551234'] });
+  check('a bare 10-digit run that looks Israeli is still left alone', 'Order 0541234567 shipped.', { kept: ['0541234567'] });
+  check('a date with dashes is not a phone', 'Due 05-10-2026.', { kept: ['05-10-2026'] });
   check('a version string is left alone', 'Upgrade to +1.5 release.', { kept: ['+1.5'] });
 }
 
