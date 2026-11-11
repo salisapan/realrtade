@@ -23,15 +23,16 @@ node glance-ai/scoreboard/run.cjs \
 
 ## Readings (frozen, text-bound label set; the earlier readings joined labels by positional id and are withdrawn, see `glance-ai/model/V23.md` CORRECTION)
 
-**2026-11-11, agreement labels, n = 394 (218 silent, 176 act), product order, engine hard quiets as a veto on the model (`--hard-quiets A`):**
+**2026-11-11, full frozen set (batches 003 to 007), agreement labels n = 485 (264 silent, 221 act), product order, engine hard quiets as a veto on the model (`--hard-quiets A`); the zero-shot baseline was given the labelling rules as its prompt (as favourable as a prompt can be) and 88 of its 607 answers were CONTEXT or UNSURE, counted as silent:**
 
 | system | wrong Do It | missed | wrong action |
 |---|---|---|---|
-| engine alone | 13 (6.0%) | 86 (48.9%) | 7 |
-| engine + v2 (default) | 13 | 79 (44.9%) | 9 |
-| engine + v2.6 | 13 | 57 (32.4%) | 10 |
-| engine + hard quiets, then zero-shot Claude | 14 (6.4%) | 4 (2.3%) | 25 |
-| zero-shot Claude, alone | 24 (11.0%) | 8 (4.5%) | 33 |
+| engine alone | 17 (6.4%) | 112 (50.7%) | 12 |
+| engine + v2 (default) | 17 (6.4%) | 102 (46.2%) | 15 |
+| engine + v2.3 | 17 (6.4%) | 82 (37.1%) | 17 |
+| engine + v2.6 | 17 (6.4%) | 78 (35.3%) | 17 |
+| engine + hard quiets, then zero-shot Claude | 19 (7.2%) | 5 (2.3%) | 31 |
+| zero-shot Claude, alone | 26 (9.8%) | 9 (4.1%) | 33 |
 
 Without the engine's hard quiets as a veto, v2.6 adds 3 wrong Do Its (asks addressed to another named person) and is HELD by the gate. The zero-shot Claude baseline was run by a fresh subagent on the masked frozen cases (no API key was available; its prompt showed no sender name). Labels are Claude's, so the baseline is favoured. **No claim that Glance beats a frontier model follows from this, and none should be made;** what the table shows is that the floor cuts a general model's wrong Do Its from 24 to 14 and keeps 97.7% of the closes.
 
