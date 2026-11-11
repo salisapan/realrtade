@@ -30,7 +30,8 @@ const FAM = { task: 'task', calendar: 'calendar', draft: 'reply', file_save: 'fi
 const judge = (s) => (s === 'SILENT' ? { decision: 'silent' } : { decision: 'act', family: FAM[s] });
 const stepOfLabel = (l) => (!l || l === 'SILENT' ? 'SILENT' : String(l).split('|').pop());
 
-const frozen = read(path.join(G, 'labeling', 'frozen-eval.jsonl'));
+const ONLY = arg('batches') ? new Set(arg('batches').split(',')) : null; // e.g. --batches 007: the hold-out batch, labelled after the engine reason list was chosen
+const frozen = read(path.join(G, 'labeling', 'frozen-eval.jsonl')).filter((r) => !ONLY || ONLY.has(r.batch));
 const overlayFile = path.join(G, 'labeling', 'owner-convention-overlay.jsonl');
 const overlay = fs.existsSync(overlayFile) ? Object.fromEntries(read(overlayFile).map((r) => [r.id, r])) : {};
 const lang = (r) => (r.lang === 'he' ? 'he' : 'en');

@@ -10,13 +10,10 @@ const read = (p) => fs.readFileSync(p, 'utf8').trim().split('\n').filter(Boolean
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const VARIANT = arg('variant', 'zero'), OUT = arg('out');
 if (!OUT) { console.error('usage: make-prompts.cjs --variant zero|understanding|fewshot --out file.jsonl [--labels a.jsonl,b.jsonl]'); process.exit(2); }
-const RULES = [
-  'You read ONE mail or chat message addressed to the reader (the owner of the inbox). Decide whether it contains an open intention that Glance should offer to close with ONE action.',
-  'Silence is correct unless there is an explicit ask or promise with a close that can be carried out. A wrong offer is worse than no offer.',
-  'Actions: task (do the work, or a promise to do it), calendar (a meeting or time to hold, needs a date and a time), draft (a reply or sending something back), file_save (save an attached file).',
-  'Stay SILENT for: newsletters and notices, confirmations with no ask, approximate or confirmed amounts with no ask, mail where the reader is only on Cc, mail addressed to someone else, asks with no date or deadline.',
-  'Dates in the text are the only dates you may use. Do not invent one.'
-].join('\n');
+// The system prompt is the labelling rules themselves (labeling/pass-rules.md, the conventions of docs/glance-ai/model-conventions.md): the baseline is given the
+// SAME instruction the label passes had, which is as favourable to the baseline as a prompt can be. (The first baseline used a shorter prompt that still said an
+// undated ask stays silent, which was the convention before the owner decided C-4.)
+const RULES = fs.readFileSync(path.join(G, 'labeling', 'pass-rules.md'), 'utf8').replace(/\n+Output format:[\s\S]*$/, '').trim();
 const FORMAT = {
   zero: 'Answer with one word: silent, task, calendar, draft or file_save.',
   understanding: 'Answer with JSON only: {"decision":"act"|"silent","family":"task"|"calendar"|"reply"|"file"|null,"ask_span":"<the exact words of the ask, or null>","reason":"<one short sentence>"}.',
@@ -28,7 +25,8 @@ const frozen = fs.readFileSync(path.join(G, 'labeling', 'frozen-eval.jsonl'), 'u
 // Masked, as the lab's own model sees it: no addresses, only the sender's local name, the reader's position (To or Cc) and the text.
 const mask = (t) => String(t || '').replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '<email>');
 const OWNS = /ai\.local\.flow@gmail\.com|glance\.salisapan@outlook\.com/i;
-const rows = frozen.map((r) => {
+const ONLY = (() => { const i = process.argv.indexOf('--batches'); return i > 0 ? new Set(process.argv[i + 1].split(',')) : null; })();
+const rows = frozen.filter((r) => !ONLY || ONLY.has(r.batch)).map((r) => {
   const onCc = (r.cc || []).some((x) => OWNS.test(x)) && !(r.to || []).some((x) => OWNS.test(x));
   const f = r.from && typeof r.from === 'object' ? (r.from.name || String(r.from.email || '').split('@')[0]) : String(r.from || '').split('@')[0];
   const from = String(f || '').replace(/[._]/g, ' ') || '<sender>';
