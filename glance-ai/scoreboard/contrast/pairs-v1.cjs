@@ -1,0 +1,26 @@
+'use strict';
+// Contrast pairs v1 (W2.3 of docs/glance-ai/model-upgrade-plan.md). Each pair differs in ONE fact; the expected step follows the conventions in
+// docs/glance-ai/model-conventions.md (cited). A pair passes only when BOTH rows are right, so an improvement is causal, not lucky.
+// Synthetic, written by Claude, NOT owner-verified. Reader: Sali (gmail, ai.local.flow@gmail.com).  steps: SILENT | draft | task | calendar | file_save
+const P = (id, fact, conv, a, b) => ({ id, fact, conv, a, b });
+const R = (lang, body, step, o) => Object.assign({ lang, body, step }, o || {});
+module.exports = [
+  P('dated-vs-confirm-en', 'ask vs confirmation of an amount', 'C-1', R('en', 'Hi Sali,\n\nCould you send me the signed lease by Thursday?\n\nThanks,\nDana', 'draft'), R('en', 'Hi Sali,\n\nThe fee was approved at $4,200.\n\nThanks,\nDana', 'SILENT')),
+  P('dated-vs-confirm-he', 'ask vs confirmation of an amount', 'C-1', R('he', 'היי סאלי,\n\nתוכל לשלוח לי את החוזה החתום עד יום חמישי?\n\nתודה, דנה', 'draft'), R('he', 'היי סאלי,\n\nאושר תקציב של ₪4,200.\n\nתודה, דנה', 'SILENT')),
+  P('exact-vs-approx-en', 'confirmed vs approximate amount', 'C-2', R('en', 'Hi Sali,\n\nPlease confirm the $4,200 payment by Friday.\n\nDana', 'draft'), R('en', 'Hi Sali,\n\nThe payment will be about $4,200.\n\nDana', 'SILENT')),
+  P('exact-vs-approx-he', 'confirmed vs approximate amount', 'C-2', R('he', 'היי סאלי,\n\nנא לאשר את התשלום של ₪4,200 עד יום שישי.\n\nדנה', 'draft'), R('he', 'היי סאלי,\n\nהתשלום יהיה בערך ₪4,200.\n\nדנה', 'SILENT')),
+  P('to-vs-cc-en', 'reader on To vs Cc only', 'C-12', R('en', 'Hi Sali,\n\nCould you send me the budget by Tuesday?\n\nDana', 'draft'), R('en', 'Hi Sali,\n\nCould you send me the budget by Tuesday?\n\nDana', 'SILENT', { cc: true })),
+  P('named-vs-group-en', 'addressed by name vs a group greeting', 'C-12', R('en', 'Hi Sali,\n\nCould you send me the budget by Tuesday?\n\nDana', 'draft'), R('en', 'Hi all,\n\nCould you send me the budget by Tuesday?\n\nDana', 'SILENT', { unsureConvention: 'C-12: group mail is a profile feature; labels keep it unsure' })),
+  P('ask-vs-fyi-en', 'an ask vs a no-action note', 'C-14', R('en', 'Hi Sali,\n\nPlease send the signed form by Friday.\n\nDana', 'draft'), R('en', 'Hi Sali,\n\nFYI, the signed form is due Friday. No action needed.\n\nDana', 'SILENT')),
+  P('ask-vs-fyi-he', 'an ask vs a no-action note', 'C-14', R('he', 'היי סאלי,\n\nנא לשלוח את הטופס החתום עד יום שישי.\n\nדנה', 'draft'), R('he', 'היי סאלי,\n\nלידיעתך, הטופס החתום נדרש עד יום שישי. אין צורך לפעול.\n\nדנה', 'SILENT')),
+  P('future-vs-past-en', 'a future promise vs a report of a past action', null, R('en', 'Hi Sali,\n\nAs agreed, you will send the invoice by Monday.\n\nDana', 'task'), R('en', 'Hi Sali,\n\nThanks, I received the invoice you sent on Monday.\n\nDana', 'SILENT')),
+  P('meeting-time-vs-none-en', 'a meeting with a time vs without', 'C-9', R('en', 'Hi Sali,\n\nCan we meet Tuesday at 3pm to review the contract?\n\nDana', 'calendar'), R('en', 'Hi Sali,\n\nLet us meet some time next week to review the contract.\n\nDana', 'SILENT', { unsureConvention: 'meeting without a time: the engine asks nothing today' })),
+  P('meeting-time-vs-none-he', 'a meeting with a time vs without', 'C-9', R('he', 'היי סאלי,\n\nנוכל להיפגש ביום שלישי בשעה 15:00 לסקירת החוזה?\n\nדנה', 'calendar'), R('he', 'היי סאלי,\n\nבואו ניפגש מתישהו בשבוע הבא לסקירת החוזה.\n\nדנה', 'SILENT', { unsureConvention: 'meeting without a time' })),
+  P('file-save-vs-none-en', 'a save request with an attachment vs without', null, R('en', 'Hi Sali,\n\nPlease save the attached contract to Drive.\n\nDana', 'file_save', { attachmentCount: 1 }), R('en', 'Hi Sali,\n\nPlease save the contract to Drive when you have it.\n\nDana', 'SILENT', { unsureConvention: 'no attachment: nothing to save' })),
+  P('promise-self-dated-vs-undated-en', 'a dated note to self vs a vague one', 'C-10', R('en', 'Remember to renew the insurance by October 20.', 'task', { self: true }), R('en', 'Remember to renew the insurance sometime.', 'SILENT', { self: true })),
+  P('undated-ask-vs-statement-en', 'an undated ask vs a statement', 'C-4', R('en', 'Hi Sali,\n\nCould you send me the passport scan?\n\nDana', 'draft'), R('en', 'Hi Sali,\n\nThe passport scan is on the shared drive.\n\nDana', 'SILENT')),
+  P('undated-ask-vs-statement-he', 'an undated ask vs a statement', 'C-4', R('he', 'היי סאלי,\n\nתוכל לשלוח לי את הסריקה של הדרכון?\n\nדנה', 'draft'), R('he', 'היי סאלי,\n\nהסריקה של הדרכון נמצאת בדרייב המשותף.\n\nדנה', 'SILENT')),
+  P('work-vs-reply-en', 'an ask for work vs a request for information', 'C-7', R('en', 'Hi Sali,\n\nPlease prepare the Q4 report by Friday.\n\nDana', 'task'), R('en', 'Hi Sali,\n\nPlease send me the Q4 report by Friday.\n\nDana', 'draft')),
+  P('newsletter-vs-ask-en', 'a newsletter footer vs a person', null, R('en', 'Hi Sali,\n\nCould you send me the agenda by Wednesday?\n\nDana', 'draft'), R('en', 'Our October update is here. You are receiving this because you subscribed. Unsubscribe any time.', 'SILENT')),
+  P('holiday-promise-vs-statement-he', 'a promise before the holiday vs a holiday greeting', 'C-3', R('he', 'סאלי שלום,\n\nסיכמנו שאת שולחת את האישור לפני החג.\n\nמיכאל', 'task'), R('he', 'סאלי שלום,\n\nחג שמח לך ולמשפחה!\n\nמיכאל', 'SILENT'))
+];

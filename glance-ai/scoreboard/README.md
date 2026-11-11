@@ -26,3 +26,4 @@ node glance-ai/scoreboard/run.cjs \
 **2026-11-11 (after the owner's C-4: an undated ask gets a Do It).** Agreement labels, n = 407 after 37 rows moved to the rule-derived source `labeling/owner-convention-overlay.jsonl`. The engine alone: 13 wrong Do Its of 136 silent rows (9.6%, interval 5.7% to 15.7%), none an undated ask any more; v2.6 adds none and cuts misses from 35 to 26 of 69. On the 21 decided act rows of the overlay the engine misses 8 and v2.6 alone misses all 21, because the gate's tau is above its confidence on real sentences. v2.8 (undated asks labelled act) adds 3 wrong Do Its on one open convention, C-18 (a reader's undated promise), so it is held. Details: `glance-ai/model/V23.md`.
 
 Before C-4 the same run read 26 of 161 (16.1%), 13 of them undated asks.
+- Contrast pairs and metamorphic checks: `contrast/README.md`. Regression ratchet of engine wrong Do Its: `node glance-ai/labeling/ratchet.cjs`.

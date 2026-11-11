@@ -1,0 +1,10 @@
+# Contrast pairs and metamorphic checks (lab)
+
+Glance closes open loops. Gmail is where it starts today.
+
+- `pairs-v1.cjs`: 18 minimal pairs (EN and HE), each differing in one fact (ask against a confirmed amount, exact against approximate amount, To against Cc, named against group greeting, ask against FYI, future promise against past report, meeting with and without a time, save with and without an attachment, dated against vague note to self, undated ask against statement, work against reply, newsletter footer, holiday promise). A pair passes only when both rows are right. Written by Claude from `docs/glance-ai/model-conventions.md`; synthetic, NOT owner-verified; the "soft" rows encode a convention the owner has not confirmed.
+- `run.cjs`: runs the pairs through the tip rules engine. `baseline-2026-11-11.json` is the first reading: **7 of 18 pass; 8 hard failures**, which are the first causal map of the engine's gaps: a confirmed amount read as a task (C-1, EN and HE), an approximate amount in Hebrew read as a task (C-2), a Cc-only ask offered when the reader is greeted by name (C-12), an English ask next to an FYI line left silent, a dated note to self left silent (C-10), a work ask offered as a reply (C-7), a promise «לפני החג» left silent (C-3). Some pairs may encode an expectation the owner would not share; review before treating a failure as an engine defect.
+- `test-ratchet.cjs`: a pair that passed in the baseline must still pass.
+- `../metamorphic/run.cjs`: meaning-preserving edits (greeting and sign-off, "Re:" subject, mobile signature, spacing and doubled punctuation) on 600 test rows. **0 flips of 600 on every edit**: the engine is robust to these wrappers. A flip would be a candidate defect, not a label.
+
+Models are not scored on the pairs yet: a model needs the pair rows exported through the dataset pipeline (`train/export-features-v2.cjs`) and, for a model with the lab's frame features, a JS runtime that knows them.

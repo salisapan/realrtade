@@ -201,6 +201,102 @@
       "ece": 0.144,
       "brier": 0.163
      }
+    },
+    "v3a": {
+     "undatedWrongDoIt": 0,
+     "product": {
+      "n": 205,
+      "silent": 136,
+      "act": 69,
+      "wrongDoIt": 13,
+      "missed": 27,
+      "wrongAction": 7,
+      "he": {
+       "silent": 51,
+       "act": 26,
+       "wrongDoIt": 7,
+       "missed": 12
+      },
+      "en": {
+       "silent": 85,
+       "act": 43,
+       "wrongDoIt": 6,
+       "missed": 15
+      }
+     },
+     "alone": {
+      "n": 205,
+      "silent": 136,
+      "act": 69,
+      "wrongDoIt": 1,
+      "missed": 49,
+      "wrongAction": 3,
+      "he": {
+       "silent": 51,
+       "act": 26,
+       "wrongDoIt": 1,
+       "missed": 18
+      },
+      "en": {
+       "silent": 85,
+       "act": 43,
+       "wrongDoIt": 0,
+       "missed": 31
+      }
+     },
+     "calibration": {
+      "n": 205,
+      "ece": 0.121,
+      "brier": 0.156
+     }
+    },
+    "v3b": {
+     "undatedWrongDoIt": 2,
+     "product": {
+      "n": 205,
+      "silent": 136,
+      "act": 69,
+      "wrongDoIt": 15,
+      "missed": 32,
+      "wrongAction": 7,
+      "he": {
+       "silent": 51,
+       "act": 26,
+       "wrongDoIt": 7,
+       "missed": 13
+      },
+      "en": {
+       "silent": 85,
+       "act": 43,
+       "wrongDoIt": 8,
+       "missed": 19
+      }
+     },
+     "alone": {
+      "n": 205,
+      "silent": 136,
+      "act": 69,
+      "wrongDoIt": 3,
+      "missed": 55,
+      "wrongAction": 3,
+      "he": {
+       "silent": 51,
+       "act": 26,
+       "wrongDoIt": 1,
+       "missed": 19
+      },
+      "en": {
+       "silent": 85,
+       "act": 43,
+       "wrongDoIt": 2,
+       "missed": 36
+      }
+     },
+     "calibration": {
+      "n": 205,
+      "ece": 0.156,
+      "brier": 0.155
+     }
     }
    }
   },
@@ -399,6 +495,102 @@
       "ece": 0.123,
       "brier": 0.15
      }
+    },
+    "v3a": {
+     "undatedWrongDoIt": 0,
+     "product": {
+      "n": 209,
+      "silent": 136,
+      "act": 73,
+      "wrongDoIt": 13,
+      "missed": 28,
+      "wrongAction": 9,
+      "he": {
+       "silent": 51,
+       "act": 27,
+       "wrongDoIt": 7,
+       "missed": 12
+      },
+      "en": {
+       "silent": 85,
+       "act": 46,
+       "wrongDoIt": 6,
+       "missed": 16
+      }
+     },
+     "alone": {
+      "n": 209,
+      "silent": 136,
+      "act": 73,
+      "wrongDoIt": 1,
+      "missed": 50,
+      "wrongAction": 4,
+      "he": {
+       "silent": 51,
+       "act": 27,
+       "wrongDoIt": 1,
+       "missed": 18
+      },
+      "en": {
+       "silent": 85,
+       "act": 46,
+       "wrongDoIt": 0,
+       "missed": 32
+      }
+     },
+     "calibration": {
+      "n": 227,
+      "ece": 0.107,
+      "brier": 0.144
+     }
+    },
+    "v3b": {
+     "undatedWrongDoIt": 2,
+     "product": {
+      "n": 209,
+      "silent": 136,
+      "act": 73,
+      "wrongDoIt": 15,
+      "missed": 33,
+      "wrongAction": 9,
+      "he": {
+       "silent": 51,
+       "act": 27,
+       "wrongDoIt": 7,
+       "missed": 13
+      },
+      "en": {
+       "silent": 85,
+       "act": 46,
+       "wrongDoIt": 8,
+       "missed": 20
+      }
+     },
+     "alone": {
+      "n": 209,
+      "silent": 136,
+      "act": 73,
+      "wrongDoIt": 3,
+      "missed": 56,
+      "wrongAction": 4,
+      "he": {
+       "silent": 51,
+       "act": 27,
+       "wrongDoIt": 1,
+       "missed": 19
+      },
+      "en": {
+       "silent": 85,
+       "act": 46,
+       "wrongDoIt": 2,
+       "missed": 37
+      }
+     },
+     "calibration": {
+      "n": 227,
+      "ece": 0.132,
+      "brier": 0.143
+     }
     }
    }
   },
@@ -551,6 +743,102 @@
      }
     },
     "v28": {
+     "undatedWrongDoIt": 0,
+     "product": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 8,
+      "wrongAction": 7,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 4
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 4
+      }
+     },
+     "alone": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 21,
+      "wrongAction": 0,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 10
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 11
+      }
+     },
+     "calibration": {
+      "n": 25,
+      "ece": null,
+      "brier": null
+     }
+    },
+    "v3a": {
+     "undatedWrongDoIt": 0,
+     "product": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 8,
+      "wrongAction": 7,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 4
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 4
+      }
+     },
+     "alone": {
+      "n": 21,
+      "silent": 0,
+      "act": 21,
+      "wrongDoIt": 0,
+      "missed": 21,
+      "wrongAction": 0,
+      "he": {
+       "silent": 0,
+       "act": 10,
+       "wrongDoIt": 0,
+       "missed": 10
+      },
+      "en": {
+       "silent": 0,
+       "act": 11,
+       "wrongDoIt": 0,
+       "missed": 11
+      }
+     },
+     "calibration": {
+      "n": 25,
+      "ece": null,
+      "brier": null
+     }
+    },
+    "v3b": {
      "undatedWrongDoIt": 0,
      "product": {
       "n": 21,

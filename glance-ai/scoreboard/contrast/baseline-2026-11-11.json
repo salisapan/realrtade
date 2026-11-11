@@ -1,0 +1,308 @@
+[
+ {
+  "id": "dated-vs-confirm-en",
+  "fact": "ask vs confirmation of an amount",
+  "conv": "C-1",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "task"
+  ],
+  "passA": true,
+  "passB": false,
+  "pass": false,
+  "soft": false
+ },
+ {
+  "id": "dated-vs-confirm-he",
+  "fact": "ask vs confirmation of an amount",
+  "conv": "C-1",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "SILENT",
+   "task"
+  ],
+  "passA": false,
+  "passB": false,
+  "pass": false,
+  "soft": false
+ },
+ {
+  "id": "exact-vs-approx-en",
+  "fact": "confirmed vs approximate amount",
+  "conv": "C-2",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "exact-vs-approx-he",
+  "fact": "confirmed vs approximate amount",
+  "conv": "C-2",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "task",
+   "SILENT"
+  ],
+  "passA": false,
+  "passB": true,
+  "pass": false,
+  "soft": false
+ },
+ {
+  "id": "to-vs-cc-en",
+  "fact": "reader on To vs Cc only",
+  "conv": "C-12",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "draft"
+  ],
+  "passA": true,
+  "passB": false,
+  "pass": false,
+  "soft": false
+ },
+ {
+  "id": "named-vs-group-en",
+  "fact": "addressed by name vs a group greeting",
+  "conv": "C-12",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "draft"
+  ],
+  "passA": true,
+  "passB": false,
+  "pass": false,
+  "soft": true
+ },
+ {
+  "id": "ask-vs-fyi-en",
+  "fact": "an ask vs a no-action note",
+  "conv": "C-14",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "SILENT",
+   "SILENT"
+  ],
+  "passA": false,
+  "passB": true,
+  "pass": false,
+  "soft": false
+ },
+ {
+  "id": "ask-vs-fyi-he",
+  "fact": "an ask vs a no-action note",
+  "conv": "C-14",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "future-vs-past-en",
+  "fact": "a future promise vs a report of a past action",
+  "conv": null,
+  "expected": [
+   "task",
+   "SILENT"
+  ],
+  "got": [
+   "task",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "meeting-time-vs-none-en",
+  "fact": "a meeting with a time vs without",
+  "conv": "C-9",
+  "expected": [
+   "calendar",
+   "SILENT"
+  ],
+  "got": [
+   "calendar",
+   "draft"
+  ],
+  "passA": true,
+  "passB": false,
+  "pass": false,
+  "soft": true
+ },
+ {
+  "id": "meeting-time-vs-none-he",
+  "fact": "a meeting with a time vs without",
+  "conv": "C-9",
+  "expected": [
+   "calendar",
+   "SILENT"
+  ],
+  "got": [
+   "calendar",
+   "draft"
+  ],
+  "passA": true,
+  "passB": false,
+  "pass": false,
+  "soft": true
+ },
+ {
+  "id": "file-save-vs-none-en",
+  "fact": "a save request with an attachment vs without",
+  "conv": null,
+  "expected": [
+   "file_save",
+   "SILENT"
+  ],
+  "got": [
+   "file_save",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": true
+ },
+ {
+  "id": "promise-self-dated-vs-undated-en",
+  "fact": "a dated note to self vs a vague one",
+  "conv": "C-10",
+  "expected": [
+   "task",
+   "SILENT"
+  ],
+  "got": [
+   "SILENT",
+   "SILENT"
+  ],
+  "passA": false,
+  "passB": true,
+  "pass": false,
+  "soft": false
+ },
+ {
+  "id": "undated-ask-vs-statement-en",
+  "fact": "an undated ask vs a statement",
+  "conv": "C-4",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "undated-ask-vs-statement-he",
+  "fact": "an undated ask vs a statement",
+  "conv": "C-4",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "work-vs-reply-en",
+  "fact": "an ask for work vs a request for information",
+  "conv": "C-7",
+  "expected": [
+   "task",
+   "draft"
+  ],
+  "got": [
+   "draft",
+   "draft"
+  ],
+  "passA": false,
+  "passB": true,
+  "pass": false,
+  "soft": false
+ },
+ {
+  "id": "newsletter-vs-ask-en",
+  "fact": "a newsletter footer vs a person",
+  "conv": null,
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "holiday-promise-vs-statement-he",
+  "fact": "a promise before the holiday vs a holiday greeting",
+  "conv": "C-3",
+  "expected": [
+   "task",
+   "SILENT"
+  ],
+  "got": [
+   "SILENT",
+   "SILENT"
+  ],
+  "passA": false,
+  "passB": true,
+  "pass": false,
+  "soft": false
+ }
+]

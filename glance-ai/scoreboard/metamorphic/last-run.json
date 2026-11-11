@@ -1,0 +1,33 @@
+{
+ "n": 600,
+ "edits": {
+  "greet+sign": {
+   "flips": 0,
+   "silentToAct": 0,
+   "actToSilent": 0,
+   "rate": 0,
+   "examples": []
+  },
+  "re-prefix": {
+   "flips": 0,
+   "silentToAct": 0,
+   "actToSilent": 0,
+   "rate": 0,
+   "examples": []
+  },
+  "trailing-ws": {
+   "flips": 0,
+   "silentToAct": 0,
+   "actToSilent": 0,
+   "rate": 0,
+   "examples": []
+  },
+  "case-punct": {
+   "flips": 0,
+   "silentToAct": 0,
+   "actToSilent": 0,
+   "rate": 0,
+   "examples": []
+  }
+ }
+}
