@@ -1,12 +1,13 @@
 # The refund you asked for, carried until the money is back
 
-- **Status:** proposed
+- **Status:** experiment built (2026-11-11, Wednesday run; not approved by Sali yet: no «כן» or «לא» since Sunday, so this run took it as the newest measured gap)
 - **Date:** 2026-11-08 (product lab, Sunday run)
 - **Switch:** `opts.enabled` on `FlowRefundLoop.ask`, `.reply` and `.judge` (`REFUND_LOOP`, **off**; nothing calls it). It joins `core/labs-switches.js` only when it is wired.
 - **Code:**
   - `flow-trial-extension/core/refund-loop.js`
-  - corpus `flow-trial-extension/test/refund-loop-corpus.cjs` (50 checks)
-  - held-out score `scripts/refund-loop-heldout.cjs` on `glance-ai/eval-data/refund-loop-heldout-v0.jsonl`
+  - corpus `flow-trial-extension/test/refund-loop-corpus.cjs` (73 checks)
+  - held-out score `scripts/refund-loop-heldout.cjs` on `glance-ai/eval-data/refund-loop-heldout-v0.jsonl` and `-v1.jsonl`
+  - dormant real-user A/B: experiment `refund-loop` in `core/pmf-metrics.js`
 
 ## בעברית, בקצרה
 
@@ -152,3 +153,66 @@ Two loops that fit: silence.
    - a refund split in two;
    - the merchant's legal name on the card («שופ אונליין בע"מ») against the brand in mail.
 3. **A second frozen held-out set** written by a different routine, plus the dormant real-user A/B `refund-loop` in `core/pmf-metrics.js`: refunds asked, approved, money back, not back by their day, released.
+
+## Experiment built (Wednesday 2026-11-11)
+
+### What changed since Sunday
+
+Today's changes are the edge cases from "Size", in Hebrew and English. Each one is pinned in the corpus, which went from 50 checks to 73.
+- **Store credit instead of money** («זיכוי לחנות», «שובר», "store credit", "travel voucher") is a new stage, `store-credit`. It is never "approved" and never a close: the person decides whether to take it (release) or insist. A refund to the card that happens to mention a voucher code stays approved.
+- **"Once we receive the item"** («לאחר שנקבל את המוצר») is `needs-you` with `need: 'return-item'`, not approved.
+- **More ways to say approved:** «הכסף יוחזר לכרטיס», and "refund to your original payment method was approved".
+- **"Can I get a refund?"** opens a loop.
+- **A refund in parts:**
+  - a smaller credit from the named merchant is counted (`partialPatch`, once per notice id) and never closes the loop;
+  - the credit that completes the amount closes it;
+  - a part from an unnamed credit is never counted.
+- **The card descriptor:** the merchant's own mail-domain label (at least 4 letters, not a generic word such as "shop") names the merchant, as in "MAKERSPACE*BOOKING" or "STREAMLY.COM". The legal name around the brand («אלקטרה צריכה בע"מ») still names it.
+- **Cashback, points and promotions** («קאשבק», «נקודות», «במסגרת מבצע») are not a refund.
+- **Dormant real-user A/B:** experiment `refund-loop` in `core/pmf-metrics.js`.
+  - The arm is fixed by the install id, and only when the switch is on.
+  - It keeps counts only: refunds asked, lines shown, money back seen, not back by the merchant's day, released, and reopened after a close (the wrong-close signal).
+  - Both arms count refunds asked and money back, so the rate compares carrying with not carrying.
+  - No text leaves the device. Turning it on needs the owner and a privacy-page change in the same commit.
+
+**Disclosed:** a credit counted as a part is reported as "not a close". The held-out scorer now maps `partial` to none, and the v0 label for the $25-of-$49 case (none) is unchanged.
+
+### Offline A/B on a fresh held-out set (v1)
+
+- **The set:** `refund-loop-heldout-v1.jsonl`: 24 new cases, 14 Hebrew and 10 English, none copied from the corpus.
+- **Frozen:** in commit `f6c00d92` (sha256 `77dd326a…`) after today's code was written and before it was scored, and scored once.
+- **Disclosure:** I wrote both the set and the code.
+
+| part | arm | lang | should n | right | missed | should not n | wrong |
+|---|---|---|---|---|---|---|---|
+| ask | A | all | 5 | 0 | 5 | 5 | 0 |
+| ask | **B** | all | 5 | **5** | **0** | 5 | **0** |
+| ask | B | he | 3 | 3 | 0 | 3 | 0 |
+| ask | B | en | 2 | 2 | 0 | 2 | 0 |
+| reply | A | all | 6 | 0 | 6 | 0 | 0 |
+| reply | **B** | all | 6 | **6** | **0** | 0 | 0 |
+| reply | B | he | 3 | 3 | 0 | 0 | 0 |
+| reply | B | en | 3 | 3 | 0 | 0 | 0 |
+| close | A | all | 3 | 0 | 3 | 5 | 0 |
+| close | **B** | all | 3 | **3** | **0** | 5 | **0** |
+| close | B | he | 2 | 2 | 0 | 3 | 0 |
+| close | B | en | 1 | 1 | 0 | 2 | 0 |
+
+**Sunday's code on the same v1 set:**
+- asks: 5/5;
+- merchant replies: **2/6**. It missed «הכסף יוחזר לכרטיס» and both store-credit replies, and it read "after we receive the item" as approved;
+- closes: 3/3, with **1 wrong close**: cashback from the same merchant for the same amount.
+- Today's edge cases fix all five.
+
+**In the routine's terms (v0 and v1 together):**
+- **wrong Do It** (a refund loop opened where none is owed): 0/13;
+- **missed close:** 0/8 (A: 8/8);
+- **wrong action** (a close on the wrong proof, or a reply read as the wrong stage): 0/14 closes that must not close, and 0/12 replies that need a stage.
+
+### Recommendation
+
+**Keep `REFUND_LOOP` off and wire it next.**
+- The ask goes on the sent-mail hook in `src/follow.js`, the reply on the same thread, and the credit on the opened-mail hook that `outside-signals` uses. The notice is read back by id before the close.
+- Before the labs switch: a mock of the line («החזר משופ · ₪189 · עד 26/11») for the owner, and a live Gate.
+- The offline numbers are clean, but the n are small and from one author. The real-user A/B is what will show whether carrying a refund raises the share of refunds that are actually seen back.
+
