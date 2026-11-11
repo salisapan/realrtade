@@ -7,7 +7,7 @@ const G = path.join(__dirname, '..', '..');
 const eng = require(path.join(G, 'model', 'teacher', 'engine.cjs')).makeEngine('tip');
 const PAIRS = require('./pairs-v1.cjs');
 const step = (l) => (!l || l === 'SILENT' ? 'SILENT' : String(l).split('|').pop());
-const row = (r) => ({ from: { name: 'Dana Cole', email: 'dana@northwind.com' }, to: r.cc ? ['colleague@northwind.com'] : ['ai.local.flow@gmail.com'], cc: r.cc ? ['ai.local.flow@gmail.com'] : [], ownNames: ['Sali', 'סאלי'],
+const row = (r) => ({ from: r.self ? { name: 'Sali', email: 'ai.local.flow@gmail.com' } : { name: 'Dana Cole', email: 'dana@northwind.com' }, to: r.cc ? ['colleague@northwind.com'] : ['ai.local.flow@gmail.com'], cc: r.cc ? ['ai.local.flow@gmail.com'] : [], ownNames: ['Sali', 'סאלי'],
   subject: r.self ? '' : 'Quick question', body: r.body, cleanBody: r.body, attachmentCount: r.attachmentCount || 0, direction: r.self ? 'self' : 'inbound', surface: 'gmail', lang: r.lang });
 const res = PAIRS.map((p) => {
   const got = ['a', 'b'].map((k) => step(eng.teach(row(p[k])).label));

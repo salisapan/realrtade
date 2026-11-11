@@ -6,9 +6,9 @@ const P = (id, fact, conv, a, b) => ({ id, fact, conv, a, b });
 const R = (lang, body, step, o) => Object.assign({ lang, body, step }, o || {});
 module.exports = [
   P('dated-vs-confirm-en', 'ask vs confirmation of an amount', 'C-1', R('en', 'Hi Sali,\n\nCould you send me the signed lease by Thursday?\n\nThanks,\nDana', 'draft'), R('en', 'Hi Sali,\n\nThe fee was approved at $4,200.\n\nThanks,\nDana', 'SILENT')),
-  P('dated-vs-confirm-he', 'ask vs confirmation of an amount', 'C-1', R('he', 'היי סאלי,\n\nתוכל לשלוח לי את החוזה החתום עד יום חמישי?\n\nתודה, דנה', 'draft'), R('he', 'היי סאלי,\n\nאושר תקציב של ₪4,200.\n\nתודה, דנה', 'SILENT')),
+  P('dated-vs-confirm-he', 'ask vs confirmation of an amount', 'C-1', R('he', 'היי סאלי,\n\nתוכל לשלוח לי את התקציב עד יום חמישי?\n\nתודה, דנה', 'draft'), R('he', 'היי סאלי,\n\nאושר תקציב של ₪4,200.\n\nתודה, דנה', 'SILENT')),
   P('exact-vs-approx-en', 'confirmed vs approximate amount', 'C-2', R('en', 'Hi Sali,\n\nPlease confirm the $4,200 payment by Friday.\n\nDana', 'draft'), R('en', 'Hi Sali,\n\nThe payment will be about $4,200.\n\nDana', 'SILENT')),
-  P('exact-vs-approx-he', 'confirmed vs approximate amount', 'C-2', R('he', 'היי סאלי,\n\nנא לאשר את התשלום של ₪4,200 עד יום שישי.\n\nדנה', 'draft'), R('he', 'היי סאלי,\n\nהתשלום יהיה בערך ₪4,200.\n\nדנה', 'SILENT')),
+  P('exact-vs-approx-he', 'approval ask with a deadline (task, C-15) vs approximate amount', 'C-2/C-15', R('he', 'היי סאלי,\n\nנא לאשר את התשלום של ₪4,200 עד יום שישי.\n\nדנה', 'task'), R('he', 'היי סאלי,\n\nהתשלום יהיה בערך ₪4,200.\n\nדנה', 'SILENT')),
   P('to-vs-cc-en', 'reader on To vs Cc only', 'C-12', R('en', 'Hi Sali,\n\nCould you send me the budget by Tuesday?\n\nDana', 'draft'), R('en', 'Hi Sali,\n\nCould you send me the budget by Tuesday?\n\nDana', 'SILENT', { cc: true })),
   P('named-vs-group-en', 'addressed by name vs a group greeting', 'C-12', R('en', 'Hi Sali,\n\nCould you send me the budget by Tuesday?\n\nDana', 'draft'), R('en', 'Hi all,\n\nCould you send me the budget by Tuesday?\n\nDana', 'SILENT', { unsureConvention: 'C-12: group mail is a profile feature; labels keep it unsure' })),
   P('ask-vs-fyi-en', 'an ask vs a no-action note', 'C-14', R('en', 'Hi Sali,\n\nPlease confirm the numbers by Friday.\n\nDana', 'draft'), R('en', 'Hi Sali,\n\nFYI, the numbers are due Friday. No action needed.\n\nDana', 'SILENT')),

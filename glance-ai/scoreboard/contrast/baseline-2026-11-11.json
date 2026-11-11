@@ -25,10 +25,10 @@
    "SILENT"
   ],
   "got": [
-   "SILENT",
+   "draft",
    "task"
   ],
-  "passA": false,
+  "passA": true,
   "passB": false,
   "pass": false,
   "soft": false
@@ -52,19 +52,19 @@
  },
  {
   "id": "exact-vs-approx-he",
-  "fact": "confirmed vs approximate amount",
-  "conv": "C-2",
+  "fact": "approval ask with a deadline (task, C-15) vs approximate amount",
+  "conv": "C-2/C-15",
   "expected": [
-   "draft",
+   "task",
    "SILENT"
   ],
   "got": [
    "task",
    "SILENT"
   ],
-  "passA": false,
+  "passA": true,
   "passB": true,
-  "pass": false,
+  "pass": true,
   "soft": false
  },
  {
@@ -212,11 +212,11 @@
    "SILENT"
   ],
   "got": [
-   "SILENT",
-   "SILENT"
+   "task",
+   "task"
   ],
-  "passA": false,
-  "passB": true,
+  "passA": true,
+  "passB": false,
   "pass": false,
   "soft": false
  },
