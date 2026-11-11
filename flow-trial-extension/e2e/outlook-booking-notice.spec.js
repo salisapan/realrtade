@@ -464,8 +464,24 @@ for (const [label, body, want] of [['English', 'Hi Sali, a friendly reminder to 
   });
 }
 
+// "ב-5.11" has no year, so after that calendar day the product correctly
+// rolls to the next one. A literal 2026-11-05 went stale on 6 Nov 2026
+// (same approach as gate-163: compute the expected day from today).
+function upcomingIecChargeDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const year = d.getFullYear();
+  return {
+    stamped: day + '.' + month,
+    iso: year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0')
+  };
+}
+
 test('SYSTEM_NOTICE off: an electric-company notice shows no card; on: one To Do task with the date, read back, Undo deletes it, nothing is paid', async ({ glance }) => {
-  const body = 'שלום סלי, החשבון שלך יחויב ב-5.11. יש לעדכן פרטי תשלום.';
+  const notice = upcomingIecChargeDate();
+  const body = 'שלום סלי, החשבון שלך יחויב ב-' + notice.stamped + '. יש לעדכן פרטי תשלום.';
   await glance.seedOutlook({}, {});
   n += 1;
   let page = await glance.openOutlook({ id: 'AQMk-iec-off-' + n, subject: 'עדכון חשבון', senderEmail: 'noreply@iec.co.il', senderName: 'חברת החשמל', body: body });
@@ -480,7 +496,7 @@ test('SYSTEM_NOTICE off: an electric-company notice shows no card; on: one To Do
   await expect(page.locator(PANE + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   const list = await todo(glance);
   expect(list).toHaveLength(1);
-  expect(JSON.stringify(list[0])).toContain('2026-11-05');
+  expect(JSON.stringify(list[0])).toContain(notice.iso);
   expect(JSON.stringify(list[0])).toContain('noreply@iec.co.il');
   await page.locator(PANE + ' button.flow-chip-undo').click();
   await expect.poll(async () => (await todo(glance)).length).toBe(0);
@@ -489,7 +505,8 @@ test('SYSTEM_NOTICE off: an electric-company notice shows no card; on: one To Do
 test('SYSTEM_NOTICE on: the same words from a lookalike domain show no card', async ({ glance }) => {
   await glance.seedOutlook({ glanceSwitches: { SYSTEM_NOTICE: true } }, {});
   n += 1;
-  const page = await glance.openOutlook({ id: 'AQMk-iec-fake-' + n, subject: 'עדכון חשבון', senderEmail: 'noreply@iec-billing.co.il', senderName: 'חברת החשמל', body: 'שלום סלי, החשבון שלך יחויב ב-5.11. יש לעדכן פרטי תשלום.' });
+  const notice = upcomingIecChargeDate();
+  const page = await glance.openOutlook({ id: 'AQMk-iec-fake-' + n, subject: 'עדכון חשבון', senderEmail: 'noreply@iec-billing.co.il', senderName: 'חברת החשמל', body: 'שלום סלי, החשבון שלך יחויב ב-' + notice.stamped + '. יש לעדכן פרטי תשלום.' });
   await page.waitForTimeout(3500);
   await expect(page.locator(PANE + ' .flow-chip-host')).toHaveCount(0);
   expect(await todo(glance)).toHaveLength(0);

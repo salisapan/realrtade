@@ -81,7 +81,8 @@ const FlowCommitmentTitle = (() => {
   function stripGreeting(sentence) {
     return sentence
       .replace(/^(?:hi|hello|hey|dear)(?:\s+[\w.'-]+){0,4}\s*,\s*/i, '')
-      .replace(/^(?:היי|הי|שלום)(?:\s+\S+){0,3}\s*,\s*/, '');
+      .replace(/^(?:היי|הי|שלום)(?:\s+\S+){0,3}\s*,\s*/, '')
+      .replace(/^(?:היי|הי|שלום)\s*,\s*/, '');
   }
 
   function fires(sentence) {

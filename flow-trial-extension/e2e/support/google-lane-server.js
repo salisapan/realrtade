@@ -179,6 +179,9 @@ function startGoogleLaneServer() {
     state.driveHits = [];
     state.lagGets = [];
     state.noMeetLink = false;
+    state.tasks401AfterRefresh = false;
+    state.tasks403Insufficient = false;
+    state.contactAmbiguous = false;
     seedLists();
   }
 
@@ -236,6 +239,39 @@ function startGoogleLaneServer() {
       const bearer = /^Bearer\s+\S+/.test(String(req.headers.authorization || ''));
       if (!e2ePath && !bearer) { send(res, 401, GOOGLE_AUTH_401); return; }
       if (!e2ePath && state.unauthorized.some((part) => path.indexOf(part) >= 0)) { send(res, 401, GOOGLE_AUTH_401); return; }
+
+      if (method === 'GET' && path === '/v1/people:searchContacts') {
+        const q = String(url.searchParams.get('query') || '').toLowerCase();
+        const results = [];
+        if (q.indexOf('dana') >= 0) {
+          results.push({
+            person: {
+              names: [{ displayName: 'Dana Cohen' }],
+              emailAddresses: [{ value: 'dana.cohen@example.com' }]
+            }
+          });
+          if (state.contactAmbiguous) {
+            results.push({
+              person: {
+                names: [{ displayName: 'Dana Levy' }],
+                emailAddresses: [{ value: 'dana.levy@example.com' }]
+              }
+            });
+          }
+        }
+        send(res, 200, { results: results });
+        return;
+      }
+
+      if (method === 'GET' && (path === '/oauth2/v3/userinfo' || path === '/oauth2/v2/userinfo')) {
+        if (!e2ePath && state.failGets.some((part) => path.indexOf(part) >= 0)) {
+          send(res, 500, { error: { code: 500, message: 'Backend Error', status: 'INTERNAL' } });
+          return;
+        }
+        const email = accountFor(req);
+        send(res, 200, { email: email, sub: 'e2e-sub-' + email });
+        return;
+      }
 
       if (!e2ePath) {
         const once = state.rejectOnce.findIndex((part) => path.indexOf(part) >= 0);
@@ -657,6 +693,9 @@ function startGoogleLaneServer() {
         tasks: () => state.tasks,
         deleteEvent: (id) => { delete state.events[id]; },
         setNoMeetLink: (on) => { state.noMeetLink = on === true; },
+        setContactAmbiguous: (on) => { state.contactAmbiguous = on === true; },
+        setTasks401AfterRefresh: (on) => { state.tasks401AfterRefresh = on === true; },
+        setTasks403Insufficient: (on) => { state.tasks403Insufficient = on === true; },
         seedEvent: (ev) => {
           const id = opaqueId('event', state.seq++);
           const who = state.account;

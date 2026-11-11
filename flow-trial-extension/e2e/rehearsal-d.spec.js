@@ -93,7 +93,6 @@ test('D4 Outlook with the calendar permission: one event, read back by id, then 
 });
 
 test('D5 Gate: a mail that asks to find a time shows nothing', async ({ glance }) => {
-  test.fail(true, 'Today it is a Reply & Track card (draft plus task) on purpose: core/intent.js:1656 "the card is a reply that offers times, not a hold". The Gate says nothing. Owner decision.');
   const page = await gmail(glance, 'find', 'Can you find us 30 minutes next week to go over the quote?');
   await page.waitForTimeout(7000);
   await expect(page.locator(MAIN + ' .flow-chip-host')).toHaveCount(0, { timeout: 1000 });

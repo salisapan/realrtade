@@ -59,7 +59,9 @@ function connectorFamily(id) {
 function messageConnector(msg) {
   if (!msg) return '';
   if (msg.type === 'flow:execute-action') return msg.payload && msg.payload.connectorId;
-  if (msg.type === 'flow:google-write' || msg.type === 'flow:gmail-compose') return msg.connectorId;
+  if (msg.type === 'flow:google-write' || msg.type === 'flow:gmail-compose') {
+    return msg.connectorId || (msg.payload && msg.payload.connectorId) || (msg.input && msg.input.draft && 'gmailCompose');
+  }
   return '';
 }
 function executedFamilies(sent) {
@@ -109,6 +111,12 @@ function chromeStub(w, store, sent) {
     sent.push(msg);
     if (msg.type === 'flow:outlook-session') return { ok: true, token: store.outlookAuth && store.outlookAuth.token, changed: false, how: 'fresh' };
     if (msg.type === 'flow:outlook-fetch') return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+    if (msg.type === 'flow:gmail-compose') {
+      return { ok: true, preview: true, closes: false, sent: false, seen: { to: 'dana@acme.io', subject: 'Re: Vendor', body: 'draft' } };
+    }
+    if (msg.type === 'flow:google-write' && msg.connectorId === 'gmailCompose') {
+      return { ok: true, preview: true, closes: false, sent: false, seen: { to: 'dana@acme.io', subject: 'Re: Vendor', body: 'draft' } };
+    }
     if (msg.type === 'flow:execute-action') {
       const id = msg.payload && msg.payload.connectorId;
       if (id === 'outlookCalendar' || id === 'calendar') {
@@ -220,10 +228,11 @@ function planCtx(kind, surface) {
   return ctx;
 }
 
-async function bootGmail() {
+async function bootGmail(opts) {
+  const o = opts || {};
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
   const files = manifest.content_scripts[0].js;
-  const html = '<!doctype html><html lang="en"><head><title>Inbox - me@x.com - Gmail</title></head><body><a aria-label="Google Account: Glance (me@x.com)" href="https://accounts.google.com/SignOutOptions"></a><h2 class="hP">Vendor</h2><div role="main"><div role="listitem" data-legacy-thread-id="t1" data-legacy-message-id="m1"><span email="dana@acme.io">Dana Levi</span><div class="a3s">Hello</div></div></div></body></html>';
+  const html = '<!doctype html><html lang="en"><head><title>Inbox - me@x.com - Gmail</title></head><body><a aria-label="Google Account: Glance (me@x.com)" href="https://accounts.google.com/SignOutOptions"></a><h2 class="hP">Vendor</h2><div role="main"><div role="listitem" data-legacy-thread-id="t1" data-legacy-message-id="m1"><span email="dana@acme.io">Dana Levi</span><div class="a3s">Hello</div></div></div><div aria-label="Message Body" contenteditable="true" role="textbox"></div></body></html>';
   const dom = new JSDOM(html, { url: 'https://mail.google.com/mail/u/0/#inbox/t1', runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   pinDate(w);
@@ -232,12 +241,23 @@ async function bootGmail() {
   if (!w.crypto || !w.crypto.subtle) Object.defineProperty(w, 'crypto', { value: webcrypto });
   w.fetch = async () => ({ ok: true, headers: { get: () => '4' }, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer, blob: async () => ({}) });
   const store = { onboarded: true, connectorId: 'googleTasks' };
+  if (o.composeOn) {
+    const scopes = (manifest.oauth2 && manifest.oauth2.scopes ? manifest.oauth2.scopes.slice() : []).concat([
+      'https://www.googleapis.com/auth/gmail.compose'
+    ]);
+    store.googleGrantedScopes = {
+      status: 'granted',
+      version: scopes.slice().sort().join('\n'),
+      source: 'chrome'
+    };
+  }
   const sent = [];
   chromeStub(w, store, sent);
   const ctx = dom.getInternalVMContext();
   for (const f of files) {
     new vm.Script(fs.readFileSync(path.join(ROOT, f), 'utf8'), { filename: f }).runInContext(ctx);
   }
+  await sleep(600);
   return { w, doc: w.document, sent, store };
 }
 
@@ -304,7 +324,21 @@ async function clickDo(host) {
   }
   outlook.w.close();
 
-  const gmail = await bootGmail();
+  console.log('\n--- v1 compose off: no Gmail draft Do It card ---\n');
+  const gmailV1 = await bootGmail();
+  gmailV1.sent.length = 0;
+  const draftOnly = planCtx('draft', 'gmail');
+  const draftHost = gmailV1.w.__glanceGmailPage.paintPlan(draftOnly);
+  check('v1 compose off: a Gmail draft-only plan does not offer Do It',
+    !draftHost || !draftHost.querySelector('button.flow-chip'),
+    { host: Boolean(draftHost) });
+  const writes = gmailV1.sent.filter((m) => m.type === 'flow:gmail-compose' || m.type === 'flow:google-write' || m.type === 'flow:execute-action');
+  check('v1 compose off: a draft-only plan sends nothing',
+    writes.length === 0, { writes: writes.map((m) => m.type) });
+  gmailV1.w.close();
+
+  console.log('\n--- Gmail plan execute (gmail.compose ON fixture) ---\n');
+  const gmail = await bootGmail({ composeOn: true });
   check('Gmail exposes the same plan painter', typeof gmail.w.__glanceGmailPage.paintPlan === 'function');
   for (const kind of ['calendar', 'task', 'draft', 'file']) {
     gmail.sent.length = 0;
