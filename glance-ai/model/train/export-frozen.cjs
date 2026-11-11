@@ -21,7 +21,7 @@ const seen = new Set();
 for (const f of ['train', 'val']) for (const r of read(path.join(G, 'model', 'dataset', 'out-v2', f + '.jsonl'))) { seen.add(norm(r.body)); seen.add(norm(r.cleanBody)); }
 const frozen = [], feats = []; const stats = { rows: 0, dupText: 0, inTrainVal: 0, kept: 0 };
 const taken = new Set();
-for (const b of ['003', '004', '005', '006', '007'].filter((b) => fs.existsSync(path.join(L, `batch-${b}.pass2-labels.jsonl`)))) {
+for (const b of ['003', '004', '005', '006', '007', '008'].filter((b) => fs.existsSync(path.join(L, `batch-${b}.pass2-labels.jsonl`)))) {
   const rows = JSON.parse(fs.readFileSync(path.join(L, `batch-${b}.json`), 'utf8'));
   const p1 = read(path.join(L, `batch-${b}.claude-labels.jsonl`)), p2 = read(path.join(L, `batch-${b}.pass2-labels.jsonl`));
   const by1 = Object.fromEntries(p1.map((x) => [x.item, x])), by2 = Object.fromEntries(p2.map((x) => [x.item, x]));

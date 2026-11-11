@@ -29,7 +29,7 @@ t('every label travels with its text: the frozen set, the overlay and the ratche
   assert.ok(fr.length >= 400 && fr.every((r) => typeof r.body === 'string' && r.body.length > 0 && /^b\d{3}-\d+$/.test(r.id)), 'frozen rows carry text');
   for (const f of ['owner-convention-overlay.jsonl', 'regression-wrong-doits.jsonl']) for (const r of read(f)) assert.ok(ids.has(r.id), f + ' row ' + r.id + ' is not in the frozen set (an id-keyed label would be scored against the wrong text)');
   // the frozen text must still equal the text in the batch file it came from
-  const batches = {}; for (const b of ['003', '004', '005', '006', '007'].filter((b) => fs.existsSync(path.join(__dirname, '..', 'labeling', 'batch-' + b + '.pass2-labels.jsonl')))) batches[b] = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'labeling', `batch-${b}.json`), 'utf8'));
+  const batches = {}; for (const b of ['003', '004', '005', '006', '007', '008'].filter((b) => fs.existsSync(path.join(__dirname, '..', 'labeling', 'batch-' + b + '.pass2-labels.jsonl')))) batches[b] = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'labeling', `batch-${b}.json`), 'utf8'));
   for (const r of fr) { const row = batches[r.batch].find((x) => x.item === r.item); assert.ok(row && row.body === r.body, r.id + ' text drifted from its batch file'); }
   const fz = fs.readFileSync(path.join(__dirname, '..', 'model', 'train', 'features-frozen', 'frozen.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).id);
   assert.deepStrictEqual(fz, fr.map((r) => r.id), 'the feature export covers exactly the frozen rows, in order');
