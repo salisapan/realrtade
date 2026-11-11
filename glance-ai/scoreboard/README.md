@@ -27,3 +27,15 @@ node glance-ai/scoreboard/run.cjs \
 
 Before C-4 the same run read 26 of 161 (16.1%), 13 of them undated asks.
 - Contrast pairs and metamorphic checks: `contrast/README.md`. Regression ratchet of engine wrong Do Its: `node glance-ai/labeling/ratchet.cjs`.
+
+**2026-11-11, first frontier-baseline reading (zero-shot Claude, Sonnet class, one pass, the rules of `baseline/make-prompts.cjs`, 252 masked test cases, 0 unreadable answers).** No API key was available (the session authenticates only the harness), so the baseline was run by a fresh subagent that saw only the prompts file; the answers were ingested by `baseline/ingest.cjs`. Agreement labels, n = 407:
+
+| system | wrong Do It | missed | wrong action |
+|---|---|---|---|
+| Glance engine alone | 13 / 136 (9.6%) | 35 / 69 (50.7%) | 8 |
+| Glance engine + v2.6 | 13 / 136 (9.6%) | 26 / 69 (37.7%) | 7 |
+| Claude zero-shot, alone | 19 / 136 (14.0%) | 7 / 69 (10.1%) | 10 |
+| engine first, then Claude zero-shot (no veto) | 28 / 136 (20.6%) | 4 / 69 (5.8%) | 10 |
+
+Read it with care: (1) the labels were made by Claude passes under rules close to the baseline prompt, so the baseline is favoured; a frontier win here proves little, a frontier loss would prove a lot. (2) 15 of the 19 "wrong Do Its" are rows the labels call silent but that are label questions: seven save-to-Drive or OneDrive asks on a row with no attachment (the file chain is silent without one), six undated or «לפני החג» promises by the reader (C-18, C-3), two notes to self; 4 are real mistakes. (3) The trade is the point: a general model finds almost every close (missed 10%) and acts wrongly more often; Glance's rules and small model are precise and miss a lot (38%). The product design (Tier 2 model reading, then the device validator, strict gate and veto on every answer; `docs/glance-ai/ai-product.md`) is the way to take the recall without the wrong Do Its; its measured cost on the cached Qwen answers is in `ai-product.md` section 10. **No claim that Glance beats a frontier model follows from this, and none should be made.**
+

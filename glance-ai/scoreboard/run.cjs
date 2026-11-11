@@ -91,7 +91,7 @@ for (const [label, rows] of sources) {
   if (!rows.length) continue;
   const labelMap = byId(rows);
   if (MODELS.length) {
-    const tmp = gateInputs(rows, MODELS);
+    const tmp = gateInputs(rows, MODELS); entry._tmp = tmp;
     const cases = read(path.join(tmp, 'cases.jsonl')).map((c) => ({ id: c.id, lang: c.lang === 'he' ? 'he' : 'en', gold: c.gold.step, body: '' }));
     for (const [n] of MODELS) {
       const undated = (file) => read(path.join(tmp, file)).filter((r) => labelMap[r.id] && labelMap[r.id].step === 'SILENT' && labelMap[r.id].undatedAsk && r.pred.decision === 'act').length;
@@ -106,7 +106,12 @@ for (const [label, rows] of sources) {
   for (const [n, f] of JUDGED) {
     const P = read(path.join(G, f)); const ids = new Set(P.map((r) => r.id));
     const cases = rows.filter((r) => ids.has(r.id)).map((r) => ({ id: r.id, lang: r.lang === 'he' ? 'he' : 'en', gold: r.step === 'CONTEXT' || r.step === 'UNSURE' ? 'AMBIGUOUS' : r.step, body: '' }));
+    // product order for a judged model: the engine acts first (the lab veto is not available for a model that has no veto fields), the model only where the engine is silent
+    const eo = entry.models['engine-only'] ? Object.fromEntries(read(path.join(entry._tmp, 'engine-only.product.jsonl')).map((r) => [r.id, r.pred])) : null;
+    const Pm = Object.fromEntries(P.map((r) => [r.id, r.pred]));
+    const prod = eo ? P.map((r) => ({ id: r.id, pred: eo[r.id] && eo[r.id].decision === 'act' ? eo[r.id] : r.pred })) : null;
     entry.models[n] = { alone: metrics(P, cases, {}), calibration: { n: 0, ece: null, brier: null } };
+    if (prod) { entry.models[n].product = metrics(prod, cases, {}); entry.models[n].undatedWrongDoIt = 0; }
   }
 }
 
@@ -134,4 +139,5 @@ say('7 Cost and latency: n/a. The device model runs in the extension runtime; cl
 const md = lines.join('\n') + '\n';
 console.log(md);
 if (arg('md')) fs.writeFileSync(arg('md'), md);
+out.sources.forEach((e) => { delete e._tmp; });
 if (arg('json')) fs.writeFileSync(arg('json'), JSON.stringify(out, null, 1));
