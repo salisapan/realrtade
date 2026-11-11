@@ -23,4 +23,15 @@ t('the prompt writer makes no model call and never puts a label in the prompt', 
   assert.ok(rows.length > 100);
   for (const r of rows.slice(0, 50)) { assert.ok(!/ownerLabel|"step"|"agreed"/.test(JSON.stringify(r))); assert.ok(!/@[\w-]+\./.test(r.user) && !/\[object/.test(r.user), 'masked'); assert.ok(r.user.includes('Answer with JSON only')); }
 });
+t('every label travels with its text: the frozen set, the overlay and the ratchet are joined by text-bound ids', () => {
+  const read = (f) => fs.readFileSync(path.join(__dirname, '..', 'labeling', f), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+  const fr = read('frozen-eval.jsonl'); const ids = new Set(fr.map((r) => r.id));
+  assert.ok(fr.length >= 400 && fr.every((r) => typeof r.body === 'string' && r.body.length > 0 && /^b\d{3}-\d+$/.test(r.id)), 'frozen rows carry text');
+  for (const f of ['owner-convention-overlay.jsonl', 'regression-wrong-doits.jsonl']) for (const r of read(f)) assert.ok(ids.has(r.id), f + ' row ' + r.id + ' is not in the frozen set (an id-keyed label would be scored against the wrong text)');
+  // the frozen text must still equal the text in the batch file it came from
+  const batches = {}; for (const b of ['003', '004', '005', '006']) batches[b] = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'labeling', `batch-${b}.json`), 'utf8'));
+  for (const r of fr) { const row = batches[r.batch].find((x) => x.item === r.item); assert.ok(row && row.body === r.body, r.id + ' text drifted from its batch file'); }
+  const fz = fs.readFileSync(path.join(__dirname, '..', 'model', 'train', 'features-frozen', 'frozen.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l).id);
+  assert.deepStrictEqual(fz, fr.map((r) => r.id), 'the feature export covers exactly the frozen rows, in order');
+});
 console.log('\n' + n + ' passed');

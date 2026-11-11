@@ -36,10 +36,11 @@ for (const b of ['003', '004', '005', '006']) {
     const l1 = by1[r.item] || {}, l2 = by2[r.item] || {}, ag = agreed[r.item] || null;
     const row = Object.assign({}, r, { cleanBody: r.body, ownNames: ['Sali', 'Sali Sapan', 'סאלי'], batch: b });
     const P = prepare(row);
-    const tipStep = step(tip.teach(Object.assign({}, row, { body: row.body })).label);
+    const tipOut = tip.teach(Object.assign({}, row, { body: row.body }));
+    const tipStep = step(tipOut.label);
     frozen.push({ id, srcId: r.id, batch: b, item: r.item, lang: r.lang, scenario: r.scenario, surface: r.surface, direction: r.direction, from: r.from, to: r.to, cc: r.cc, subject: r.subject,
       attachmentCount: r.attachmentCount || 0, body: r.body, pass1: l1.step || null, pass2: l2.step || null, undatedAsk: Boolean(l1.undatedAsk || l2.undatedAsk),
-      agreed: ag ? ag.step : null, tip: tipStep });
+      agreed: ag ? ag.step : null, tip: tipStep, tipReason: tipOut.reason });
     feats.push({ id, x: P.x, y: 'SILENT', ybin: 0, unsure: false, scenario: r.scenario || null, lang: r.lang, surface: r.surface, direction: r.direction, att: r.attachmentCount || 0,
       voc: P.voc, role: P.role, vb: P.veto.base, vp: P.veto.product, vc: P.veto.cap, eng: P.eng.label, prov: 'frozen', tip: tipStep });
     stats.kept++;

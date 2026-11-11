@@ -50,14 +50,21 @@ const M = { 'engine-only': emptyModel }; for (const [n, f] of MODELS) M[n] = mod
 const J = Object.fromEntries(JUDGED.map(([n, f]) => [n, Object.fromEntries(read(path.join(G, f)).map((r) => [r.id, r.pred]))]));
 
 // a model's two orders on one frozen row
-function product(id, m) { // engine (tip) first, unless the lab veto removes it; the model only where the engine is silent
+// --hard-quiets: the engine's own hard quiets (its silence reason) also veto the model, the way the floor decides in the product: a model may act only where
+// the engine found no intent (`intent-null`) or a soft reason. A = reasons with no act in the agreement labels (hedge, google, own-sender, meeting-veto, onedrive-target-on-gmail);
+// B = A plus quiet:noise and quiet:family. Off by default (the first readings in the records were taken without it).
+const HQ = { A: new Set(['quiet:hedge', 'quiet:google', 'own-sender', 'meeting-veto', 'onedrive-target-on-gmail']) };
+HQ.B = new Set([...HQ.A, 'quiet:noise', 'quiet:family']);
+const HARD = HQ[arg('hard-quiets', '')] || new Set();
+function product(id, m) { // engine (tip) first, unless the lab veto removes it; the model only where the engine is silent (and not hard-quiet)
   const row = byId[id], x = m[id];
   const eng = x && (x.vb || x.vp) ? 'SILENT' : row.tip;
   if (eng !== 'SILENT') return judge(eng);
+  if (HARD.has(row.tipReason)) return judge('SILENT');
   return judge(x ? stepOfLabel(x.pred) : 'SILENT');
 }
 function alone(id, m) { const x = m[id]; return judge(x ? stepOfLabel(x.predAlone) : 'SILENT'); }
-const productJ = (id, name) => (J[name] ? (byId[id].tip !== 'SILENT' ? judge(byId[id].tip) : (J[name][id] || { decision: 'silent' })) : null);
+const productJ = (id, name) => (J[name] ? (byId[id].tip !== 'SILENT' ? judge(byId[id].tip) : (HARD.has(byId[id].tipReason) ? { decision: 'silent' } : (J[name][id] || { decision: 'silent' }))) : null);
 
 function metrics(ids, getPred, srcMap) {
   const cases = ids.map((id) => ({ id, lang: lang(byId[id]), gold: srcMap[id].step, body: '' }));
@@ -90,7 +97,7 @@ for (const [label, srcMap] of Object.entries(src)) {
 
 const lines = []; const say = (s) => lines.push(s);
 say('# Glance model scoreboard'); say('');
-say('Lab only. Frozen label set, joined by text (' + frozen.length + ' rows). Labels are never owner-verified unless the first source says so. Rates: value [95% Wilson interval] k/n.');
+say('Lab only. Frozen label set, joined by text (' + frozen.length + ' rows).' + (HARD.size ? ' Engine hard quiets veto the model (--hard-quiets ' + arg('hard-quiets') + ').' : '') + ' Labels are never owner-verified unless the first source says so. Rates: value [95% Wilson interval] k/n.');
 for (const e of out.sources) {
   say(''); say('## ' + e.source + ' (n = ' + e.n + ')');
   if (!e.n) { say('No rows. Phase 0 needs path A (own-use labels with read-back proof) to fill this source.'); continue; }

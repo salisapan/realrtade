@@ -21,11 +21,20 @@ node glance-ai/scoreboard/run.cjs \
 - `last-run.md` and `last-run.json` are the latest printed scoreboard (agreement labels n = 444, single-pass n = 500).
 - Test: `node glance-ai/scoreboard/test-scoreboard.cjs`.
 
-## Readings
+## Readings (frozen, text-bound label set; the earlier readings joined labels by positional id and are withdrawn, see `glance-ai/model/V23.md` CORRECTION)
 
-**2026-11-11 (after the owner's C-4: an undated ask gets a Do It).** Agreement labels, n = 407 after 37 rows moved to the rule-derived source `labeling/owner-convention-overlay.jsonl`. The engine alone: 13 wrong Do Its of 136 silent rows (9.6%, interval 5.7% to 15.7%), none an undated ask any more; v2.6 adds none and cuts misses from 35 to 26 of 69. On the 21 decided act rows of the overlay the engine misses 8 and v2.6 alone misses all 21, because the gate's tau is above its confidence on real sentences. v2.8 (undated asks labelled act) adds 3 wrong Do Its on one open convention, C-18 (a reader's undated promise), so it is held. Details: `glance-ai/model/V23.md`.
+**2026-11-11, agreement labels, n = 394 (218 silent, 176 act), product order, engine hard quiets as a veto on the model (`--hard-quiets A`):**
 
-Before C-4 the same run read 26 of 161 (16.1%), 13 of them undated asks.
+| system | wrong Do It | missed | wrong action |
+|---|---|---|---|
+| engine alone | 13 (6.0%) | 86 (48.9%) | 7 |
+| engine + v2 (default) | 13 | 79 (44.9%) | 9 |
+| engine + v2.6 | 13 | 57 (32.4%) | 10 |
+| engine + hard quiets, then zero-shot Claude | 14 (6.4%) | 4 (2.3%) | 25 |
+| zero-shot Claude, alone | 24 (11.0%) | 8 (4.5%) | 33 |
+
+Without the engine's hard quiets as a veto, v2.6 adds 3 wrong Do Its (asks addressed to another named person) and is HELD by the gate. The zero-shot Claude baseline was run by a fresh subagent on the masked frozen cases (no API key was available; its prompt showed no sender name). Labels are Claude's, so the baseline is favoured. **No claim that Glance beats a frontier model follows from this, and none should be made;** what the table shows is that the floor cuts a general model's wrong Do Its from 24 to 14 and keeps 97.7% of the closes.
+
 - Contrast pairs and metamorphic checks: `contrast/README.md`. Regression ratchet of engine wrong Do Its: `node glance-ai/labeling/ratchet.cjs`.
 
 **2026-11-11, first frontier-baseline reading (zero-shot Claude, Sonnet class, one pass, the rules of `baseline/make-prompts.cjs`, 252 masked test cases, 0 unreadable answers).** No API key was available (the session authenticates only the harness), so the baseline was run by a fresh subagent that saw only the prompts file; the answers were ingested by `baseline/ingest.cjs`. Agreement labels, n = 407:
@@ -39,3 +48,5 @@ Before C-4 the same run read 26 of 161 (16.1%), 13 of them undated asks.
 
 Read it with care: (1) the labels were made by Claude passes under rules close to the baseline prompt, so the baseline is favoured; a frontier win here proves little, a frontier loss would prove a lot. (2) 15 of the 19 "wrong Do Its" are rows the labels call silent but that are label questions: seven save-to-Drive or OneDrive asks on a row with no attachment (the file chain is silent without one), six undated or «לפני החג» promises by the reader (C-18, C-3), two notes to self; 4 are real mistakes. (3) The trade is the point: a general model finds almost every close (missed 10%) and acts wrongly more often; Glance's rules and small model are precise and miss a lot (38%). The product design (Tier 2 model reading, then the device validator, strict gate and veto on every answer; `docs/glance-ai/ai-product.md`) is the way to take the recall without the wrong Do Its; its measured cost on the cached Qwen answers is in `ai-product.md` section 10. **No claim that Glance beats a frontier model follows from this, and none should be made.**
 
+
+**Legacy id-keyed label files.** `labeling/agreement-gold.jsonl`, `batch-NNN.claude-labels.jsonl` and `batch-NNN.pass2-labels.jsonl` are keyed by the dataset row ids of the day they were made. Those ids are positional and move when the generator changes, so these files are history, not an evaluation input: the scoreboard reads `labeling/frozen-eval.jsonl` (text-bound, built by `model/train/export-frozen.cjs` from the batch files, which carry the text) and the overlay and ratchet use its ids. `promote_gate.cjs` itself is unchanged (it reads whatever cases and labels it is given); feed it frozen rows, never dataset ids.

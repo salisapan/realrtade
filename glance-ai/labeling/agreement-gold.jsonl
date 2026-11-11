@@ -1,4 +1,4 @@
-{"id":"v2syn-22856","item":3,"lang":"he","step":"task","stepWas":"calendar","ownerConvention":"2026-11-11 לפני החג = task","undatedAsk":false,"agreed":true,"passes":2,"ownerVerified":false,"labeledBy":"agreement:claude+claude-pass2"}
+{"id":"v2syn-22856","item":3,"lang":"he","step":"calendar","undatedAsk":false,"agreed":true,"passes":2,"ownerVerified":false,"labeledBy":"agreement:claude+claude-pass2"}
 {"id":"v2syn-7716","item":4,"lang":"he","step":"task","undatedAsk":false,"agreed":true,"passes":2,"ownerVerified":false,"labeledBy":"agreement:claude+claude-pass2"}
 {"id":"v2syn-21787","item":5,"lang":"he","step":"draft","undatedAsk":false,"agreed":true,"passes":2,"ownerVerified":false,"labeledBy":"agreement:claude+claude-pass2"}
 {"id":"v2syn-9268","item":6,"lang":"he","step":"SILENT","undatedAsk":true,"agreed":true,"passes":2,"ownerVerified":false,"labeledBy":"agreement:claude+claude-pass2"}

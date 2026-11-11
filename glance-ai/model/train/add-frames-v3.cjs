@@ -29,14 +29,16 @@ const FRAMES = {
   work_verb: /\b(?:create|make|prepare|schedule|review|proofread|sign|fix|update|book|set up|finish|complete)\b|תכין|תכיני|תסדר|תעדכן|תעבור על|תחתום|תקבע|להכין|לסדר|לבדוק|לסיים/i
 };
 const NAMES = Object.keys(FRAMES);
+// frozen label rows (ids bNNN-item) carry their own text in labeling/frozen-eval.jsonl
+const frozenText = {}; try { for (const r of read(path.join(HERE, '..', '..', 'labeling', 'frozen-eval.jsonl'))) frozenText[r.id] = r; } catch (e) { /* no frozen set */ }
 const src = {}; for (const f of ['train', 'val', 'test']) for (const r of read(path.join(HERE, '..', 'dataset', 'out-v2', f + '.jsonl'))) src[r.id] = r;
 fs.mkdirSync(DST, { recursive: true });
 fs.copyFileSync(path.join(SRC, 'meta.json'), path.join(DST, 'meta.json'));
 let added = 0, rows = 0;
-for (const split of fs.readdirSync(SRC).filter((f) => /^(train|val|test|adversarial|oss)\.jsonl$/.test(f))) {
+for (const split of fs.readdirSync(SRC).filter((f) => /^(train|val|test|adversarial|oss|frozen)\.jsonl$/.test(f))) {
   const out = [];
   for (const f of read(path.join(SRC, split))) {
-    const r = src[f.id]; rows++;
+    const r = src[f.id] || (frozenText[f.id] ? { cleanBody: frozenText[f.id].body } : null); rows++;
     if (!r) { out.push(f); continue; }
     const body = r.cleanBody || r.body || '';
     const hit = NAMES.filter((n) => FRAMES[n].test(body));
