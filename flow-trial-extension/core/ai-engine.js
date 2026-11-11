@@ -29,6 +29,11 @@ const FlowAiEngine = (() => {
   const kinds = () => sibling(typeof FlowKindCheck !== 'undefined' ? FlowKindCheck : null, './kind-check.js', 'FlowKindCheck');
   const floor = () => sibling(typeof FlowAiFloor !== 'undefined' ? FlowAiFloor : null, './ai-floor.js', 'FlowAiFloor');
 
+  // The surfaces a plan knows (core/model-plan.js); anything else is planned as Gmail.
+  const SURFACES = { gmail: true, outlook: true, whatsapp: true, messenger: true, instagram: true, teams: true };
+  // The channel names the app the mail or message came from (core/ai-host.js sets it from the surface); it wins over the surface field.
+  function surfaceOf(mail) { return SURFACES[mail.channel] ? mail.channel : (SURFACES[mail.surface] ? mail.surface : 'gmail'); }
+
   // A host that injects no gate or veto gets the production floor (core/ai-floor.js) bound to this mail. A host gate or veto wins.
   // With no floor available either, Router v2 counts the missing gate as silence.
   function withFloor(deps, mail) {
@@ -81,7 +86,7 @@ const FlowAiEngine = (() => {
     const card = { source: 'model', step: r.step, proposal: r.proposal, plan: null, rows: [] };
     const P = planner();
     if (P && P.enabled(flags)) {
-      const x = P.plan(flags, r.proposal, { text: mail.text, today: mail.today, lang: mail.lang, surface: mail.surface === 'outlook' ? 'outlook' : 'gmail' });
+      const x = P.plan(flags, r.proposal, { text: mail.text, today: mail.today, lang: mail.lang, surface: surfaceOf(mail) });
       if (x.plan) {
         card.plan = x.plan; card.rows = x.rows;
         base.watch = P.toWatch(x.plan, r.proposal, { threadId: mail.threadId, messageId: mail.messageId, subject: mail.subject, counterpart: mail.counterpart, channel: mail.channel || mail.surface },
