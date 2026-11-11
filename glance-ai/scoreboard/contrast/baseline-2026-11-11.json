@@ -110,12 +110,12 @@
    "SILENT"
   ],
   "got": [
-   "SILENT",
+   "draft",
    "SILENT"
   ],
-  "passA": false,
+  "passA": true,
   "passB": true,
-  "pass": false,
+  "pass": true,
   "soft": false
  },
  {
