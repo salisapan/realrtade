@@ -2,11 +2,30 @@
  "n": 600,
  "edits": {
   "greet+sign": {
-   "flips": 0,
-   "silentToAct": 0,
-   "actToSilent": 0,
-   "rate": 0,
-   "examples": []
+   "flips": 25,
+   "silentToAct": 24,
+   "actToSilent": 1,
+   "rate": 0.042,
+   "examples": [
+    {
+     "id": "v2syn-157",
+     "from": "SILENT",
+     "to": "draft",
+     "text": "Hey, Hope your week is going well. Can you review the NDA and get back to me bef"
+    },
+    {
+     "id": "v2syn-770",
+     "from": "SILENT",
+     "to": "task",
+     "text": "Hello, As agreed, you will send the CV on Monday. Cheers"
+    },
+    {
+     "id": "v2syn-798",
+     "from": "SILENT",
+     "to": "task",
+     "text": "Good morning, Hope your week is going well. As agreed, you will send the price q"
+    }
+   ]
   },
   "re-prefix": {
    "flips": 0,
@@ -22,12 +41,127 @@
    "rate": 0,
    "examples": []
   },
-  "case-punct": {
+  "double-space": {
+   "flips": 62,
+   "silentToAct": 8,
+   "actToSilent": 53,
+   "rate": 0.103,
+   "examples": [
+    {
+     "id": "v2syn-68",
+     "from": "draft",
+     "to": "SILENT",
+     "text": "Hi Sali, I need the resume from you by November 2. Can you send it? Many thanks,"
+    },
+    {
+     "id": "v2syn-269",
+     "from": "draft",
+     "to": "SILENT",
+     "text": "Hi all, Hope your week is going well. When you get a moment, please send the onb"
+    },
+    {
+     "id": "v2syn-585",
+     "from": "draft",
+     "to": "SILENT",
+     "text": "Reminder: the payment of ₪1,200 is due by November 2. Please process it. Regards"
+    }
+   ]
+  },
+  "double-punct": {
+   "flips": 1,
+   "silentToAct": 0,
+   "actToSilent": 1,
+   "rate": 0.002,
+   "examples": [
+    {
+     "id": "v2rtest-capture-corpus-50",
+     "from": "draft",
+     "to": "SILENT",
+     "text": "Can you send the lease please?"
+    }
+   ]
+  },
+  "thanks-line": {
+   "flips": 2,
+   "silentToAct": 1,
+   "actToSilent": 1,
+   "rate": 0.003,
+   "examples": [
+    {
+     "id": "v2repo-chat-gold-24-gmail",
+     "from": "SILENT",
+     "to": "draft",
+     "text": "מתי נוח לך מחר?"
+    },
+    {
+     "id": "v2rtest-capture-corpus-50",
+     "from": "draft",
+     "to": "SILENT",
+     "text": "Can you send the lease please?"
+    }
+   ]
+  },
+  "signature-block": {
+   "flips": 2,
+   "silentToAct": 1,
+   "actToSilent": 1,
+   "rate": 0.003,
+   "examples": [
+    {
+     "id": "v2repo-chat-gold-24-gmail",
+     "from": "SILENT",
+     "to": "draft",
+     "text": "מתי נוח לך מחר?"
+    },
+    {
+     "id": "v2rtest-capture-corpus-50",
+     "from": "draft",
+     "to": "SILENT",
+     "text": "Can you send the lease please?"
+    }
+   ]
+  },
+  "quoted-history": {
+   "flips": 1,
+   "silentToAct": 1,
+   "actToSilent": 0,
+   "rate": 0.002,
+   "examples": [
+    {
+     "id": "v2repo-chat-gold-24-gmail",
+     "from": "SILENT",
+     "to": "draft",
+     "text": "מתי נוח לך מחר?"
+    }
+   ]
+  },
+  "crlf": {
    "flips": 0,
    "silentToAct": 0,
    "actToSilent": 0,
    "rate": 0,
    "examples": []
+  },
+  "nbsp": {
+   "flips": 0,
+   "silentToAct": 0,
+   "actToSilent": 0,
+   "rate": 0,
+   "examples": []
+  },
+  "emoji-tail": {
+   "flips": 1,
+   "silentToAct": 0,
+   "actToSilent": 1,
+   "rate": 0.002,
+   "examples": [
+    {
+     "id": "v2rtest-capture-corpus-50",
+     "from": "draft",
+     "to": "SILENT",
+     "text": "Can you send the lease please?"
+    }
+   ]
   }
  }
 }

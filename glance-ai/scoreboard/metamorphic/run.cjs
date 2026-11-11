@@ -19,18 +19,29 @@ const rows = read(path.join(G, 'model', 'dataset', 'out-v2', 'test.jsonl')).filt
 // deterministic sample: every k-th row
 const k = Math.max(1, Math.floor(rows.length / N)); const sample = rows.filter((_, i) => i % k === 0).slice(0, N);
 const bodyOf = (r) => r.cleanBody || r.body || '';
+// An edit returns a row whose body AND cleanBody are the edited text (the engine reads cleanBody when present; an edit that only set `body` was a no-op: the first
+// version of this file made that mistake and its "0 flips" for the first four edits were void; fixed 2026-11-11).
+const mk = (r, text, extra) => Object.assign({}, r, { body: text, cleanBody: text }, extra || {});
+const isHe = (r) => /[\u05D0-\u05EA]/.test(bodyOf(r));
 const EDITS = {
-  'greet+sign': (r) => { const he = /[א-ת]/.test(bodyOf(r)); return Object.assign({}, r, { body: (he ? 'היי סאלי,\n\n' : 'Hi Sali,\n\n') + bodyOf(r) + (he ? '\n\nתודה, דנה' : '\n\nThanks,\nDana') }); },
-  're-prefix': (r) => Object.assign({}, r, { subject: 'Re: ' + (r.subject || 'update'), body: bodyOf(r) }),
-  'trailing-ws': (r) => { const he = /[א-ת]/.test(bodyOf(r)); return Object.assign({}, r, { body: bodyOf(r) + '\n\n\n' + (he ? 'נשלח מהאייפון' : 'Sent from my iPhone') }); },
-  'case-punct': (r) => Object.assign({}, r, { body: bodyOf(r).replace(/ /g, '  ').replace(/([.?!])\s*$/, '$1$1') })
+  'greet+sign': (r) => mk(r, (isHe(r) ? 'היי סאלי,\n\n' : 'Hi Sali,\n\n') + bodyOf(r) + (isHe(r) ? '\n\nתודה, דנה' : '\n\nThanks,\nDana')),
+  're-prefix': (r) => mk(r, bodyOf(r), { subject: 'Re: ' + (r.subject || 'update') }),
+  'trailing-ws': (r) => mk(r, bodyOf(r) + '\n\n\n' + (isHe(r) ? 'נשלח מהאייפון' : 'Sent from my iPhone')),
+  'double-space': (r) => mk(r, bodyOf(r).replace(/ /g, '  ')),
+  'double-punct': (r) => mk(r, bodyOf(r).replace(/([.?!])\s*$/, '$1$1')),
+  'thanks-line': (r) => mk(r, bodyOf(r) + (isHe(r) ? '\nתודה!' : '\nThanks!')),
+  'signature-block': (r) => mk(r, bodyOf(r) + '\n\n--\nDana Cole | Operations | Northwind Ltd\nwww.northwind.example'),
+  'quoted-history': (r) => mk(r, bodyOf(r) + '\n\nOn Mon, 5 Oct 2026, Sali wrote:\n> Thanks, will do.\n> Best,\n> Sali'),
+  'crlf': (r) => mk(r, bodyOf(r).replace(/\n/g, '\r\n')),
+  'nbsp': (r) => mk(r, bodyOf(r).replace(/ /g, '\u00A0')),
+  'emoji-tail': (r) => mk(r, bodyOf(r) + ' \u{1F642}')
 };
-const run = (r) => step(eng.teach(Object.assign({}, r, { body: bodyOf(r), cleanBody: bodyOf(r) })).label);
+const run = (r) => step(eng.teach(r).label);
 const out = { n: sample.length, edits: {} };
 for (const [name, f] of Object.entries(EDITS)) {
   let flips = 0, toAct = 0, toSilent = 0, ex = [];
   for (const r of sample) {
-    const a = run(r), b = run(f(r));
+    const a = run(mk(r, bodyOf(r))), b = run(f(r)); // the baseline is the same row with its text normalised, so only the edit can flip it
     if (a !== b) { flips++; if (a === 'SILENT') toAct++; else if (b === 'SILENT') toSilent++; if (ex.length < 3) ex.push({ id: r.id, from: a, to: b, text: bodyOf(r).slice(0, 80).replace(/\n/g, ' ') }); }
   }
   out.edits[name] = { flips, silentToAct: toAct, actToSilent: toSilent, rate: +(flips / sample.length).toFixed(3), examples: ex };
