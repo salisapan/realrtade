@@ -40,4 +40,13 @@ t('the engine hard-quiet reasons are one list, and a model may not act under the
   for (const r of ['intent-null', 'too-short', 'note-to-self', 'no-draft-close']) assert.strictEqual(H.modelMayAct(r), true, r);
   assert.strictEqual(H.modelMayAct('quiet:noise'), true); assert.strictEqual(H.modelMayAct('quiet:noise', H.B), false);
 });
+t('content ids are stable: same text, same id; another text, another id; the frozen set has one id per row', () => {
+  const { cid } = require('../model/dataset/cid.cjs');
+  const a = { lang: 'en', surface: 'gmail', direction: 'inbound', from: { email: 'D@x.com' }, subject: 'Hi', cleanBody: 'Could you send  the budget?' };
+  assert.strictEqual(cid(a), cid(Object.assign({}, a, { cleanBody: 'Could you send the budget?', from: { email: 'd@x.com' } })), 'whitespace and case of the sender do not change it');
+  assert.notStrictEqual(cid(a), cid(Object.assign({}, a, { cleanBody: 'Could you send the invoice?' })));
+  assert.notStrictEqual(cid(a), cid(Object.assign({}, a, { lang: 'he' })));
+  const fr = fs.readFileSync(path.join(__dirname, '..', 'labeling', 'frozen-eval.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.strictEqual(new Set(fr.map((r) => r.cid)).size, fr.length, 'one content id per frozen row');
+});
 console.log('\n' + n + ' passed');

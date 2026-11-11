@@ -140,6 +140,8 @@ for (const r of rows) {
   else { const b = bucket(r.templateId); r.split = b < 20 ? 'test' : (b < 32 ? 'val' : 'train'); }
 }
 const w = (name, arr) => fs.writeFileSync(path.join(OUT, name), arr.map((r) => JSON.stringify(r)).join('\n') + '\n');
+// stable content ids (model/dataset/cid.cjs): join labels by `cid`, never by the positional `id`
+const { cid: contentId } = require('../cid.cjs'); for (const r of rows) r.cid = contentId(r);
 w('all.jsonl', rows); for (const s of ['train', 'val', 'test']) w(s + '.jsonl', rows.filter((r) => r.split === s));
 const by = (fn) => { const o = {}; for (const r of rows) { const k = fn(r); o[k] = o[k] || { n: 0, show: 0 }; o[k].n++; if (r.reference.show) o[k].show++; } return o; };
 const frameCounts = {}; for (const f of frames) { const k = f.origin + ':' + f.lang; frameCounts[k] = (frameCounts[k] || 0) + 1; }

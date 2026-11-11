@@ -14,6 +14,7 @@ const read = (p) => fs.readFileSync(p, 'utf8').trim().split('\n').filter(Boolean
 const { prepare } = require('../runtime/pipeline-v2.cjs');
 const { makeEngine } = require('../teacher/engine.cjs');
 const { merge } = require(path.join(L, 'merge-passes.cjs'));
+const { cid } = require(path.join(__dirname, '..', 'dataset', 'cid.cjs'));
 const tip = makeEngine('tip');
 const step = (l) => (!l || l === 'SILENT' ? 'SILENT' : String(l).split('|').pop());
 const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -38,7 +39,7 @@ for (const b of ['003', '004', '005', '006', '007', '008'].filter((b) => fs.exis
     const P = prepare(row);
     const tipOut = tip.teach(Object.assign({}, row, { body: row.body }));
     const tipStep = step(tipOut.label);
-    frozen.push({ id, srcId: r.id, batch: b, item: r.item, lang: r.lang, scenario: r.scenario, surface: r.surface, direction: r.direction, from: r.from, to: r.to, cc: r.cc, subject: r.subject,
+    frozen.push({ id, cid: cid(Object.assign({}, r, { cleanBody: r.body })), srcId: r.id, batch: b, item: r.item, lang: r.lang, scenario: r.scenario, surface: r.surface, direction: r.direction, from: r.from, to: r.to, cc: r.cc, subject: r.subject,
       attachmentCount: r.attachmentCount || 0, body: r.body, pass1: l1.step || null, pass2: l2.step || null, undatedAsk: Boolean(l1.undatedAsk || l2.undatedAsk),
       agreed: ag ? ag.step : null, tip: tipStep, tipReason: tipOut.reason });
     feats.push({ id, x: P.x, y: 'SILENT', ybin: 0, unsure: false, scenario: r.scenario || null, lang: r.lang, surface: r.surface, direction: r.direction, att: r.attachmentCount || 0,

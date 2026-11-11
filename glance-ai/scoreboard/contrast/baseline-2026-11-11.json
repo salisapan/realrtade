@@ -304,5 +304,277 @@
   "passB": true,
   "pass": false,
   "soft": false
+ },
+ {
+  "id": "pay-vs-paid-en",
+  "fact": "a payment ask vs a report of a paid invoice",
+  "conv": "C-1",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "pay-vs-paid-he",
+  "fact": "a payment ask vs a report of a paid invoice (a Hebrew paid report is the designed confirmed-amount close, family E, which `close-families-corpus` pins: the same C-1 question, not a defect)",
+  "conv": "C-1",
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "task"
+  ],
+  "passA": true,
+  "passB": false,
+  "pass": false,
+  "soft": false
+ },
+ {
+  "id": "meeting-vs-cancelled-en",
+  "fact": "a meeting proposal vs a cancelled meeting",
+  "conv": null,
+  "expected": [
+   "calendar",
+   "SILENT"
+  ],
+  "got": [
+   "calendar",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "meeting-vs-cancelled-he",
+  "fact": "a meeting proposal vs a cancelled meeting",
+  "conv": null,
+  "expected": [
+   "calendar",
+   "SILENT"
+  ],
+  "got": [
+   "calendar",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "file-save-vs-fyi-en",
+  "fact": "a save request with an attachment vs an attachment sent for information",
+  "conv": null,
+  "expected": [
+   "file_save",
+   "SILENT"
+  ],
+  "got": [
+   "file_save",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "reader-promise-vs-vague-en",
+  "fact": "a dated promise of the reader vs a vague possibility",
+  "conv": "C-11",
+  "expected": [
+   "task",
+   "SILENT"
+  ],
+  "got": [
+   "task",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "reader-promise-vs-vague-he",
+  "fact": "a dated promise of the reader vs a vague possibility",
+  "conv": "C-11",
+  "expected": [
+   "task",
+   "SILENT"
+  ],
+  "got": [
+   "task",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "sender-promise-en",
+  "fact": "the reader asked vs the sender promises",
+  "conv": null,
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "task"
+  ],
+  "passA": true,
+  "passB": false,
+  "pass": false,
+  "soft": true
+ },
+ {
+  "id": "live-vs-quoted-ask-en",
+  "fact": "a live ask vs an old ask only quoted",
+  "conv": null,
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "ask-vs-thanks-en",
+  "fact": "an ask vs a thank-you",
+  "conv": null,
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "ask-vs-thanks-he",
+  "fact": "an ask for information vs a thank-you (a Hebrew «לאשר» is an approval ask and a task by C-15, so the ask here is a send-back)",
+  "conv": null,
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "ask-vs-ooo-en",
+  "fact": "an ask vs an out-of-office reply",
+  "conv": null,
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "ask-vs-newsletter-he",
+  "fact": "an ask vs a newsletter",
+  "conv": null,
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "decision-vs-ask-en",
+  "fact": "a decision announced vs the same decision asked",
+  "conv": null,
+  "expected": [
+   "task",
+   "SILENT"
+  ],
+  "got": [
+   "task",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "note-self-vs-ask-en",
+  "fact": "a dated note to self vs an ask from someone else",
+  "conv": "C-10",
+  "expected": [
+   "task",
+   "task"
+  ],
+  "got": [
+   "task",
+   "task"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
+ },
+ {
+  "id": "relative-date-he",
+  "fact": "a Hebrew ask with a weekday vs the same ask in the past",
+  "conv": null,
+  "expected": [
+   "draft",
+   "SILENT"
+  ],
+  "got": [
+   "draft",
+   "SILENT"
+  ],
+  "passA": true,
+  "passB": true,
+  "pass": true,
+  "soft": false
  }
 ]
