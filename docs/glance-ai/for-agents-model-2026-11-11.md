@@ -57,3 +57,8 @@ Everything is lab only: v2 stays the default, no candidate passed the promotion 
 - Needs the owner or an account: a reader service key with a spend cap (the one with the best return), the on-device export of his own decisions (path A), a GPU host.
 - Free to pick up: more contrast pairs and metamorphic edits, engine fixes found by the ratchet (each with a corpus and the full corpora run), the greeting-dependence item (low priority, owner 2026-11-11).
 - Before you run anything: `scripts/graphify-setup.sh`, then the engine environment variables listed at the top of `glance-ai/model/V23.md`.
+
+## 7. The teacher pipeline (added the same day)
+
+`glance-ai/teacher/` holds the API teacher pipeline: `api.py` (the only place a key is read: the variable `GLANCE_LAB_ANTHROPIC_API_KEY`, never `ANTHROPIC_API_KEY`; metered in `ledger.jsonl`; hard stop at $24), `label.py`, `make-cases.cjs`, `escalate.cjs`, `bootstrap.sh`, and `RUNBOOK.md` (the order: sealed-set baseline, a 200-row cost probe, about 10,000 teacher labels, retrain on CPU, the stop rule). The key lives only in the `glance-model-lab` cloud environment; a session in another environment cannot use it. The teacher labels and evaluates and never goes into the product.
+
