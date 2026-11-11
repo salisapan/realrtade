@@ -26,6 +26,9 @@ const FlowIncomingJudge = (() => {
       .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069\u061C]/g, '')
       .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
       .replace(/[\u00A0\u202F]/g, ' ')
+      // A run of spaces or tabs is one space: the patterns below assume single spaces, and a metamorphic check (2026-11-11) found that doubling the spaces
+      // of a mail flipped about 10% of the engine's decisions (53 of 600 acts went silent). Newlines are kept.
+      .replace(/[ \t]{2,}/g, ' ')
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n');
   }
