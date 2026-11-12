@@ -5,11 +5,12 @@ Glance closes open loops. Gmail is where it starts today.
 Source: `git log origin/claude/install-uiux-pro-max-skill-a4agox --since=2026-10-20` limited to `flow-trial-extension/core`, `flow-trial-extension/src`, `flow-trial-extension/manifest.json` and `glance-gmail-addon/`. Regenerate: `scripts/what-changed.sh 2026-10-20 > docs/glance-ai/shipped-in-code.md`.
 
 - Extension version in `manifest.json` on the branch: 0.9.56
-- Commits on the working branch that are not on `main`: 167. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
-- Lines changed in core, src and the add-on since `main`: 74 files changed, 8813 insertions(+), 569 deletions(-)
+- Commits on the working branch that are not on `main`: 184. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
+- Lines changed in core, src and the add-on since `main`: 75 files changed, 8973 insertions(+), 569 deletions(-)
 
 | Commit | When | What it changed in code | Files in core, src or the add-on |
 |---|---|---|---|
+| d166efd5 | 2026-11-12 | Decompose v1 (off): every intention of a mail, with its parts and steps | core/README.md core/intent-decompose.js  |
 | d79bb595 | 2026-11-11 | Whitespace robustness in the shared judge (found by the metamorphic check) with its corpus; contrast pairs 18 to 34 | core/incoming-judge.js glance-gmail-addon/CoreBundle.js  |
 | 48842602 | 2026-11-11 | Plan 2 for the model; Hebrew reader-commitment parity fix in the engine with its corpus; ratchet grown; v2.9 measured | core/intent.js glance-gmail-addon/CoreBundle.js  |
 | 6b12ac69 | 2026-11-11 | C-1 alignment as an engine option (confirmedAmountSilent, off by default) with its corpus; hard-quiet reasons as one lab list; batch-008 blind batch | core/incoming-judge.js core/intent.js glance-gmail-addon/CoreBundle.js  |
