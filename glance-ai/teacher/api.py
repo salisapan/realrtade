@@ -59,7 +59,7 @@ def call(model, system, user, max_tokens=600, tag='', est_in=0, est_out=0):
     with _lock:
         est = cost(model, {'input_tokens': est_in, 'output_tokens': est_out or max_tokens})
         if spent() + est > BUDGET: raise Refused('budget: spent %.2f + estimate %.2f would pass the %.2f hard stop' % (spent(), est, BUDGET))
-    body = json.dumps({'model': model, 'max_tokens': max_tokens, 'temperature': 0,
+    body = json.dumps({'model': model, 'max_tokens': max_tokens, **({'thinking': {'type': 'disabled'}} if 'haiku' in model else {'thinking': {'type': 'adaptive'}, 'output_config': {'effort': 'low'}}),
                        'system': [{'type': 'text', 'text': system, 'cache_control': {'type': 'ephemeral'}}], 'messages': [{'role': 'user', 'content': user}]}).encode()
     req = urllib.request.Request(URL, data=body, headers={'content-type': 'application/json', 'anthropic-version': '2023-06-01', 'x-api-key': key})
     for attempt in range(4):

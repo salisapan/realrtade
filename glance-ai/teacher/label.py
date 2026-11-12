@@ -32,7 +32,7 @@ def work(ch):
     user = ''.join(block(i + 1, r) for i, r in enumerate(ch))
     try:
         if A.dry_run: text, usd = '\n'.join(json.dumps({'item': i + 1, 'step': 'SILENT', 'undatedAsk': False}) for i in range(len(ch))), 0.0
-        else: text, usd = api.call(A.model, SYSTEM, user, max_tokens=60 * len(ch) + 40, tag=A.tag, est_in=900 + 450 * len(ch), est_out=40 * len(ch))
+        else: text, usd = api.call(A.model, SYSTEM, user, max_tokens=60 * len(ch) + 40 + (0 if 'haiku' in A.model else 2500), tag=A.tag, est_in=900 + 450 * len(ch), est_out=40 * len(ch))
     except api.Refused as e:
         with lock: stats['stopped'] = str(e)
         return
@@ -43,6 +43,8 @@ def work(ch):
         try: o = json.loads(l)
         except Exception: continue
         if o.get('step') in STEPS and isinstance(o.get('item'), int) and 1 <= o['item'] <= len(ch): got[o['item']] = o
+    if len(got) < len(ch):
+        with lock, open(A.out + '.unparsed.txt', 'a', encoding='utf8') as f: f.write('=== chunk ids %s\n%s\n' % ([r['id'] for r in ch], text))
     with lock:
         with open(A.out, 'a', encoding='utf8') as f:
             for i, r in enumerate(ch):
