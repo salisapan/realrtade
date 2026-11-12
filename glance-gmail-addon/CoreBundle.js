@@ -4866,7 +4866,7 @@ const FlowIntent = (() => {
   // no per-sentence negation/hedge check, so each addition below was
   // re-verified against the full negative-test corpus before being kept.
   const READER_COMMIT = /\b(you (?:agreed|committed|promised|confirmed) to|you (?:said|mentioned|indicated) you(?:'d| would)|you told (?:us|me) you(?:'d| would)|you'?re supposed to|you were (?:going|supposed) to|as (?:you|per your|we) (?:agreed|committed|promised|discussed)|confirming you(?:'ll| will)|per your commitment|as (?:discussed|promised|previously agreed),? you(?:'ll| will)|per our conversation,? you(?:'ll| will)|reminding you (?:that )?you (?:agreed|committed|promised) to)\b/i;
-  const READER_COMMIT_HE = /(כפי שהתחייבת|כמו שהתחייבת|כפי שסיכמת|כמו שסיכמת|את(?:ה)? התחייבת|כמו שאמרת ש|כפי שהבטחת|כמו שהבטחת|אתה אמור ל|את אמורה ל|היית אמור ל|היית אמורה ל|לפי הסיכום שלנו|בהתאם למה שסיכמנו|כפי שהיה מוסכם|כמו שהיה מוסכם)/;
+  const READER_COMMIT_HE = /(כפי שהתחייבת|כמו שהתחייבת|כפי שסיכמת|כמו שסיכמת|את(?:ה)? התחייבת|כמו שאמרת ש|כפי שהבטחת|כמו שהבטחת|אתה אמור ל|את אמורה ל|היית אמור ל|היית אמורה ל|לפי הסיכום שלנו|בהתאם למה שסיכמנו|כפי שהיה מוסכם|כמו שהיה מוסכם|(?<!לא )(?:התחייבת|הבטחת) (?:ל|ש)|סיכמנו ש(?:ת|י)|(?:אמרת|דיברנו|סוכם) ש(?:ת)|לפי מה שאמרת)/;
 
   // The one sentence a human would point to as "this is the ask" — reused
   // as the `what` entity rather than synthesizing new wording, the same
@@ -6929,6 +6929,10 @@ const FlowIntent = (() => {
       return logged;
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {
+      // Owner decision 2026-10-14 (C-1, glance-ai/labeling/owner-rules.md 3b): a mail that only confirms an amount or an approved budget and asks
+      // nothing is silence. The engine still offers the confirmed-amount close by default; this option is the alignment, OFF until the host passes
+      // it (no host does yet, so nothing changes). test/confirmed-amount-silent-corpus.cjs.
+      if (ctx.confirmedAmountSilent === true && !requestEvidence) return stayQuiet('confirmed-amount-no-ask');
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
         what: whatText(text, DATED_COMMIT_PATTERNS) || labelFor(TYPES.DECISION_TO_LOG),
@@ -9784,6 +9788,9 @@ const FlowIncomingJudge = (() => {
       .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069\u061C]/g, '')
       .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
       .replace(/[\u00A0\u202F]/g, ' ')
+      // A run of spaces or tabs is one space: the patterns below assume single spaces, and a metamorphic check (2026-11-11) found that doubling the spaces
+      // of a mail flipped about 10% of the engine's decisions (53 of 600 acts went silent). Newlines are kept.
+      .replace(/[ \t]{2,}/g, ' ')
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n');
   }
@@ -10047,6 +10054,7 @@ const FlowIncomingJudge = (() => {
       forwarded: i.forwarded === true,
       namesPending: i.namesPending === true,
       namesWaitDone: i.namesWaitDone === true,
+      confirmedAmountSilent: i.confirmedAmountSilent === true,
       readerEmail: i.readerEmail || null
     });
     // The profile names are not cached yet. No card, and not a quiet.

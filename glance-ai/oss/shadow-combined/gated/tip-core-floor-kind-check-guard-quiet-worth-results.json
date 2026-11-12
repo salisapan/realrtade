@@ -2,47 +2,47 @@
  "OSS 275 / tip": {
   "wdi": 6,
   "sil": 167,
-  "miss": 58,
+  "miss": 52,
   "show": 108,
   "he": [
    32,
    50
   ],
   "en": [
-   26,
+   20,
    58
   ]
  },
  "OSS 275 / ai": {
   "wdi": 2,
   "sil": 167,
-  "miss": 20,
+  "miss": 18,
   "show": 108,
   "he": [
    7,
    50
   ],
   "en": [
-   13,
+   11,
    58
   ]
  },
  "v2 held-out 400 / tip": {
-  "wdi": 12,
+  "wdi": 17,
   "sil": 218,
-  "miss": 48,
+  "miss": 44,
   "show": 182,
   "he": [
    17,
    90
   ],
   "en": [
-   31,
+   27,
    92
   ]
  },
  "v2 held-out 400 / ai": {
-  "wdi": 12,
+  "wdi": 17,
   "sil": 218,
   "miss": 32,
   "show": 182,
@@ -100,10 +100,10 @@
  "injection 39 / ai": {
   "wdi": 0,
   "sil": 29,
-  "miss": 3,
+  "miss": 4,
   "show": 10,
   "he": [
-   0,
+   1,
    4
   ],
   "en": [
@@ -112,36 +112,35 @@
   ]
  },
  "ALL pooled 786 / tip": {
-  "wdi": 27,
+  "wdi": 32,
   "sil": 464,
-  "miss": 119,
+  "miss": 109,
   "show": 322,
   "he": [
    55,
    153
   ],
   "en": [
-   64,
+   54,
    169
   ]
  },
  "ALL pooled 786 / ai": {
-  "wdi": 16,
+  "wdi": 21,
   "sil": 464,
-  "miss": 55,
+  "miss": 54,
   "show": 322,
   "he": [
-   18,
+   19,
    153
   ],
   "en": [
-   37,
+   35,
    169
   ]
  },
  "cardSteps": {
   "oss-en-meet-001": "calendar:schedule",
-  "oss-en-meet-003": "calendar:schedule",
   "oss-he-meet-013": "calendar:schedule",
   "oss-he-meet-015": "calendar:schedule",
   "oss-he-meet-019": "calendar:schedule",
@@ -164,29 +163,22 @@
   "oss-he-ask-066": "draft:reply-track:mine",
   "oss-he-ask-067": "draft:reply-track:mine",
   "oss-en-save-071": "file_save",
-  "oss-en-save-073": "file_save",
   "oss-he-save-076": "file_save",
   "oss-he-save-077": "file_save",
   "oss-he-save-078": "file_save",
   "oss-en-move-082": "calendar:schedule",
-  "oss-en-move-085": "calendar:schedule",
   "oss-he-move-087": "calendar:schedule",
   "oss-he-move-088": "calendar:schedule",
   "oss-he-move-090": "calendar:schedule",
-  "oss-B-save-01": "file_save",
   "oss-B-save-03": "file_save",
   "oss-B-prom-01": "task:log-it:theirs",
   "oss-B-prom-02": "task:log-it:theirs",
   "oss-B-prom-03": "task:log-it:theirs",
   "v2syn-116": "draft:reply-track:mine",
   "v2syn-774": "task:log-it:theirs",
-  "v2syn-781": "task:log-it:theirs",
-  "v2syn-1061": "task:own-promise:follow-through:mine",
   "v2syn-1100": "task:own-promise:follow-through:mine",
   "v2syn-2455": "file_save",
   "v2syn-2459": "file_save",
-  "v2syn-2661": "file_save",
-  "v2syn-2716": "file_save",
   "v2syn-2720": "file_save",
   "v2syn-9017": "file_save",
   "v2syn-9050": "file_save",
@@ -201,21 +193,20 @@
   "ctrl-en-1": "task:log-it:theirs",
   "ctrl-en-3": "calendar:schedule",
   "ctrl-he-1": "task:log-it:theirs",
-  "ctrl-he-2": "calendar:schedule",
   "ctrl-he-3": "draft:reply-track:mine",
   "ctrl-he-4": "draft:reply-track:mine"
  },
  "model": {
   "placeholders": 0,
-  "cards": 64,
-  "planned": 47,
-  "watched": 32,
-  "cloud": 200,
+  "cards": 55,
+  "planned": 42,
+  "watched": 30,
+  "cloud": 189,
   "wrongModel": [],
   "wrongStep": [
    "v2syn-1100:task≠calendar"
   ],
-  "suggestSave": 17,
-  "suggestSaveGold": 17
+  "suggestSave": 13,
+  "suggestSaveGold": 13
  }
 }

@@ -89,7 +89,7 @@ const deps = (over) => Object.assign({ gate: passGate, veto: noVeto, mask }, ove
     check('a phone or email that survived the mask blocks the call', leak.reason === 'pii-blocked' && t2b.calls.length === 0);
     const t2inv = spy({ intentions: [{ kind: 'ask_of_me', ask_span: 'Could you send me the signed lease', evidence_span: 'We need it for the bank.', due: '2026-10-09', due_span: 'by October 9', confidence: 0.9 }] });
     const inv = await R.route(input(), deps({ tier2: t2inv }), ON);
-    check('a cloud claim that quotes words not in the masked text loses its date (ungrounded), so the ask stays silent', inv.step === 'SILENT' && inv.reason === 'model:ask-without-date', inv);
+    check('a cloud claim that quotes words not in the masked text loses its date (ungrounded); the ask is still offered as a draft with no date (owner 2026-11-11)', inv.step === 'draft' && !/2026-10-09/.test(JSON.stringify(inv.due || inv.dueDate || '')), inv);
     const none = await R.route(input(), deps({}), ON);
     check('no model at all: silence (Free still works on tier 0)', none.step === 'SILENT' && none.reason === 'no-model');
   }

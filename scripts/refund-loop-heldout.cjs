@@ -29,7 +29,7 @@ rows.forEach((r) => {
     a = 'none';
     const loop = Object.assign({ id: r.id, status: 'open', stage: 'asked' }, r.loop);
     const d = R.judge([loop], r.msg, ON);
-    b = d ? d.verdict : 'none';
+    b = d && d.verdict !== 'partial' ? d.verdict : 'none';                        // a part counted is not a close
   }
   const pos = r.expect !== 'none';
   ['all', r.lang].forEach((l) => {
