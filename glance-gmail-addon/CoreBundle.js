@@ -911,6 +911,8 @@ const FlowExtract = (() => {
   function senderIsAutomated(email, text) {
     const local = String(email || '').split('@')[0].toLowerCase();
     if (/^(no-?reply|do-?not-?reply|noreply|notifications?|alerts?|mailer|bounce|postmaster|automated|support-bot)/.test(local)) return true;
+    // Google Calendar's own notices (booked, declined, updated): the calendar already holds the event (found on real mail, 2026-11-12).
+    if (/^calendar-notification$/.test(local)) return true;
     // newsletter@ news@ marketing@ — the local part, not a longer word such as newspaper.
     if (/^(newsletter|news|marketing)(?![a-z0-9])/.test(local)) return true;
     if (/\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b|\byou are receiving this\b|\byou(?:'|’)re receiving this\b|\byou received this email because\b|קיבלת מייל זה|להסרה מרשימת התפוצה|הנך רשום/i.test(text)) return true;
@@ -9971,7 +9973,71 @@ const FlowIncomingJudge = (() => {
       || ((hitD) => (hitD ? doItCard(i, hitD) : null))(decideAsk(i, body0))
       || ((hit1) => (hit1 ? holdCard(i, hit1) : null))(holdProposal(i, body0))
       || ((hit2) => (hit2 ? replyCard(i, hit2) : null))(answerAsk(i, body0))
-      || ((hit3) => (hit3 ? inviteCard(i, hit3) : null))(inviteAccept(i, body0));
+      || ((hit3) => (hit3 ? inviteCard(i, hit3) : null))(inviteAccept(i, body0))
+      || (i.directAskOn === true ? directAskCard(i, body0) : null);
+  }
+
+  // ---- direct ask (owner 2026-11-12, after the first run on his real mailbox): the two shapes the classifier does not read ----
+  //   1. plain information questions a PERSON puts to the reader ("מה ההבדלים בין...?", "What is the price of...?"): the close is a reply.
+  //      At least two such questions, or one in a mail that greets the reader by name. No date is needed and none is invented.
+  //   2. a Hebrew bare imperative with a day ("מלא את הטופס, חתום והחזר עד מחר", "תשלם את החשבונית עד יום חמישי"): work is a task,
+  //      a payment or a send-back is a reply.
+  // Strict about who and where: a person (not an automated sender, not an auto-reply, bounce or calendar notice), a mail addressed To the
+  // reader with at most three recipients, only the mail's own text above any quoted or forwarded header. A sentence that hedges, cancels or
+  // sells is skipped. Last of the second reads, so every earlier reader and every quiet wins. Off unless the host passes directAskOn.
+  const DIRECT_AUTO_SUBJECT = /^(?:\s*(?:re|fw|fwd)\s*:\s*)*(?:automatic reply|auto(?:matic)?[- ]reply|out of (?:the )?office|undeliverable|delivery status|declined:|accepted:|tentative|מענה אוטומטי|תשובה אוטומטית|[\u200e\u200f]*לא ניתן למסירה)/i;
+  const DIRECT_CUT = /\n(?:-{2,}\s*(?:Original|Forwarded|הודעה)|From:\s|מאת:\s|On .{4,80} wrote:|ב[-־]?.{4,60} כתב)/;
+  const DIRECT_Q_EN = /^(?:what|why|how|when|where|which|who|is there|are there|do you have|does it|does the)\b/i;
+  const DIRECT_Q_HE = /^(?:ו)?(?:מה|למה|מדוע|איך|כיצד|האם|מתי|איפה|היכן|כמה|מי|איזה|איזו|אילו|יש|אנחנו יכולים|נוכל)(?![\u0590-\u05FF])/;
+  const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
+  const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני)(?![\u0590-\u05FF])/;
+  const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
+  function directAsk(i, body) {
+    const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
+    const sender = String((i.sender && i.sender.email) || '').toLowerCase();
+    const own = (i.ownAddresses || []).map((a) => String(a).toLowerCase());
+    const to = (i.to || []).map((a) => String(a).toLowerCase());
+    if (!sender || !own.length || own.indexOf(sender) >= 0) return null;
+    if (!to.some((a) => own.indexOf(a) >= 0) || to.length > 3) return null;
+    if (DIRECT_AUTO_SUBJECT.test(String(i.subject || ''))) return null;
+    if (X && typeof X.senderIsAutomated === 'function' && X.senderIsAutomated(sender, String(body || ''))) return null;
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const raw = String(body || '');
+    const cut = raw.search(DIRECT_CUT);
+    const ownText = cut >= 0 ? raw.slice(0, cut) : raw;
+    const sents = sentencesOf(ownText).map((x) => x.replace(/^(?:\d{1,2}[.)]|[-*•])\s*/, '').trim()).filter((x) => x.length >= 8 && x.length <= 220);
+    const names = (i.ownNames || []).filter(Boolean).map((n) => String(n).toLowerCase());
+    const head = ownText.slice(0, 60).toLowerCase();
+    const greetsReader = names.some((n) => head.indexOf(n) >= 0);
+    const skip = (x, he) => (he ? ANSWER_NO_HE.test(x) : ANSWER_NO_EN.test(x)) || DIRECT_Q_NO.test(x);
+    // 2. a Hebrew bare imperative with its day
+    for (const x0 of sents) {
+      const x = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
+      if (!/[\u0590-\u05FF]/.test(x) || skip(x, true) || /(?:^|\s)(?:אל|לא)\s/.test(x)) continue;
+      const work = DIRECT_IMP_WORK_HE.test(x), back = DIRECT_IMP_BACK_HE.test(x);
+      if (!work && !back) continue;
+      const d = dayOf(x, now0).date;
+      if (!d || d < ymdOf(now0)) continue;
+      return { kind: work ? 'task' : 'reply', what: x.slice(0, 200), title: x.replace(/[.!?\s]+$/, '').slice(0, 80), dateIso: d, lang: 'he' };
+    }
+    // 1. plain information questions
+    const qs = sents.filter((x) => /\?\s*$/.test(x)).map((x) => x.replace(/\s+\?\s*$/, '?')).filter((x) => {
+      const he = /[\u0590-\u05FF]/.test(x);
+      // A question that names a clock is a meeting proposal: the hold readers and the calendar path own it, not a reply.
+      return (he ? DIRECT_Q_HE.test(x) : DIRECT_Q_EN.test(x)) && !skip(x, he) && !dayOf(x, now0).time;
+    });
+    if (qs.length >= 2 || (qs.length === 1 && greetsReader)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length };
+    return null;
+  }
+  function directAskCard(i, body) {
+    const hit = directAsk(i, body);
+    if (!hit) return null;
+    if (hit.kind === 'task') { const c = doItCard(i, hit); c.intent.directAsk = true; return c; }
+    const c = replyCard(i, hit);
+    c.intent.directAsk = true; c.intent.questions = hit.questions || null;
+    // No day in the words: the reply draft alone (owner C-4). A task with no date is not invented.
+    if (!hit.dateIso) c.process.steps = c.process.steps.filter((st) => st.kind !== 'googleTask');
+    return c;
   }
 
   function judge(input, deps) {

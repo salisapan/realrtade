@@ -44,7 +44,8 @@ function makeEngine(name) {
     if (process.env.GLANCE_HOST_CTX === '0') return {};
     const names = Array.isArray(c.ownNames) ? c.ownNames : [];
     return { to: c.to || [], cc: c.cc || [], ownAddresses: [own], ownNames: names, userName: names[0] || null,
-      direction: c.direction || null, inbound: c.direction === 'inbound', namesWaitDone: true };
+      direction: c.direction || null, inbound: c.direction === 'inbound', namesWaitDone: true,
+      directAskOn: process.env.GLANCE_DIRECT_ASK === '1' };  // lab only: the direct-ask second read (core/incoming-judge.js), off in the product
   }
   function teach(c) {
     const surface = c.surface === 'outlook' ? 'outlook' : 'gmail';

@@ -712,6 +712,8 @@ const FlowExtract = (() => {
   function senderIsAutomated(email, text) {
     const local = String(email || '').split('@')[0].toLowerCase();
     if (/^(no-?reply|do-?not-?reply|noreply|notifications?|alerts?|mailer|bounce|postmaster|automated|support-bot)/.test(local)) return true;
+    // Google Calendar's own notices (booked, declined, updated): the calendar already holds the event (found on real mail, 2026-11-12).
+    if (/^calendar-notification$/.test(local)) return true;
     // newsletter@ news@ marketing@ — the local part, not a longer word such as newspaper.
     if (/^(newsletter|news|marketing)(?![a-z0-9])/.test(local)) return true;
     if (/\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b|\byou are receiving this\b|\byou(?:'|’)re receiving this\b|\byou received this email because\b|קיבלת מייל זה|להסרה מרשימת התפוצה|הנך רשום/i.test(text)) return true;
