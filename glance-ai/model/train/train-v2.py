@@ -10,8 +10,25 @@ from scipy.sparse import csr_matrix
 from sklearn.linear_model import LogisticRegression
 ap = argparse.ArgumentParser(); ap.add_argument('--feat', default='features-v2'); ap.add_argument('--tag', default='v2'); ap.add_argument('--rows', default='all'); ap.add_argument('--no-export', action='store_true'); ap.add_argument('--predict-set', dest='predict_set', default=None, help='features jsonl (e.g. features-frozen/frozen.jsonl) to predict with the final model; writes <tag>.extra-preds.jsonl')
 ap.add_argument('--target', type=float, default=0.0029); ap.add_argument('--strict', dest='mask_unsure', action='store_false'); ap.add_argument('--gate-on-all', dest='gate_unvetoed', action='store_false'); ap.add_argument('--no-oof', dest='oof', action='store_false'); ap.add_argument('--extra', default=None, help='npz with dense extra features per set (e5 experiment)')
+ap.add_argument('--action-target', dest='action_target', type=float, default=None, help='abstain when the chooser is unsure of the STEP: kappa = smallest step confidence whose OOF wrong-action rate (of the shown asks) is <= this; off by default')
+ap.add_argument('--gate-learner', dest='gate_learner', default='lr', choices=['lr', 'mlp'], help='gate model: lr (default, the shipped linear family) or mlp (one hidden layer; lab only, needs --no-export)'); ap.add_argument('--mlp-hidden', dest='mlp_hidden', type=int, default=64); ap.add_argument('--mlp-iter', dest='mlp_iter', type=int, default=40)
 ap.add_argument('--out', default=None, help='artifact directory (default: model/artifacts). Refuses a path that is the shipped artifacts directory, so a dry-run cannot overwrite v2 weights.')
 A = ap.parse_args()
+if A.gate_learner != 'lr' and not A.no_export: raise SystemExit('--gate-learner mlp is lab only: pass --no-export')
+def GATE(C):
+    # same regularisation scale for both learners: LR minimises mean loss + |w|^2/(2Cn); sklearn MLP minimises mean loss + alpha|W|^2/(2n), so alpha = 1/C
+    if A.gate_learner == 'mlp':
+        from sklearn.neural_network import MLPClassifier
+        return MLPClassifier(hidden_layer_sizes=(A.mlp_hidden,), alpha=1.0 / C, max_iter=A.mlp_iter, random_state=0)
+    return LogisticRegression(C=C, max_iter=4000)
+STEP_OF = lambda l: str(l).split('|')[-1]
+def step_conf(ch, X):
+    # probability of the chosen STEP (families that share a step are summed): the eval's wrong action is a wrong step, not a wrong family
+    P = ch.predict_proba(X); cl = [STEP_OF(c) for c in ch.classes_]; steps = sorted(set(cl))
+    S = np.zeros((X.shape[0], len(steps)))
+    for j, c in enumerate(cl): S[:, steps.index(c)] += P[:, j]
+    return S.max(1)
+KAPPA = None
 HERE = os.path.dirname(os.path.abspath(__file__)); FEAT = os.path.join(HERE, A.feat)
 _default_art = os.path.abspath(os.path.join(HERE, '..', 'artifacts'))
 ART = os.path.abspath(A.out) if A.out else _default_art
@@ -41,7 +58,7 @@ print(f'[{A.tag}] gate rows {len(gidx)}; train {len(tr)} (show {ytr_bin.sum()}),
 # (A) gate
 best = None
 for C in (4.0, 16.0, 64.0):
-    t0 = time.time(); g = LogisticRegression(C=C, max_iter=4000); g.fit(Xtr[gidx], ytr_bin[gidx])
+    t0 = time.time(); g = GATE(C); g.fit(Xtr[gidx], ytr_bin[gidx])
     p = g.predict_proba(Xva)[:, 1]
     p = np.where(np.array([bool(r['vb'] or r['vp']) for r in va]) & A.gate_unvetoed, 0.0, p)  # selection on the gated pipeline
     # model-selection criterion: val recall at val wrong-Do-It <= target (model alone, no veto; unsure rows excluded)
@@ -66,10 +83,11 @@ _, Cc, chooser = bestc
 CL = list(chooser.classes_)
 TAUS = None
 def decide(rows, X, tau, use_veto=True, per_label=None):
-    p = gate.predict_proba(X)[:, 1]; lab = chooser.predict(X)
+    p = gate.predict_proba(X)[:, 1]; lab = chooser.predict(X); cf = step_conf(chooser, X) if KAPPA else None
     out = []
-    for r, pi, l in zip(rows, p, lab):
+    for i, (r, pi, l) in enumerate(zip(rows, p, lab)):
         if pi < (per_label[l] if per_label else tau): out.append('SILENT'); continue
+        if KAPPA and cf[i] < KAPPA: out.append('SILENT'); continue
         if use_veto:
             if r['vb'] or r['vp']: out.append('SILENT'); continue
             step = l.split('|')[1]; vc = r['vc'] or {}
@@ -83,7 +101,7 @@ def metrics(rows, pred, masked=True):
         m['strict'] = {k: v for k, v in metrics(rows, pred, masked=False).items() if k in ('wrongDoIt', 'wrongDoItRate', 'missedRate', 'missedRate_he')}
         return m
     y = np.array([r['y'] for r in rows]); sil = y == 'SILENT'; show = pred != 'SILENT'
-    he = np.array([r['lang'] == 'he' for r in rows])
+    he = np.array([r['lang'] == 'he' for r in rows], dtype=bool)
     m = {'n': len(rows), 'refSilent': int(sil.sum()), 'refShow': int((~sil).sum()),
          'wrongDoIt': int((show & sil).sum()), 'wrongDoItRate': float((show & sil).sum() / max(1, sil.sum())),
          'missed': int((~show & ~sil).sum()), 'missedRate': float((~show & ~sil).sum() / max(1, (~sil).sum())),
@@ -101,12 +119,12 @@ if A.oof:
     Xall = vstack([Xtr, Xva[np.where(keep_va)[0]]]).tocsr()
     yall = np.array([r['y'] for r in allr]); ybin = yall != 'SILENT'
     gmask = np.array([gate_keep(r) for r in allr]); groups = np.array([r['tid'] for r in allr])
-    oof_p = np.zeros(len(allr)); oof_l = np.array(['SILENT'] * len(allr), dtype=object)
+    oof_p = np.zeros(len(allr)); oof_l = np.array(['SILENT'] * len(allr), dtype=object); oof_c = np.ones(len(allr))
     for k, (a, b) in enumerate(GroupKFold(n_splits=5).split(Xall, ybin, groups)):
-        ga = a[gmask[a]]; gk = LogisticRegression(C=Cg, max_iter=4000).fit(Xall[ga], ybin[ga])
+        ga = a[gmask[a]]; gk = GATE(Cg).fit(Xall[ga], ybin[ga])
         sa = a[ybin[a]]; ck = LogisticRegression(C=Cc, max_iter=4000).fit(Xall[sa], yall[sa])
-        oof_p[b] = gk.predict_proba(Xall[b])[:, 1]; oof_l[b] = ck.predict(Xall[b]); print(f'  oof fold {k} done', flush=True)
-    gate = LogisticRegression(C=Cg, max_iter=4000).fit(Xall[np.where(gmask)[0]], ybin[np.where(gmask)[0]])
+        oof_p[b] = gk.predict_proba(Xall[b])[:, 1]; oof_l[b] = ck.predict(Xall[b]); oof_c[b] = step_conf(ck, Xall[b]); print(f'  oof fold {k} done', flush=True)
+    gate = GATE(Cg).fit(Xall[np.where(gmask)[0]], ybin[np.where(gmask)[0]])
     chooser = LogisticRegression(C=Cc, max_iter=4000).fit(Xall[np.where(ybin)[0]], yall[np.where(ybin)[0]]); CL = list(chooser.classes_)
     def oof_decide(t):
         out = []
@@ -150,6 +168,15 @@ if A.oof:
         _, c, g, w0, r0 = best_step; taus[c] = g
     print('  per-label taus', taus, 'oof wdi', w0, '/', silent_n, 'oof shows', r0, flush=True)
     TAUS = taus
+    if A.action_target is not None:
+        th = np.array([taus[l] for l in oof_l]); shown = (oof_p >= th) & ~vet; act = yref != 'SILENT'
+        wa = shown & act & (np.array([STEP_OF(l) for l in oof_l]) != np.array([STEP_OF(y) for y in yref]))
+        ks = []
+        for k in np.round(np.arange(0.40, 0.996, 0.01), 2):
+            kept = oof_c >= k; n_show = int((shown & act & kept).sum()); n_wa = int((wa & kept).sum())
+            ks.append({'kappa': float(k), 'wrongAction': n_wa, 'actShown': n_show, 'rate': round(n_wa / max(1, n_show), 4), 'wdi': int((shown & ~act & kept).sum())})
+            if KAPPA is None and n_wa / max(1, n_show) <= A.action_target: KAPPA = float(k)
+        print('  action kappa', KAPPA, 'sweep', [x for x in ks if abs(x['kappa'] * 20 - round(x['kappa'] * 20)) < 1e-9], flush=True)
 pv, _ = decide(va, Xva, tau, per_label=TAUS); pt, ptest = decide(te, Xte, tau, per_label=TAUS); pt_alone, _ = decide(te, Xte, tau, use_veto=False, per_label=TAUS)
 pt_single, _ = decide(te, Xte, tau)
 rep = {'calibration': 'grouped-5fold-OOF(train+val), final fit on train+val' if A.oof else 'val', 'oofSweep': (oof_sweep[::4] if A.oof else None), 'tag': A.tag, 'rows': A.rows, 'feat': A.feat, 'gateC': Cg, 'chooserC': Cc, 'tau': tau, 'target': A.target, 'classes': CL,
@@ -160,7 +187,7 @@ json.dump(rep, open(os.path.join(ART, A.tag + '.report.json'), 'w'), indent=1)
 with open(os.path.join(ART, A.tag + '.test-preds.jsonl'), 'w') as fo:
     for r, a, b, c in zip(te, pt, ptest, pt_alone): fo.write(json.dumps({'id': r['id'], 'y': r['y'], 'pred': a, 'predAlone': c, 'p': round(float(b), 4), 'lang': r['lang'], 'scenario': r['scenario'], 'prov': r['prov'], 'eng': r['eng'], 'vb': r['vb'], 'vp': r['vp'], 'rule': r['rule'], 'voc': r['voc'], 'role': r['role']}, ensure_ascii=False) + '\n')
 import pickle
-pickle.dump({'gate': gate, 'chooser': chooser, 'tau': tau, 'TAUS': TAUS, 'DIM': DIM, 'tag': A.tag}, open(os.path.join(ART, A.tag + '.model.pkl'), 'wb'))  # lab only (gitignored): lets predict-set.py score a new set without retraining
+pickle.dump({'gate': gate, 'chooser': chooser, 'tau': tau, 'TAUS': TAUS, 'KAPPA': KAPPA, 'DIM': DIM, 'tag': A.tag}, open(os.path.join(ART, A.tag + '.model.pkl'), 'wb'))  # lab only (gitignored): lets predict-set.py score a new set without retraining
 if A.predict_set:
     ex_rows = [json.loads(l) for l in open(os.path.join(HERE, A.predict_set)) if l.strip()]
     ind, ptr = [], [0]

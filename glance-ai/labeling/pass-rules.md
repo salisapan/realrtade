@@ -19,5 +19,6 @@ Rules:
 6. A reader's promise with NO date ("as agreed, you will send the invoice asap", «התחייבת לשלוח… ASAP») is a task: it reminds the reader of their own commitment, and tracking a commitment is what Glance is for.
 7. "FYI", "no action needed", «לידיעתך», a newsletter or a receipt, an out-of-office reply, a webinar invitation, a meeting that already happened, marketing: SILENT.
 8. If the same text could be two steps, choose the one whose completion CLOSES the loop (a reply is closed by sending the reply; work is closed by doing it).
+9. Paying the SENDER is a payment back, so a draft: "Please pay the $1,200 renewal fee by November 2", «נא להעביר תשלום של ₪89.90 ביום שלישי», "please settle the ₪500 balance by Wednesday". Paying someone else (a supplier, a third party the mail names) is work, so a task. (The `draft` definition above, spelled out on 2026-11-12 after the teacher run labelled most pay-the-sender asks a task.)
 
 Output format: JSON Lines, one object per case: {"item": <number>, "step": "<one of the above>", "undatedAsk": <true if the offer rests on an ask with no date, else false>}

@@ -17,9 +17,11 @@ Frozen set, two-pass agreement labels (Claude's, NOT owner-verified), n = 565, p
 | engine alone | 7.0% | 47.0% |
 | engine + v2 (default) | 6.7% | 43.6% |
 | engine + v2.6 / v2.9 / v3.0 | 6.4 to 6.7% | 36 to 38% |
+| engine + v3.1 (10,000 teacher labels mixed with the reference, 2026-11-12) | 6.4% | 36.8% |
+| **engine + v3.3 (teacher labels alone, payment-back audit rule, step-confidence floor; 2026-11-12, no spend)** | **6.4%** | **25.6%** |
 | engine + hard quiets, then a zero-shot strong reader | 7.2% | 2.3% |
 
-Everything is lab only: v2 stays the default, no candidate passed the promotion gate (they are held on the kind of action), nothing is wired. Details and every dated run: `glance-ai/model/V23.md`. The scoreboard and how to run it: `glance-ai/scoreboard/README.md`.
+Everything is lab only: v2 stays the default, no candidate passed the promotion gate (they are held on the kind of action; v3.3 by 17 wrong actions vs v2's 15 on the whole frozen set, while on the validation batch 007+008 it has no more wrong Do Its or wrong actions and 30.0% vs 47.8% missed), nothing is wired. Details and every dated run: `glance-ai/model/V23.md`. The scoreboard and how to run it: `glance-ai/scoreboard/README.md`.
 
 ## 3. What was built (all on the working branch)
 
@@ -62,3 +64,7 @@ Everything is lab only: v2 stays the default, no candidate passed the promotion 
 
 `glance-ai/teacher/` holds the API teacher pipeline: `api.py` (the only place a key is read: the variable `GLANCE_LAB_ANTHROPIC_API_KEY`, never `ANTHROPIC_API_KEY`; metered in `ledger.jsonl`; hard stop at $24), `label.py`, `make-cases.cjs`, `escalate.cjs`, `bootstrap.sh`, and `RUNBOOK.md` (the order: sealed-set baseline, a 200-row cost probe, about 10,000 teacher labels, retrain on CPU, the stop rule). The key lives only in the `glance-model-lab` cloud environment; a session in another environment cannot use it. The teacher labels and evaluates and never goes into the product.
 
+
+## 8. 2026-11-12: the plateau was the supervision (no spend)
+
+Training the same small model on the teacher's 10,000 labels ALONE (v3.2) instead of mixing them with the engine-derived reference (v3.1) cut frozen-set misses from 36.8% to 22.6%; the extra wrong actions came from one teacher error (an ask to pay the sender is a draft under `labeling/pass-rules.md`; the teacher's Sonnet escalation made it a task in 302 of 367 rows). v3.3 fixes those labels by the written rule (`model/train/gap-labels-v33.cjs`) and abstains when the chooser is unsure of the step (`train-v2.py --action-target`, chosen on training OOF): 25.6% missed at 19/299 wrong Do Its. Tool: `glance-ai/scoreboard/confusion.cjs`. Full record and the declaration of what was read before each choice: `glance-ai/model/V23.md` (last section). Next lever: teacher labels for the ~15,000 dataset rows not yet labelled (about $3.50), only after the owner's yes in the lab session.

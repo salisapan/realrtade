@@ -58,6 +58,15 @@ node scoreboard/run.cjs --batches 007,008 --models <same> --gate-base v2 --hard-
 ```
 Never train or tune on the frozen, validation (007 and 008) or sealed texts: `make-cases.cjs` excludes them by text.
 
+## 4b. Teacher-only supervision and the label audit (2026-11-12, no spend)
+
+```sh
+cd glance-ai/model
+node train/gap-labels-v32.cjs && node train/gap-labels-v33.cjs                                  # teacher rows only; payment-to-sender task -> draft (pass-rules 9)
+.venv/bin/python train/train-v2.py --feat features-v33 --tag v33 --out v2x/fz-v33 --predict-set features-frozen/frozen.jsonl --no-export --action-target 0.05
+```
+Mixing teacher rows with the engine-derived reference (v3.1) taught two conventions; training on the teacher rows alone (v3.2, v3.3) took the frozen set from 36.8% to 25.6% missed at 19/299 wrong Do Its (`glance-ai/model/V23.md`). **Teacher quality check before every retrain:** `node scoreboard/confusion.cjs` on the validation batch, and a reference-vs-teacher table by generator scenario. The first run's Sonnet escalation broke the written payment-back rule in 302 of 367 rows; rule 9 of `labeling/pass-rules.md` now states it with examples, so the next labelling run carries it in the prompt. The next run labels the about 15,000 dataset rows the teacher has not seen (about $3.50 projected), only after the owner's yes and with the tag in `owner-yes.json`.
+
 ## 5. Stop rule
 
 On the validation batch (007 + 008), at the **same or lower wrong-Do-It rate**, v3.1's missed closes must fall by at least **4 points** against the best prior in-house model (engine + v2.9: 41.1% on that batch) and are also reported against the default v2 (47.8%). If not, stop: spend no more, do not ask for more money. Write the report either way: what changed, the valid scoreboard numbers against the baseline (engine + v2 6.7% / 43.6%, v2.6 / v2.9 / v3.0 about 36 to 38% misses, a strong reader under the floor 2.3%), the cost from `ledger.jsonl`, whether the rule fired. Do not recommend wiring or merging.

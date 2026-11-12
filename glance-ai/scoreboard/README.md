@@ -19,6 +19,7 @@ node glance-ai/scoreboard/run.cjs \
 - **Real-mail frozen set:** `real-mail/README.md` (structure only; `private/` is gitignored).
 - **Conventions the labels follow:** `docs/glance-ai/model-conventions.md`.
 - `last-run.md` and `last-run.json` are the latest printed scoreboard (agreement labels n = 444, single-pass n = 500).
+- **Where the wrong actions come from:** `confusion.cjs --model name=extra-preds.jsonl [--batches 007,008]` prints the product-order confusion (gold step -> predicted step) and splits the wrong actions between the engine and the model. Diagnosis only; a change chosen from it is declared in `glance-ai/model/V23.md`.
 - Test: `node glance-ai/scoreboard/test-scoreboard.cjs`.
 
 ## Readings (frozen, text-bound label set; the earlier readings joined labels by positional id and are withdrawn, see `glance-ai/model/V23.md` CORRECTION)
