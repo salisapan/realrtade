@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('./support/harness');
-const { freezeDate } = require('./support/frozen-date');
+const { freezeDate, sameDayIso } = require('./support/frozen-date');
 
 // The dev fixture's place event is Thu Oct 8 2026, 10:00 +03:00, and the sentence asks about last week.
 // "Last week" is Sun Oct 4 to Sat Oct 10 only while the page's clock is in Oct 11-17, so the clock is fixed
@@ -29,8 +29,14 @@ const LANE_JS = [
   'src/content-messenger.js'
 ];
 const PLACE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/messenger-place.html'), 'utf8');
+// The lane drops a chat row older than 14 days (STALE_MS, src/content-messenger.js) or in the future, and the
+// content script reads the real clock (freezeDate cannot reach it). So the fixture's row dates are yesterday,
+// computed from today, not a literal date that goes stale (a literal 2026-10-27 went stale on 2026-11-10).
+const SUITE_DAY = sameDayIso(-1);
 const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8')
-  .replace(/2026-10-14/g, '2026-10-27');
+  .replace(/2026-10-14/g, SUITE_DAY);
+// "שבוע שעבר" is lastWeek(message time): the same weekday one week before the customer's row is always inside it.
+const SUITE_EVENT_ISO = new Date(Date.parse(SUITE_DAY + 'T08:00:00Z') - 7 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString();
 const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
 async function registerMessenger(glance) {
@@ -135,8 +141,7 @@ test('an open Business Suite thread drafts the existing last row and sends nothi
   expect(registered).toBe(true);
 
   await glance.seedOutlook();
-  // Fixture rows use 2026-10-27 (fresh on CI). "שבוע שעבר" is lastWeek(message time), not the dev fixture clock.
-  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: '2026-10-21T10:00:00.000Z' });
+  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: SUITE_EVENT_ISO });
   const page = await glance.openBusiness(SUITE_HTML);
   const before = await page.locator('[role="row"]').count();
   const box = page.locator('[data-glance-composer="1"]');
