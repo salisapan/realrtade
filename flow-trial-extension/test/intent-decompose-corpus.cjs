@@ -20,6 +20,7 @@ for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(__dirname, '..'
 const D = vm.runInContext('FlowIntentDecompose', sb);
 const J = vm.runInContext('FlowIncomingJudge', sb);
 const FI = vm.runInContext('FlowIntent', sb);
+const CF = vm.runInContext('FlowCloseFamilies', sb);
 const DEPS = { intent: FI, actions: vm.runInContext('FlowActions', sb), factReply: vm.runInContext('FlowFactReply', sb), fileAttach: vm.runInContext('FlowFileAttach', sb),
   resolution: vm.runInContext('FlowResolution', sb), quietMetrics: vm.runInContext('FlowQuietMetrics', sb) };
 const ON = { aiDecomposeV1: true };
@@ -30,7 +31,8 @@ function run(text, extra) {
     direction: 'inbound', inbound: true, namesWaitDone: true }, extra || {});
   const whole = J.judge(input, DEPS);
   return D.decompose(ON, { text, whole, sender: input.sender, vetoText: input.subject + '\n' + text },
-    { judgeText: (t) => J.judge(Object.assign({}, input, { text: t }), DEPS), phishing: (t) => FI.phishingOrNegative(t) });
+    { judgeText: (t) => J.judge(Object.assign({}, input, { text: t }), DEPS), phishing: (t) => FI.phishingOrNegative(t),
+      familyHit: (t) => CF.assess(t, null, { now: new Date(NOW), senderEmail: input.sender.email }) });
 }
 const anchors = (r) => r.intentions.map((x) => x.anchor).sort().join(',');
 
@@ -52,19 +54,34 @@ console.log('\n--- the floor, with a stub judge ---\n');
 const SHOW = (kind, anchor, extra) => ({ show: true, intent: Object.assign({ type: kind, entities: {} }, extra || {}), process: { id: 'p', name: 'P', steps: [{ kind: anchor }] } });
 const stubText = 'Hi Sali, Please review the deck by Friday. Also, can we meet Monday at 10:00?';
 const stub = (map) => ({ judgeText: (t) => { for (const [k, v] of map) if (t.includes(k)) return v; return { show: false, reason: 'intent-null' }; }, phishing: () => false });
-let r = D.decompose(ON, { text: stubText, whole: { show: false, reason: 'quiet:hedge' } }, stub([['review', SHOW('request', 'gmailDraft')]]));
+let r = D.decompose(ON, { text: stubText, whole: { show: false, reason: 'quiet:hedge' } }, stub([['review', SHOW('request', 'gmailDraft', { entities: { dateIso: '2026-10-09' } })]]));
 check('a named whole-mail quiet (hedge) stands: no clause pass', r.used && r.intentions.length === 0 && r.reason === 'whole-mail-quiet', r);
 for (const q of ['quiet:noise', 'quiet:marketing', 'own-sender', 'names-pending', 'meeting-veto', 'file', 'quiet:relay']) {
-  r = D.decompose(ON, { text: stubText, whole: { show: false, reason: q } }, stub([['review', SHOW('request', 'gmailDraft')]]));
+  r = D.decompose(ON, { text: stubText, whole: { show: false, reason: q } }, stub([['review', SHOW('request', 'gmailDraft', { entities: { dateIso: '2026-10-09' } })]]));
   check('whole-mail quiet ' + q + ' stands', r.intentions.length === 0, r);
 }
-r = D.decompose(ON, { text: stubText, whole: { show: false, reason: 'quiet:family' } }, { judgeText: () => SHOW('request', 'gmailDraft'), phishing: () => true });
-check('a phishing or bank-change mail never gets a clause pass, even under quiet:family', r.intentions.length === 0 && r.reason === 'whole-mail-veto', r);
-r = D.decompose(ON, { text: stubText, whole: { show: false, reason: 'intent-null' } }, stub([['review', SHOW('request', 'gmailDraft')], ['meet', SHOW('event', 'calendar', { entities: { dateIso: '2026-10-12', hour: 10, minute: 0 } })]]));
+const TWO_CLOCKS = { familyHit: () => ({ suppress: true, family: 'H', rule: 'ambiguousClocks' }) };
+r = D.decompose(ON, { text: stubText, whole: { show: false, reason: 'quiet:family' } }, Object.assign({ judgeText: () => SHOW('request', 'gmailDraft'), phishing: () => true }, TWO_CLOCKS));
+check('a phishing or bank-change mail never gets a clause pass, even under the two-clocks family quiet', r.intentions.length === 0 && r.reason === 'whole-mail-veto', r);
+r = D.decompose(ON, { text: stubText, whole: { show: false, reason: 'quiet:family' } }, { judgeText: () => SHOW('request', 'gmailDraft'), phishing: () => false, familyHit: () => ({ suppress: true, family: 'B' }) });
+check('a family quiet that is not the two-clocks rule stands: no clause pass', r.intentions.length === 0 && r.reason === 'whole-mail-quiet', r);
+r = D.decompose(ON, { text: stubText, whole: { show: false, reason: 'quiet:family' } }, { judgeText: () => SHOW('request', 'gmailDraft'), phishing: () => false });
+check('a family quiet with no familyHit check from the host stands', r.intentions.length === 0 && r.reason === 'whole-mail-quiet', r);
+r = D.decompose(ON, { text: stubText, whole: { show: false, reason: 'quiet:family' } }, Object.assign({ judgeText: () => SHOW('request', 'gmailDraft') }, TWO_CLOCKS));
+check('a family quiet with no phishing check from the host stands', r.intentions.length === 0 && r.reason === 'whole-mail-quiet', r);
+for (const t of ['Hi Sali, Could you send the invoice by Friday? Please don\'t.', 'Hi Sali, Please review the deck by Friday. Actually never mind, send the contract instead.', 'Hi Sali, Could you send the invoice by Friday? Or could you send the contract?', 'היי סאלי, תשלח את החשבונית עד יום חמישי. לא צריך, כבר קיבלתי.', 'היי סאלי, אפשר לשלוח את החשבונית עד חמישי? תשלח את החוזה במקום.']) {
+  r = D.decompose(ON, { text: t, whole: { show: false, reason: 'intent-null' } }, { judgeText: () => SHOW('request', 'gmailDraft', { entities: { dateIso: '2026-10-09' } }), phishing: () => false });
+  check('a clause that takes something back stops the clause pass: ' + t.slice(9, 60), r.intentions.length === 0 && r.reason === 'takes-back', r);
+}
+r = D.decompose(ON, { text: stubText.replace('?', '? Please ignore the earlier note.'), whole: SHOW('request', 'gmailDraft') }, stub([['meet', SHOW('event', 'calendar', { entities: { dateIso: '2026-10-12', hour: 10, minute: 0 } })]]));
+check('takes-back with a whole-mail decision: that decision stays alone', r.intentions.length === 1 && r.intentions[0].source === 'whole' && r.reason === 'takes-back', r);
+r = D.decompose(ON, { text: 'Sali, could you please approve the hiring plan by October 14? We need your sign-off on it. Sarah', whole: SHOW('request', 'googleTask', { entities: { dateIso: '2026-10-14' } }) }, stub([['approve', SHOW('request', 'googleTask', { entities: { dateIso: '2026-10-14' } })], ['sign-off', SHOW('request', 'gmailDraft')]]));
+check('a second intention with no day or clock of its own is not a second card (a context sentence)', r.intentions.length === 1 && r.intentions[0].anchor === 'task', r.intentions);
+r = D.decompose(ON, { text: stubText, whole: { show: false, reason: 'intent-null' } }, stub([['review', SHOW('request', 'gmailDraft', { entities: { dateIso: '2026-10-09' } })], ['meet', SHOW('event', 'calendar', { entities: { dateIso: '2026-10-12', hour: 10, minute: 0 } })]]));
 check('intent-null: the clauses find both intentions, in the mail\'s order', anchors(r) === 'calendar,draft' && r.intentions[0].anchor === 'draft', r.intentions);
 check('every intention needs a click, none closes, each has its evidence clause from the mail', r.intentions.every((x) => x.needsClick === true && x.closes === false && stubText.includes(x.evidence)));
 check('the parts: who acts, the date and clock read by the judge, what closes it', r.intentions[1].actor === 'both' && r.intentions[1].due.dateIso === '2026-10-12' && r.intentions[1].due.hour === 10 && r.intentions[1].doneWhen.kind === 'event-held' && r.intentions[0].doneWhen.kind === 'reply-sent');
-r = D.decompose(ON, { text: stubText, whole: SHOW('event', 'calendar', { entities: { dateIso: '2026-10-12', hour: 10, minute: 0 } }) }, stub([['review', SHOW('request', 'gmailDraft')], ['meet', SHOW('event', 'calendar', { entities: { dateIso: '2026-10-12', hour: 10, minute: 0 } })]]));
+r = D.decompose(ON, { text: stubText, whole: SHOW('event', 'calendar', { entities: { dateIso: '2026-10-12', hour: 10, minute: 0 } }) }, stub([['review', SHOW('request', 'gmailDraft', { entities: { dateIso: '2026-10-09' } })], ['meet', SHOW('event', 'calendar', { entities: { dateIso: '2026-10-12', hour: 10, minute: 0 } })]]));
 check('a whole-mail decision keeps its anchor first; the other intention is added after it', r.intentions[0].anchor === 'calendar' && r.intentions[0].source === 'whole+clause' && r.intentions[1].anchor === 'draft', r.intentions);
 r = D.decompose(ON, { text: stubText, whole: SHOW('request', 'gmailDraft') }, stub([]));
 check('when no clause reads anything, the whole-mail decision stays alone', r.intentions.length === 1 && r.intentions[0].source === 'whole');
@@ -85,6 +102,12 @@ r = run('היי סאלי, אפשר לשלוח לי את הדוח עד יום ח�
 check('HE: the report ask and the meeting, each with its own date', anchors(r) === 'calendar,draft' && r.intentions.find((x) => x.anchor === 'draft').due.dateIso === '2026-10-08' && r.intentions.find((x) => x.anchor === 'calendar').due.dateIso === '2026-10-11', r.intentions.map((x) => [x.anchor, x.due]));
 r = run('Hi Sali, Could you set up a check-in Monday at 9am? Also, please schedule a call with Maya on Wednesday at 14:30. Thanks, Dana');
 check('two meetings in one mail (held as one piece) become two holds, each at its own time', r.intentions.length === 2 && r.intentions.every((x) => x.anchor === 'calendar') && r.intentions[0].due.hour !== r.intentions[1].due.hour, r.intentions.map((x) => [x.anchor, x.due]));
+r = run('Could you send the invoice? Please don\'t.');
+check('"Could you send the invoice? Please don\'t." stays quiet (a family quiet that is not two clocks; natural set mcn-08)', r.intentions.length === 0 && r.whole.show === false, r);
+r = run('Could you send the invoice? Or could you send the contract?');
+check('two alternative files stay the family quiet the engine chose', r.intentions.length === 0, r);
+r = run('Sali, could you please approve the vendor contract by October 14? We need your sign-off. Tom');
+check('a context sentence after the ask adds no second card', r.intentions.length === 1, r.intentions.map((x) => [x.anchor, x.evidence]));
 r = run('Hi Sali, Could you send me the Q3 numbers by Wednesday? Thanks, Dana');
 check('one intention: exactly the whole-mail decision', r.intentions.length === 1 && r.intentions[0].anchor === 'draft', r.intentions);
 r = run('Hi Sali, FYI the office is closed on Friday. Can you send me the Q3 numbers by Wednesday? Thanks');

@@ -16,6 +16,10 @@ Mails with more than one intention: 1 (gold step of those: {"SILENT":1}). Single
 | system | intentions found | steps offered that are not in the mail | every intention right, nothing extra |
 |---|---|---|---|
 | engine (whole mail) | 35.2% (276/783) | 24 | 25.2% (147/583) |
-| decomposed engine | 52.2% (409/783) | 42 | 43.7% (255/583) |
+| decomposed engine | 50.6% (396/783) | 33 | 43.2% (252/583) |
 
-By kind (every intention right): two acts of different steps 0.0% (0/200) -> 27.5% (55/200); an act and a silent mail 34.5% (69/200) -> 39.0% (78/200); two acts of the same step 42.6% (78/183) -> 66.7% (122/183).
+By kind (every intention right): two acts of different steps 0.0% (0/200) -> 25.0% (50/200); an act and a silent mail 34.5% (69/200) -> 41.0% (82/200); two acts of the same step 42.6% (78/183) -> 65.6% (120/183).
+
+Of the intentions the decomposed engine found, 3 are file asks handed to the file chain (find the one right file, then the draft). The lab cannot run that chain (no Drive), so they are counted as found on the assumption that it finds the file; in the product the chain may also stay quiet.
+
+**These are stitched mails. They test the split, not recognition on a mail that was written with two intentions, and they are not a product quality number.** The natural set: `node scoreboard/decompose/natural.cjs`.

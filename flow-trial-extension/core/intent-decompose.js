@@ -8,10 +8,16 @@
 // Floor, unchanged:
 //   - the judge decides every intention; this file never invents a kind, a step, a date or a word: every part is read from the judge's
 //     intent or from the mail's own text, and every evidence clause is a substring of the mail;
-//   - the whole-mail decision comes first. A clause pass runs only when the whole mail SHOWS (to find the other intentions) or when the judge
-//     found no intent at all (`intent-null`) or held a mail whose two closes made it ambiguous as one piece (`quiet:family`). Any other named
-//     quiet of the whole mail (hedge, noise, marketing, relay, own sender, names pending, addressee, a meeting veto, a file chain, a
-//     no-need-to-send) stands for the whole mail, and a phishing or bank-change mail never gets a clause pass;
+//   - the whole-mail decision comes first. A clause pass runs only when the whole mail SHOWS (to find the other intentions), when the judge
+//     found no intent at all (`intent-null`), or when the close-family gate held the mail for ONE reason only: two clock times in one mail
+//     (`quiet:family`, family H, rule `ambiguousClocks`: two meetings), and only when the host hands in both checks (familyHit and phishing).
+//     Every other family quiet stands ("Could you send the invoice? Please don't." is a family quiet; found 2026-11-12 on the natural
+//     multi-clause set), and so does every other named quiet of the whole mail (hedge, noise, marketing, relay, own sender, names pending,
+//     addressee, a meeting veto, a file chain, a no-need-to-send). A phishing or bank-change mail never gets a clause pass;
+//   - a clause that takes something back anywhere in the mail (don't, no need, never mind, instead, ignore, cancel, "or could you";
+//     «אל ת», «לא צריך», «במקום», «תתעלם») stops the clause pass for the whole mail: a clause read alone cannot see what a later one cancelled;
+//   - an intention beyond the first is offered only when its own clause carries its own day or clock; an undated second ask is left to the
+//     first card (one reply answers it), so a context sentence ("We need your sign-off.") never becomes a second card;
 //   - a clause intention never replaces the whole mail's decision: it is added after it, at most MAX_INTENTIONS in all;
 //   - nothing here writes, sends or closes. Each step still needs the person's click, and a loop closes only on its real proof
 //     (docs/true-close.md; `doneWhen` names that proof).
@@ -23,10 +29,12 @@ const FlowIntentDecompose = (() => {
   const DEFAULTS = Object.freeze({ [SWITCH]: false });
   const MAX_INTENTIONS = 3;
   const MIN_CLAUSE = 12;
-  // `quiet:family` is the close-family gate (core/close-families.js): it holds a mail whose shape is ambiguous AS ONE PIECE (two meetings, two
-  // closes of different kinds). Each clause still meets the same gate on its own, and a bank-change or phishing mail never gets here (the
-  // phishing check below runs on the whole mail first). Hedges, noise, addressee and meeting vetoes stay whole-mail quiets.
-  const CLAUSE_PASS_REASONS = new Set(['intent-null', 'quiet:family']);
+  const CLAUSE_PASS_REASONS = new Set(['intent-null']);
+  // `quiet:family` is the close-family gate (core/close-families.js). Only its two-clocks rule (two meetings in one mail) is an ambiguity that
+  // reading each clause resolves; its other rules read a cancel, a correction or an alternative ACROSS clauses and must stand.
+  const FAMILY_CLAUSE_RULES = new Set(['ambiguousClocks']);
+  // A clause that takes something back. Broad on purpose: it only ever removes the clause pass (silence), never adds an offer.
+  const TAKES_BACK = /\b(?:don'?t|do not|no need|never ?mind|nevermind|ignore|disregard|instead|cancel(?:led|ed)?|scratch that|hold off|not yet|forget (?:it|that)|or (?:could|can|would|maybe) (?:you|we))\b|(?:^|[\s,.;:!?])(?:אל ת|לא צריך|אין צורך|במקום|תתעלמ|תתעלם|להתעלם|בטל|מבוטל|לא משנה|עזוב|עזבי|או ש(?:ת|א))/i;
   const FILE_CHAIN_REASONS = new Set(['file', 'file-chain-not-run']);
   const STEP_NEUTRAL = { gmailDraft: 'draft', outlookDraft: 'draft', googleTask: 'task', googleTasks: 'task', outlookTask: 'task', calendar: 'calendar', outlookCalendar: 'calendar', driveFile: 'file_save', onedriveFile: 'file_save' };
   // What really closes each anchor (docs/true-close.md §7). A prepared draft, a hold or a task alone is not completion.
@@ -118,10 +126,16 @@ const FlowIntentDecompose = (() => {
     const intentions = [];
     if (whole.show) intentions.push(Object.assign(partsOf(whole, null, ctx), { source: 'whole' }));
     const reason = whole.show ? null : (whole.reason || null);
-    if (!whole.show && !CLAUSE_PASS_REASONS.has(reason)) return { used: true, intentions, primary: null, whole: { show: false, reason }, reason: 'whole-mail-quiet' };
-    if (typeof d.judgeText !== 'function') return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'no-judge' };
     const text = String(i.text || '');
+    let pass = !!whole.show || CLAUSE_PASS_REASONS.has(reason);
+    if (!pass && reason === 'quiet:family' && typeof d.familyHit === 'function' && typeof d.phishing === 'function') {
+      let hit = null; try { hit = d.familyHit(text); } catch (e) { hit = null; }
+      pass = !!(hit && hit.suppress && FAMILY_CLAUSE_RULES.has(hit.rule));
+    }
+    if (!pass) return { used: true, intentions, primary: null, whole: { show: false, reason }, reason: 'whole-mail-quiet' };
+    if (typeof d.judgeText !== 'function') return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'no-judge' };
     if (typeof d.phishing === 'function' && d.phishing(String(i.vetoText || text))) return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'whole-mail-veto' };
+    if (TAKES_BACK.test(text)) return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'takes-back' };
     const split = clauses(text);
     if (split.clauses.length < 2) return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'one-clause' };
     ctx.greeting = split.greeting;
@@ -149,11 +163,13 @@ const FlowIntentDecompose = (() => {
       if (k >= 0) out = [Object.assign({}, found[k], { source: 'whole+clause' })].concat(found.filter((_, j) => j !== k));
       else out = intentions.concat(found);
     } else if (!whole.show) out = found;
-    out = out.filter((x, j) => out.findIndex((y) => sameIntention(x, y)) === j).slice(0, MAX_INTENTIONS);
+    out = out.filter((x, j) => out.findIndex((y) => sameIntention(x, y)) === j);
+    // Beyond the first, only an intention whose own clause carries its own day or clock.
+    out = out.filter((x, j) => j === 0 || (x.due && (x.due.dateIso || x.due.hour != null))).slice(0, MAX_INTENTIONS);
     return { used: true, intentions: out, primary: out[0] || null, whole: { show: !!whole.show, reason } };
   }
 
-  return { decompose, clauses, partsOf, cleanWhat, enabled, SWITCH, DEFAULTS, MAX_INTENTIONS, DONE_WHEN, CLAUSE_PASS_REASONS };
+  return { decompose, clauses, partsOf, cleanWhat, enabled, SWITCH, DEFAULTS, MAX_INTENTIONS, DONE_WHEN, CLAUSE_PASS_REASONS, FAMILY_CLAUSE_RULES, TAKES_BACK };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntentDecompose };

@@ -110,7 +110,8 @@ function makeEngine(name) {
       if (!whole) whole = J.judge(input, DEPS);
       const newText = FJ && FJ.newContent ? FJ.newContent(input.text) : input.text;
       const r = D.decompose({ aiDecomposeV1: true }, { text: newText, whole, sender: input.sender, vetoText: (c.subject ? c.subject + '\n' : '') + input.text },
-        { judgeText: (t) => J.judge(Object.assign({}, input, { text: t }), DEPS), phishing: (t) => (FI && typeof FI.phishingOrNegative === 'function' ? FI.phishingOrNegative(t) : false) });
+        { judgeText: (t) => J.judge(Object.assign({}, input, { text: t }), DEPS), phishing: (t) => (FI && typeof FI.phishingOrNegative === 'function' ? FI.phishingOrNegative(t) : false),
+          familyHit: (t) => { const CF = g('FlowCloseFamilies'); return CF && typeof CF.assess === 'function' ? CF.assess(t, null, { now: NOW, senderEmail: input.sender.email }) : null; } });
       return { whole: r.whole, intentions: r.intentions || [], reason: r.reason || null };
     } catch (e) { return { whole: { show: false, reason: 'engine-error' }, intentions: [], reason: 'engine-error:' + e.message }; }
   }

@@ -94,11 +94,11 @@ for (let k = 0; k < NP; k++) {
   cases.push({ kind, lang, gold, row: { surface: 'gmail', direction: 'inbound', from: { name: lang === 'en' ? 'Dana Levi' : 'דנה לוי', email: 'dana@acme.io' }, to: ['ai.local.flow@gmail.com'], cc: [], ownNames: ['Sali', 'Sali Sapan', 'סאלי'], attachmentCount: 0, subject: A.subject || '', body } });
 }
 const agg = { whole: { found: 0, extra: 0, exact: 0, silentWrong: 0 }, decomposed: { found: 0, extra: 0, exact: 0, silentWrong: 0 } };
-let goldN = 0; const byKind = { 0: { n: 0, whole: 0, dec: 0 }, 1: { n: 0, whole: 0, dec: 0 }, 2: { n: 0, whole: 0, dec: 0 } };
+let goldN = 0, fileChain = 0; const byKind = { 0: { n: 0, whole: 0, dec: 0 }, 1: { n: 0, whole: 0, dec: 0 }, 2: { n: 0, whole: 0, dec: 0 } };
 for (const c of cases) {
   const t = E.teach(c.row); const wholeSet = new Set(t.show ? [t.primaryStep] : []);
   const d = E.decompose(c.row); const decSet = new Set(d.intentions.map((x) => x.anchor));
-  goldN += c.gold.size; byKind[c.kind].n++;
+  goldN += c.gold.size; byKind[c.kind].n++; fileChain += d.intentions.filter((x) => x.owner === 'file-chain' && c.gold.has(x.anchor)).length;
   for (const [name, set] of [['whole', wholeSet], ['decomposed', decSet]]) {
     const a = agg[name];
     for (const s of c.gold) if (set.has(s)) a.found++;
@@ -112,4 +112,6 @@ say(''); say('## 2. Composed mails' + (AGREE ? ', parts the engine reads right a
 say('| system | intentions found | steps offered that are not in the mail | every intention right, nothing extra |'); say('|---|---|---|---|');
 for (const [n, a] of Object.entries(agg)) say(`| ${n === 'whole' ? 'engine (whole mail)' : 'decomposed engine'} | ${pct(a.found, goldN)} | ${a.extra} | ${pct(a.exact, cases.length)} |`);
 say(''); say('By kind (every intention right): two acts of different steps ' + pct(byKind[0].whole, byKind[0].n) + ' -> ' + pct(byKind[0].dec, byKind[0].n) + '; an act and a silent mail ' + pct(byKind[1].whole, byKind[1].n) + ' -> ' + pct(byKind[1].dec, byKind[1].n) + '; two acts of the same step ' + pct(byKind[2].whole, byKind[2].n) + ' -> ' + pct(byKind[2].dec, byKind[2].n) + '.');
+say(''); say('Of the intentions the decomposed engine found, ' + fileChain + ' are file asks handed to the file chain (find the one right file, then the draft). The lab cannot run that chain (no Drive), so they are counted as found on the assumption that it finds the file; in the product the chain may also stay quiet.');
+say(''); say('**These are stitched mails. They test the split, not recognition on a mail that was written with two intentions, and they are not a product quality number.** The natural set: `node scoreboard/decompose/natural.cjs`.');
 if (arg('md')) fs.writeFileSync(arg('md'), lines.join('\n') + '\n');

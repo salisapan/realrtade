@@ -32,7 +32,23 @@ const stepOfLabel = (l) => (!l || l === 'SILENT' ? 'SILENT' : String(l).split('|
 
 const ONLY = arg('batches') ? new Set(arg('batches').split(',')) : null; // e.g. --batches 007: the hold-out batch, labelled after the engine reason list was chosen
 const FROZEN_FILE = arg('frozen', path.join('labeling', 'frozen-eval.jsonl')); // --frozen labeling/sealed/frozen-sealed.jsonl for the one-time sealed opening
-const frozen = read(path.join(G, FROZEN_FILE)).filter((r) => !ONLY || ONLY.has(r.batch));
+let frozen = read(path.join(G, FROZEN_FILE)).filter((r) => !ONLY || ONLY.has(r.batch));
+// --decompose: the engine's decision on each row is the decomposed engine's first intention (core/intent-decompose.js, lab only, its switch
+// forced on in model/teacher/engine.cjs): the whole-mail decision where there is one, else what the clause pass finds. The stored `tip` is
+// checked against a fresh whole-mail run first, so the two readings differ by the clause pass only.
+const DECOMPOSE = process.argv.includes('--decompose');
+if (DECOMPOSE) {
+  const E = require(path.join(G, 'model', 'teacher', 'engine.cjs')).makeEngine('tip');
+  let drift = 0, changed = 0;
+  frozen = frozen.map((r) => {
+    const c = Object.assign({}, r, { ownNames: r.ownNames || ['Sali', 'Sali Sapan', 'סאלי'] });
+    const t = E.teach(c); const now = t.show ? t.primaryStep : 'SILENT'; if (now !== r.tip) drift++;
+    const d = E.decompose(c); const dec = d.intentions[0] ? d.intentions[0].anchor : 'SILENT';
+    if (dec !== r.tip) changed++;
+    return Object.assign({}, r, { tip: dec, intentions: d.intentions.length });
+  });
+  console.error(`--decompose: ${changed} of ${frozen.length} engine decisions differ from the stored whole-mail decision; stored vs fresh whole-mail drift: ${drift}`);
+}
 const overlayFile = path.join(G, 'labeling', 'owner-convention-overlay.jsonl');
 const overlay = fs.existsSync(overlayFile) ? Object.fromEntries(read(overlayFile).map((r) => [r.id, r])) : {};
 const lang = (r) => (r.lang === 'he' ? 'he' : 'en');
