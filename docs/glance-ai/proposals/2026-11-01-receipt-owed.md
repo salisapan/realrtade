@@ -1,6 +1,6 @@
 # The receipt you owe once you are paid
 
-- **Status:** experiment built (2026-11-04, Wednesday run; not approved by Sali yet: no «כן» or «לא» since Sunday, so this run took it as the newest measured gap)
+- **Status:** experiment built (2026-11-04). Not approved and not rejected. Sali's test on 2026-11-12 (make things get done) puts it after refund-loop: Glance cannot issue the receipt (Morning is on HOLD), so it can remind and prove but not execute. It moves up when Morning is approved
 - **Date:** 2026-11-01 (product lab, Sunday run)
 - **Switch:** `opts.enabled` on `FlowReceiptOwed.owe` and `.judge` (`RECEIPT_OWED`, **off**; nothing calls it). It joins `core/labs-switches.js` only when it is wired, so the person never sees a switch that does nothing.
 - **Code:**
