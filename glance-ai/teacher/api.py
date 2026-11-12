@@ -13,6 +13,21 @@ LEDGER = os.path.join(HERE, 'ledger.jsonl')
 PRICES = json.load(open(os.path.join(HERE, 'prices.json')))
 BUDGET = min(24.0, float(os.environ.get('GLANCE_LAB_BUDGET_USD', '24')))
 URL = 'https://api.anthropic.com/v1/messages'
+# SPEND GATE (owner, 2026-11-12): only the cheap probe may spend without the owner's explicit yes. Everything else (the sealed-set frontier baseline, the 10k labelling, the
+# escalation) needs the file teacher/owner-yes.json, written by the session ONLY after the owner has said yes IN THAT SESSION; its "scope" lists the tags it allows
+# (sealed, small, escalate). The probe is capped at $1.50 in total and only on the small model.
+GATE_FILE = os.path.join(HERE, 'owner-yes.json')
+PROBE_CAP = 1.50
+def _gate(model, tag):
+    if tag == 'ping': return
+    if tag == 'probe':
+        if model != 'claude-haiku-5-5': raise Refused('the probe must use claude-haiku-5-5')
+        probe = sum(json.loads(l)['usd'] for l in open(LEDGER) if l.strip() and json.loads(l).get('tag') == 'probe') if os.path.exists(LEDGER) else 0.0
+        if probe >= PROBE_CAP: raise Refused('the probe is capped at $%.2f (spent %.4f)' % (PROBE_CAP, probe))
+        return
+    try: g = json.load(open(GATE_FILE))
+    except Exception: g = {}
+    if tag not in (g.get('scope') or []): raise Refused("SPEND GATE: tag '%s' needs the owner's explicit yes in this session (teacher/owner-yes.json with that scope); report the probe cost and stop" % tag)
 _lock = threading.Lock()
 class Refused(Exception): pass
 
@@ -39,6 +54,7 @@ def _ctx():
 def call(model, system, user, max_tokens=600, tag='', est_in=0, est_out=0):
     """One Messages call. Returns (text, usd). Refuses before calling if the estimate would pass the budget."""
     if model not in PRICES: raise Refused('no price for ' + model + ' in prices.json')
+    _gate(model, tag)
     key = _key()
     with _lock:
         est = cost(model, {'input_tokens': est_in, 'output_tokens': est_out or max_tokens})

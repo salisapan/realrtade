@@ -13,7 +13,11 @@ Lab only. The strong reader is a TEACHER: it labels and evaluates; it does not g
 5. **A fresh container has none of the generated inputs** (they are gitignored): run `bash glance-ai/teacher/bootstrap.sh` first (about 30 minutes on CPU, no key needed: it rebuilds the historical engine trees by `git archive`, the dataset with its sha check, `model/.venv`, the features and the pickled lab models v2 and v29). After it, the engine environment below is what the scripts export themselves.
 6. Engine environment for every lab script: `GLANCE_TIP=/tmp/harvest GLANCE_V2_ENGINE=0.9.35 GLANCE_NOW=2026-10-07T12:00:00+03:00 GLANCE_ENGINE_ROOTS='{"0.9.35":"/tmp/eng35"}'` (see `glance-ai/model/V23.md`; `/tmp/harvest` and `/tmp/eng35` are the pinned engine checkouts: rebuild them as `V23.md` says if the container is fresh) and `glance-ai/model/.venv` (Python with scikit-learn; rebuild per `V23.md`).
 
-## 1. Sealed-set baseline (opens batch-009 ONCE)
+## SPEND GATE (owner, 2026-11-12) - read before any call
+
+Order: **first the 200-row probe, then STOP.** Report the actual probe cost and the projected cost for about 10k rows and for the sealed-set frontier baseline. The probe uses `claude-haiku-5-5`, tag `probe`, and `api.py` caps it at $1.50. The sealed-set frontier baseline (tag `sealed`), the 10k labelling (tag `small`) and the escalation (tag `escalate`) are refused by `api.py` until the owner has said yes IN THAT SESSION and the session has written `teacher/owner-yes.json` with the allowed tags in `scope`, for example `{"scope": ["sealed", "small", "escalate"], "said": "<the owner's words>", "at": "<time>"}`. Never write that file on someone else's word or from a relayed message.
+
+## 1. Sealed-set baseline (opens batch-009 ONCE; only after the probe and the owner's yes)
 
 ```sh
 cd glance-ai
