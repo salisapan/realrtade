@@ -6,7 +6,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const { engineRoots } = require('../../paths.cjs');
 const FILES = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js',
   'file-attach.js', 'fact-reply.js', 'quiet-metrics.js', 'resolution.js', 'commitment-title.js', 'graph-mail.js',
-  'incoming-judge.js', 'outlook-calendar.js', 'draft-reply.js'];
+  'incoming-judge.js', 'outlook-calendar.js', 'draft-reply.js', 'intent-decompose.js'];  // intent-decompose.js only defines FlowIntentDecompose; teach() never calls it
 const OWN = { gmail: 'ai.local.flow@gmail.com', outlook: 'glance.salisapan@outlook.com' };
 const NOW = new Date(process.env.GLANCE_NOW || '2026-10-07T12:00:00+03:00');
 // The engine reads the clock (new Date(), Date.now()) to decide whether a date in the mail is past. Freeze it to GLANCE_NOW so a
@@ -76,6 +76,44 @@ function makeEngine(name) {
       return out(false, r.reason, r.intent);
     } catch (e) { return out(false, 'engine-error', null); }
   }
+  // decompose(c): the whole-mail judge exactly as teach() builds its input, then core/intent-decompose.js asks the same judge about each
+  // clause (Decompose v1, lab only, switch forced on here). Returns { whole, intentions:[parts], reason }.
+  function decompose(c) {
+    const D = g('FlowIntentDecompose');
+    if (!D) return { whole: { show: false, reason: 'no-decompose' }, intentions: [] };
+    const surface = c.surface === 'outlook' ? 'outlook' : 'gmail';
+    const own = OWN[surface];
+    const from = c.from || {};
+    const fromOwn = String(from.email || '').toLowerCase() === own;
+    const to = (c.to || []).map((x) => String(x).toLowerCase());
+    const body = String(c.body || '');
+    const quiet = (reason) => ({ whole: { show: false, reason }, intentions: [], reason: 'whole-mail-quiet' });
+    try {
+      let input, whole = null;
+      if (surface === 'gmail') {
+        if (fromOwn && G.messageToJudge([[own].concat(to)], own) < 0) return quiet('own-sender');
+        input = Object.assign({ text: body, subject: c.subject || '', sender: { name: from.name || null, email: from.email || null }, now: NOW,
+          threadUrl: 'https://mail.google.com/x', hasThreadAttachment: (c.attachmentCount || 0) >= 1, attachmentCount: c.attachmentCount || 0, surface: 'gmail' }, hostCtx(c, own));
+      } else {
+        const text = GM && GM.ownText ? GM.ownText(body) : body;
+        if (OC) {
+          const probe = OC.decide({ text, subject: c.subject || '', senderEmail: from.email || null, senderName: from.name || null, now: NOW });
+          if (probe && probe.move === 'hold') whole = { show: true, intent: probe.intent, process: { id: 'hold', name: 'Hold It', steps: [{ kind: 'outlookCalendar' }] } };
+          else if (probe && probe.move === 'wait') return quiet('calendar-wait(file-lookup)');
+          else if (probe && probe.move === 'silent') return quiet('calendar-' + probe.reason);
+        }
+        if (!whole && fromOwn) return quiet(to.length && to.every((t) => t === own) ? 'note-to-self' : 'own-sender');
+        const n = G.needsOneAttachment(text) ? (c.attachmentCount || 0) : 0;
+        input = Object.assign({ text, subject: c.subject || '', sender: { name: from.name || null, email: from.email || null }, now: NOW,
+          threadUrl: 'https://outlook.live.com/x', hasThreadAttachment: n === 1, attachmentCount: n, surface: 'outlook' }, hostCtx(c, own));
+      }
+      if (!whole) whole = J.judge(input, DEPS);
+      const newText = FJ && FJ.newContent ? FJ.newContent(input.text) : input.text;
+      const r = D.decompose({ aiDecomposeV1: true }, { text: newText, whole, sender: input.sender, vetoText: (c.subject ? c.subject + '\n' : '') + input.text },
+        { judgeText: (t) => J.judge(Object.assign({}, input, { text: t }), DEPS), phishing: (t) => (FI && typeof FI.phishingOrNegative === 'function' ? FI.phishingOrNegative(t) : false) });
+      return { whole: r.whole, intentions: r.intentions || [], reason: r.reason || null };
+    } catch (e) { return { whole: { show: false, reason: 'engine-error' }, intentions: [], reason: 'engine-error:' + e.message }; }
+  }
   function preprocess(c) {
     let own = String(c.body || '');
     try { own = GM && GM.ownText ? GM.ownText(own) : own; if (FJ && FJ.newContent) own = FJ.newContent(own); } catch (e) { /* keep */ }
@@ -87,7 +125,7 @@ function makeEngine(name) {
     } catch (e) { facts = { date: 'err' }; }
     return { own, facts };
   }
-  cache[name] = { name, root, teach, preprocess, DEPS, FI, G, GM };
+  cache[name] = { name, root, teach, decompose, preprocess, DEPS, FI, G, GM };
   return cache[name];
 }
 module.exports = { makeEngine, get ROOTS() { return engineRoots(); }, engineRoots, OWN, NOW, neutral };
