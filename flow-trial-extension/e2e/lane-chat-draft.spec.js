@@ -30,7 +30,8 @@ const LANE_JS = [
 ];
 const PLACE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/messenger-place.html'), 'utf8');
 const SUITE_HTML = fs.readFileSync(path.join(__dirname, '../test/fixtures/chat/live/business-suite-existing.html'), 'utf8')
-  .replace(/2026-10-14/g, '2026-10-27');
+  // Messenger skips rows older than 14 days, so the capture is moved to today (a fixed date ages out: 14 Oct on 28 Oct, 27 Oct on 10 Nov).
+  .replace(/2026-10-14/g, new Date().toISOString().slice(0, 10));
 const SUITE_ASK = 'איפה המסעדה שהיינו בה שבוע שעבר?';
 
 async function registerMessenger(glance) {
@@ -136,7 +137,7 @@ test('an open Business Suite thread drafts the existing last row and sends nothi
 
   await glance.seedOutlook();
   // Fixture rows use 2026-10-27 (fresh on CI). "שבוע שעבר" is lastWeek(message time), not the dev fixture clock.
-  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: '2026-10-21T10:00:00.000Z' });
+  await glance.setScenario({ chatLocation: 'דיזנגוף 99', chatEventIso: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 11) + '10:00:00.000Z' }); // last week, as the ask says
   const page = await glance.openBusiness(SUITE_HTML);
   const before = await page.locator('[role="row"]').count();
   const box = page.locator('[data-glance-composer="1"]');
