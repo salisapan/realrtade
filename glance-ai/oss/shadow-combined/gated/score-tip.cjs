@@ -7,6 +7,7 @@
 //   --tier0-guard aiTier0GuardV1 on: core/tier0-guard.js silences an injection or fraud-shaped money on every card, the engine's own included.
 //   --tier0-quiet aiTier0QuietV1 on: core/tier0-quiet.js keeps the engine's own card quiet on a hedge, an undecided sender or a met deadline.
 //   --cloud-worth aiCloudWorthV1 on: core/cloud-worth.js skips any model read on a mail with no sign of something to do.
+//   --multi       aiMultiV1 on: core/model-multi.js keeps every intention the model found (the cached answers here carry one each).
 //   --kind-check  aiKindCheckV1 on: core/kind-check.js corrects who owes what from the model's own quotes.
 //   --core-floor  no lab gate or veto is injected: the AI engine uses the production floor, core/ai-floor.js (what the extension will run).
 const fs = require('fs'), path = require('path'), vm = require('vm');
@@ -31,7 +32,7 @@ const goodTitle = (t, lang) => t && !LV.titleVeto(t) && (HE.test(t) === (lang ==
 const sb = { module: undefined, console: { log() {}, warn() {}, error() {} }, setTimeout, clearTimeout, Promise, TextEncoder, atob, btoa };
 vm.createContext(sb);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'step-list.js', 'json-enforce.js',
-  'understanding.js', 'request-types.js', 'follow-up.js', 'model-plan.js', 'privacyShield.js', 'mask-ids.js', 'exec-router.js', 'understanding-router.js', 'ai-floor.js', 'kind-check.js', 'tier0-guard.js', 'tier0-quiet.js', 'cloud-worth.js', 'ai-engine.js'])
+  'understanding.js', 'request-types.js', 'follow-up.js', 'model-plan.js', 'privacyShield.js', 'mask-ids.js', 'exec-router.js', 'kind-check.js', 'model-multi.js', 'understanding-router.js', 'ai-floor.js', 'tier0-guard.js', 'tier0-quiet.js', 'cloud-worth.js', 'ai-engine.js'])
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'flow-trial-extension/core', f), 'utf8'), sb, { filename: f });
 const g = (n) => vm.runInContext(n, sb);
 const AI = g('FlowAiEngine'), U = g('FlowUnderstanding'), ER = g('FlowExecRouter'), Shield = g('FlowPrivacyShield'), MI = g('FlowMaskIds');
@@ -41,7 +42,8 @@ const KIND_CHECK = process.argv.includes('--kind-check');
 const GUARD = process.argv.includes('--tier0-guard');
 const QUIET = process.argv.includes('--tier0-quiet');
 const WORTH = process.argv.includes('--cloud-worth');
-const OUT = (CORE_FLOOR ? 'tip-core-floor' : 'tip') + (KIND_CHECK ? '-kind-check' : '') + (GUARD ? '-guard' : '') + (QUIET ? '-quiet' : '') + (WORTH ? '-worth' : '');
+const MULTI = process.argv.includes('--multi');
+const OUT = (CORE_FLOOR ? 'tip-core-floor' : 'tip') + (KIND_CHECK ? '-kind-check' : '') + (GUARD ? '-guard' : '') + (QUIET ? '-quiet' : '') + (WORTH ? '-worth' : '') + (MULTI ? '-multi' : '');
 
 const sentences = (t) => String(t || '').split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter((s) => s.length >= 3);
 const words = (t) => new Set((String(t).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []).map((w) => (HE.test(w) ? w.replace(/^[להבוכמש]/, '') : w)));
@@ -82,7 +84,7 @@ function goldOf(c) { if (REL[c.id]) return REL[c.id].to; const gg = c.gold.step;
     const quiet = c.vetoBase || c.vetoProduct || c.textVeto || null;
     const mail = { text: c.own, body: c.prompt.body, subject: c.subject, today: c.today, direction: c.direction, attachmentCount: c.attachmentCount || 0, surface: c.surface, lang: c.lang, cloudConsent: true,
       threadId: 'lab-' + c.id, now: Date.parse(c.today + 'T09:00:00'), tier0: { quiet: tipStep === 'SILENT' ? quiet : null, step: tipStep, possible: tipStep === 'SILENT' && !!LLM[c.id] } };
-    const out = await AI.read(mail, deps, Object.assign({ aiPrimary: true, aiPlanV1: true }, KIND_CHECK ? { aiKindCheckV1: true } : {}, GUARD ? { aiTier0GuardV1: true } : {}, QUIET ? { aiTier0QuietV1: true } : {}, WORTH ? { aiCloudWorthV1: true } : {}));
+    const out = await AI.read(mail, deps, Object.assign({ aiPrimary: true, aiPlanV1: true }, KIND_CHECK ? { aiKindCheckV1: true } : {}, GUARD ? { aiTier0GuardV1: true } : {}, QUIET ? { aiTier0QuietV1: true } : {}, WORTH ? { aiCloudWorthV1: true } : {}, MULTI ? { aiMultiV1: true } : {}));
     rows.push({ c, tip: tipStep, ai: out.card ? out.card.step : 'SILENT', out });
   }
   const SETS = [['OSS 275', (c) => c.set === 'oss'], ['v2 held-out 400', (c) => c.set === 'v2test'], ['adversarial 72', (c) => c.set === 'adv'], ['injection 39', (c) => c.set === 'inj'], ['ALL pooled 786', () => true]];
