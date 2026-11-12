@@ -10026,7 +10026,7 @@ const FlowIncomingJudge = (() => {
       // A question that names a clock is a meeting proposal: the hold readers and the calendar path own it, not a reply.
       return (he ? DIRECT_Q_HE.test(x) : DIRECT_Q_EN.test(x)) && !skip(x, he) && !dayOf(x, now0).time;
     });
-    if (qs.length >= 2 || (qs.length === 1 && greetsReader)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length };
+    if (qs.length >= 2 || (qs.length === 1 && greetsReader)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length, questionList: qs.slice(0, 8).map((q) => q.slice(0, 200)) };
     return null;
   }
   function directAskCard(i, body) {
@@ -10035,6 +10035,8 @@ const FlowIncomingJudge = (() => {
     if (hit.kind === 'task') { const c = doItCard(i, hit); c.intent.directAsk = true; return c; }
     const c = replyCard(i, hit);
     c.intent.directAsk = true; c.intent.questions = hit.questions || null;
+    // What the draft step needs to be written well: the mail's language, and every question for the answer frame (core/draft-reply.js).
+    for (const st of c.process.steps) if (st.kind === 'gmailDraft' || st.kind === 'outlookDraft') { st.params.lang = hit.lang; if (hit.questionList) st.params.questions = hit.questionList; }
     // No day in the words: the reply draft alone (owner C-4). A task with no date is not invented.
     if (!hit.dateIso) c.process.steps = c.process.steps.filter((st) => st.kind !== 'googleTask');
     return c;

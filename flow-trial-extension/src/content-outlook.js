@@ -742,6 +742,9 @@
   function glanceLabsLocked() {
     try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
   }
+  // The direct-ask second read (plain questions a person puts to the reader; a Hebrew bare imperative with a day): on, on every surface that
+  // runs the shared judge, by the owner's approval of 2026-11-12. To turn it off, set this to false.
+  const directAskSwitch = true;
   // glanceSwitches.SYSTEM_NOTICE (off): a known service's deadline notice becomes a To Do task (core/system-notice.js).
   let systemNoticeSwitch = false;
   try {
@@ -821,6 +824,7 @@
     });
     const judgeWith = (text) => FlowIncomingJudge.judge({
       systemNoticeOn: systemNoticeSwitch === true,
+      directAskOn: directAskSwitch !== false,
       bookingNoticeOn: bookingNoticeSwitch === true,
       paymentAskOn: paymentAskSwitch === true,
       taskAskOn: taskAskSwitch === true,
@@ -5449,6 +5453,7 @@
         });
         return FlowIncomingJudge.judge({
           systemNoticeOn: systemNoticeSwitch === true,
+      directAskOn: directAskSwitch !== false,
           bookingNoticeOn: bookingNoticeSwitch === true,
           paymentAskOn: paymentAskSwitch === true,
           taskAskOn: taskAskSwitch === true,

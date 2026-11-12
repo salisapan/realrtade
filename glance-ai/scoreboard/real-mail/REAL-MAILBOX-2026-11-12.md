@@ -56,3 +56,31 @@ So the unit of value is the **loop over a thread**, not the single mail: opened 
 1. **A thread-level check on real mail:** for each real thread, does the follow loop open on the owner's ask, hold on an auto-reply until its day, close on a decline, an opt-out or a delivery, and flag a bounce? The code exists (`core/follow-up.js`, `core/reply-meaning.js`, `core/model-plan.js closeFor`); it has never been measured on real threads. This is the measurement that matches the product.
 2. **Owner decisions:** turn the direct-ask reader on behind its switch on Gmail first (needs «מאשר» and a live Gate); a convention for a one-word opt-out reply.
 3. **The structured teacher run (about $5):** it labels generated mail. This mailbox shows the lab models do not carry over to real mail, so its expected value for the product is low until a real-mail check says otherwise. Recommended: hold it.
+
+## 6. Later the same day: on by the owner's approval, on every surface that runs the shared judge; the thread check; execution after Do It
+
+**The direct-ask reader is ON** (owner, 2026-11-12, in session). It is not a Gmail feature: the Chrome extension on Gmail, the extension on Outlook and the Gmail add-on all pass `directAskOn` to the one shared judge. Off switch: the `directAskOn` flag each host passes (one line per host; no storage switch, the Labs list is for closes that ship off). No live Gate was run; the headless suite runs in CI on a pull request.
+
+| change | Gmail (extension) | Outlook (extension) | Gmail add-on (phone card) | chats: WhatsApp, Messenger, Instagram, Teams | Safari iOS |
+|---|---|---|---|---|---|
+| direct-ask reader | on | on | on for a task plan; a reply-only plan is left to the surfaces that can draft, as every reply plan there is | follow-up: a chat is mostly casual questions, so it needs its own corpus and a group check before it is turned on | n/a, the surface does not exist yet |
+| the reply draft in the language of the ask; the answer frame for a mail of questions; no echo of the sender's greeting | done (shared composer) | done (same composer) | n/a, the card writes no draft | follow-up: the chat draft has its own composer | n/a |
+| follow loop: real outgoing asks open a loop; an opt-out and "we have our own systems" close it as declined; a Hebrew out-of-office holds it | done (shared `core/follow-up.js`) | done | n/a, no follow loop on the card | done where the chat lanes use the same follow loop | n/a |
+| Google Calendar notices are an automated sender | done | done | done | n/a | n/a |
+
+**Thread-level check on 8 real threads** (`run-owner-threads.cjs`; the owner's own outgoing ask, then what came back; masked, private, gold by Claude in one pass):
+
+| | before | now |
+|---|---|---|
+| a follow loop opens on the owner's ask | 2 of 8 | 8 of 8 |
+| the reply does to the loop what a careful reader expects | 1 of 8 | 7 of 8 |
+
+Before: the way a person really asks in a business mail («נשמח לתאם פגישה קצרה», «נשמח לקבל את שם...», «אשמח שתשלחי זימון») opened no loop, a one-word opt-out was read as an acknowledgement (the loop would have chased a person who asked to be left alone), and a Hebrew out-of-office closed a loop. Still open: a bounce only holds the loop (there is no "the ask never arrived, fix the address" state), and a reply that delivers one of three things asked closes the whole loop.
+
+**Execution after Do It** (`flow-trial-extension/test/execution-coverage-corpus.cjs`, 89 checks, Gmail, Outlook and chat through the shared judge): every step a card can carry has a writer and an undoer in `src/background.js`; Outlook gets no Gmail draft and no Drive step, Gmail no Outlook step. Three defects found and fixed in the shared draft composer (`core/draft-reply.js`), so on every surface that drafts:
+
+1. **A Hebrew ask got an English draft** (the generic reply step never named its language). The draft is now written in the language of the ask.
+2. **A mail of questions got a draft that quoted only the first question.** It is now an answer frame: every question as written, in order, with a place for the person's answer under each. Glance writes no answer.
+3. **The draft repeated the sender's greeting to the reader** ("Thanks. I'll follow up on: Hi Sali, could you..."). The quoted ask now starts at the ask.
+
+What this does NOT prove: the lab cannot run a writer against Google or Microsoft (no account, no browser), so "has a writer" is a registry check, not a proof that the write lands and reads back. That proof is ProofOfClose on a live Gate. Read from code only, not run: on Outlook the shared judge's reply plan still names a `googleTask` after the Outlook draft and a meeting names `calendar`; the Outlook host maps both at run time.

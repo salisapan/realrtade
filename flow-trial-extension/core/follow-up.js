@@ -86,7 +86,11 @@ const FlowFollowUp = (() => {
     /(?:תשלח(?:ו|י)?|שלח(?:ו|י)?|אשר(?:ו|י)?|תאשר(?:ו|י)?|חתום|תחתום|עדכן|תעדכן|תחזור|תחזרו|תחזרי|העבר(?:ו|י)?|תעביר(?:ו|י)?) (?:לי|לנו|אלי|בבקשה|את|עד|מיד)/,
     /(?:נא|בבקשה) (?:לשלוח|לאשר|להשיב|לחתום|להעביר|לעדכן|לשלם)/,
     /(?:ממתין|ממתינה|מחכה|מחכים|ממתינים) (?:ל|לתשובה|לאישור|לחתימה|לתשלום)/,
-    /אשמח (?:אם|ש)(?:תשלח|תוכל|תאשר|תחזור|תעדכן|נקבל)/
+    /אשמח (?:אם|ש)(?:תשלח|תוכל|תאשר|תחזור|תעדכן|נקבל)/,
+    // The way a person really asks in a business mail (owner's real threads, 2026-11-12): "we would be glad to set up a short meeting",
+    // "glad to receive the name of...", "glad if you send the invitation". A closing courtesy ("נשמח לעזור", "אשמח לעמוד לרשותך") is not here.
+    /(?:נשמח|אשמח) (?:לתאם|לקבוע|להיפגש|לקבל (?:את|ממך|מכם)|לדעת (?:מראש|אם|מי|מתי|על)|שתשלח(?:ו|י)?|שתצרפ(?:ו|י)?|שתעדכנ(?:ו|י)?|שתחזר(?:ו|י)?|שתאשר(?:ו|י)?)/,
+    /אפשר לקבוע כאן|(?:או )?לשלוח לי (?:יום|מועד|תאריך)/
   ];
 
   // ---- payment --------------------------------------------------------------
@@ -543,7 +547,7 @@ const FlowFollowUp = (() => {
 
   // An out-of-office or automatic reply is not an answer. Treating it as one
   // would close a follow-up the person is still waiting on.
-  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|בחופשה עד|בחופשה|אעדר)/i;
+  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|מענה אוטומטי|בחופשה עד|בחופשה|אעדר|(?:לא|אינני|איני) נמצא(?:ת)? במשרד|המסירה לנמענים|לא ניתן למסירה)/i;
 
   function isAutoReply(text, senderEmail) {
     if (AUTO_REPLY.test(String(text || '').slice(0, 600))) return true;
@@ -686,6 +690,12 @@ const FlowFollowUp = (() => {
     if (!n) return { outcome: kind === KINDS.PAYMENT ? 'answered' : 'closed', promisedIso: null, basis: 'rule' };
 
     if (kind === KINDS.PAYMENT && paidClaimed(body)) return { outcome: 'paid', promisedIso: null, basis: 'rule' };
+
+    // An opt-out is a no, whatever its grammar ("נא להסיר אותי מרשימת התפוצה" is phrased as an ask): the loop closes as declined and is
+    // never chased again (owner's real threads, 2026-11-12).
+    if (/^(?:נא |בבקשה )?(?:הסר|הסירו|להסיר)(?: אותי| אותנו)?(?: מרשימת התפוצה| מהרשימה)?[.!]?\s*$|^(?:please )?(?:unsubscribe|remove (?:me|us)(?: from (?:your|this|the) (?:mailing )?list)?)[.!]?\s*$/i.test(body.trim())) {
+      return { outcome: 'declined', promisedIso: null, basis: 'rule', why: 'opt-out' };
+    }
 
     // What they wrote may not be completion even though they wrote back: they
     // could not open it, they asked something, or they said no (core/reply-meaning.js).

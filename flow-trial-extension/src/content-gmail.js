@@ -1665,7 +1665,10 @@ function glanceUiCopy(kind) {
       // The same second read Outlook's judge runs when the classifier finds nothing: a do-it ask with a named day, a timed
       // proposal asked back, an answer-needing ask with a date. Nothing is sent; the plan is the usual card.
       const q0 = intent && intent.quiet ? intent.quiet : null;
-      const hit = FlowIncomingJudge.secondRead({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true }, q0);
+      // The direct-ask second read (plain questions a person puts to the reader; a Hebrew bare imperative with a day): on, on every
+      // surface that runs the shared judge, by the owner's approval of 2026-11-12 after the run on his real mailbox. To turn it off, pass false.
+      const directAskOn = true;
+      const hit = FlowIncomingJudge.secondRead({ directAskOn, text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true }, q0);
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
     return intent || { type: null };
