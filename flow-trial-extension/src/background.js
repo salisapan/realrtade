@@ -45,7 +45,7 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
-import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
+import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleMissingScopes, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
@@ -1672,6 +1672,14 @@ async function runGoogleWebAuth(interactive) {
   const resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
   if (epoch !== googleWebAuthEpoch) throw new Error('Google sign-in was closed or denied.');
   const parsed = parseGoogleImplicitRedirect(resultUrl, state);
+  // A consent with boxes left unticked is not kept: the token cannot write,
+  // and keeping it made the next Connect reuse it without a window.
+  const missing = googleMissingScopes(parsed.scope, scopes);
+  if (missing.length) {
+    const partial = new Error('Google did not grant every permission Glance needs. Connect Google again and tick every box.');
+    partial.code = 'partial-grant';
+    throw partial;
+  }
   const record = { accessToken: parsed.accessToken, source: 'web', obtainedAt: Date.now() };
   if (parsed.expiresIn) record.expiresAt = Date.now() + parsed.expiresIn * 1000;
   const keptHint = parsed.email || hint;
@@ -1865,6 +1873,19 @@ async function recordGoogleConsent(token, source) {
   try { await lane.record(token, source); } catch (e) { /* the first verified write records the account */ }
 }
 
+// A write was refused (401, revoked, missing scope, wrong account). The token
+// still in storage is the one Google refused, so an explicit Connect must ask
+// Google again instead of handing that token back without a window.
+async function googleReconnectFlagged() {
+  try {
+    const bag = await chrome.storage.local.get(GOOGLE_RECONNECT_STORAGE_KEY);
+    const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+    return Boolean(flag && flag.needed);
+  } catch (e) {
+    return false;
+  }
+}
+
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
   const granted = await readGoogleGrantedScopes();
@@ -1872,6 +1893,7 @@ async function getGoogleAccessToken(interactive) {
   if (googleScopeAction(granted, requiredScopes, wantUi ? 'interactive' : 'silent') === 'upgrade') {
     return upgradeGoogleScopesOnce();
   }
+  if (wantUi && await googleReconnectFlagged()) return upgradeGoogleScopesOnce();
   try {
     const token = await getGoogleAuthToken(wantUi);
     if (wantUi) await recordGoogleConsent(token, 'chrome');
@@ -1888,6 +1910,7 @@ async function getGoogleAccessToken(interactive) {
       if (wantUi) await recordGoogleConsent(web.token, 'web');
       return web;
     } catch (fallbackErr) {
+      if (wantUi && fallbackErr && fallbackErr.code === 'partial-grant') throw fallbackErr;
       if (wantUi) throw new Error(googleConnectErrorMessage(message, fallbackErr && fallbackErr.message));
       throw fallbackErr;
     }
@@ -1938,7 +1961,8 @@ async function disconnectConnector(connectorId) {
       GOOGLE_GRANTED_SCOPES_KEY,
       'googleProfile',
       'googleConnectedAccount',
-      'glanceOwnNames'
+      'glanceOwnNames',
+      'googleLaneWarning'
     ]));
     googleNamesFilled = false;
     const hook = globalThis.FlowProfileHook;
@@ -2289,7 +2313,8 @@ async function clearGoogleAuthForRevocation(reason) {
     GOOGLE_GRANTED_SCOPES_KEY,
     'googleProfile',
     'googleConnectedAccount',
-    'glanceOwnNames'
+    'glanceOwnNames',
+    'googleLaneWarning'
   ]));
   googleNamesFilled = false;
   try {
@@ -2574,6 +2599,9 @@ async function connectGoogleTasks(interactive, preset) {
     googleTasksAuth: { taskListId },
     [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
   });
+  // «שלב אחד לא הושלם» belongs to a Do It on the grant this Connect replaced.
+  // Left in place it kept a fresh, fully granted connection off Connected.
+  await chrome.storage.local.remove('googleLaneWarning');
   const accountEmail = globalThis.FlowGoogleLaneAccount && typeof globalThis.FlowGoogleLaneAccount.read === 'function'
     ? await globalThis.FlowGoogleLaneAccount.read()
     : '';

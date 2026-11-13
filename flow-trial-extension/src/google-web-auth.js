@@ -205,11 +205,33 @@ export function parseGoogleImplicitRedirect(redirectUrl, expectedState) {
   }
   const expiresRaw = pick('expires_in');
   const expiresIn = expiresRaw == null || expiresRaw === '' ? null : Number(expiresRaw);
+  const scopeRaw = pick('scope');
   return {
     accessToken: accessToken.trim(),
     expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : null,
-    email: emailFromIdToken(pick('id_token'))
+    email: emailFromIdToken(pick('id_token')),
+    scope: typeof scopeRaw === 'string' ? scopeRaw : null
   };
+}
+
+// Google's consent screen lets each box be unticked. The implicit redirect's
+// scope is what was actually granted. A required scope missing from it means
+// the token cannot write, so it is not a connection. No scope in the redirect
+// says nothing either way: nothing is reported missing.
+const SCOPE_ALIASES = {
+  'https://www.googleapis.com/auth/userinfo.email': 'email',
+  'https://www.googleapis.com/auth/userinfo.profile': 'profile'
+};
+export function googleMissingScopes(grantedScope, requiredScopes) {
+  if (typeof grantedScope !== 'string' || !grantedScope.trim()) return [];
+  const granted = grantedScope.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+  const required = Array.isArray(requiredScopes) ? requiredScopes : [];
+  return required.filter((s) => {
+    const want = String(s || '').trim();
+    if (!want || granted.indexOf(want) >= 0) return false;
+    const alias = SCOPE_ALIASES[want];
+    return !(alias && granted.indexOf(alias) >= 0);
+  });
 }
 
 // Browser UI language. he and he-IL use the Hebrew refusal. Anything else

@@ -4865,7 +4865,11 @@ function glanceUiCopy(kind) {
     if (!chromeLive()) return;
     const store = chrome.storage && chrome.storage.local;
     if (!store) return;
-    const lane = (results || []).filter((r) => r && r.action && laneConnectorId(r.action.kind));
+    // A reply-draft hand-off (preview, closes nothing) and a skipped step are
+    // not failed writes, the same rule as the receipt. Counting them set the
+    // warning on a full «טופל», and it then kept Google off Connected.
+    const lane = (results || []).filter((r) => r && r.action && laneConnectorId(r.action.kind)
+      && !draftHandOff(r) && !(r.response && r.response.skipped));
     if (!lane.length) return;
     const ok = lane.some((r) => r.response && r.response.ok);
     const failed = lane.some((r) => !(r.response && r.response.ok));

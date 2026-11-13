@@ -940,6 +940,176 @@ async function run() {
       before && before.googleTasks);
   }
 
+
+  // Gate (c) on e1695c85, box Chrome Fork-7, browser sign-in off so the web
+  // flow is the consent. Storage on disk after the full re-grant held a fresh
+  // googleWebAuth, googleTasksAuth and granted scopes, and the popup still said
+  // «התחבר ל-Google» / «שלב אחד לא הושלם»: googleLaneWarning from the Board
+  // pack Do It in (a) was never cleared by the revoke or by the new Connect.
+  console.log('\n--- gate c: reconnect after a remote revoke ends Connected ---\n');
+  {
+    const NOT_SIGNED_IN = 'The user is not signed in.';
+    const glanceList = [/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] }) }];
+    const tokenOk = [/\/oauth2\/v3\/tokeninfo/, { reply: res(200, { aud: WEB_CLIENT, expires_in: 3500 }) }];
+    const env = load({
+      getAuthTokenError: NOT_SIGNED_IN,
+      webToken: 'ya29.regrant',
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_G' },
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.revoked', source: 'web', expiresAt: Date.now() + 3600e3 },
+        // Set by the Board pack Do It in (a): Drive wrote, the reply draft was a hand-off.
+        googleLaneWarning: { needed: true }
+      },
+      routes: [glanceList, tokenOk]
+    });
+    await env.fn('clearGoogleAuthForRevocation')('revoked');
+    check('a remote revoke clears the lane warning with the grant', env.stored.googleLaneWarning == null, env.stored);
+    const revoked = await env.fn('connectorStatus')();
+    check('after the revoke the popup is Connect Google, not Connected',
+      revoked && revoked.googleTasks && revoked.googleTasks.connected === false && revoked.googleTasks.needsReconnect === false,
+      revoked && revoked.googleTasks);
+    // The warning can also be left from before the revoke on a profile that
+    // ran an older build. A fresh Connect still has to end Connected.
+    env.stored.googleLaneWarning = { needed: true };
+    const out = await attempt(env.fn('connectGoogleTasks')(true));
+    check('the reconnect itself succeeds through the web window', out.ok === true, out);
+    check('the reconnect opened one consent window', interactiveCalls(env.calls).filter((c) => /^WEB /.test(c)).length === 1, env.calls);
+    check('the reconnect stored the fresh token and the Glance list',
+      env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'ya29.regrant' && env.stored.googleTasksAuth && env.stored.googleTasksAuth.taskListId === 'LIST_G',
+      { web: env.stored.googleWebAuth, tasks: env.stored.googleTasksAuth });
+    check('a successful Connect clears the stale lane warning', env.stored.googleLaneWarning == null, env.stored.googleLaneWarning);
+    const after = await env.fn('connectorStatus')();
+    check('after the full re-grant the popup is Connected (מחובר, with Disconnect), not «שלב אחד לא הושלם»',
+      after && after.googleTasks && after.googleTasks.connected === true && after.googleTasks.warning === false && after.googleTasks.needsReconnect === false,
+      after && after.googleTasks);
+  }
+
+  console.log('\n--- gate c: a profile-only grant does not stick, and the retry opens consent again ---\n');
+  {
+    const NOT_SIGNED_IN = 'The user is not signed in.';
+    let grant = 'profile';
+    const PROFILE_ONLY = 'openid https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+    const env = load({
+      getAuthTokenError: NOT_SIGNED_IN,
+      stored: { googleGrantedScopes: null },
+      webFlowRedirect: (authUrl) => {
+        const state = authUrl.searchParams.get('state');
+        const token = grant === 'profile' ? 'ya29.profile-only' : 'ya29.full';
+        const scope = grant === 'profile' ? PROFILE_ONLY : SCOPES.join(' ');
+        return 'https://' + EXTENSION_ID + '.chromiumapp.org/#access_token=' + token + '&expires_in=3599&token_type=Bearer&scope=' + encodeURIComponent(scope) + '&state=' + encodeURIComponent(state);
+      },
+      routes: [[/\/users\/@me\/lists/, {
+        get reply() {
+          return grant === 'profile'
+            ? res(403, { error: { message: 'Request had insufficient authentication scopes.' } })
+            : res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] });
+        }
+      }]]
+    });
+    const first = await attempt(env.fn('connectGoogleTasks')(true));
+    check('a profile-only consent does not connect', first.ok === false && !env.stored.googleTasksAuth, { first, tasks: env.stored.googleTasksAuth });
+    check('a profile-only token is not kept as the Google session', !(env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'ya29.profile-only'), env.stored.googleWebAuth);
+    check('a profile-only consent is not recorded as granted',
+      !(env.stored.googleGrantedScopes && env.stored.googleGrantedScopes.status === 'granted'), env.stored.googleGrantedScopes);
+    const windowsBefore = env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length;
+    // Second click without ticking: still a window, never a silent reuse.
+    const again = await attempt(env.fn('connectGoogleTasks')(true));
+    const windowsAgain = env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length;
+    check('a second Connect after a profile-only grant opens the Google window again', windowsAgain === windowsBefore + 1, env.calls);
+    check('that second profile-only consent still does not connect', again.ok === false && !env.stored.googleTasksAuth, again);
+    grant = 'full';
+    const third = await attempt(env.fn('connectGoogleTasks')(true));
+    const windowsThird = env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length;
+    check('ticking every box on the next window connects', third.ok === true && env.stored.googleTasksAuth && env.stored.googleTasksAuth.taskListId === 'LIST_G', { third, tasks: env.stored.googleTasksAuth });
+    check('that connect opened its own window', windowsThird === windowsAgain + 1, env.calls);
+    check('the full grant is recorded as granted', env.stored.googleGrantedScopes && env.stored.googleGrantedScopes.status === 'granted', env.stored.googleGrantedScopes);
+    const status = await env.fn('connectorStatus')();
+    check('after the full grant the popup is Connected', status && status.googleTasks && status.googleTasks.connected === true, status && status.googleTasks);
+  }
+
+  console.log('\n--- gate c: Connect after a write was refused for scope opens consent, not the stored token ---\n');
+  {
+    const env = load({
+      getAuthTokenError: 'The user is not signed in.',
+      webToken: 'ya29.after-ask',
+      stored: {
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.profile-only', source: 'web', expiresAt: Date.now() + 3600e3 },
+        googleReconnect: { needed: true, reason: 'missing scope' }
+      },
+      routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] }) }]]
+    });
+    const out = await attempt(env.fn('connectGoogleTasks')(true));
+    check('Connect with Reconnect flagged opens the Google window', env.calls.some((c) => /^WEB prompt=select_account interactive=true/.test(c)), env.calls);
+    check('Connect with Reconnect flagged does not reuse the refused token',
+      out.ok === true && env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'ya29.after-ask' && env.tokens.indexOf('ya29.profile-only') === -1,
+      { out, web: env.stored.googleWebAuth, tokens: env.tokens });
+    const silent = load({
+      getAuthTokenError: 'The user is not signed in.',
+      stored: {
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.profile-only', source: 'web', expiresAt: Date.now() + 3600e3 },
+        googleReconnect: { needed: true, reason: 'missing scope' }
+      }
+    });
+    await attempt(silent.fn('getGoogleAccessToken')(false));
+    check('a silent caller with Reconnect flagged still never opens a window', interactiveCalls(silent.calls).length === 0, silent.calls);
+  }
+
+  console.log('\n--- gate c: a closed Google window, then Connect again, opens a window ---\n');
+  {
+    let cancel = true;
+    const env = load({
+      getAuthTokenError: 'The user is not signed in.',
+      stored: { googleGrantedScopes: null },
+      webFlowRedirect: (authUrl) => {
+        if (cancel) return 'https://' + EXTENSION_ID + '.chromiumapp.org/#error=access_denied&state=' + encodeURIComponent(authUrl.searchParams.get('state'));
+        return 'https://' + EXTENSION_ID + '.chromiumapp.org/#access_token=ya29.second&expires_in=3599&scope=' + encodeURIComponent(SCOPES.join(' ')) + '&state=' + encodeURIComponent(authUrl.searchParams.get('state'));
+      },
+      routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] }) }]]
+    });
+    const first = await attempt(env.fn('connectGoogleTasks')(true));
+    check('a closed window does not connect', first.ok === false && !env.stored.googleTasksAuth, first);
+    cancel = false;
+    const second = await attempt(env.fn('connectGoogleTasks')(true));
+    check('the next Connect opens a window again', env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length === 2, env.calls);
+    check('the next Connect connects', second.ok === true && env.stored.googleTasksAuth && env.stored.googleTasksAuth.taskListId === 'LIST_G', second);
+  }
+
+  console.log('\n--- gate a: a Drive save plus a reply-draft hand-off does not raise the lane warning ---\n');
+  {
+    const gmailSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
+    function sliceFn(name) {
+      const at = gmailSrc.indexOf('  function ' + name + '(');
+      if (at < 0) throw new Error('content-gmail.js has no ' + name);
+      const end = gmailSrc.indexOf('\n  }\n', at);
+      return gmailSrc.slice(at, end + 4);
+    }
+    function runLane(results) {
+      const store = {};
+      const box = {
+        chromeLive: () => true,
+        laneConnectorId: (kind) => (kind === 'googleDriveSave' ? 'googleDriveSave' : kind === 'gmailCompose' ? 'gmailCompose' : kind === 'googleTask' ? 'googleTasks' : ''),
+        chrome: { storage: { local: {
+          set: (patch) => { Object.assign(store, patch); return Promise.resolve(); },
+          remove: (k) => { delete store[k]; return Promise.resolve(); }
+        } } }
+      };
+      vm.createContext(box);
+      vm.runInContext(sliceFn('draftHandOff') + '\n' + sliceFn('noteLaneOutcome') + '\nthis.noteLaneOutcome = noteLaneOutcome;', box, { filename: 'content-gmail.js' });
+      box.noteLaneOutcome(results);
+      return store;
+    }
+    const drive = { action: { kind: 'googleDriveSave' }, response: { ok: true, fileId: 'F1' } };
+    const handOff = { action: { kind: 'gmailCompose' }, response: { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false } };
+    const skipped = { action: { kind: 'googleTask' }, response: { ok: false, skipped: true } };
+    const failed = { action: { kind: 'googleTask' }, response: { ok: false, reason: 'error' } };
+    check('Drive written + draft hand-off sets no lane warning', !runLane([drive, handOff]).googleLaneWarning);
+    check('Drive written + a skipped step sets no lane warning', !runLane([drive, skipped]).googleLaneWarning);
+    check('Drive written + a real failed write still sets the lane warning', !!(runLane([drive, failed]).googleLaneWarning || {}).needed);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }

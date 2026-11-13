@@ -141,6 +141,33 @@ test('(b2) remount after Drive+compose hand-off stays טופל, never טופל �
   await expect(again.locator('div[role="main"]')).not.toContainText('טופל חלקית');
 });
 
+test('(b3) a full טופל with a compose hand-off leaves Google Connected, no «שלב אחד לא הושלם»', async ({ glance }) => {
+  // Gate (c) on e1695c85: this Do It set googleLaneWarning, and after a
+  // revoke and a full re-grant the popup still said «שלב אחד לא הושלם».
+  await glance.context.route('https://mail.google.com/e2e/**', (r) => r.fulfill({ status: 404, contentType: 'text/plain', body: 'page fetch' }));
+  await glance.seedGmail({ glanceUiLanguage: 'he' });
+  const page = await glance.openGmail({
+    messageId: 'm-polish-b3', threadId: 't-polish-b3', subject: 'Board pack',
+    senderEmail: 'dana@acme.io', senderName: 'Dana', ownEmail: SELF, to: [SELF], lang: 'he',
+    body: ASK, downloadUrl: BOARD,
+    // No Reply open, as in the live Gate: the draft step is a hand-off.
+    composeReply: false
+  });
+  const chip = page.locator('div[role="main"] button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  const receipt = page.locator('div[role="main"] .flow-chip-done');
+  await expect(receipt).toBeVisible({ timeout: 20000 });
+  await expect(receipt).not.toContainText('טופל חלקית');
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    return Boolean(bag.glanceLaneUndo && Object.keys(bag.glanceLaneUndo).length);
+  }, { timeout: 10000 }).toBe(true);
+  const bag = await glance.storage();
+  // connectorStatus reads this key: set, Google shows «שלב אחד לא הושלם» and not Connected.
+  expect(bag.googleLaneWarning || null).toBeNull();
+});
+
 test('(b) one closed step of two still yields partly handled copy', () => {
   const engine = { module: undefined, console };
   vm.createContext(engine);
