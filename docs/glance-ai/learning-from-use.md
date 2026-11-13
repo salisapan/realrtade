@@ -51,3 +51,8 @@ One outcome event per decision, no text: `{connector, closeType, proposed, appro
 - Labels from one person's use are few at the start and reflect one person's habits. They are the trustworthy base, not a large one. Report n every time.
 - Calibration can be fooled by a few hasty clicks; it moves slowly and has a floor.
 - Nothing here is live until it is built, tested and switched on by the owner. Today the model's learning from outcomes is limited to the on-device modules listed above.
+
+## Build log
+
+- **2026-11-11, path A, gate and tools (lab; owner «יש לך אישור להכל»).** `glance-ai/labeling/lib.cjs` now knows the own-use source: `isOwnUse(row)` is true only for `labeledBy: "sali:action"`, `source: "own-use"`, an `approve` or `edit` decision, and a read-back proof `{system, externalId, fetchedBack: true, verifiedAt}`; `validateRow` accepts `ownerVerified: true` for such a row and still refuses it for any other labeler. `glance-ai/oss/finetune/promote_gate.cjs` counts a `sali:action` row toward the 200 only when `isOwnUse` holds, so a forged row without proof counts 0. `glance-ai/labeling/ingest-own-use.cjs` turns the device export (masked text, proposed step, decision, proof) into labels: approve or edit with proof is gold, an undo is a negative (`UNSURE`, wrong step recorded), ignored and proof-less rows are left out; the output defaults to the gitignored `flow-trial-extension/test/fixtures/private/`. Tests: `node glance-ai/labeling/test-own-use.cjs` (7 checks). **Not built:** the on-device export in the extension (it needs a switch and a decision about how the file leaves the device; no manifest change was made). The export format is the input contract of `ingest-own-use.cjs`.
+

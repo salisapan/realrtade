@@ -39,9 +39,15 @@ const FlowChatTaskCard = (() => {
     });
   }
 
+  // A Chrome Web Store install (Chrome adds update_url to the manifest) never turns a Labs switch on,
+  // whatever storage says. Unpacked/dev installs have no update_url and keep Labs working.
+  function glanceLabsLocked() {
+    try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
+  }
   async function switchOn(name) {
     try {
       if (!runtimeAlive() || !chrome.storage || !chrome.storage.local) return false;
+      if (glanceLabsLocked()) return false;
       const bag = await chrome.storage.local.get({ glanceSwitches: {} });
       return !!(bag.glanceSwitches && bag.glanceSwitches[name || SWITCH] === true);
     } catch (e) { return false; }
@@ -699,7 +705,8 @@ const FlowChatTaskCard = (() => {
       if ((held === appt || held === inv) && held.durationMinutes) holdMinutes = held.durationMinutes;
     } else {
       try {
-        judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
+        // directAskOn: plain business questions (two or more) in a one-to-one chat; this card already dropped groups, own and quoted text.
+        judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0, directAskOn: true, oneToOne: i.oneToOne === true && !i.group && !i.fromMe && !i.quoted });
       } catch (e) { judged = null; }
       // A payment asked with an amount and a day is read by its own reader (a task "Pay 1200 NIS · Dana"); the shared judge's generic
       // "Reply requested by Oct 27, ₪1,200" for the same words is the weaker reading and gives way to it.

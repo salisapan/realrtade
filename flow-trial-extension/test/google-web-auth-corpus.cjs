@@ -58,6 +58,7 @@ function load(opts) {
   const calls = [];
   const sets = [];
   const tokens = [];
+  const requests = [];
   const pendingWebFlows = [];
   const stored = JSON.parse(JSON.stringify(opts.stored || {}));
   if (!Object.prototype.hasOwnProperty.call(stored, 'googleGrantedScopes')) {
@@ -101,8 +102,21 @@ function load(opts) {
       calls.push(method + ' ' + String(url));
       const auth = options && options.headers && options.headers.Authorization;
       if (auth) tokens.push(String(auth).replace('Bearer ', ''));
+      const headers = (options && options.headers) || {};
+      requests.push({
+        method,
+        url: String(url),
+        body: options && typeof options.body === 'string' ? options.body : (options && options.body != null ? String(options.body) : ''),
+        contentType: String(headers['Content-Type'] || headers['content-type'] || ''),
+        heldTasksAuth: Boolean(stored.googleTasksAuth),
+        heldWebAuth: Boolean(stored.googleWebAuth && stored.googleWebAuth.accessToken)
+      });
       for (const [match, answer] of opts.routes || []) {
-        if (match.test(String(url)) && (!answer.method || answer.method === method)) return answer.reply;
+        if (match.test(String(url)) && (!answer.method || answer.method === method)) {
+          if (answer.throws) throw new TypeError(answer.throws);
+          if (typeof answer.replyFor === 'function') return answer.replyFor(options || {});
+          return answer.reply;
+        }
       }
       return res(500, { error: { message: 'unrouted' } });
     },
@@ -184,6 +198,7 @@ function load(opts) {
   return {
     calls,
     tokens,
+    requests,
     stored,
     sets,
     onMessage: onMessageListener,
@@ -683,6 +698,8 @@ async function run() {
     check('that 401 retry never calls interactive true', interactiveCalls(env.calls).length === 0, env.calls);
     check('that 401 retry did try prompt=none',
       env.calls.some((c) => c.indexOf('WEB prompt=none interactive=false') === 0), env.calls);
+    check('that 401 clears the stored Google grant',
+      env.stored.googleTasksAuth == null && env.stored.googleWebAuth == null, env.stored);
   }
 
   console.log('\n--- disconnect invalidates an in-flight consent window ---\n');
@@ -832,7 +849,7 @@ async function run() {
     const session = await restarted.fn('refreshGoogleSession')();
     const afterRestart = await restarted.fn('connectorStatus')();
     check('a new service worker keeps a stored token that is still inside expiresAt when silent getAuthToken fails', session && session.ok === true && session.source === 'stored' && session.token === 'ya29.kept' && restarted.stored.googleWebAuth && restarted.stored.googleWebAuth.accessToken === 'ya29.kept', { session, auth: restarted.stored.googleWebAuth });
-    check('that unexpired token does not ask again and the panel is not Reconnect', restarted.calls.filter((c) => c === 'GET_AUTH true').length === 0 && !restarted.calls.some((c) => c.indexOf('WEB prompt=') === 0) && restarted.calls.filter((c) => c === 'GET_AUTH false').length === 1 && restarted.stored.googleReconnect == null && afterRestart && afterRestart.googleTasks && afterRestart.googleTasks.needsReconnect === false && afterRestart.googleTasks.connected === true, { calls: restarted.calls, panel: afterRestart && afterRestart.googleTasks, reconnect: restarted.stored.googleReconnect });
+    check('that unexpired token does not ask again and the panel is not Reconnect', restarted.calls.filter((c) => c === 'GET_AUTH true').length === 0 && !restarted.calls.some((c) => c.indexOf('WEB prompt=') === 0) && restarted.calls.filter((c) => c === 'GET_AUTH false').length >= 1 && restarted.calls.filter((c) => c === 'GET_AUTH false').length <= 2 && restarted.stored.googleReconnect == null && afterRestart && afterRestart.googleTasks && afterRestart.googleTasks.needsReconnect === false && afterRestart.googleTasks.connected === true, { calls: restarted.calls, panel: afterRestart && afterRestart.googleTasks, reconnect: restarted.stored.googleReconnect });
     const lapsed = load({
       getAuthTokenError: 'The user is not signed in.',
       webToken: 'ya29.silent-new',
@@ -890,7 +907,7 @@ async function run() {
     check('Reconnect is set only when silent getAuthToken and silent launchWebAuthFlow both fail',
       failed && failed.ok === false &&
       gone.calls.filter((c) => c === 'GET_AUTH true').length === 0 &&
-      gone.calls.filter((c) => c === 'GET_AUTH false').length === 1 &&
+      gone.calls.filter((c) => c === 'GET_AUTH false').length >= 1 &&
       gone.calls.some((c) => c.indexOf('WEB prompt=none interactive=false') === 0) &&
       gone.stored.googleReconnect && gone.stored.googleReconnect.needed === true &&
       failedPanel && failedPanel.googleTasks && failedPanel.googleTasks.needsReconnect === true,
@@ -909,6 +926,363 @@ async function run() {
     check('connector status hides Connected while a write needs reconnect',
       status && status.googleTasks && status.googleTasks.connected === false && status.googleTasks.needsReconnect === true && status.googleTasks.reconnectLabel === 'חבר מחדש את Google',
       status && status.googleTasks);
+  }
+
+
+  console.log('\n--- revoked grant: tokeninfo on popup status clears Connected ---\n');
+  {
+    const env = load({
+      chromeToken: 'ya29.dead',
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_REVOKED' },
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.dead', source: 'chrome', expiresAt: Date.now() + 3600e3 },
+        googleGrantedScopes: {
+          version: scopeVersionOf(SCOPES),
+          status: 'granted',
+          source: 'chrome',
+          at: 1
+        }
+      },
+      routes: [[/\/oauth2\/v3\/tokeninfo/, { reply: res(400, { error: 'invalid_token', error_description: 'Invalid Value' }) }]]
+    });
+    const before = await env.fn('connectorStatus')();
+    check('tokeninfo invalid_token clears googleTasksAuth', env.stored.googleTasksAuth == null, env.stored);
+    check('tokeninfo invalid_token clears googleWebAuth', env.stored.googleWebAuth == null, env.stored);
+    check('tokeninfo invalid_token clears ever-connected', env.stored.googleEverConnected == null, env.stored);
+    check('popup status is Connect (not Connected, not Reconnect)',
+      before && before.googleTasks && before.googleTasks.connected === false && before.googleTasks.needsReconnect === false,
+      before && before.googleTasks);
+  }
+
+
+  // Gate (c) on e1695c85, box Chrome Fork-7, browser sign-in off so the web
+  // flow is the consent. Storage on disk after the full re-grant held a fresh
+  // googleWebAuth, googleTasksAuth and granted scopes, and the popup still said
+  // «התחבר ל-Google» / «שלב אחד לא הושלם»: googleLaneWarning from the Board
+  // pack Do It in (a) was never cleared by the revoke or by the new Connect.
+  console.log('\n--- gate c: reconnect after a remote revoke ends Connected ---\n');
+  {
+    const NOT_SIGNED_IN = 'The user is not signed in.';
+    const glanceList = [/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] }) }];
+    const tokenOk = [/\/oauth2\/v3\/tokeninfo/, { reply: res(200, { aud: WEB_CLIENT, expires_in: 3500 }) }];
+    const env = load({
+      getAuthTokenError: NOT_SIGNED_IN,
+      webToken: 'ya29.regrant',
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_G' },
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.revoked', source: 'web', expiresAt: Date.now() + 3600e3 },
+        // Set by the Board pack Do It in (a): Drive wrote, the reply draft was a hand-off.
+        googleLaneWarning: { needed: true }
+      },
+      routes: [glanceList, tokenOk]
+    });
+    await env.fn('clearGoogleAuthForRevocation')('revoked');
+    check('a remote revoke clears the lane warning with the grant', env.stored.googleLaneWarning == null, env.stored);
+    const revoked = await env.fn('connectorStatus')();
+    check('after the revoke the popup is Connect Google, not Connected',
+      revoked && revoked.googleTasks && revoked.googleTasks.connected === false && revoked.googleTasks.needsReconnect === false,
+      revoked && revoked.googleTasks);
+    // The warning can also be left from before the revoke on a profile that
+    // ran an older build. A fresh Connect still has to end Connected.
+    env.stored.googleLaneWarning = { needed: true };
+    const out = await attempt(env.fn('connectGoogleTasks')(true));
+    check('the reconnect itself succeeds through the web window', out.ok === true, out);
+    check('the reconnect opened one consent window', interactiveCalls(env.calls).filter((c) => /^WEB /.test(c)).length === 1, env.calls);
+    check('the reconnect stored the fresh token and the Glance list',
+      env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'ya29.regrant' && env.stored.googleTasksAuth && env.stored.googleTasksAuth.taskListId === 'LIST_G',
+      { web: env.stored.googleWebAuth, tasks: env.stored.googleTasksAuth });
+    check('a successful Connect clears the stale lane warning', env.stored.googleLaneWarning == null, env.stored.googleLaneWarning);
+    const after = await env.fn('connectorStatus')();
+    check('after the full re-grant the popup is Connected (מחובר, with Disconnect), not «שלב אחד לא הושלם»',
+      after && after.googleTasks && after.googleTasks.connected === true && after.googleTasks.warning === false && after.googleTasks.needsReconnect === false,
+      after && after.googleTasks);
+  }
+
+  console.log('\n--- gate c: a profile-only grant does not stick, and the retry opens consent again ---\n');
+  {
+    const NOT_SIGNED_IN = 'The user is not signed in.';
+    let grant = 'profile';
+    const PROFILE_ONLY = 'openid https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+    const env = load({
+      getAuthTokenError: NOT_SIGNED_IN,
+      stored: { googleGrantedScopes: null },
+      webFlowRedirect: (authUrl) => {
+        const state = authUrl.searchParams.get('state');
+        const token = grant === 'profile' ? 'ya29.profile-only' : 'ya29.full';
+        const scope = grant === 'profile' ? PROFILE_ONLY : SCOPES.join(' ');
+        return 'https://' + EXTENSION_ID + '.chromiumapp.org/#access_token=' + token + '&expires_in=3599&token_type=Bearer&scope=' + encodeURIComponent(scope) + '&state=' + encodeURIComponent(state);
+      },
+      routes: [[/\/users\/@me\/lists/, {
+        get reply() {
+          return grant === 'profile'
+            ? res(403, { error: { message: 'Request had insufficient authentication scopes.' } })
+            : res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] });
+        }
+      }]]
+    });
+    const first = await attempt(env.fn('connectGoogleTasks')(true));
+    check('a profile-only consent does not connect', first.ok === false && !env.stored.googleTasksAuth, { first, tasks: env.stored.googleTasksAuth });
+    check('a profile-only token is not kept as the Google session', !(env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'ya29.profile-only'), env.stored.googleWebAuth);
+    check('a profile-only consent is not recorded as granted',
+      !(env.stored.googleGrantedScopes && env.stored.googleGrantedScopes.status === 'granted'), env.stored.googleGrantedScopes);
+    const windowsBefore = env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length;
+    // Second click without ticking: still a window, never a silent reuse.
+    const again = await attempt(env.fn('connectGoogleTasks')(true));
+    const windowsAgain = env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length;
+    check('a second Connect after a profile-only grant opens the Google window again', windowsAgain === windowsBefore + 1, env.calls);
+    check('that second profile-only consent still does not connect', again.ok === false && !env.stored.googleTasksAuth, again);
+    grant = 'full';
+    const third = await attempt(env.fn('connectGoogleTasks')(true));
+    const windowsThird = env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length;
+    check('ticking every box on the next window connects', third.ok === true && env.stored.googleTasksAuth && env.stored.googleTasksAuth.taskListId === 'LIST_G', { third, tasks: env.stored.googleTasksAuth });
+    check('that connect opened its own window', windowsThird === windowsAgain + 1, env.calls);
+    check('the full grant is recorded as granted', env.stored.googleGrantedScopes && env.stored.googleGrantedScopes.status === 'granted', env.stored.googleGrantedScopes);
+    const status = await env.fn('connectorStatus')();
+    check('after the full grant the popup is Connected', status && status.googleTasks && status.googleTasks.connected === true, status && status.googleTasks);
+  }
+
+  console.log('\n--- gate c: Connect after a write was refused for scope opens consent, not the stored token ---\n');
+  {
+    const env = load({
+      getAuthTokenError: 'The user is not signed in.',
+      webToken: 'ya29.after-ask',
+      stored: {
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.profile-only', source: 'web', expiresAt: Date.now() + 3600e3 },
+        googleReconnect: { needed: true, reason: 'missing scope' }
+      },
+      routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] }) }]]
+    });
+    const out = await attempt(env.fn('connectGoogleTasks')(true));
+    check('Connect with Reconnect flagged opens the Google window', env.calls.some((c) => /^WEB prompt=select_account interactive=true/.test(c)), env.calls);
+    check('Connect with Reconnect flagged does not reuse the refused token',
+      out.ok === true && env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'ya29.after-ask' && env.tokens.indexOf('ya29.profile-only') === -1,
+      { out, web: env.stored.googleWebAuth, tokens: env.tokens });
+    const silent = load({
+      getAuthTokenError: 'The user is not signed in.',
+      stored: {
+        googleEverConnected: { connected: true },
+        googleWebAuth: { accessToken: 'ya29.profile-only', source: 'web', expiresAt: Date.now() + 3600e3 },
+        googleReconnect: { needed: true, reason: 'missing scope' }
+      }
+    });
+    await attempt(silent.fn('getGoogleAccessToken')(false));
+    check('a silent caller with Reconnect flagged still never opens a window', interactiveCalls(silent.calls).length === 0, silent.calls);
+  }
+
+  console.log('\n--- gate c: a closed Google window, then Connect again, opens a window ---\n');
+  {
+    let cancel = true;
+    const env = load({
+      getAuthTokenError: 'The user is not signed in.',
+      stored: { googleGrantedScopes: null },
+      webFlowRedirect: (authUrl) => {
+        if (cancel) return 'https://' + EXTENSION_ID + '.chromiumapp.org/#error=access_denied&state=' + encodeURIComponent(authUrl.searchParams.get('state'));
+        return 'https://' + EXTENSION_ID + '.chromiumapp.org/#access_token=ya29.second&expires_in=3599&scope=' + encodeURIComponent(SCOPES.join(' ')) + '&state=' + encodeURIComponent(authUrl.searchParams.get('state'));
+      },
+      routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] }) }]]
+    });
+    const first = await attempt(env.fn('connectGoogleTasks')(true));
+    check('a closed window does not connect', first.ok === false && !env.stored.googleTasksAuth, first);
+    cancel = false;
+    const second = await attempt(env.fn('connectGoogleTasks')(true));
+    check('the next Connect opens a window again', env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length === 2, env.calls);
+    check('the next Connect connects', second.ok === true && env.stored.googleTasksAuth && env.stored.googleTasksAuth.taskListId === 'LIST_G', second);
+  }
+
+
+  console.log('\n--- gate d: Disconnect revokes the grant at Google before the local clear ---\n');
+  const REVOKE = /^https:\/\/oauth2\.googleapis\.com\/revoke$/;
+  function revokes(env) {
+    return env.requests.filter((r) => /^https:\/\/oauth2\.googleapis\.com\/revoke/.test(r.url));
+  }
+  function revokedToken(r) {
+    return new URLSearchParams(r.body).get('token');
+  }
+  {
+    const env = load({
+      chromeToken: 'cached-chrome',
+      routes: [[REVOKE, { method: 'POST', reply: res(200, {}) }]],
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_A' },
+        googleWebAuth: { accessToken: 'ya29.web', expiresAt: Date.now() + 3600e3 },
+        googleEverConnected: { connected: true }
+      }
+    });
+    const out = await attempt(env.fn('disconnectConnector')('googleTasks'));
+    const sent = revokes(env);
+    check('disconnect POSTs to the official revoke endpoint', sent.length >= 1 && sent.every((r) => r.method === 'POST' && REVOKE.test(r.url)), env.requests);
+    check('revoke is a form post with token=<access token>',
+      sent.length >= 1 && sent.every((r) => /^application\/x-www-form-urlencoded/.test(r.contentType) && revokedToken(r)), sent);
+    check('the stored web token is revoked', sent.some((r) => revokedToken(r) === 'ya29.web'), sent);
+    check('the cached Chrome token is revoked', sent.some((r) => revokedToken(r) === 'cached-chrome'), sent);
+    check('the token never rides in the revoke URL', sent.every((r) => r.url.indexOf('ya29') === -1 && r.url.indexOf('cached-chrome') === -1), sent);
+    check('revoke runs before the local grant is cleared', sent.length >= 1 && sent.every((r) => r.heldTasksAuth), sent);
+    check('disconnect reports Google access removed', out.ok && out.value && out.value.ok === true && out.value.revoked === true, out);
+    check('local state is still cleared after revoke', env.stored.googleTasksAuth == null && env.stored.googleWebAuth == null, env.stored);
+    check('no revoke-pending note after a confirmed revoke', env.stored.googleRevokePending == null, env.stored.googleRevokePending);
+    check('the next Connect is marked to ask for consent', !!(env.stored.googleConsentRequired && env.stored.googleConsentRequired.needed), env.stored);
+    check('disconnect with a usable token opened no window', interactiveCalls(env.calls).length === 0 && !env.calls.some((c) => c.indexOf('WEB ') === 0), env.calls);
+  }
+
+  console.log('\n--- gate d: a failed revoke still clears locally but does not claim Google access is gone ---\n');
+  for (const [label, route] of [
+    ['400', { method: 'POST', reply: res(400, { error: 'invalid_token' }) }],
+    ['network', { method: 'POST', throws: 'Failed to fetch' }]
+  ]) {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      routes: [[REVOKE, route]],
+      silentFails: true,
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_A' },
+        googleWebAuth: { accessToken: 'ya29.web', expiresAt: Date.now() + 3600e3 },
+        googleEverConnected: { connected: true }
+      }
+    });
+    const out = await attempt(env.fn('disconnectConnector')('googleTasks'));
+    check(label + ': disconnect still resolves', out.ok && out.value && out.value.ok === true, out);
+    check(label + ': revoke was attempted with the stored token', revokes(env).some((r) => revokedToken(r) === 'ya29.web'), env.requests);
+    check(label + ': Google access is not reported removed', out.value && out.value.revoked === false, out);
+    check(label + ': local grant is cleared anyway', env.stored.googleTasksAuth == null && env.stored.googleWebAuth == null, env.stored);
+    check(label + ': a revoke-pending note is kept for the popup', !!(env.stored.googleRevokePending && env.stored.googleRevokePending.needed), env.stored);
+    check(label + ': the next Connect is still marked to ask for consent', !!(env.stored.googleConsentRequired && env.stored.googleConsentRequired.needed), env.stored);
+    check(label + ': no consent window opened', interactiveCalls(env.calls).length === 0, env.calls);
+    const st = api.googleConnectionState(env.stored.googleTasksAuth || null, null, { revokePending: env.stored.googleRevokePending, lang: 'en' });
+    check(label + ': status is Not connected with an honest note', st.connected === false && /Google/.test(st.revokeNote || ''), st);
+    const he = api.googleConnectionState(null, null, { revokePending: env.stored.googleRevokePending, lang: 'he' });
+    check(label + ': Hebrew note is set too', /Google/.test(he.revokeNote || '') && /myaccount\.google\.com/.test(he.revokeNote || ''), he);
+  }
+
+  console.log('\n--- gate d: no usable token at Disconnect: interactive-free best effort, reported ---\n');
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      silentFails: true,
+      routes: [[REVOKE, { method: 'POST', reply: res(200, {}) }]],
+      stored: { googleTasksAuth: { taskListId: 'LIST_A' }, googleEverConnected: { connected: true } }
+    });
+    const out = await attempt(env.fn('disconnectConnector')('googleTasks'));
+    check('no token: disconnect resolves', out.ok && out.value && out.value.ok === true, out);
+    check('no token: nothing interactive ran', interactiveCalls(env.calls).length === 0, env.calls);
+    check('no token: Google access is not claimed removed', out.value && out.value.revoked === false && out.value.revokeReason === 'no-token', out);
+    check('no token: local grant is cleared', env.stored.googleTasksAuth == null, env.stored);
+  }
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      webToken: 'ya29.silent-mint',
+      // Google refuses an expired access token (400 invalid_token), so the
+      // grant is still live until a fresh token is revoked.
+      routes: [[REVOKE, { method: 'POST', replyFor: (o) => (/ya29\.expired/.test(String(o.body)) ? res(400, { error: 'invalid_token' }) : res(200, {})) }]],
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_A' },
+        googleWebAuth: { accessToken: 'ya29.expired', expiresAt: Date.now() - 5000 }
+      }
+    });
+    const out = await attempt(env.fn('disconnectConnector')('googleTasks'));
+    check('expired token: the silent prompt=none mint is revoked',
+      revokes(env).some((r) => revokedToken(r) === 'ya29.silent-mint') && out.value && out.value.revoked === true, { out, req: env.requests });
+    check('expired token: the silent mint never opened a window',
+      interactiveCalls(env.calls).length === 0 && env.calls.filter((c) => c.indexOf('WEB prompt=') === 0).every((c) => c === 'WEB prompt=none interactive=false'), env.calls);
+    check('expired token: the silent mint is not kept', env.stored.googleWebAuth == null && env.stored.googleTasksAuth == null, env.stored);
+  }
+
+  console.log('\n--- gate d: the Connect after Disconnect asks for consent; Cancel stays Not connected ---\n');
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      webFlowError: USER_CANCEL,
+      routes: [[REVOKE, { method: 'POST', reply: res(200, {}) }]],
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_A' },
+        googleWebAuth: { accessToken: 'ya29.web', expiresAt: Date.now() + 3600e3 },
+        googleEverConnected: { connected: true }
+      }
+    });
+    await attempt(env.fn('disconnectConnector')('googleTasks'));
+    env.calls.length = 0;
+    const cancelled = await attempt(env.fn('connectGoogleTasks')(true));
+    const urls = env.calls.filter((c) => c.indexOf('WEB_URL ') === 0).map(authParams);
+    const interactiveUrls = urls.filter((u) => u.searchParams.get('prompt') !== 'none');
+    check('the Connect after Disconnect opened the Google window', interactiveUrls.length >= 1, env.calls);
+    check('that window forces the consent screen', interactiveUrls.length >= 1 && interactiveUrls.every((u) => (u.searchParams.get('prompt') || '').split(' ').indexOf('consent') !== -1), interactiveUrls.map(String));
+    check('Cancel on that consent fails the Connect', cancelled.ok === false, cancelled);
+    check('Cancel leaves no grant stored', env.stored.googleTasksAuth == null && !(env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken), env.stored);
+    const st = api.googleConnectionState(env.stored.googleTasksAuth || null, env.stored.googleReconnect || null, {
+      everConnected: env.stored.googleEverConnected || null,
+      webAuth: env.stored.googleWebAuth || null,
+      scopesGranted: false
+    });
+    check('Cancel leaves Not connected', st.connected === false, st);
+    check('Cancel keeps the consent mark for the next try', !!(env.stored.googleConsentRequired && env.stored.googleConsentRequired.needed), env.stored);
+  }
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      webToken: 'ya29.fresh',
+      routes: [
+        [REVOKE, { method: 'POST', reply: res(200, {}) }],
+        [/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] }) }]
+      ],
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_A' },
+        googleWebAuth: { accessToken: 'ya29.web', expiresAt: Date.now() + 3600e3 }
+      }
+    });
+    await attempt(env.fn('disconnectConnector')('googleTasks'));
+    env.calls.length = 0;
+    const silent = await attempt(env.fn('connectGoogleTasks')(false));
+    check('a silent auto-connect after Disconnect does not reconnect', silent.ok === false && env.stored.googleTasksAuth == null, { silent, stored: env.stored });
+    check('a silent auto-connect after Disconnect opens no window', interactiveCalls(env.calls).length === 0, env.calls);
+    const again = await attempt(env.fn('connectGoogleTasks')(true));
+    const urls = env.calls.filter((c) => c.indexOf('WEB_URL ') === 0).map(authParams).filter((u) => u.searchParams.get('prompt') !== 'none');
+    check('an approved consent after Disconnect connects', again.ok === true && env.stored.googleTasksAuth && env.stored.googleTasksAuth.taskListId === 'LIST_G', { again, stored: env.stored });
+    check('that Connect asked with prompt=consent', urls.length >= 1 && (urls[0].searchParams.get('prompt') || '').split(' ').indexOf('consent') !== -1, urls.map(String));
+    check('a successful Connect clears the consent mark', env.stored.googleConsentRequired == null, env.stored);
+    check('a successful Connect clears the revoke-pending note', env.stored.googleRevokePending == null, env.stored);
+  }
+  {
+    const env = load({ getAuthTokenError: SIGNIN_OFF, holdWebFlow: false });
+    env.calls.length = 0;
+    await attempt(env.fn('getGoogleWebAccessToken')(true));
+    const first = env.calls.filter((c) => c.indexOf('WEB_URL ') === 0).map(authParams)[0];
+    check('a Connect with no prior Disconnect keeps prompt=select_account', first && first.searchParams.get('prompt') === 'select_account', env.calls);
+  }
+
+  console.log('\n--- gate a: a Drive save plus a reply-draft hand-off does not raise the lane warning ---\n');
+  {
+    const gmailSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
+    function sliceFn(name) {
+      const at = gmailSrc.indexOf('  function ' + name + '(');
+      if (at < 0) throw new Error('content-gmail.js has no ' + name);
+      const end = gmailSrc.indexOf('\n  }\n', at);
+      return gmailSrc.slice(at, end + 4);
+    }
+    function runLane(results) {
+      const store = {};
+      const box = {
+        chromeLive: () => true,
+        laneConnectorId: (kind) => (kind === 'googleDriveSave' ? 'googleDriveSave' : kind === 'gmailCompose' ? 'gmailCompose' : kind === 'googleTask' ? 'googleTasks' : ''),
+        chrome: { storage: { local: {
+          set: (patch) => { Object.assign(store, patch); return Promise.resolve(); },
+          remove: (k) => { delete store[k]; return Promise.resolve(); }
+        } } }
+      };
+      vm.createContext(box);
+      vm.runInContext(sliceFn('draftHandOff') + '\n' + sliceFn('noteLaneOutcome') + '\nthis.noteLaneOutcome = noteLaneOutcome;', box, { filename: 'content-gmail.js' });
+      box.noteLaneOutcome(results);
+      return store;
+    }
+    const drive = { action: { kind: 'googleDriveSave' }, response: { ok: true, fileId: 'F1' } };
+    const handOff = { action: { kind: 'gmailCompose' }, response: { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false } };
+    const skipped = { action: { kind: 'googleTask' }, response: { ok: false, skipped: true } };
+    const failed = { action: { kind: 'googleTask' }, response: { ok: false, reason: 'error' } };
+    check('Drive written + draft hand-off sets no lane warning', !runLane([drive, handOff]).googleLaneWarning);
+    check('Drive written + a skipped step sets no lane warning', !runLane([drive, skipped]).googleLaneWarning);
+    check('Drive written + a real failed write still sets the lane warning', !!(runLane([drive, failed]).googleLaneWarning || {}).needed);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

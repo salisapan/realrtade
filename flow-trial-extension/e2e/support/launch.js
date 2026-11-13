@@ -930,7 +930,7 @@ async function boot() {
     const closing = [];
     for (const p of context.pages()) {
       const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('instagram.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('instagram.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0 || url.indexOf('/dev/whatsapp-fixture.html') >= 0) {
         closing.push(p.close().catch(() => {}));
       }
     }

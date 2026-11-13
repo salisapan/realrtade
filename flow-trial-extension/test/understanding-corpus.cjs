@@ -40,7 +40,7 @@ check('a model date the words do not say is corrected to what the device reads, 
 r = v({ intentions: [{ kind: 'meeting', ask_span: 'פגישת צוות ביום רביעי בשעה 15:00', evidence_span: 'לגבי תוכנית הרבעון', due: '2026-10-08', due_span: 'ביום רביעי בשעה 15:00', confidence: 0.9 }] }, 'סאלי, פגישת צוות ביום רביעי בשעה 15:00 במשרד לגבי תוכנית הרבעון.\nשרה');
 check('«ביום רביעי» said on a Wednesday is next Wednesday, not tomorrow (a real cached model error)', r.understanding.intentions[0].due === '2026-10-14' && U.proposal(r.understanding).step === 'calendar', r);
 r = v({ intentions: [ask({ due: '2026-10-07', due_span: undefined, ask_span: 'send me the signed lease' })] });
-check('a model date with no span in the text is dropped, and the ask without a date stays silent', !r.understanding.intentions[0].due && U.proposal(r.understanding).reason === 'ask-without-date');
+check('a model date with no span in the text is dropped (never invented); the ask without a date still gets a draft (owner 2026-11-11)', !r.understanding.intentions[0].due && U.proposal(r.understanding).step === 'draft');
 r = v({ intentions: [ask({ due_span: undefined })] });
 check('a due date with no span is dropped', !r.understanding.intentions[0].due && has(r, 'intentions[0].due', 'span-missing'));
 r = v({ intentions: [ask({ due: '2026-10-14', due_span: 'We need it' })] }, EN + '\nWe need it');
