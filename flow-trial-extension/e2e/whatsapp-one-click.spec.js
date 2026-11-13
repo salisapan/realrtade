@@ -36,6 +36,11 @@ test('W1: no DOM read until gesture (English fixture)', async ({ glance }) => {
 });
 
 test('W1: one click drafts into composer, never sends (English)', async ({ glance }) => {
+  // The sentence asks for last week's restaurant. The draft is typed only when
+  // that week has one place on the connected calendar. The read flags stay off
+  // until registerWhatsApp turns them on for this gesture.
+  await glance.seedOutlook();
+  await glance.setScenario({ chatLocation: 'Taizu, 23 Montefiore, Tel Aviv' });
   const page = await openFixture(glance, FIXTURE_EN);
   await page.evaluate(() => {
     window.__glanceSendClicks = 0;
