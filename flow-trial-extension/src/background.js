@@ -811,6 +811,26 @@ async function restoreLaneTeams() {
     }]);
   } catch (e) {
     console.info('[Glance] whyNotShown: teams-lane-not-registered');
+    return;
+  }
+  if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return;
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: LANE_TEAMS.origins }); } catch (e) { tabs = []; }
+  for (const tab of tabs || []) {
+    if (!tab || typeof tab.id !== 'number') continue;
+    let alive = false;
+    try {
+      const reply = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => Boolean(window.__glanceLaneTeams)
+      });
+      alive = Array.isArray(reply) && reply.some((row) => row && row.result === true);
+    } catch (e) { alive = false; }
+    if (alive) continue;
+    try {
+      await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: LANE_CHAT_CSS });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: laneChatScripts(LANE_TEAMS) });
+    } catch (e) { console.info('[Glance] whyNotShown: teams-lane-not-injected'); }
   }
 }
 

@@ -80,8 +80,11 @@ check('business.facebook.com is not a static content script match', scriptBlob.i
 check('no chat host is a static content script match', !/whatsapp|messenger|instagram/.test(scriptBlob));
 const required = manifest.host_permissions || [];
 const optional = manifest.optional_host_permissions || [];
-const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct|app\.slack\.com|web\.telegram\.org|teams\.microsoft\.com/;
-check('v1 manifest keeps chat optional hosts out (Meta, WhatsApp, Slack, Telegram, Teams)', !required.some((h) => chatHost.test(h)) && !optional.some((h) => chatHost.test(h)));
+const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct|app\.slack\.com|web\.telegram\.org/;
+check('v1 manifest keeps Meta, WhatsApp, Slack and Telegram hosts out', !required.some((h) => chatHost.test(h)) && !optional.some((h) => chatHost.test(h)));
+check('Teams web hosts are optional and not required',
+  optional.indexOf('https://teams.microsoft.com/*') >= 0 && optional.indexOf('https://teams.live.com/*') >= 0 &&
+  !required.some((h) => /teams\.(microsoft|live)\.com/.test(h)));
 check('Business Suite inbox is not a v1 optional host', !required.some((h) => /business\.facebook\.com/.test(h)) && !optional.some((h) => /business\.facebook\.com\/latest\/inbox/.test(h)));
 function chromeHostCovers(pattern, url) {
   const u = new URL(url);

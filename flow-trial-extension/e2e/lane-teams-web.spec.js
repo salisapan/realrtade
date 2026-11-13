@@ -1,6 +1,11 @@
 // Teams web lane (fixture DOM): English and Hebrew inbound asks, attachment row, silence when unsure, never sends.
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { test, expect } = require('./support/harness');
+const { chromium } = require('@playwright/test');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
+const { copyExtension } = require('./support/launch');
 
 const CARD = '#glance-chat-task .flow-chip-host';
 const ASK_EN = 'Can you review the draft by Wednesday?';
@@ -23,13 +28,14 @@ const LANE_JS = [
   'src/content-teams.js'
 ];
 
-// Runs once C1 adds optional_host_permissions for teams.microsoft.com / teams.live.com (PR #212).
-const TEAMS_HOSTS_IN_MANIFEST = false;
+const TEAMS_HOSTS = ['https://teams.microsoft.com/*', 'https://teams.live.com/*'];
 
 let server;
-test.beforeAll(async () => { server = await startGoogleLaneServer(); });
+test.beforeAll(async () => {
+  server = await startGoogleLaneServer();
+  server.setAccount('me@x.com');
+});
 test.afterAll(async () => { if (server) await server.close(); });
-test.beforeEach(() => { test.skip(!TEAMS_HOSTS_IN_MANIFEST, 'Waiting on manifest host permissions (C1 #212)'); });
 
 function shellHtml(bodyRow) {
   return '<!doctype html><html><body><div role="main" data-glance-teams-thread="dm" data-glance-teams-root="1">' +
@@ -50,10 +56,13 @@ async function injectTeamsLane(glance, page) {
 }
 
 async function openTeams(glance, bodyRow, switches) {
+  if (server.reset) server.reset();
+  server.setAccount('me@x.com');
   await glance.seedGmail(Object.assign({
     googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' },
     glanceDevFixture: true
   }, switches ? { glanceSwitches: switches } : {}));
+  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
   const page = await glance.context.newPage();
   await page.goto('chrome-extension://' + glance.extensionId + '/dev/teams-fixture.html', { waitUntil: 'domcontentloaded', timeout: 30000 });
   if (bodyRow) {
@@ -79,7 +88,6 @@ async function openTeams(glance, bodyRow, switches) {
 const taskCalls = () => server.calls.filter((c) => /tasks\/v1/.test(c.path) && c.method !== 'GET');
 
 test('CHAT_TASK_CARD on: English inbound ask shows one Do It, read back, never sends', async ({ glance }) => {
-  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
   const page = await openTeams(glance, row('<div data-glance-message data-author="them" data-message-id="m1"><span dir="auto">' + ASK_EN + '</span></div>'), { CHAT_TASK_CARD: true });
   await page.waitForSelector('html[data-glance-lane-teams="on"]', { timeout: 20000 });
   await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
@@ -92,7 +100,6 @@ test('CHAT_TASK_CARD on: English inbound ask shows one Do It, read back, never s
 });
 
 test('CHAT_TASK_CARD on: Hebrew inbound ask with attachment shows the card', async ({ glance }) => {
-  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
   const heRow = '<div data-glance-message data-author="them" data-message-id="m-he"><span dir="auto">' + ASK_HE + '</span><span data-glance-attachment="quote.pdf"></span></div>';
   const page = await openTeams(glance, heRow, { CHAT_TASK_CARD: true });
   await page.waitForSelector('html[data-glance-lane-teams="on"]', { timeout: 20000 });
@@ -101,7 +108,6 @@ test('CHAT_TASK_CARD on: Hebrew inbound ask with attachment shows the card', asy
 });
 
 test('CHAT_TASK_CARD on: unsure line stays silent', async ({ glance }) => {
-  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
   const page = await openTeams(glance, row('<div data-glance-message data-author="them" data-message-id="q"><span dir="auto">' + QUIET + '</span></div>'), { CHAT_TASK_CARD: true });
   await page.waitForSelector('html[data-glance-lane-teams="on"]', { timeout: 20000 });
   await page.waitForTimeout(4000);
@@ -109,8 +115,89 @@ test('CHAT_TASK_CARD on: unsure line stays silent', async ({ glance }) => {
   expect(taskCalls()).toHaveLength(0);
 });
 
+function launchBare(extDir, userData) {
+  return chromium.launchPersistentContext(userData, {
+    headless: false,
+    ignoreDefaultArgs: ['--disable-extensions'],
+    args: [
+      '--headless=new',
+      '--disable-extensions-except=' + extDir,
+      '--load-extension=' + extDir,
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-dev-shm-usage'
+    ]
+  });
+}
+
+async function readyWorker(context) {
+  let worker = context.serviceWorkers()[0];
+  if (!worker) worker = await context.waitForEvent('serviceworker', { timeout: 30000 });
+  await expect.poll(async () => worker.evaluate(() => Boolean(chrome.runtime && chrome.runtime.id)).catch(() => false), { timeout: 20000 }).toBe(true);
+  return worker;
+}
+
+function grantOrigins(userData, id, origins) {
+  const prefsPath = path.join(userData, 'Default', 'Preferences');
+  const prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf8'));
+  const row = prefs.extensions && prefs.extensions.settings && prefs.extensions.settings[id];
+  if (!row) throw new Error('extension preferences were not written');
+  function add(block) {
+    const hosts = new Set((block && block.explicit_host) || []);
+    origins.forEach((origin) => hosts.add(origin));
+    block.explicit_host = Array.from(hosts);
+  }
+  row.granted_permissions = row.granted_permissions || {};
+  row.active_permissions = row.active_permissions || {};
+  add(row.granted_permissions);
+  add(row.active_permissions);
+  fs.writeFileSync(prefsPath, JSON.stringify(prefs));
+}
+
+test('Teams hosts not granted: the lane does not register', async () => {
+  test.setTimeout(90000);
+  const extDir = copyExtension({ bare: true });
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-teams-off-'));
+  let context = null;
+  try {
+    context = await launchBare(extDir, userData);
+    const worker = await readyWorker(context);
+    const ids = await worker.evaluate(async () => (await chrome.scripting.getRegisteredContentScripts()).map((row) => row.id));
+    expect(ids).not.toContain('glance-lane-teams');
+    const manifest = await worker.evaluate(() => chrome.runtime.getManifest());
+    expect(manifest.optional_host_permissions).toEqual(expect.arrayContaining(TEAMS_HOSTS));
+    expect(manifest.host_permissions || []).not.toEqual(expect.arrayContaining(TEAMS_HOSTS));
+    expect((manifest.permissions || []).join(' ')).not.toMatch(/teams\.microsoft\.com|teams\.live\.com/);
+  } finally {
+    if (context) await context.close().catch(() => {});
+    fs.rmSync(extDir, { recursive: true, force: true });
+    fs.rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+test('Teams hosts granted: the lane registers', async () => {
+  test.setTimeout(120000);
+  const extDir = copyExtension({ bare: true });
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-teams-on-'));
+  let context = null;
+  try {
+    context = await launchBare(extDir, userData);
+    let worker = await readyWorker(context);
+    const extensionId = await worker.evaluate(() => chrome.runtime.id);
+    await context.close();
+    context = null;
+    grantOrigins(userData, extensionId, TEAMS_HOSTS);
+    context = await launchBare(extDir, userData);
+    worker = await readyWorker(context);
+    await expect.poll(async () => worker.evaluate(async () => (await chrome.scripting.getRegisteredContentScripts()).map((row) => row.id)).catch(() => []), { timeout: 20000 }).toContain('glance-lane-teams');
+  } finally {
+    if (context) await context.close().catch(() => {});
+    fs.rmSync(extDir, { recursive: true, force: true });
+    fs.rmSync(userData, { recursive: true, force: true });
+  }
+});
+
 test('a reply draft is inserted in the composer and is not sent', async ({ glance }) => {
-  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
   await glance.seedOutlook();
   await glance.setScenario({ chatLocation: 'Taizu, 23 Montefiore, Tel Aviv' });
   const place = 'איפה הייתה המסעדה משבוע שעבר?';

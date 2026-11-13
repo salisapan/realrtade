@@ -1909,7 +1909,7 @@
           calendar: 'שם קובץ אחד על היומן. ביטול מסיר את האירוע. לא מזמין אף אחד.',
           onedrive: 'שומר קובץ אחד ב-OneDrive > Glance, קורא אותו, וביטול מוחק אותו. מייל לא מחפש בקבצים.',
           contacts: 'קורא אנשי קשר.',
-          teams: 'קורא צ׳אטים שאתה בהם.',
+          teams: 'Glance קורא את הצ׳אט האישי הפתוח ב-Teams ומניח תשובה רק בתיבת הכתיבה. הוא לא שולח, וביטול מוחק כל כתיבה שהוא עשה.',
           sharepoint: 'יוצר קובץ ריק, או שומר את הקובץ המצורף, בתיקיית Glance של אתר SharePoint אחד ששמו נכתב במייל. קורא בחזרה, וביטול מוחק אם לא ערכת. לא משתף.'
         };
         const detail = uiLang() === 'he' ? (heDetail[svc.id] || '') : svc.detail;
@@ -1940,10 +1940,18 @@
       c.setAttribute('data-glance-connect-go', '1');
       c.addEventListener('click', async () => {
         c.disabled = true;
-        const ids = services.filter((svc) => {
+        let ids = services.filter((svc) => {
           const box = boxes[svc.id];
           return box && (box.checked || box.disabled);
         }).map((svc) => svc.id);
+        let teamsQuiet = false;
+        if (ids.indexOf('teams') >= 0) {
+          const hostOk = await requestTeamsWebHosts();
+          if (!hostOk) {
+            teamsQuiet = true;
+            ids = ids.filter((id) => id !== 'teams');
+          }
+        }
         const scopes = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.scopesFor === 'function')
           ? FlowOutlookConfig.scopesFor(ids) : null;
         const r = scopes ? await o.connect({ scopes: scopes }) : await o.connect();
@@ -1954,6 +1962,10 @@
             : (OUTLOOK_ERRORS[r.error] || 'Could not turn it on (' + r.error + ').');
           note.textContent = sentence;
           return;
+        }
+        if (teamsQuiet) {
+          note.hidden = false;
+          note.textContent = 'הדפדפן לא נתן גישה ל-Teams. Glance לא קורא שם.';
         }
         await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
       });
@@ -2000,7 +2012,16 @@
       addScope.setAttribute('data-glance-add-scope', '1');
       addScope.addEventListener('click', async () => {
         addScope.disabled = true;
+        const teamsBox = scopeBoxes.teams;
+        const teamsOn = !!(teamsBox && teamsBox.checked && !teamsBox.disabled);
+        let teamsHostOk = true;
+        if (teamsOn) teamsHostOk = await requestTeamsWebHosts();
+        if (teamsOn && !teamsHostOk) {
+          note.hidden = false;
+          note.textContent = 'הדפדפן לא נתן גישה ל-Teams. Glance לא קורא שם.';
+        }
         const add = scopeServices.filter((svc) => {
+          if (svc.id === 'teams' && !teamsHostOk) return false;
           const box = scopeBoxes[svc.id];
           if (!box || !box.checked || box.disabled) return false;
           return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
@@ -2008,8 +2029,9 @@
         let consentedNow = [];
         const ticked = scopeServices.some((svc) => { const b = scopeBoxes[svc.id]; return b && b.checked && !b.disabled; });
         if (ticked && !add.length) {
-          // Ticked, and every scope of it is already on the token: nothing to ask, and the person is told so.
           addScope.disabled = false;
+          if (teamsOn && !teamsHostOk) return;
+          // Ticked, and every scope of it is already on the token: nothing to ask, and the person is told so.
           note.hidden = false;
           note.textContent = 'ההרשאות שסימנת כבר ניתנו.';
           return;
@@ -2371,6 +2393,18 @@
       if (chrome.permissions && chrome.permissions.contains) on = await chrome.permissions.contains({ origins: FlowMetaConsent.ORIGINS.slice() });
     } catch (e) { on = false; }
     FlowMetaConsent.paintConnection(host, { granted: on, lang: metaLang(), chrome: chrome });
+  }
+
+  function teamsWebHosts() {
+    const listed = globalThis.FlowConnectEcosystem && FlowConnectEcosystem.TEAMS_OPTIONAL_HOST_ORIGINS;
+    return (listed && listed.length) ? listed.slice() : ['https://teams.microsoft.com/*', 'https://teams.live.com/*'];
+  }
+
+  // The browser prompt has to start on this click. A later await is not a user gesture.
+  async function requestTeamsWebHosts() {
+    if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) return false;
+    try { return Boolean(await chrome.permissions.request({ origins: teamsWebHosts() })); }
+    catch (e) { return false; }
   }
 
   async function labsOptionalScopeAfterFlip(switchId) {
