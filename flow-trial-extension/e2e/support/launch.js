@@ -248,6 +248,19 @@ function installE2EHooks() {
       const email = googleAccountEmailFromAuth(init);
       return Promise.resolve(json(200, { emailAddress: email, messagesTotal: 1, threadsTotal: 1, historyId: '1' }));
     }
+    if (host === 'theflow-ai.com' && path.indexOf('/meta-official-messaging') >= 0) {
+      const meta = scenario.metaOfficial || null;
+      if (!meta) return Promise.resolve(json(404, { ok: false, reason: 'off' }));
+      let posted = {};
+      try { posted = JSON.parse((init && init.body) || '{}'); } catch (err) { posted = {}; }
+      if (posted.approved !== true) return Promise.resolve(json(403, { ok: false, reason: 'not-approved' }));
+      if (meta.unverified) return Promise.resolve(json(200, { ok: false, reason: 'unverified' }));
+      const system = posted.channel === 'instagram' ? 'meta/instagram' : 'meta/messenger';
+      return Promise.resolve(json(200, {
+        ok: true,
+        proof: { system: system, externalId: 'mid.e2e', fetchedBack: true, verifiedAt: '2026-11-13T09:00:00.000Z' }
+      }));
+    }
     if (host === 'theflow-ai.com' || host === 'gmail.googleapis.com' || host === 'oauth2.googleapis.com') {
       return Promise.resolve(json(200, {}));
     }
@@ -930,7 +943,7 @@ async function boot() {
     const closing = [];
     for (const p of context.pages()) {
       const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('instagram.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('instagram.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0 || url.indexOf('/dev/meta-official.html') >= 0) {
         closing.push(p.close().catch(() => {}));
       }
     }
@@ -1133,6 +1146,16 @@ async function boot() {
   harness.openInstagram = async function openInstagram(html) {
     await watchSend();
     return openDocument('https://www.instagram.com/direct/t/abc/', html);
+  };
+
+  harness.openMetaOfficial = async function openMetaOfficial() {
+    const url = 'chrome-extension://' + extensionId + '/dev/meta-official.html';
+    const page = await context.newPage();
+    page.on('pageerror', (err) => noteError('page', err && err.message ? err.message : err));
+    page.on('console', (msg) => { if (msg.type() === 'error') noteError('page', msg.text()); });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    harness.page = page;
+    return page;
   };
 
   harness.openFixture = async function openFixture(search) {

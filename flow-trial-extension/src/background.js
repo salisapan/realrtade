@@ -94,6 +94,7 @@ import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/meta-official-messaging.js'; // classic: sets globalThis.FlowMetaOfficial (switch META_OFFICIAL_MESSAGING, off)
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
 import '../core/google-contacts.js';
@@ -7569,9 +7570,95 @@ if (chrome.runtime.onConnect && typeof chrome.runtime.onConnect.addListener === 
   });
 }
 
+const META_OFFICIAL_RELAY = 'https://theflow-ai.com/.netlify/functions/meta-official-messaging';
+
+function metaOfficialItem(row) {
+  if (!row || (row.channel !== 'messenger' && row.channel !== 'instagram')) return null;
+  const pageId = String(row.pageId || '');
+  const recipientId = String(row.recipientId || row.senderId || '');
+  if (!/^[0-9]{5,32}$/.test(pageId) || !/^[0-9]{5,32}$/.test(recipientId)) return null;
+  const messageId = String(row.messageId || '');
+  if (!/^[A-Za-z0-9._:-]{1,200}$/.test(messageId)) return null;
+  return {
+    channel: row.channel,
+    pageId: pageId,
+    recipientId: recipientId,
+    messageId: messageId,
+    timestamp: Number(row.timestamp),
+    text: String(row.text || '').slice(0, 2000),
+    draft: String(row.draft || '').slice(0, 2000),
+    lang: row.lang === 'he' ? 'he' : 'en'
+  };
+}
+
+async function metaOfficialPending() {
+  if (!(await glanceSwitchOn('META_OFFICIAL_MESSAGING'))) return { ok: true, on: false, items: [] };
+  let bag = { glanceMetaOfficialInbox: [] };
+  try { bag = await chrome.storage.local.get({ glanceMetaOfficialInbox: [] }); } catch (e) { bag = { glanceMetaOfficialInbox: [] }; }
+  const rows = Array.isArray(bag.glanceMetaOfficialInbox) ? bag.glanceMetaOfficialInbox : [];
+  const items = [];
+  for (let i = 0; i < rows.length && items.length < 5; i++) {
+    const item = metaOfficialItem(rows[i]);
+    if (item) items.push(item);
+  }
+  return { ok: true, on: true, items: items };
+}
+
+// The page token stays on the server. This posts the approved text to Glance's relay, which calls Graph.
+async function metaOfficialSend(msg) {
+  if (!(await glanceSwitchOn('META_OFFICIAL_MESSAGING'))) return { ok: false, reason: 'off' };
+  if (!msg || msg.approved !== true) return { ok: false, reason: 'not-approved' };
+  const item = metaOfficialItem(msg);
+  const text = String((msg && msg.text) || '').trim();
+  if (!item || !text || text.length > 2000) return { ok: false, reason: 'empty' };
+  const lane = globalThis.FlowMetaOfficial;
+  if (!lane || typeof lane.withinWindow !== 'function' || !lane.withinWindow(item.timestamp, Date.now())) {
+    return { ok: false, reason: 'window' };
+  }
+  let secret = '';
+  try {
+    const bag = await chrome.storage.local.get({ glanceMetaOfficialRelaySecret: '' });
+    secret = String(bag.glanceMetaOfficialRelaySecret || '');
+  } catch (e) { secret = ''; }
+  if (secret.length < 16) return { ok: false, reason: 'not-configured' };
+  let res;
+  try {
+    res = await fetch(META_OFFICIAL_RELAY, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Glance-Meta-Action': 'send',
+        'X-Glance-Meta-Relay': secret
+      },
+      body: JSON.stringify({
+        approved: true,
+        channel: item.channel,
+        pageId: item.pageId,
+        recipientId: item.recipientId,
+        messageId: item.messageId,
+        timestamp: item.timestamp,
+        text: text
+      })
+    });
+  } catch (e) {
+    return { ok: false, reason: 'error' };
+  }
+  let body = {};
+  try { body = await res.json(); } catch (e2) { body = {}; }
+  if (!res.ok || !body || body.ok !== true || !body.proof || body.proof.fetchedBack !== true) {
+    return { ok: false, reason: (body && body.reason) || 'unverified' };
+  }
+  return { ok: true, proof: { system: body.proof.system, externalId: body.proof.externalId, fetchedBack: true, verifiedAt: body.proof.verifiedAt } };
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
   // Signup, later, opens the one Meta consent page. The prompt stays on that page.
+  if (msg.type === 'flow:meta-official-status') {
+    return reply(sendResponse, glanceSwitchOn('META_OFFICIAL_MESSAGING').then((on) => ({ ok: true, on: on === true })));
+  }
+  if (msg.type === 'flow:meta-official-pending') return reply(sendResponse, metaOfficialPending());
+  if (msg.type === 'flow:meta-official-send') return reply(sendResponse, metaOfficialSend(msg));
   if (msg.type === 'flow:open-meta-chats') {
     const page = (typeof FlowMetaConsent !== 'undefined' && FlowMetaConsent.PAGE) || 'lane-chat/enable.html';
     try {
