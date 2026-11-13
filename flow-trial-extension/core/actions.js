@@ -34,17 +34,56 @@ const FlowActions = (() => {
   // preference — one dismissal on a novel process is not a verdict.
   const DEMOTE_THRESHOLD = 3;
 
+  // "בשעה 10:00 עד 10:30" / "10:00-10:30" / "from 10:00 to 10:30": the end the message states, as minutes after the start
+  // the hold already uses. Only a range that starts at that same clock counts; anything else keeps the writer's default.
+  const CLOCK_RANGE = /(?:^|[^\d:])(\d{1,2})[:.](\d{2})\s*(?:עד|-|–|—|to|until|till)\s*(?:השעה\s+)?(\d{1,2})[:.](\d{2})(?![\d:])/gi;
+  function statedDurationMinutes(sources, hour, minute) {
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+    for (let s = 0; s < sources.length; s++) {
+      const text = String(sources[s] || '');
+      if (!text) continue;
+      CLOCK_RANGE.lastIndex = 0;
+      let m;
+      while ((m = CLOCK_RANGE.exec(text))) {
+        const h1 = Number(m[1]); const m1 = Number(m[2]); const h2 = Number(m[3]); const m2 = Number(m[4]);
+        if (h1 !== hour || m1 !== minute || h2 > 23 || m2 > 59) continue;
+        const span = (h2 * 60 + m2) - (h1 * 60 + m1);
+        if (span >= 5 && span <= 720) return span;
+      }
+    }
+    return null;
+  }
+
+  // The event title for a calendar hold is the meeting subject, with reply
+  // prefixes and bracket tags like [G-Calendar] stripped. The card label
+  // ("Hold Tue 10:00" / "שריין ג׳ 10:00") is a separate string. An empty
+  // subject falls back to the sentence being closed.
+  function holdSubjectTitle(subject) {
+    let s = String(subject || '')
+      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    let prev = '';
+    while (s && s !== prev) {
+      prev = s;
+      s = s.replace(/^(?:(?:re|fw|fwd|השב|תגובה|הועבר)\s*:\s*)+/ig, '').trim();
+      s = s.replace(/^\[[^[\]]+\]\s*/g, '').trim();
+    }
+    return s;
+  }
+
   function calendarAction(intent, e, ctx) {
-    // A calendar hold's title is the sentence being closed. The schedule
-    // processes keep the short "Meeting Sep 18" label — that path is a
-    // meeting, and the sentence can be the whole invite.
+    // A calendar hold's title is the meeting subject when one is present.
+    // The schedule processes keep the short "Meeting Sep 18" label — that
+    // path is a meeting, and the sentence can be the whole invite.
     const mutate = e.calendarOp === 'delete' || e.calendarOp === 'update';
     const hold = intent.personalClose === 'calendar-hold' || mutate;
-    const title = (hold ? (e.what || intent.label) : (intent.label || e.what)) || (hold ? 'Hold' : 'Meeting');
+    const subjectTitle = hold ? holdSubjectTitle(ctx && ctx.subject) : '';
+    const title = (hold ? (subjectTitle || e.what || intent.label) : (intent.label || e.what)) || (hold ? 'Hold' : 'Meeting');
     const hint = e.calendarOp === 'delete' ? 'Remove from Calendar: '
       : e.calendarOp === 'update' ? 'Move on Calendar: '
       : 'Add to Calendar: ';
-    return {
+    const step = {
       id: 'calendar',
       kind: 'calendar',
       // Short — this is a collapsed-by-default step label, not the whole
@@ -70,9 +109,18 @@ const FlowActions = (() => {
         // writer must not fall back to an all-day event if that time is
         // missing by the time Do It runs.
         requireTime: hold || mutate,
-        threadUrl: ctx.threadUrl
+        threadUrl: ctx.threadUrl,
+        // Raw mail subject. Writers strip reply prefixes and [tags] when
+        // they add the "Subject:" line to the event description.
+        subject: ctx && ctx.subject ? String(ctx.subject).slice(0, 300) : '',
+        // A calendar hold uses the meeting subject (or the sentence) as the
+        // event title. Other calendar steps keep the short classifier label.
+        useMeetingSubject: hold
       }
     };
+    const span = mutate ? null : statedDurationMinutes([e.what, ctx && ctx.text], e.hour, e.minute);
+    if (span) step.params.durationMinutes = span;
+    return step;
   }
 
   function draftAction(intent, e, ctx, hasAttachment) {
@@ -977,7 +1025,7 @@ const FlowActions = (() => {
     return lines;
   }
 
-  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
+  return { planFor, chooseDate, holdSubjectTitle, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };
