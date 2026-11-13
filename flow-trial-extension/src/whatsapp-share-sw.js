@@ -1,4 +1,9 @@
 // Service-worker helpers for WhatsApp share intake (W2). Classic globals via side-effect imports.
+// intent.js is not imported here. It is a classic script: its top-level body reads FlowJudgment,
+// which exists only when judgment.js shares the same classic scope (content scripts, the popup).
+// An ES module import throws, the service worker never finishes starting, and every message
+// (including flow:surface-enable during e2e boot) waits forever. The judge reads FlowIntent
+// with typeof, which stays unset in this module scope, and returns no-intent-api.
 import '../core/domains.js';
 import '../core/day-words.js';
 import '../core/extract.js';
@@ -7,7 +12,6 @@ import '../core/google-closes.js';
 import '../core/close-families.js';
 import '../core/fact-reply.js';
 import '../core/file-attach.js';
-import '../core/intent.js';
 import '../core/actions.js';
 import '../core/resolution.js';
 import '../core/incoming-judge.js';
