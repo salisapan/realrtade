@@ -2596,7 +2596,9 @@ function glanceUiCopy(kind) {
       threadUrl: threadUrl(legacyId),
       hasThreadAttachment: Boolean(chosenAttachment) || Boolean(attachFile),
       executionMemory: executionMemory,
-      attachFile: attachFile
+      attachFile: attachFile,
+      // The hold's event title is the meeting subject (FlowActions.calendarAction).
+      subject: subject
     });
     let process = planned && planned.process;
     if (!process) {
@@ -5048,7 +5050,10 @@ function glanceUiCopy(kind) {
         } else if (!payload) {
           result = { action, response: { ok: false, reason: 'unclear' } };
         } else {
-          const response = await sendExecuteAction(payload);
+          let response = await sendExecuteAction(payload);
+          // No answer at all (the worker did not register the handler) is a
+          // failure with a name, not an empty "unconfirmed".
+          if (!response || typeof response !== 'object') response = { ok: false, reason: 'no-response' };
           if (ctx && ctx.previewOnly && response && response.ok === true) {
             response.preview = true;
             response.closes = false;
@@ -5061,10 +5066,107 @@ function glanceUiCopy(kind) {
           }
         }
       }
+      if (action && action.kind === 'calendar') logCalendarHold(calendarHoldOutcome(result.response));
       results.push(result);
       if (onStepDone) onStepDone(result, results.length, actions.length);
     }
     return results;
+  }
+
+  // A calendar hold that did not land is never a silent "unconfirmed". The
+  // card says what happened in the UI language and, when Google needs the
+  // person (an expired or missing token, the Calendar scope not granted),
+  // offers Reconnect. result: created | unverified | failed. reason: a short
+  // code, never the mail text.
+  function calendarHoldOutcome(response) {
+    const r = response && typeof response === 'object' ? response : null;
+    if (r && r.ok === true) {
+      return { result: 'created', reason: r.proof && r.proof.fetchedBack === true ? 'verified' : 'unproved', line: '', reconnect: false };
+    }
+    const raw = r && typeof r.reason === 'string' && r.reason ? r.reason : 'no-response';
+    if (raw === 'unverified' || (r && r.unverified === true && r.ref)) {
+      return { result: 'unverified', reason: 'unverified', line: '', reconnect: false };
+    }
+    const he = glanceUiHebrew();
+    const lead = he ? 'לא נוצר אירוע ביומן — ' : 'No calendar event was created — ';
+    if (raw === 'not-connected') {
+      return {
+        result: 'failed',
+        reason: r && r.needsReconnect ? 'token-expired' : 'not-connected',
+        reconnect: true,
+        line: lead + (he
+          ? 'החיבור ל-Google פג או לא פעיל. לחץ «' + glanceUiCopy('reconnect') + '» ואז «בצע» שוב.'
+          : 'the Google connection expired or is off. Press ' + glanceUiCopy('reconnect') + ', then Do It again.')
+      };
+    }
+    if (raw === 'calendar-not-granted' || raw === 'missing-scope') {
+      return {
+        result: 'failed',
+        reason: 'calendar-scope-missing',
+        reconnect: true,
+        line: lead + (he
+          ? 'ל-Glance אין הרשאה ליומן Google. לחץ «' + glanceUiCopy('reconnect') + '» ואשר את היומן.'
+          : 'Glance is not allowed to use Google Calendar. Press ' + glanceUiCopy('reconnect') + ' and allow Calendar.')
+      };
+    }
+    if (raw === 'account-unverified') {
+      return { result: 'failed', reason: raw, reconnect: true, line: lead + reasonMessageRaw(r) };
+    }
+    if (raw === 'unknown' || raw === 'unavailable' || raw === 'no-response') {
+      return {
+        result: 'failed',
+        reason: raw === 'unknown' ? 'handler-unpublished' : (raw === 'no-response' ? 'no-response' : 'worker-unavailable'),
+        reconnect: false,
+        line: lead + (he ? 'רכיב היומן של Glance לא נטען. רענן את Gmail ונסה שוב.' : "Glance's calendar writer did not load. Refresh Gmail and try again.")
+      };
+    }
+    if (raw === 'verify_failed' || raw === 'proof_pending') {
+      return {
+        result: 'failed',
+        reason: raw,
+        reconnect: false,
+        line: lead + (he ? 'Google לא החזיר את האירוע אחרי הכתיבה, ולכן הוא הוסר. נסה שוב.' : 'Google did not return the event after the write, so it was removed. Try again.')
+      };
+    }
+    if (/^http-\d+$/.test(raw)) {
+      return {
+        result: 'failed',
+        reason: raw,
+        reconnect: false,
+        line: lead + (he ? 'Google החזיר שגיאה (' + raw.slice(5) + '). נסה שוב.' : 'Google answered with an error (' + raw.slice(5) + '). Try again.')
+      };
+    }
+    return { result: 'failed', reason: raw, reconnect: Boolean(r && r.needsReconnect), line: lead + reasonMessageRaw(r) };
+  }
+
+  function logCalendarHold(outcome) {
+    const o = outcome || {};
+    console.log('[Glance] calendar hold ' + (o.result || 'failed') + ' ' + (o.reason || 'unknown'));
+  }
+
+  // The failure line sits on the card in full (the step row truncates in a
+  // narrow pane), with Reconnect when Google needs the person.
+  function paintHoldError(host, chip, outcome, response) {
+    if (!host || !outcome || !outcome.line) return;
+    setChipState(chip, 'flow-chip-error', outcome.line);
+    host.querySelectorAll('.flow-chip-hold-error').forEach((n) => n.remove());
+    const box = el('div', 'flow-chip-hold-error', glanceShow(outcome.line));
+    box.setAttribute('role', 'alert');
+    box.setAttribute('dir', glanceUiHebrew() ? 'rtl' : 'ltr');
+    box.setAttribute('data-glance-hold-reason', outcome.reason || '');
+    host.appendChild(box);
+    if (outcome.reconnect) offerReconnect(host, chip, response || {});
+    else host.querySelectorAll('.flow-chip-reconnect').forEach((n) => n.remove());
+  }
+
+  function calendarHoldFailure(results) {
+    for (const r of results || []) {
+      if (!r || !r.action || r.action.kind !== 'calendar') continue;
+      if (r.response && r.response.skipped) continue;
+      const o = calendarHoldOutcome(r.response);
+      if (o.result === 'failed') return { result: r, outcome: o };
+    }
+    return null;
   }
 
   // Reverses the successful chain and undoes it one step at a time, stopping
@@ -5725,6 +5827,8 @@ function glanceUiCopy(kind) {
       if (res && res.ok) {
         btn.remove();
         setChipState(chip, 'flow-chip-error', he ? 'החיבור התחדש. לחץ שוב על Do It.' : 'Reconnected. Press Do It again.');
+        const note = host.querySelector('.flow-chip-hold-error');
+        if (note) note.textContent = glanceShow(he ? 'החיבור התחדש. לחץ «בצע» שוב.' : 'Reconnected. Press Do It again.');
         return;
       }
       btn.disabled = false;
@@ -5750,6 +5854,12 @@ function glanceUiCopy(kind) {
 
     if (!succeeded.length && orphans.length) {
       showUnverifiedReceipt(host, chip, ctx, results, orphans);
+      return;
+    }
+    const holdFail = !succeeded.length ? calendarHoldFailure(results) : null;
+    if (holdFail) {
+      paintHoldError(host, chip, holdFail.outcome, holdFail.result.response);
+      noteLaneOutcome(results);
       return;
     }
     const refused = results.find(accountRefusal);
@@ -6187,7 +6297,9 @@ function glanceUiCopy(kind) {
       if (host.__glanceSteps && result && result.action) {
         const proved = result.response && result.response.proof && result.response.proof.fetchedBack === true;
         const next = (result.response && result.response.ok) ? (proved ? 'verified' : 'verifying') : 'failed';
-        host.__glanceSteps.setRow(result.action.id, next, next === 'failed' ? reasonMessage(result.response, ctx) : null);
+        const hold = next === 'failed' && result.action.kind === 'calendar' ? calendarHoldOutcome(result.response) : null;
+        const why = next === 'failed' ? (hold && hold.result === 'failed' ? glanceShow(hold.line) : reasonMessage(result.response, ctx)) : null;
+        host.__glanceSteps.setRow(result.action.id, next, why, hold && hold.result === 'failed' ? { blocker: true } : null);
       }
       if (result.response && result.response.ok) {
         doneVerbs.push(STEP_DONE_VERB[result.action.kind] || 'completed one step');
@@ -6198,7 +6310,14 @@ function glanceUiCopy(kind) {
 
     runActionsSequentially(liveSteps, ctx, onStepDone)
       .then(async (results) => { await showMultiActionReceipt(host, chip, ctx, results); checkBrief(); })
-      .catch(() => setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'));
+      .catch(() => {
+        setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.');
+        if (liveSteps.some((s) => s && s.kind === 'calendar')) {
+          const o = calendarHoldOutcome({ ok: false, reason: 'unavailable' });
+          logCalendarHold({ result: 'failed', reason: 'exception' });
+          paintHoldError(host, chip, o, null);
+        }
+      });
   }
 
   async function onDismiss(host, ctx) {
