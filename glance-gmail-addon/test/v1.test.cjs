@@ -20,6 +20,13 @@ const NOW = new Date('2026-10-15T12:00:00Z');
 const TZ = 'UTC';
 let failures = 0;
 
+// Google Tasks stores `due` as a date only: it converts the value to UTC and keeps that day,
+// then returns UTC midnight of it. Test doubles use this so a wrong day cannot hide.
+function googleTaskDue(value) {
+  if (!value) return null;
+  return new Date(value).toISOString().slice(0, 10) + 'T00:00:00.000Z';
+}
+
 function check(name, cond, detail) {
   if (cond) console.log('PASS:', name);
   else {
@@ -433,9 +440,12 @@ console.log('\n--- calendar proof ---');
     execute.instantUtc('2026-10-22', 14, 0, fromObject.start.timeZone) === '2026-10-22T11:00:00Z',
     fromObject);
   check('a missing zone falls back to Asia/Jerusalem', fallback.start.timeZone === 'Asia/Jerusalem');
-  check('a task due is RFC3339 in that zone',
-    execute.dueRfc3339('2026-10-22', 'Asia/Jerusalem') === '2026-10-22T00:00:00+03:00' &&
-    execute.dueRfc3339('2026-10-22', 'America/New_York') === '2026-10-22T00:00:00-04:00');
+  check('a task due is UTC midnight of that date, in every zone',
+    execute.dueRfc3339('2026-10-22', 'Asia/Jerusalem') === '2026-10-22T00:00:00.000Z' &&
+    execute.dueRfc3339('2026-10-22', 'America/New_York') === '2026-10-22T00:00:00.000Z');
+  check('the Tasks double drops local midnight east of UTC to the day before (the Gate 04e115ab off-by-one)',
+    googleTaskDue('2026-11-18T00:00:00+02:00') === '2026-11-17T00:00:00.000Z' &&
+    googleTaskDue(execute.dueRfc3339('2026-11-18', 'Asia/Jerusalem')) === '2026-11-18T00:00:00.000Z');
 }
 function memoryCalendar() {
   const calls = [];
@@ -548,31 +558,49 @@ function memoryCalendar() {
   };
   check('the same instant hashes equal in that zone', proof.contentHash(localEvent) === proof.contentHash(zuluEvent) && proof.contentHash(localEvent) !== proof.contentHash(movedEvent));
 }
-{
+function googleTasksClient(store) {
   const calls = [];
-  const client = {
+  return {
     calls: calls,
     insert: function (listId, resource) {
       calls.push(resource.due);
-      return { id: 'task-z', title: resource.title, due: resource.due, etag: 'e1', updated: 'u1' };
+      store.task = { id: 'task-z', title: resource.title, due: googleTaskDue(resource.due), etag: 'e1', updated: 'u1' };
+      return JSON.parse(JSON.stringify(store.task));
     },
     get: function () {
-      return { id: 'task-z', title: 'send the contract', due: '2026-10-21T21:00:00.000Z', etag: 'e1', updated: 'u1' };
+      calls.push('get');
+      return store.task ? JSON.parse(JSON.stringify(store.task)) : null;
     },
-    remove: function () { calls.push('remove'); }
+    remove: function () { calls.push('remove'); store.task = null; }
   };
-  const result = execute.performCreate({ listId: 'list', title: 'send the contract', due: '2026-10-22', timeZone: 'Asia/Jerusalem' }, client);
-  check('a task due is written in the user zone', calls[0] === '2026-10-22T00:00:00+03:00', calls[0]);
-  check('a task read-back in that zone keeps 22/10', result.confirmed === true && result.view.due === '2026-10-22' && result.snapshot.timeZone === 'Asia/Jerusalem', result);
-  const again = {
-    calls: [],
-    get: function () {
-      this.calls.push('get');
-      return { id: 'task-z', title: 'send the contract', due: '2026-10-21T21:00:00.000Z', etag: 'e1', updated: 'u1' };
-    },
-    remove: function () { this.calls.push('remove'); }
+}
+for (const zone of ['Asia/Jerusalem', 'America/New_York', 'Pacific/Kiritimati']) {
+  const store = {};
+  const client = googleTasksClient(store);
+  const result = execute.performCreate({ listId: 'list', title: 'send the contract', due: '2026-11-18', timeZone: zone }, client);
+  check('a task due 18/11 is written as UTC midnight (' + zone + ')', client.calls[0] === '2026-11-18T00:00:00.000Z', client.calls[0]);
+  check('Google Tasks keeps 18/11 and the read-back says 18/11 (' + zone + ')',
+    result.confirmed === true && store.task.due === '2026-11-18T00:00:00.000Z' && result.view.due === '2026-11-18' && result.snapshot.due === '2026-11-18',
+    { result: result, stored: store.task });
+  const undoClient = googleTasksClient(store);
+  check('undo matches that due and deletes (' + zone + ')',
+    execute.performUndo(result.snapshot, undoClient).action === 'deleted' && undoClient.calls.join(',') === 'get,remove',
+    undoClient.calls);
+}
+{
+  const store = {};
+  const shifted = googleTasksClient(store);
+  const insertOnce = shifted.insert;
+  // The server answers with the day before on both the insert and the read (what the +02:00 write did live).
+  shifted.insert = function (listId, resource) {
+    insertOnce(listId, resource);
+    store.task.due = '2026-11-17T00:00:00.000Z';
+    return JSON.parse(JSON.stringify(store.task));
   };
-  check('undo compares the task due in that zone', execute.performUndo(result.snapshot, again).action === 'deleted' && again.calls.join(',') === 'get,remove', again.calls);
+  const result = execute.performCreate({ listId: 'list', title: 'send the contract', due: '2026-11-18', timeZone: 'Asia/Jerusalem' }, shifted);
+  check('a read-back on another day is not confirmed and the wrong-day task is taken back',
+    result.confirmed === false && result.reason === 'due-mismatch' && shifted.calls.indexOf('remove') !== -1 && store.task === null,
+    { result: result, calls: shifted.calls });
 }
 
 console.log('\n--- prefetch and classifier stubs ---');
@@ -640,7 +668,10 @@ function scopesRequiredByManifest(manifest, hostSource) {
     if (gmail.currentMessageAccess === 'metadata') add('gmail.addons.current.message.metadata');
     else add('gmail.addons.current.message.readonly');
   }
-  if (gmail.composeTrigger) add('gmail.addons.current.action.compose');
+  if (gmail.composeTrigger || (hostSource && /createDraftReply/.test(hostSource))) {
+    add('gmail.addons.current.action.compose');
+  }
+  if (gmail.composeTrigger && gmail.composeTrigger.draftAccess === 'METADATA') add('gmail.addons.current.message.metadata');
   services.forEach((service) => {
     if (service.serviceId === 'tasks' || service.userSymbol === 'Tasks') add('tasks');
     if (service.serviceId === 'calendar' || service.userSymbol === 'Calendar') add('calendar.events');
@@ -658,14 +689,26 @@ console.log('\n--- host boundaries ---');
   const expected = scopesRequiredByManifest(manifest, host);
   check('every manifest flag has its scope, and there are no extras', JSON.stringify(scopes) === JSON.stringify(expected), { scopes: scopes, expected: expected });
   check('useLocaleFromApp requires script.locale', expected.indexOf(scopeUrl('script.locale')) !== -1 && scopes.indexOf(scopeUrl('script.locale')) !== -1);
-  check('message open reads the body, not metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
-  check('there is no compose scope', !manifest.addOns.gmail.composeTrigger && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) === -1);
+  check('message open still uses current.message.readonly and compose has metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) !== -1 && manifest.addOns.gmail.composeTrigger.draftAccess === 'METADATA');
+  check('compose trigger requires the compose scope', manifest.addOns.gmail.composeTrigger && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) !== -1);
+  check('compose trigger runs onGmailCompose', manifest.addOns.gmail.composeTrigger.selectActions[0].runFunction === 'onGmailCompose');
+  const absent = ['gmail.modify', 'gmail.readonly', 'gmail.metadata', 'gmail.compose', 'gmail.send'];
+  check('mail.google.com/ and full Gmail scopes are absent',
+    JSON.stringify(manifest).indexOf('mail.google.com/') === -1 &&
+    absent.every(function (id) { return scopes.indexOf(scopeUrl(id)) === -1; }),
+    scopes);
 
   const withCompose = JSON.parse(JSON.stringify(manifest));
   withCompose.addOns.gmail.composeTrigger = { draftAccess: 'NONE' };
   withCompose.oauthScopes = scopes.slice();
   const composeNeed = scopesRequiredByManifest(withCompose, host);
   check('a compose trigger would require the compose scope', composeNeed.indexOf(scopeUrl('gmail.addons.current.action.compose')) !== -1);
+  check('draft access NONE does not require the add-on metadata scope', composeNeed.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
+  const metadataDraft = JSON.parse(JSON.stringify(manifest));
+  metadataDraft.addOns.gmail.composeTrigger = { draftAccess: 'METADATA' };
+  delete metadataDraft.addOns.gmail.currentMessageAccess;
+  const metadataDraftNeed = scopesRequiredByManifest(metadataDraft, host);
+  check('METADATA draft access requires the add-on metadata scope', metadataDraftNeed.indexOf(scopeUrl('gmail.addons.current.message.metadata')) !== -1 && metadataDraftNeed.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1);
 
   const metadataOnly = JSON.parse(JSON.stringify(manifest));
   metadataOnly.addOns.gmail.currentMessageAccess = 'metadata';
@@ -683,7 +726,10 @@ console.log('\n--- host boundaries ---');
   check('contextual trigger is message open', manifest.addOns.gmail.contextualTriggers[0].onTriggerFunction === 'onGmailMessageOpen');
   check('locale comes from the app', manifest.addOns.common.useLocaleFromApp === true);
   check('the script time zone is only the Asia/Jerusalem fallback', manifest.timeZone === 'Asia/Jerusalem');
-  check('host never sends mail', !/gmail\.send|sendEmail|Drafts\.send|MailApp|createDraft|\.send\(/.test(host));
+  check('host never sends mail', !/gmail\.send|sendEmail|Drafts\.send|MailApp|GmailApp\.createDraft\b|GmailDraft\.send|GmailApp\.sendEmail|\.send\(/.test(host));
+  check('no GmailDraft.send or GmailApp.sendEmail', !/GmailDraft\.send|GmailApp\.sendEmail/.test(host));
+  check('createDraftReply uses the add-on compose scope, not gmail.compose', host.indexOf('createDraftReply') !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) !== -1 && scopes.indexOf(scopeUrl('gmail.compose')) === -1);
+  check('compose does not call GmailApp.getDraft or setPlainBody', !/GmailApp\.getDraft|setPlainBody|setUpdateDraftBodyValue/.test(host));
   check('host does not patch a task', !/Tasks\.Tasks\.patch|Tasks\.Tasks\.update/.test(host));
   check('host reads the task back through performCreate', host.indexOf('performCreate') !== -1 && host.indexOf('performUndo') !== -1);
   check('host reads an event back through performCreateEvent', host.indexOf('performCreateEvent') !== -1 && host.indexOf('performUndoEvent') !== -1);
@@ -691,7 +737,7 @@ console.log('\n--- host boundaries ---');
 
 console.log('\n--- message path parity ---');
 {
-  const state = { props: {}, messages: {}, events: {}, tasks: {}, eventSeq: 1, taskSeq: 1, fetches: 0, tokenCalls: 0, scopeChecks: [], granted: [] };
+  const state = { props: {}, messages: {}, events: {}, tasks: {}, eventSeq: 1, taskSeq: 1, fetches: 0, tokenCalls: 0, scopeChecks: [], granted: [], cache: {}, cacheTtl: {}, logs: [], createdReplies: [] };
   const ALL_SCOPES = [
     'https://www.googleapis.com/auth/tasks',
     'https://www.googleapis.com/auth/calendar.events',
@@ -711,6 +757,10 @@ console.log('\n--- message path parity ---');
     state.scopeChecks = [];
     state.granted = ALL_SCOPES.slice();
     state.authThrows = [];
+    state.cache = {};
+    state.cacheTtl = {};
+    state.logs = [];
+    state.createdReplies = [];
   }
   function widget(kind) {
     const node = { type: kind, text: '', action: '', params: {}, style: '' };
@@ -721,7 +771,15 @@ console.log('\n--- message path parity ---');
     return node;
   }
   const sandbox = {
-    console: console,
+    console: {
+      log: function () {
+        const line = Array.prototype.map.call(arguments, function (part) { return String(part); }).join(' ');
+        state.logs.push(line);
+        console.log(line);
+      },
+      error: function () { console.error.apply(console, arguments); },
+      warn: function () { console.warn.apply(console, arguments); }
+    },
     module: undefined,
     GmailApp: {
       setCurrentMessageAccessToken: function (token) {
@@ -730,6 +788,14 @@ console.log('\n--- message path parity ---');
         if (state.tokenThrow) throw new Error('token refused');
       },
       getMessageById: function (id) { return state.messages[id] || null; }
+    },
+    CacheService: {
+      getUserCache: function () {
+        return {
+          get: function (key) { return Object.prototype.hasOwnProperty.call(state.cache, key) ? state.cache[key] : null; },
+          put: function (key, value, ttl) { state.cache[key] = value; state.cacheTtl[key] = ttl; }
+        };
+      }
     },
     PropertiesService: {
       getUserProperties: function () {
@@ -755,7 +821,7 @@ console.log('\n--- message path parity ---');
           const task = {
             id: 'task-' + state.taskSeq++,
             title: resource.title,
-            due: resource.due || null,
+            due: googleTaskDue(resource.due),
             notes: resource.notes || '',
             etag: 'e1',
             updated: 'u1'
@@ -850,10 +916,33 @@ console.log('\n--- message path parity ---');
         nav.updateCard = function (card) { nav.card = card; return nav; };
         return nav;
       },
+      ContentType: { TEXT: 'text' },
+      UpdateDraftBodyType: { IN_PLACE_INSERT: 'IN_PLACE_INSERT' },
+      newUpdateDraftBodyAction: function () {
+        const action = { contents: [], type: '' };
+        action.addUpdateContent = function (content, contentType) {
+          action.contents.push({ content: String(content || ''), contentType: contentType });
+          return action;
+        };
+        action.setUpdateType = function (type) { action.type = type; return action; };
+        return action;
+      },
       newActionResponseBuilder: function () {
         const response = { card: null };
         response.setNavigation = function (nav) { response.card = nav.card; return response; };
         response.build = function () { return { card: response.card }; };
+        return response;
+      },
+      newUpdateDraftActionResponseBuilder: function () {
+        const response = { bodyAction: null };
+        response.setUpdateDraftBodyAction = function (action) { response.bodyAction = action; return response; };
+        response.build = function () { return { draftAction: response.bodyAction }; };
+        return response;
+      },
+      newComposeActionResponseBuilder: function () {
+        const response = { draft: null };
+        response.setGmailDraft = function (draft) { response.draft = draft; return response; };
+        response.build = function () { return { composeDraft: response.draft }; };
         return response;
       }
     }
@@ -882,7 +971,10 @@ console.log('\n--- message path parity ---');
   vm.runInContext(fs.readFileSync(path.join(addon, 'CoreBundle.js'), 'utf8'), sandbox, { filename: 'CoreBundle.js' });
   vm.runInContext(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8'), sandbox, { filename: 'Code.js' });
   const openMessage = vm.runInContext('onGmailMessageOpen', sandbox);
+  const openCompose = vm.runInContext('onGmailCompose', sandbox);
   const doIt = vm.runInContext('onDoIt', sandbox);
+  const composeDoIt = vm.runInContext('onComposeDoIt', sandbox);
+  const prepareReply = vm.runInContext('onPrepareReply', sandbox);
   const undo = vm.runInContext('onUndo', sandbox);
   const contentTitle = vm.runInContext('Glance.intent.contentTitle', sandbox);
   const prepareText = vm.runInContext('Glance.intent.prepareText', sandbox);
@@ -922,6 +1014,12 @@ console.log('\n--- message path parity ---');
         const out = [];
         for (let i = 0; i < n; i++) out.push({ getName: function () { return 'signed-copy.pdf'; } });
         return out;
+      },
+      createDraftReply: function (body) {
+        calls.push('createDraftReply');
+        const draft = { id: 'reply-draft-1', body: String(body || '') };
+        state.createdReplies.push(draft);
+        return draft;
       }
     };
   }
@@ -1035,7 +1133,15 @@ console.log('\n--- message path parity ---');
       return;
     }
     const label = lang === 'he' ? 'בצע' : 'Do it';
-    check(name + ' offers one Do it', buttons.length === 1 && plain(buttons[0].text) === label && buttons[0].action === 'onDoIt', buttons.map((item) => item.text));
+    const doIts = buttons.filter((item) => item.action === 'onDoIt');
+    const prepare = buttons.filter((item) => item.action === 'onPrepareReply');
+    const hasDraft = (plan.steps || []).some((step) => step.kind === 'gmailDraft' || step.kind === 'outlookDraft');
+    const prepareLabel = lang === 'he' ? 'הכן תשובה' : 'Prepare a reply';
+    check(name + ' offers one Do it',
+      doIts.length === 1 && plain(doIts[0].text) === label &&
+      buttons.every((item) => item.action === 'onDoIt' || item.action === 'onPrepareReply') &&
+      (hasDraft ? prepare.length === 1 && plain(prepare[0].text) === prepareLabel : prepare.length === 0),
+      buttons.map((item) => item.action + ':' + plain(item.text)));
     const calendarStep = plan.steps.filter((step) => step.kind === 'calendar')[0];
     const taskStep = plan.steps.filter((step) => step.kind === 'googleTask')[0];
     const title = shownTitle(sourceText, plan);
@@ -1225,7 +1331,13 @@ console.log('\n--- message path parity ---');
   }
   function expectDoIt(card, he) {
     const btns = buttonsOf(card);
-    return btns.length === 1 && plain(btns[0].text) === (he ? 'בצע' : 'Do it');
+    const doIts = btns.filter((item) => item.action === 'onDoIt');
+    const prepare = btns.filter((item) => item.action === 'onPrepareReply');
+    const label = he ? 'בצע' : 'Do it';
+    const prepareLabel = he ? 'הכן תשובה' : 'Prepare a reply';
+    return doIts.length === 1 && plain(doIts[0].text) === label &&
+      btns.length === doIts.length + prepare.length &&
+      (prepare.length === 0 || (prepare.length === 1 && plain(prepare[0].text) === prepareLabel));
   }
   const greetAsks = [
     { id: 'gEnDoc', threadId: 't1', plain: 'Hi Sali, could you send the signed document by Friday?', locale: 'en' },
@@ -1602,7 +1714,7 @@ console.log('\n--- message path parity ---');
     typeof zonedEvent.start.timeZone === 'string' &&
     zonedEvent.end.timeZone === 'Asia/Jerusalem' &&
     execute.instantUtc('2026-10-22', 14, 0, zonedEvent.start.timeZone) === '2026-10-22T11:00:00Z' &&
-    zonedTask.due === '2026-10-22T00:00:00+03:00' &&
+    zonedTask.due === '2026-10-22T00:00:00.000Z' &&
     linesOf(zonedDo).join('\n').indexOf('2026-10-22 14:00') !== -1,
     { event: zonedEvent, due: zonedTask && zonedTask.due, lines: linesOf(zonedDo) });
 
@@ -1637,6 +1749,152 @@ console.log('\n--- message path parity ---');
     missingLines.indexOf('Nothing to close.') === -1 &&
     missingRow && missingRow.calendarService === false,
     { errors: missingCalendar.errors, lines: missingLines, row: missingRow });
+
+  reset();
+  const replyId = '16a2c177reply';
+  state.messages[replyId] = gmailMessage({
+    id: replyId,
+    threadId: 'thread16a2',
+    subject: 'פגישה עם דנה',
+    plain: 'Please send me the report by Friday.',
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow@gmail.com',
+    date: new Date('2026-10-15T08:00:00Z')
+  });
+  let draftReads = 0;
+  sandbox.GmailApp.getDraft = function () {
+    draftReads += 1;
+    throw new Error('getDraft needs a mailbox scope');
+  };
+  const messageCard = openMessage({
+    gmail: { messageId: replyId, accessToken: 'token', threadId: 'thread16a2' },
+    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
+  })[0];
+  const prepareButtons = buttonsOf(messageCard).filter((item) => item.action === 'onPrepareReply');
+  check('the message card has הכן תשובה for a reply intent',
+    prepareButtons.length === 1 && plain(prepareButtons[0].text) === 'הכן תשובה',
+    buttonsOf(messageCard).map((item) => plain(item.text)));
+  const cacheValues = Object.keys(state.cache).map((key) => JSON.parse(state.cache[key]));
+  check('the message card stores the reply text for six hours, not the mail body',
+    cacheValues.length === 1 &&
+    cacheValues[0].subject === 'פגישה עם דנה' &&
+    cacheValues[0].messageId === replyId &&
+    cacheValues[0].text &&
+    !cacheValues[0].plain &&
+    !cacheValues[0].body &&
+    Object.keys(state.cacheTtl).every((key) => state.cacheTtl[key] === 21600),
+    cacheValues);
+  const prepared = prepareReply({
+    gmail: { messageId: replyId, accessToken: 'token', threadId: 'thread16a2' },
+    parameters: { messageId: replyId, source: 'message' },
+    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
+  });
+  check('הכן תשובה builds a ComposeActionResponse and does not send',
+    draftReads === 0 &&
+    prepared.composeDraft &&
+    prepared.composeDraft.body.indexOf('Hi') !== -1 &&
+    state.messages[replyId].calls.indexOf('createDraftReply') !== -1,
+    prepared);
+  const composeEvent = {
+    gmail: {
+      accessToken: 'token',
+      toRecipients: ['dana@meridian.com'],
+      ccRecipients: [],
+      bccRecipients: []
+    },
+    draftMetadata: { subject: 'Re: פגישה עם דנה' },
+    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
+  };
+  const composeCard = openCompose(composeEvent)[0];
+  const composeButtons = buttonsOf(composeCard);
+  const composeLog = state.logs.filter((line) => line.indexOf('compose keys:') === 0).pop() || '';
+  check('a reply compose event with no messageId offers בצע after the cache is primed',
+    !composeEvent.gmail.messageId &&
+    composeButtons.length === 1 &&
+    composeButtons[0].action === 'onComposeDoIt' &&
+    plain(composeButtons[0].text) === 'בצע' &&
+    linesOf(composeCard).join('\n').indexOf('אין מה לסגור') === -1 &&
+    composeLog.indexOf('draftMetadata.subject') !== -1 &&
+    composeLog.indexOf('פגישה') === -1,
+    { buttons: composeButtons.map((item) => plain(item.text)), log: composeLog });
+  for (const marked of ['\u200fRe: \u200fפגישה עם דנה', '\u202bRE:  פגישה עם דנה\u202c ', '\u2067Re: Fwd: פגישה עם דנה\u2069']) {
+    const markedCard = openCompose(Object.assign({}, composeEvent, { draftMetadata: { subject: marked } }))[0];
+    check('compose finds the stored reply when the subject carries bidi marks ' + JSON.stringify(marked),
+      buttonsOf(markedCard).length === 1 && buttonsOf(markedCard)[0].action === 'onComposeDoIt' &&
+      buttonsOf(markedCard)[0].params.replyKey === composeButtons[0].params.replyKey,
+      linesOf(markedCard));
+  }
+  const inserted = composeDoIt(Object.assign({}, composeEvent, {
+    parameters: { replyKey: composeButtons[0].params.replyKey, source: 'compose' }
+  }));
+  const insertedContent = inserted.draftAction && inserted.draftAction.contents && inserted.draftAction.contents[0];
+  check('compose Do it inserts at the cursor and does not read the draft',
+    draftReads === 0 &&
+    inserted.draftAction &&
+    inserted.draftAction.type === 'IN_PLACE_INSERT' &&
+    insertedContent &&
+    insertedContent.contentType === 'text' &&
+    insertedContent.content.indexOf('Hi') !== -1 &&
+    !inserted.card,
+    inserted);
+  state.cache = {};
+  const bareCompose = openCompose(composeEvent)[0];
+  const bareLines = linesOf(bareCompose).join('\n');
+  check('an empty reply cache tells the person to press הכן תשובה first',
+    buttonsOf(bareCompose).length === 0 &&
+    bareLines.indexOf('פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».') !== -1 &&
+    bareLines.indexOf('אין מה לסגור') === -1,
+    bareLines);
+
+  // Gate 04e115ab: ai.local.flow mailed itself. A note to self has no reply (FlowIntent: selfTask, noReplyDraft),
+  // so «הכן תשובה» is not offered and compose has nothing to insert. That is the product rule, not a bug.
+  // A self-note meeting is a task unless it asks for the calendar («תשריין ביומן») — then it is the hold.
+  {
+    const realSession = sandbox.Session;
+    sandbox.Session = {
+      getActiveUser: function () { return { getEmail: function () { return 'ai.local.flow@gmail.com'; } }; },
+      getScriptTimeZone: function () { return 'Asia/Jerusalem'; }
+    };
+    const selfOpen = function (id, subject, body) {
+      reset();
+      state.messages[id] = gmailMessage({
+        id: id, threadId: 't' + id, subject: subject, plain: body, html: '<div>' + body + '</div>',
+        from: 'flow <ai.local.flow@gmail.com>', to: 'ai.local.flow@gmail.com', date: new Date('2026-10-15T08:00:00Z')
+      });
+      const ev = { gmail: { messageId: id, accessToken: 'token', threadId: 't' + id }, commonEventObject: { userLocale: 'he', timeZone: { id: 'Asia/Jerusalem', offset: 10800000 } } };
+      return { ev: ev, card: openMessage(ev)[0] };
+    };
+    const selfR = selfOpen('self04eR', 'שאלה על החשבונית 13/11 ב', 'היי, תוכל לשלוח לי את החשבונית של חודש אוקטובר? תודה, רוני');
+    check('a self-sent question offers its task, not «הכן תשובה», and stores no reply',
+      buttonsOf(selfR.card).filter((b) => b.action === 'onPrepareReply').length === 0 &&
+      buttonsOf(selfR.card).filter((b) => b.action === 'onDoIt').length === 1 &&
+      Object.keys(state.cache).length === 0,
+      { lines: linesOf(selfR.card), buttons: buttonsOf(selfR.card).map((b) => plain(b.text)) });
+    const selfC = selfOpen('self04eC', '[G-Calendar] פגישה עם דנה על הספקים', 'נקבעה פגישה ביום ד\' הקרוב ב-11:00.');
+    const selfCDo = doIt(Object.assign({}, selfC.ev, { parameters: { messageId: 'self04eC', source: 'message' } })).card;
+    const selfCTask = state.tasks[Object.keys(state.tasks)[0]];
+    check('a self-note meeting without a calendar ask is a task due that Wednesday, kept on that day by Google Tasks',
+      Object.keys(state.events).length === 0 && selfCTask && selfCTask.due === '2026-10-21T00:00:00.000Z' &&
+      linesOf(selfCDo).join('\n').indexOf('2026-10-21') !== -1,
+      { task: selfCTask, lines: linesOf(selfCDo) });
+    const selfHold = selfOpen('self04eH', '[G-Calendar] פגישה עם דנה על הספקים', 'בוא נקבע פגישה עם דנה על הספקים ביום רביעי 21/10 בשעה 11:00 עד 11:30. תשריין ביומן.');
+    doIt(Object.assign({}, selfHold.ev, { parameters: { messageId: 'self04eH', source: 'message' } }));
+    const holdIds = Object.keys(state.events);
+    const holdEv = holdIds.length === 1 ? state.events[holdIds[0]] : null;
+    check('a self-note that says «תשריין ביומן» writes the hold at 11:00 on 21/10 and no task',
+      holdEv && holdEv.start.dateTime === '2026-10-21T11:00:00' && Object.keys(state.tasks).length === 0,
+      { events: state.events, tasks: state.tasks });
+    sandbox.Session = realSession;
+  }
+  check('compose does not send', !/GmailDraft\.send|GmailApp\.sendEmail|gmail\.send|sendEmail|Drafts\.send|MailApp|\.send\(/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));
+}
+
+console.log('\n--- draft compose ---');
+{
+  const draftCompose = require('../src/draft-compose.js');
+  check('draft read-back matches normalized text', draftCompose.matches('Hi,\n\nThanks.', 'Hi, Thanks.'));
+  check('draft mismatch is not confirmed', draftCompose.matches('one', 'two') === false);
 }
 
 if (failures) {
