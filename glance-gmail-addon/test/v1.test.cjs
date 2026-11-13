@@ -32,6 +32,20 @@ function plain(value) {
   return String(value || '').replace(/[\u202A-\u202E\u2066-\u2069]/g, '');
 }
 
+function quoteCountSafe(description, line) {
+  const text = String(description || '');
+  if (!line) return 0;
+  let n = 0;
+  let from = 0;
+  while (from <= text.length) {
+    const at = text.indexOf(line, from);
+    if (at < 0) return n;
+    n++;
+    from = at + line.length;
+  }
+  return n;
+}
+
 function widgetText(model) {
   return (model.widgets || []).filter((w) => w.type === 'text').map((w) => plain(w.text));
 }
@@ -1630,6 +1644,55 @@ console.log('\n--- message path parity ---');
     execute.instantUtc('2026-10-22', 14, 0, hold14Event.start.timeZone) === '2026-10-22T11:00:00Z' &&
     linesOf(hold14).join('\n').indexOf('2026-10-22 14:00') !== -1,
     hold14Event);
+
+  reset();
+  const GATE_SUBJECT = '[G-Calendar] שיחת וידאו עם אופק על ה-onboarding';
+  const GATE_TITLE = 'שיחת וידאו עם אופק על ה-onboarding';
+  const GATE_BODY = 'בוא נקבע שיחת וידאו ביום שלישי 17/11 בשעה 10:00 עד 10:30 על ה-onboarding של אופק. תשריין ביומן ותוסיף לינק ל-Meet.';
+  const gateMail = {
+    id: 'gatehold',
+    threadId: 'threadgatehold',
+    subject: GATE_SUBJECT,
+    plain: GATE_BODY,
+    html: quietHtml,
+    from: 'Dana Levi <dana@meridian.com>',
+    to: 'owner@ai.local.flow@gmail.com',
+    date: new Date('2026-11-13T10:00:00Z')
+  };
+  state.messages.gatehold = gmailMessage(gateMail);
+  const gateOpen = openMessage({
+    gmail: { messageId: 'gatehold', accessToken: 'token', threadId: 'threadgatehold' },
+    commonEventObject: { userLocale: 'he', timeZone: { id: 'Asia/Jerusalem', offset: 7200000 } }
+  });
+  const gateCard = linesOf(gateOpen[0]).join('\n');
+  check('the Gate hold card keeps the Hebrew chrome title',
+    gateCard.indexOf('שיחת וידאו 17/11 10:00') !== -1, gateCard);
+  const gateProof = doIt({
+    gmail: { messageId: 'gatehold', accessToken: 'token', threadId: 'threadgatehold' },
+    commonEventObject: { userLocale: 'he', timeZone: { id: 'Asia/Jerusalem', offset: 7200000 } },
+    parameters: { messageId: 'gatehold', source: 'message' }
+  }).card;
+  const gateIds = Object.keys(state.events);
+  const gateEvent = state.events[gateIds[0]];
+  check('Do It writes a hold event titled with the subject, tags stripped',
+    gateIds.length === 1 && gateEvent && gateEvent.summary === GATE_TITLE,
+    gateEvent && gateEvent.summary);
+  check('the event description Subject line is stripped of [G-Calendar]',
+    gateEvent && String(gateEvent.description || '').indexOf('Subject: ' + GATE_TITLE) !== -1 &&
+    String(gateEvent.description || '').indexOf('[G-Calendar]') === -1,
+    gateEvent && gateEvent.description);
+  check('the event description still includes the body sentence once',
+    gateEvent && quoteCountSafe(gateEvent.description, 'בוא נקבע שיחת וידאו') === 1,
+    gateEvent && gateEvent.description);
+  const eventNotes = vm.runInContext('eventNotes_', sandbox);
+  const taggedNotes = eventNotes({ subject: 'Re: Fw: ' + GATE_SUBJECT, threadUrl: 'https://mail.google.com/x' }, GATE_BODY.split('.')[0] + '.');
+  check('eventNotes_ strips Re:/Fw: and [G-Calendar] from the Subject line',
+    taggedNotes.indexOf('Subject: ' + GATE_TITLE) !== -1 &&
+    taggedNotes.indexOf('[G-Calendar]') === -1 &&
+    taggedNotes.indexOf('Re:') === -1 &&
+    taggedNotes.indexOf('Fw:') === -1,
+    taggedNotes);
+  void gateProof;
 
   check('a missing Calendar service is logged and the card still offers',
     missingCalendar.errors.some(function (line) { return line.indexOf('Calendar advanced service is missing') !== -1; }) &&

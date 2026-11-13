@@ -109,7 +109,13 @@ const FlowActions = (() => {
         // writer must not fall back to an all-day event if that time is
         // missing by the time Do It runs.
         requireTime: hold || mutate,
-        threadUrl: ctx.threadUrl
+        threadUrl: ctx.threadUrl,
+        // Raw mail subject. Writers strip reply prefixes and [tags] when
+        // they add the "Subject:" line to the event description.
+        subject: ctx && ctx.subject ? String(ctx.subject).slice(0, 300) : '',
+        // A calendar hold uses the meeting subject (or the sentence) as the
+        // event title. Other calendar steps keep the short classifier label.
+        useMeetingSubject: hold
       }
     };
     const span = mutate ? null : statedDurationMinutes([e.what, ctx && ctx.text], e.hour, e.minute);
@@ -1019,7 +1025,7 @@ const FlowActions = (() => {
     return lines;
   }
 
-  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
+  return { planFor, chooseDate, holdSubjectTitle, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };

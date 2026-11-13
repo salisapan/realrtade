@@ -430,10 +430,17 @@ function finishDecision_(decision, opened, messageId, lang, timeZone) {
 }
 
 function finishCalendar_(decision, opened, messageId, lang, timeZone) {
+  // A calendar hold's event title is the meeting subject (tags stripped),
+  // or the sentence when the subject is empty. decision.title stays the
+  // card chrome ("שיחת וידאו 17/11 10:00"). Other holds keep that chrome
+  // on the event, the same way they did before.
+  var eventTitle = (decision.kind === 'hold' && decision.useMeetingSubject && decision.eventTitle)
+    ? decision.eventTitle
+    : decision.title;
   stepLog_({
     step: 'write',
     target: 'event',
-    title: decision.title,
+    title: eventTitle,
     dateIso: decision.dateIso,
     hour: Number.isInteger(decision.hour) ? decision.hour : null,
     minute: Number.isInteger(decision.minute) ? decision.minute : null,
@@ -441,7 +448,7 @@ function finishCalendar_(decision, opened, messageId, lang, timeZone) {
   });
   var eventResult = Glance.execute.performCreateEvent({
     calendarId: 'primary',
-    title: decision.title,
+    title: eventTitle,
     dateIso: decision.dateIso,
     hour: Number.isInteger(decision.hour) ? decision.hour : null,
     minute: Number.isInteger(decision.minute) ? decision.minute : null,
@@ -520,10 +527,20 @@ function undoRecord_(snapshot) {
   return Glance.execute.performUndo(snapshot, tasksApi_());
 }
 
+function cleanSubject_(subject) {
+  var raw = String(subject || '');
+  var cleaned = raw;
+  if (typeof FlowActions !== 'undefined' && typeof FlowActions.holdSubjectTitle === 'function') {
+    cleaned = FlowActions.holdSubjectTitle(raw);
+  }
+  return Glance.intent.sanitizeTitle(cleaned);
+}
+
 function eventNotes_(opened, quote) {
   var lines = [];
   if (quote) lines.push(quote);
-  if (opened && opened.subject) lines.push('Subject: ' + Glance.intent.sanitizeTitle(opened.subject));
+  var subject = opened && opened.subject ? cleanSubject_(opened.subject) : '';
+  if (subject) lines.push('Subject: ' + subject);
   if (opened && opened.threadUrl) lines.push(opened.threadUrl);
   lines.push('Logged by Glance');
   return lines.join('\n').slice(0, 2000);
@@ -805,7 +822,8 @@ function parseFrom_(raw) {
 
 function notesFor_(opened) {
   var lines = [];
-  if (opened.subject) lines.push('Subject: ' + Glance.intent.sanitizeTitle(opened.subject));
+  var subject = opened && opened.subject ? cleanSubject_(opened.subject) : '';
+  if (subject) lines.push('Subject: ' + subject);
   if (opened.threadUrl) lines.push(opened.threadUrl);
   lines.push('Logged by Glance');
   return lines.join('\n').slice(0, 2000);

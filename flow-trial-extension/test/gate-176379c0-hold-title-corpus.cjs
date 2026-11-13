@@ -3,7 +3,9 @@
 //  (a) "[G-Calendar] שיחת וידאו עם אופק על ה-onboarding" created an event titled
 //      «שריין ג׳ 10:00» (the card label) instead of the meeting subject
 //      «שיחת וידאו עם אופק על ה-onboarding».
-//  (b) The event description contained the email-body line twice.
+//  (b) The event description contained the email-body line twice. The
+//      description's Subject line still carried "[G-Calendar]"; tags and
+//      reply prefixes are now stripped there too.
 //  (c) content-gmail.js recordSilence must print «[Glance] silent: <reason>»
 //      on every engine silence, including a past-date miss, with no body text.
 // The bodies below are the exact Gate bodies. Run: node test/gate-176379c0-hold-title-corpus.cjs
@@ -123,14 +125,30 @@ for (const self of [true, false]) {
 {
   const r = gmailPlan(CAL_BODY, CAL_SUBJECT, true);
   const cal = calendarStep(r.steps);
-  const ev = eventOf(cal.params.title, cal.params.quote);
+  const ev = eventOf(cal.params.title, cal.params.quote, { subject: CAL_SUBJECT });
   const line = cal.params.quote;
   expect('quote is the body sentence', Boolean(line) && line.indexOf('בוא נקבע שיחת וידאו') === 0, line);
   expect('description includes the body sentence once', ev && quoteCount(ev.description, line) === 1, ev && ev.description);
-  const dup = eventOf('שריין ג׳ 10:00', line);
+  expect('description Subject line is the subject without [G-Calendar]',
+    ev && ev.description.indexOf('Subject: ' + CAL_TITLE) >= 0 && ev.description.indexOf('[G-Calendar]') < 0,
+    ev && ev.description);
+  const dup = eventOf('שריין ג׳ 10:00', line, { subject: CAL_SUBJECT });
   expect('even if the title is the old card label, the body line is still once', dup && quoteCount(dup.description, line) === 1, dup && dup.description);
+  expect('even if the title is the old card label, Subject is still cleaned',
+    dup && dup.description.indexOf('Subject: ' + CAL_TITLE) >= 0 && dup.description.indexOf('[G-Calendar]') < 0,
+    dup && dup.description);
   const same = eventOf(line, line);
   expect('when title equals the quote, the line is not repeated in the description', same && quoteCount(same.description, line) === 0, same && same.description);
+  const replied = eventOf(cal.params.title, cal.params.quote, { subject: 'Re: Fw: [G-Calendar] ' + CAL_TITLE });
+  expect('Re: / Fw: / [G-Calendar] are stripped from the Subject line',
+    replied && replied.description.indexOf('Subject: ' + CAL_TITLE) >= 0 &&
+    replied.description.indexOf('[G-Calendar]') < 0 &&
+    replied.description.indexOf('Re:') < 0 &&
+    replied.description.indexOf('Fw:') < 0,
+    replied && replied.description);
+  const none = eventOf(cal.params.title, cal.params.quote);
+  expect('no Subject line is added when no subject is passed',
+    none && String(none.description || '').indexOf('Subject:') < 0, none && none.description);
 }
 
 // ---- (c) every engine silence, including past-date, logs a reason and no body
