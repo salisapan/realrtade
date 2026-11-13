@@ -1,7 +1,14 @@
 // Glance card host for Gmail on the web and in the Gmail apps on iOS and Android.
 // Card Service only. Do it writes one task, one calendar hold, or a scheduled
 // event plus its reminder, then reads each write back.
-// Undo deletes only when that read still matches. This file never sends mail.
+// A compose trigger reads the message being replied to (gmail.messageId plus
+// the current-message token) and inserts the reply at the cursor.
+// Google's Gmail event object has no draft id. A thread id alone is not read:
+// the token covers the open message, not the mailbox.
+// That insert is not read back. Reading or replacing the draft through the
+// Gmail message API needs a mailbox scope this card does not ask for.
+// Undo of that draft is not offered, because restoring it would overwrite an edit we cannot see.
+// Task and calendar Undo still read those writes back. This file never sends mail.
 
 var GLANCE_TASK_LIST = 'Glance';
 var UNDO_PREFIX = 'glanceUndo_';
@@ -24,6 +31,189 @@ function onHomepage(e) {
   }
 }
 
+var REPLY_CACHE_TTL = 21600;
+
+function logEventKeys_(label, event) {
+  var names = [];
+  function walk(obj, prefix, depth) {
+    if (!obj || typeof obj !== 'object' || depth > 3) return;
+    var keys = [];
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) keys.push(key);
+    }
+    keys.sort();
+    for (var i = 0; i < keys.length; i++) {
+      var path = prefix ? prefix + '.' + keys[i] : keys[i];
+      names.push(path);
+      var value = obj[keys[i]];
+      if (value && typeof value === 'object' && !Array.isArray(value)) walk(value, path, depth + 1);
+    }
+  }
+  walk(event, '', 0);
+  console.log(label + ' keys: ' + names.join(','));
+}
+
+function composeReplyId_(e) {
+  var gmail = e && e.gmail;
+  if (gmail && gmail.messageId) return String(gmail.messageId);
+  var params = e && e.parameters;
+  if (params && params.messageId) return String(params.messageId);
+  return '';
+}
+
+function normalizeSubject_(subject) {
+  // Bidi and zero-width marks (RLM/LRM, embeddings, isolates, BOM) are invisible in a Hebrew subject
+  // but change the key, so the compose lookup would miss the reply «הכן תשובה» stored.
+  var text = String(subject || '').replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+  var changed = true;
+  while (changed && text) {
+    changed = false;
+    var next = text.replace(/^(?:re|fw|fwd)\s*:\s*/i, '').replace(/^\[[^\]]{0,40}\]\s*/, '');
+    if (next !== text) {
+      text = next.replace(/^\s+/, '');
+      changed = true;
+    }
+  }
+  return text;
+}
+
+function subjectKey_(subject) {
+  var norm = normalizeSubject_(subject);
+  var hash = 5381;
+  for (var i = 0; i < norm.length; i++) hash = (((hash * 33) ^ norm.charCodeAt(i)) >>> 0);
+  return 'glanceReply_' + hash.toString(16);
+}
+
+function userCache_() {
+  if (typeof CacheService === 'undefined' || !CacheService.getUserCache) return null;
+  return CacheService.getUserCache();
+}
+
+function rememberReply_(subject, text, messageId) {
+  var cache = userCache_();
+  var norm = normalizeSubject_(subject);
+  if (!cache || !norm || !text) return '';
+  var key = subjectKey_(norm);
+  cache.put(key, JSON.stringify({
+    subject: norm,
+    text: String(text),
+    messageId: String(messageId || '')
+  }), REPLY_CACHE_TTL);
+  return key;
+}
+
+function readReplyCache_(subjectOrKey) {
+  var cache = userCache_();
+  if (!cache || !subjectOrKey) return null;
+  var key = String(subjectOrKey).indexOf('glanceReply_') === 0 ? String(subjectOrKey) : subjectKey_(subjectOrKey);
+  var raw = cache.get(key);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (err) { return null; }
+}
+
+function composeSubject_(e) {
+  var meta = e && e.draftMetadata;
+  if (meta && meta.subject) return String(meta.subject);
+  var gmail = e && e.gmail;
+  if (gmail && gmail.subject) return String(gmail.subject);
+  return '';
+}
+
+function onGmailCompose(e) {
+  logEventKeys_('compose', e);
+  var lang = Glance.i18n.locale(localeOf_(e));
+  try {
+    var saved = readReplyCache_(composeSubject_(e));
+    if (!saved || !saved.text) return [render_(Glance.cards.composeAskFirst(lang))];
+    var preview = Glance.intent.sanitizeTitle(saved.text).slice(0, 240);
+    return [render_(Glance.cards.composeProposal(preview, subjectKey_(saved.subject), lang))];
+  } catch (err) {
+    errorLog_(err);
+    return [render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose'))];
+  }
+}
+
+function onComposeDoIt(e) {
+  logEventKeys_('composeDoIt', e);
+  var lang = Glance.i18n.locale(localeOf_(e));
+  var key = e && e.parameters && e.parameters.replyKey ? String(e.parameters.replyKey) : '';
+  var saved = readReplyCache_(key || composeSubject_(e));
+  if (!saved || !saved.text) return update_(render_(Glance.cards.composeAskFirst(lang)));
+  return draftInsertResponse_(saved.text);
+}
+
+function onPrepareReply(e) {
+  logEventKeys_('prepareReply', e);
+  var lang = Glance.i18n.locale(localeOf_(e));
+  var messageId = composeReplyId_(e);
+  if (!messageId) return update_(render_(Glance.cards.composeAskFirst(lang)));
+  try {
+    if (!e.gmail || !e.gmail.accessToken) throw readFail_('no-token', emptyRead_(e));
+    GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
+    var opened = readOpen_(e, emptyRead_(e));
+    if (!opened) throw readFail_('open', emptyRead_(e));
+    var draftText = draftTextForOpen_(opened);
+    if (!draftText) return update_(render_(Glance.cards.composeNoReply(lang)));
+    rememberReply_(opened.subject, draftText, opened.messageId);
+    var message = GmailApp.getMessageById(messageId);
+    if (!message || typeof message.createDraftReply !== 'function') throw readFail_('reply', emptyRead_(e));
+    var draft = message.createDraftReply(draftText);
+    return CardService.newComposeActionResponseBuilder().setGmailDraft(draft).build();
+  } catch (err) {
+    errorLog_(err);
+    return update_(render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose')));
+  }
+}
+
+function draftInsertResponse_(text) {
+  return CardService.newUpdateDraftActionResponseBuilder()
+    .setUpdateDraftBodyAction(CardService.newUpdateDraftBodyAction()
+      .addUpdateContent(String(text || ''), CardService.ContentType.TEXT)
+      .setUpdateType(CardService.UpdateDraftBodyType.IN_PLACE_INSERT))
+    .build();
+}
+
+function draftTextForOpen_(opened) {
+  var process = draftProcessForOpen_(opened);
+  if (!process) return null;
+  if (typeof FlowIncomingJudge === 'undefined' || typeof FlowIncomingJudge.draftText !== 'function') return null;
+  return FlowIncomingJudge.draftText(process, {
+    sender: { email: opened.fromEmail || null, name: opened.fromName || null },
+    subject: opened.subject || null
+  });
+}
+
+function draftProcessForOpen_(opened) {
+  if (!opened || typeof Glance.judge !== 'function') return null;
+  if (typeof FlowIncomingJudge === 'undefined' || typeof FlowIncomingJudge.draftStepOf !== 'function') return null;
+  var now = new Date();
+  var texts = [];
+  if (opened.body) texts.push(opened.body);
+  if (opened.subject && opened.subject !== opened.body) texts.push(opened.subject);
+  for (var i = 0; i < texts.length; i++) {
+    var judged = Glance.judge({
+      text: texts[i],
+      subject: opened.subject || '',
+      sender: { email: opened.fromEmail || null, name: opened.fromName || null },
+      to: opened.toList || [],
+      toRecipients: opened.toRecipients || [],
+      ccRecipients: opened.ccRecipients || [],
+      ownAddresses: opened.ownAddresses || [],
+      userName: opened.userName || null,
+      ownNames: opened.ownNames || [],
+      readerEmail: opened.readerEmail || null,
+      namesWaitDone: Boolean(opened.readerEmail),
+      now: now,
+      surface: 'gmail',
+      attachmentCount: opened.attachmentCount == null ? 0 : opened.attachmentCount,
+      inbound: true,
+      directAskOn: true
+    });
+    if (judged && judged.show && judged.process && FlowIncomingJudge.draftStepOf(judged.process)) return judged.process;
+  }
+  return null;
+}
+
 function onGmailMessageOpen(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
   var read = emptyRead_(e);
@@ -43,8 +233,14 @@ function onGmailMessageOpen(e) {
       planId: decision.planId,
       calendarService: calendarService
     });
-    if (!decision.speak) return [render_(silenceCard_(decision, opened.messageId, lang))];
-    return [render_(Glance.cards.proposal(decision, opened.messageId, lang))];
+    var replyText = draftTextForOpen_(opened);
+    if (replyText) rememberReply_(opened.subject, replyText, opened.messageId);
+    if (!decision.speak && !replyText) return [render_(silenceCard_(decision, opened.messageId, lang))];
+    var model = decision.speak
+      ? Glance.cards.proposal(decision, opened.messageId, lang)
+      : Glance.cards.replyOnly(opened.messageId, lang);
+    if (replyText) model.widgets.push(Glance.cards.prepareReplyButton(opened.messageId, lang));
+    return [render_(model)];
   } catch (err) {
     errorLog_(err);
     var snap = err && err.read ? err.read : read;
@@ -430,10 +626,17 @@ function finishDecision_(decision, opened, messageId, lang, timeZone) {
 }
 
 function finishCalendar_(decision, opened, messageId, lang, timeZone) {
+  // A calendar hold's event title is the meeting subject (tags stripped),
+  // or the sentence when the subject is empty. decision.title stays the
+  // card chrome ("שיחת וידאו 17/11 10:00"). Other holds keep that chrome
+  // on the event, the same way they did before.
+  var eventTitle = (decision.kind === 'hold' && decision.useMeetingSubject && decision.eventTitle)
+    ? decision.eventTitle
+    : decision.title;
   stepLog_({
     step: 'write',
     target: 'event',
-    title: decision.title,
+    title: eventTitle,
     dateIso: decision.dateIso,
     hour: Number.isInteger(decision.hour) ? decision.hour : null,
     minute: Number.isInteger(decision.minute) ? decision.minute : null,
@@ -441,7 +644,7 @@ function finishCalendar_(decision, opened, messageId, lang, timeZone) {
   });
   var eventResult = Glance.execute.performCreateEvent({
     calendarId: 'primary',
-    title: decision.title,
+    title: eventTitle,
     dateIso: decision.dateIso,
     hour: Number.isInteger(decision.hour) ? decision.hour : null,
     minute: Number.isInteger(decision.minute) ? decision.minute : null,
@@ -520,10 +723,20 @@ function undoRecord_(snapshot) {
   return Glance.execute.performUndo(snapshot, tasksApi_());
 }
 
+function cleanSubject_(subject) {
+  var raw = String(subject || '');
+  var cleaned = raw;
+  if (typeof FlowActions !== 'undefined' && typeof FlowActions.holdSubjectTitle === 'function') {
+    cleaned = FlowActions.holdSubjectTitle(raw);
+  }
+  return Glance.intent.sanitizeTitle(cleaned);
+}
+
 function eventNotes_(opened, quote) {
   var lines = [];
   if (quote) lines.push(quote);
-  if (opened && opened.subject) lines.push('Subject: ' + Glance.intent.sanitizeTitle(opened.subject));
+  var subject = opened && opened.subject ? cleanSubject_(opened.subject) : '';
+  if (subject) lines.push('Subject: ' + subject);
   if (opened && opened.threadUrl) lines.push(opened.threadUrl);
   lines.push('Logged by Glance');
   return lines.join('\n').slice(0, 2000);
@@ -805,7 +1018,8 @@ function parseFrom_(raw) {
 
 function notesFor_(opened) {
   var lines = [];
-  if (opened.subject) lines.push('Subject: ' + Glance.intent.sanitizeTitle(opened.subject));
+  var subject = opened && opened.subject ? cleanSubject_(opened.subject) : '';
+  if (subject) lines.push('Subject: ' + subject);
   if (opened.threadUrl) lines.push(opened.threadUrl);
   lines.push('Logged by Glance');
   return lines.join('\n').slice(0, 2000);
@@ -981,7 +1195,7 @@ function render_(model) {
     var widget = widgets[i];
     if (widget.type === 'text') section.addWidget(text_(widget.text));
     if (widget.type === 'button' && widget.action === 'authorize') section.addWidget(authButton_(widget));
-    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo' || widget.action === 'onRemindMe')) {
+    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo' || widget.action === 'onRemindMe' || widget.action === 'onComposeDoIt' || widget.action === 'onPrepareReply')) {
       section.addWidget(button_(widget));
     }
   }

@@ -6,6 +6,7 @@ var GlanceI18n = (function () {
   var STR = {
     en: {
       doIt: 'Do it',
+      prepareReply: 'Prepare a reply',
       undo: 'Undo',
       couldntConfirm: "Couldn't confirm",
       couldntRead: "Couldn't read this message.",
@@ -27,10 +28,17 @@ var GlanceI18n = (function () {
       onCalendar: 'On your calendar.',
       schedule: 'Calendar and a reminder.',
       editedEvent: "The event was edited, so I won't undo it",
-      grant: 'Grant permission'
+      grant: 'Grant permission',
+      draftReady: 'Draft ready in Gmail.',
+      draftInserted: 'Inserted at the cursor. Edit it in Gmail.',
+      draftNoUndo: 'Glance does not read this draft back, and does not undo it.',
+      composeNeedsReply: 'Open Glance from a reply. This compose has no message to read.',
+      composeNoReply: 'This message has no reply to insert.',
+      composeAskFirst: 'Open the message in Glance first and press Prepare a reply.'
     },
     he: {
       doIt: 'בצע',
+      prepareReply: 'הכן תשובה',
       undo: 'בטל',
       couldntConfirm: 'לא הצלחתי לאשר',
       couldntRead: 'לא הצלחתי לקרוא את ההודעה.',
@@ -52,7 +60,13 @@ var GlanceI18n = (function () {
       onCalendar: 'ביומן.',
       schedule: 'יומן ותזכורת.',
       editedEvent: 'האירוע נערך, אז לא אבטל אותו',
-      grant: 'תנו הרשאה'
+      grant: 'תנו הרשאה',
+      draftReady: 'טיוטת תשובה מוכנה ב-Gmail.',
+      draftInserted: 'הוכנס במקום הסמן. ערכו אותו ב-Gmail.',
+      draftNoUndo: 'Glance לא קורא את הטיוטה בחזרה, ולא מבטל אותה.',
+      composeNeedsReply: 'פתחו את Glance מתשובה. לכתיבה הזו אין הודעה לקרוא.',
+      composeNoReply: 'בהודעה הזו אין תשובה להכניס.',
+      composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».'
     }
   };
 

@@ -3538,7 +3538,27 @@ async function googleCalendarChange(p, op) {
   };
 }
 
+// Same rule as FlowActions.holdSubjectTitle: reply prefixes and
+// bracket tags like [G-Calendar] are stripped from the Subject line.
+function cleanMailSubject(subject) {
+  if (typeof FlowActions !== 'undefined' && typeof FlowActions.holdSubjectTitle === 'function') {
+    return FlowActions.holdSubjectTitle(subject);
+  }
+  let s = String(subject || '')
+    .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  let prev = '';
+  while (s && s !== prev) {
+    prev = s;
+    s = s.replace(/^(?:(?:re|fw|fwd|השב|תגובה|הועבר)\s*:\s*)+/ig, '').trim();
+    s = s.replace(/^\[[^\[\]]+\]\s*/g, '').trim();
+  }
+  return s;
+}
+
 async function googleCalendarWrite(p) {
+
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
   const params = p.params || {};
   if (params.calendarOp === 'delete' || params.calendarOp === 'update') {
@@ -3584,6 +3604,8 @@ async function googleCalendarWrite(p) {
   // same fact the chip proposed — not only a title and an attribution line.
   const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim() : '';
   if (quote) descriptionLines.push(quote.slice(0, QUOTE_MAX_CHARS));
+  const subjectLine = cleanMailSubject(params.subject);
+  if (subjectLine) descriptionLines.push('Subject: ' + subjectLine);
   if (linkedFile) descriptionLines.push('File: ' + linkedFile.name + '\n' + linkedFile.url);
   if (shareUrl) descriptionLines.push(shareUrl);
   if (p.threadUrl) descriptionLines.push('Open in Gmail: ' + p.threadUrl);

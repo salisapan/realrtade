@@ -13,7 +13,7 @@ var GlanceExecute = (function () {
     var zone = Proof.ianaZone(proposal.timeZone) || 'Asia/Jerusalem';
     var resource = { title: proposal.title };
     if (proposal.notes) resource.notes = String(proposal.notes).slice(0, 2000);
-    if (proposal.due && /^\d{4}-\d{2}-\d{2}$/.test(proposal.due)) resource.due = Proof.dueRfc3339(proposal.due, zone);
+    if (proposal.due && /^\d{4}-\d{2}-\d{2}$/.test(proposal.due)) resource.due = Proof.dueRfc3339(proposal.due);
     var inserted;
     try { inserted = api.insert(proposal.listId, resource); } catch (err) { return failedWrite_('write', err); }
     if (!inserted || !inserted.id) return { confirmed: false, reason: 'write' };
@@ -21,6 +21,12 @@ var GlanceExecute = (function () {
     try { fetched = api.get(proposal.listId, inserted.id); } catch (err) { return failedWrite_('fetch', err); }
     var cmp = Proof.compareCreated(inserted, fetched, zone);
     if (!cmp.ok) return { confirmed: false, reason: 'mismatch' };
+    // The read-back must carry the date the card showed, not only match the insert reply.
+    // A task on the wrong day is taken back (it is the one we just wrote) rather than left behind.
+    if (resource.due && Proof.normalizeDue(fetched.due) !== proposal.due) {
+      try { api.remove(proposal.listId, inserted.id); } catch (err) { /* reported as unconfirmed either way */ }
+      return { confirmed: false, reason: 'due-mismatch' };
+    }
     return {
       confirmed: true,
       snapshot: Proof.snapshotOf(fetched, proposal.listId, zone),
@@ -152,8 +158,8 @@ var GlanceExecute = (function () {
     instantUtc: function (dateIso, hour, minute, timeZone) {
       return proofLib().instantUtc(dateIso, hour, minute, timeZone);
     },
-    dueRfc3339: function (dateIso, timeZone) {
-      return proofLib().dueRfc3339(dateIso, timeZone);
+    dueRfc3339: function (dateIso) {
+      return proofLib().dueRfc3339(dateIso);
     },
     performCreateEvent: performCreateEvent,
     performUndoEvent: performUndoEvent,
