@@ -5,11 +5,17 @@ Glance closes open loops. Gmail is where it starts today.
 Source: `git log origin/claude/install-uiux-pro-max-skill-a4agox --since=2026-10-20` limited to `flow-trial-extension/core`, `flow-trial-extension/src`, `flow-trial-extension/manifest.json` and `glance-gmail-addon/`. Regenerate: `scripts/what-changed.sh 2026-10-20 > docs/glance-ai/shipped-in-code.md`.
 
 - Extension version in `manifest.json` on the branch: 0.9.56
-- Commits on the working branch that are not on `main`: 192. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
-- Lines changed in core, src and the add-on since `main`: 79 files changed, 9270 insertions(+), 589 deletions(-)
+- Commits on the working branch that are not on `main`: 200. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
+- Lines changed in core, src and the add-on since `main`: 81 files changed, 9657 insertions(+), 624 deletions(-)
 
 | Commit | When | What it changed in code | Files in core, src or the add-on |
 |---|---|---|---|
+| b8ef96bf | 2026-11-13 | Direct-ask reader in one-to-one chats (WhatsApp, Messenger, Instagram, Teams) | core/README.md core/incoming-judge.js src/chat-task-card.js glance-gmail-addon/CoreBundle.js  |
+| 828cac0e | 2026-11-13 | Gmail: offer Connect Google instead of dropping the card (#274) | core/display-copy.js src/background.js src/content-gmail.js src/step-kit.js  |
+| c615f4a0 | 2026-11-13 | Engine: Hebrew imperatives and "add a task" only when the message has no quote/forward (#278) | core/incoming-judge.js core/intent.js core/judgment.js glance-gmail-addon/CoreBundle.js  |
+| 1d8edbcf | 2026-11-13 | Engine: hedged asks stay quiet (#272) | core/close-families.js core/intent.js glance-gmail-addon/CoreBundle.js  |
+| 8a518b1a | 2026-11-13 | Engine: everyday Hebrew meeting proposals get a calendar step (#271) | core/intent.js glance-gmail-addon/CoreBundle.js  |
+| deae74b6 | 2026-11-13 | Engine: English cancellation of a resolved slot stays quiet (#270) | core/intent.js glance-gmail-addon/CoreBundle.js  |
 | 2adef9e2 | 2026-11-12 | Direct-ask ON on every judge surface; execution after Do It; follow loop on real threads | core/README.md core/draft-reply.js core/follow-up.js core/incoming-judge.js  |
 | 17de00e2 | 2026-11-12 | Real mailbox run: calendar-notice quiet (shipped), direct-ask second read (off) | core/README.md core/extract.js core/incoming-judge.js glance-gmail-addon/CoreBundle.js  |
 | 8ad94886 | 2026-11-12 | AI engine: every intention the model found gets its own card, an ask and a meeting in one mail are both offered (#286) | core/README.md core/ai-engine.js core/model-multi.js core/understanding-router.js  |
