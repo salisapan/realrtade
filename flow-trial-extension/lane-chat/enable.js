@@ -42,7 +42,15 @@ const LANES = [
       'https://instagram.com/direct',
       'https://instagram.com/direct/*'
     ],
-    js: SCRIPTS.concat(['src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js'])
+    js: SCRIPTS.concat([
+      'core/chat-kill-switch.js',
+      'src/chat-redact.js',
+      'src/chat-indicator.js',
+      'src/lane-draft-store.js',
+      'src/group-word.js',
+      'src/instagram-parse.js',
+      'src/content-instagram.js'
+    ])
   }
 ];
 globalThis.__glanceLaneChat = LANES;

@@ -15,8 +15,12 @@ const FlowChatLane = (() => {
         resolve({ ok: false, reason: 'invalidated' });
         return;
       }
+      let body = payload;
+      if (typeof FlowChatRedact !== 'undefined' && FlowChatRedact.redactPayload) {
+        body = FlowChatRedact.redactPayload(payload || {}, { names: (payload && payload.redactNames) || [] });
+      }
       try {
-        chrome.runtime.sendMessage({ type: type, payload: payload }, (r) => {
+        chrome.runtime.sendMessage({ type: type, payload: body }, (r) => {
           let err = null;
           try { err = chrome.runtime && chrome.runtime.lastError; } catch (e) { resolve({ ok: false, reason: 'invalidated' }); return; }
           if (!runtimeAlive()) { resolve({ ok: false, reason: 'invalidated' }); return; }
