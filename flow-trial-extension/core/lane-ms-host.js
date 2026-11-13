@@ -143,6 +143,7 @@ function laneInstall() {
 laneInstall();
 
 if (typeof module !== 'undefined') module.exports = { FlowLaneMsHost };
+else if (typeof globalThis !== 'undefined') globalThis.FlowLaneMsHost = FlowLaneMsHost;
 import './outlook-contacts.js';
 import './outlook-word.js';
 import './outlook-excel.js';
