@@ -640,10 +640,10 @@ function scopesRequiredByManifest(manifest, hostSource) {
     if (gmail.currentMessageAccess === 'metadata') add('gmail.addons.current.message.metadata');
     else add('gmail.addons.current.message.readonly');
   }
-  if (gmail.composeTrigger) {
+  if (gmail.composeTrigger || (hostSource && /createDraftReply/.test(hostSource))) {
     add('gmail.addons.current.action.compose');
-    if (gmail.composeTrigger.draftAccess === 'METADATA') add('gmail.addons.current.message.metadata');
   }
+  if (gmail.composeTrigger && gmail.composeTrigger.draftAccess === 'METADATA') add('gmail.addons.current.message.metadata');
   services.forEach((service) => {
     if (service.serviceId === 'tasks' || service.userSymbol === 'Tasks') add('tasks');
     if (service.serviceId === 'calendar' || service.userSymbol === 'Calendar') add('calendar.events');
@@ -698,7 +698,9 @@ console.log('\n--- host boundaries ---');
   check('contextual trigger is message open', manifest.addOns.gmail.contextualTriggers[0].onTriggerFunction === 'onGmailMessageOpen');
   check('locale comes from the app', manifest.addOns.common.useLocaleFromApp === true);
   check('the script time zone is only the Asia/Jerusalem fallback', manifest.timeZone === 'Asia/Jerusalem');
-  check('host never sends mail', !/gmail\.send|sendEmail|Drafts\.send|MailApp|createDraft|\.send\(/.test(host));
+  check('host never sends mail', !/gmail\.send|sendEmail|Drafts\.send|MailApp|GmailApp\.createDraft\b|GmailDraft\.send|GmailApp\.sendEmail|\.send\(/.test(host));
+  check('no GmailDraft.send or GmailApp.sendEmail', !/GmailDraft\.send|GmailApp\.sendEmail/.test(host));
+  check('createDraftReply uses the add-on compose scope, not gmail.compose', host.indexOf('createDraftReply') !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) !== -1 && scopes.indexOf(scopeUrl('gmail.compose')) === -1);
   check('compose does not call GmailApp.getDraft or setPlainBody', !/GmailApp\.getDraft|setPlainBody|setUpdateDraftBodyValue/.test(host));
   check('host does not patch a task', !/Tasks\.Tasks\.patch|Tasks\.Tasks\.update/.test(host));
   check('host reads the task back through performCreate', host.indexOf('performCreate') !== -1 && host.indexOf('performUndo') !== -1);
@@ -707,7 +709,7 @@ console.log('\n--- host boundaries ---');
 
 console.log('\n--- message path parity ---');
 {
-  const state = { props: {}, messages: {}, events: {}, tasks: {}, eventSeq: 1, taskSeq: 1, fetches: 0, tokenCalls: 0, scopeChecks: [], granted: [] };
+  const state = { props: {}, messages: {}, events: {}, tasks: {}, eventSeq: 1, taskSeq: 1, fetches: 0, tokenCalls: 0, scopeChecks: [], granted: [], cache: {}, cacheTtl: {}, logs: [], createdReplies: [] };
   const ALL_SCOPES = [
     'https://www.googleapis.com/auth/tasks',
     'https://www.googleapis.com/auth/calendar.events',
@@ -727,6 +729,10 @@ console.log('\n--- message path parity ---');
     state.scopeChecks = [];
     state.granted = ALL_SCOPES.slice();
     state.authThrows = [];
+    state.cache = {};
+    state.cacheTtl = {};
+    state.logs = [];
+    state.createdReplies = [];
   }
   function widget(kind) {
     const node = { type: kind, text: '', action: '', params: {}, style: '' };
@@ -737,7 +743,15 @@ console.log('\n--- message path parity ---');
     return node;
   }
   const sandbox = {
-    console: console,
+    console: {
+      log: function () {
+        const line = Array.prototype.map.call(arguments, function (part) { return String(part); }).join(' ');
+        state.logs.push(line);
+        console.log(line);
+      },
+      error: function () { console.error.apply(console, arguments); },
+      warn: function () { console.warn.apply(console, arguments); }
+    },
     module: undefined,
     GmailApp: {
       setCurrentMessageAccessToken: function (token) {
@@ -746,6 +760,14 @@ console.log('\n--- message path parity ---');
         if (state.tokenThrow) throw new Error('token refused');
       },
       getMessageById: function (id) { return state.messages[id] || null; }
+    },
+    CacheService: {
+      getUserCache: function () {
+        return {
+          get: function (key) { return Object.prototype.hasOwnProperty.call(state.cache, key) ? state.cache[key] : null; },
+          put: function (key, value, ttl) { state.cache[key] = value; state.cacheTtl[key] = ttl; }
+        };
+      }
     },
     PropertiesService: {
       getUserProperties: function () {
@@ -888,6 +910,12 @@ console.log('\n--- message path parity ---');
         response.setUpdateDraftBodyAction = function (action) { response.bodyAction = action; return response; };
         response.build = function () { return { draftAction: response.bodyAction }; };
         return response;
+      },
+      newComposeActionResponseBuilder: function () {
+        const response = { draft: null };
+        response.setGmailDraft = function (draft) { response.draft = draft; return response; };
+        response.build = function () { return { composeDraft: response.draft }; };
+        return response;
       }
     }
   };
@@ -918,6 +946,7 @@ console.log('\n--- message path parity ---');
   const openCompose = vm.runInContext('onGmailCompose', sandbox);
   const doIt = vm.runInContext('onDoIt', sandbox);
   const composeDoIt = vm.runInContext('onComposeDoIt', sandbox);
+  const prepareReply = vm.runInContext('onPrepareReply', sandbox);
   const undo = vm.runInContext('onUndo', sandbox);
   const contentTitle = vm.runInContext('Glance.intent.contentTitle', sandbox);
   const prepareText = vm.runInContext('Glance.intent.prepareText', sandbox);
@@ -957,6 +986,12 @@ console.log('\n--- message path parity ---');
         const out = [];
         for (let i = 0; i < n; i++) out.push({ getName: function () { return 'signed-copy.pdf'; } });
         return out;
+      },
+      createDraftReply: function (body) {
+        calls.push('createDraftReply');
+        const draft = { id: 'reply-draft-1', body: String(body || '') };
+        state.createdReplies.push(draft);
+        return draft;
       }
     };
   }
@@ -1070,7 +1105,15 @@ console.log('\n--- message path parity ---');
       return;
     }
     const label = lang === 'he' ? 'בצע' : 'Do it';
-    check(name + ' offers one Do it', buttons.length === 1 && plain(buttons[0].text) === label && buttons[0].action === 'onDoIt', buttons.map((item) => item.text));
+    const doIts = buttons.filter((item) => item.action === 'onDoIt');
+    const prepare = buttons.filter((item) => item.action === 'onPrepareReply');
+    const hasDraft = (plan.steps || []).some((step) => step.kind === 'gmailDraft' || step.kind === 'outlookDraft');
+    const prepareLabel = lang === 'he' ? 'הכן תשובה' : 'Prepare a reply';
+    check(name + ' offers one Do it',
+      doIts.length === 1 && plain(doIts[0].text) === label &&
+      buttons.every((item) => item.action === 'onDoIt' || item.action === 'onPrepareReply') &&
+      (hasDraft ? prepare.length === 1 && plain(prepare[0].text) === prepareLabel : prepare.length === 0),
+      buttons.map((item) => item.action + ':' + plain(item.text)));
     const calendarStep = plan.steps.filter((step) => step.kind === 'calendar')[0];
     const taskStep = plan.steps.filter((step) => step.kind === 'googleTask')[0];
     const title = shownTitle(sourceText, plan);
@@ -1260,7 +1303,13 @@ console.log('\n--- message path parity ---');
   }
   function expectDoIt(card, he) {
     const btns = buttonsOf(card);
-    return btns.length === 1 && plain(btns[0].text) === (he ? 'בצע' : 'Do it');
+    const doIts = btns.filter((item) => item.action === 'onDoIt');
+    const prepare = btns.filter((item) => item.action === 'onPrepareReply');
+    const label = he ? 'בצע' : 'Do it';
+    const prepareLabel = he ? 'הכן תשובה' : 'Prepare a reply';
+    return doIts.length === 1 && plain(doIts[0].text) === label &&
+      btns.length === doIts.length + prepare.length &&
+      (prepare.length === 0 || (prepare.length === 1 && plain(prepare[0].text) === prepareLabel));
   }
   const greetAsks = [
     { id: 'gEnDoc', threadId: 't1', plain: 'Hi Sali, could you send the signed document by Friday?', locale: 'en' },
@@ -1675,7 +1724,7 @@ console.log('\n--- message path parity ---');
 
   reset();
   const replyId = '16a2c177reply';
-  const draftMsg = {
+  state.messages[replyId] = gmailMessage({
     id: replyId,
     threadId: 'thread16a2',
     subject: 'פגישה עם דנה',
@@ -1684,47 +1733,65 @@ console.log('\n--- message path parity ---');
     from: 'Dana Levi <dana@meridian.com>',
     to: 'owner@ai.local.flow@gmail.com',
     date: new Date('2026-10-15T08:00:00Z')
-  };
-  state.messages[replyId] = gmailMessage(draftMsg);
+  });
   let draftReads = 0;
-  let threadReads = 0;
   sandbox.GmailApp.getDraft = function () {
     draftReads += 1;
     throw new Error('getDraft needs a mailbox scope');
   };
-  sandbox.GmailApp.getThreadById = function () {
-    threadReads += 1;
-    throw new Error('getThreadById needs a mailbox scope');
-  };
+  const messageCard = openMessage({
+    gmail: { messageId: replyId, accessToken: 'token', threadId: 'thread16a2' },
+    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
+  })[0];
+  const prepareButtons = buttonsOf(messageCard).filter((item) => item.action === 'onPrepareReply');
+  check('the message card has הכן תשובה for a reply intent',
+    prepareButtons.length === 1 && plain(prepareButtons[0].text) === 'הכן תשובה',
+    buttonsOf(messageCard).map((item) => plain(item.text)));
+  const cacheValues = Object.keys(state.cache).map((key) => JSON.parse(state.cache[key]));
+  check('the message card stores the reply text for six hours, not the mail body',
+    cacheValues.length === 1 &&
+    cacheValues[0].subject === 'פגישה עם דנה' &&
+    cacheValues[0].messageId === replyId &&
+    cacheValues[0].text &&
+    !cacheValues[0].plain &&
+    !cacheValues[0].body &&
+    Object.keys(state.cacheTtl).every((key) => state.cacheTtl[key] === 21600),
+    cacheValues);
+  const prepared = prepareReply({
+    gmail: { messageId: replyId, accessToken: 'token', threadId: 'thread16a2' },
+    parameters: { messageId: replyId, source: 'message' },
+    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
+  });
+  check('הכן תשובה builds a ComposeActionResponse and does not send',
+    draftReads === 0 &&
+    prepared.composeDraft &&
+    prepared.composeDraft.body.indexOf('Hi') !== -1 &&
+    state.messages[replyId].calls.indexOf('createDraftReply') !== -1,
+    prepared);
   const composeEvent = {
     gmail: {
-      messageId: replyId,
-      threadId: 'thread16a2',
       accessToken: 'token',
       toRecipients: ['dana@meridian.com'],
       ccRecipients: [],
-      bccRecipients: [],
-      subject: 'Re: פגישה עם דנה'
+      bccRecipients: []
     },
-    draftMetadata: {
-      toRecipients: ['dana@meridian.com'],
-      ccRecipients: [],
-      bccRecipients: [],
-      subject: 'Re: פגישה עם דנה'
-    },
+    draftMetadata: { subject: 'Re: פגישה עם דנה' },
     commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
   };
   const composeCard = openCompose(composeEvent)[0];
   const composeButtons = buttonsOf(composeCard);
-  check('a reply compose event offers בצע and does not say nothing to close',
+  const composeLog = state.logs.filter((line) => line.indexOf('compose keys:') === 0).pop() || '';
+  check('a reply compose event with no messageId offers בצע after the cache is primed',
+    !composeEvent.gmail.messageId &&
     composeButtons.length === 1 &&
     composeButtons[0].action === 'onComposeDoIt' &&
-    composeButtons[0].text.indexOf('בצע') !== -1 &&
+    plain(composeButtons[0].text) === 'בצע' &&
     linesOf(composeCard).join('\n').indexOf('אין מה לסגור') === -1 &&
-    threadReads === 0,
-    { buttons: composeButtons, lines: linesOf(composeCard) });
+    composeLog.indexOf('draftMetadata.subject') !== -1 &&
+    composeLog.indexOf('פגישה') === -1,
+    { buttons: composeButtons.map((item) => plain(item.text)), log: composeLog });
   const inserted = composeDoIt(Object.assign({}, composeEvent, {
-    parameters: { messageId: replyId, source: 'compose' }
+    parameters: { replyKey: composeButtons[0].params.replyKey, source: 'compose' }
   }));
   const insertedContent = inserted.draftAction && inserted.draftAction.contents && inserted.draftAction.contents[0];
   check('compose Do it inserts at the cursor and does not read the draft',
@@ -1736,32 +1803,15 @@ console.log('\n--- message path parity ---');
     insertedContent.content.indexOf('Hi') !== -1 &&
     !inserted.card,
     inserted);
-  const after = openCompose(composeEvent)[0];
-  const afterLines = linesOf(after).join('\n');
-  check('compose does not offer Undo after insert',
-    buttonsOf(after).length === 0 &&
-    afterLines.indexOf('לא מבטל') !== -1 &&
-    afterLines.indexOf('Handled') === -1,
-    afterLines);
-  const bareCompose = openCompose({
-    gmail: {
-      threadId: 'thread-no-message',
-      toRecipients: ['dana@meridian.com'],
-      ccRecipients: [],
-      bccRecipients: [],
-      subject: 'Re: פגישה עם דנה'
-    },
-    draftMetadata: { toRecipients: ['dana@meridian.com'], subject: 'Re: פגישה עם דנה' },
-    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
-  })[0];
+  state.cache = {};
+  const bareCompose = openCompose(composeEvent)[0];
   const bareLines = linesOf(bareCompose).join('\n');
-  check('a compose event with no message id says why',
+  check('an empty reply cache tells the person to press הכן תשובה first',
     buttonsOf(bareCompose).length === 0 &&
-    bareLines.indexOf('אין הודעה לקרוא') !== -1 &&
-    bareLines.indexOf('אין מה לסגור') === -1 &&
-    threadReads === 0,
+    bareLines.indexOf('פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».') !== -1 &&
+    bareLines.indexOf('אין מה לסגור') === -1,
     bareLines);
-  check('compose does not send', !/gmail\.send|sendEmail|Drafts\.send|MailApp|createDraft|\.send\(/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));
+  check('compose does not send', !/GmailDraft\.send|GmailApp\.sendEmail|gmail\.send|sendEmail|Drafts\.send|MailApp|\.send\(/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));
 }
 
 console.log('\n--- draft compose ---');

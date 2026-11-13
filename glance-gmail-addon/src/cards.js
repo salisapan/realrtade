@@ -197,15 +197,27 @@ var GlanceCards = (function () {
     ]);
   }
 
-  function composeDoItButton(messageId, lang) {
-    return button(lang, 'doIt', 'onComposeDoIt', { messageId: String(messageId || ''), source: 'compose' });
+  function composeDoItButton(replyKey, lang) {
+    return button(lang, 'doIt', 'onComposeDoIt', { replyKey: String(replyKey || ''), source: 'compose' });
   }
 
-  function composeProposal(preview, messageId, lang) {
+  function prepareReplyButton(messageId, lang) {
+    return button(lang, 'prepareReply', 'onPrepareReply', { messageId: String(messageId || ''), source: 'message' });
+  }
+
+  function composeProposal(preview, replyKey, lang) {
     var widgets = [text(lang, i18n().t(lang, 'draftReady'))];
     if (preview) widgets.push(text(lang, preview));
-    widgets.push(composeDoItButton(messageId, lang));
+    widgets.push(composeDoItButton(replyKey, lang));
     return card(lang, widgets);
+  }
+
+  function replyOnly(messageId, lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'draftReady'))]);
+  }
+
+  function composeAskFirst(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'composeAskFirst'))]);
   }
 
   function composeNeedsReply(lang) {
@@ -258,6 +270,9 @@ var GlanceCards = (function () {
     composeInserted: composeInserted,
     composeNeedsReply: composeNeedsReply,
     composeNoReply: composeNoReply,
+    composeAskFirst: composeAskFirst,
+    prepareReplyButton: prepareReplyButton,
+    replyOnly: replyOnly,
     spottedUnsupported: spottedUnsupported,
     planTypeLabel: planTypeLabel,
     homepage: homepage,

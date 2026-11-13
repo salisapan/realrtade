@@ -12,7 +12,6 @@
 
 var GLANCE_TASK_LIST = 'Glance';
 var UNDO_PREFIX = 'glanceUndo_';
-var COMPOSE_INSERT_PREFIX = 'glanceComposeInsert_';
 var PREFETCH_KEY = 'glancePrefetch';
 
 function onHomepage(e) {
@@ -32,6 +31,28 @@ function onHomepage(e) {
   }
 }
 
+var REPLY_CACHE_TTL = 21600;
+
+function logEventKeys_(label, event) {
+  var names = [];
+  function walk(obj, prefix, depth) {
+    if (!obj || typeof obj !== 'object' || depth > 3) return;
+    var keys = [];
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) keys.push(key);
+    }
+    keys.sort();
+    for (var i = 0; i < keys.length; i++) {
+      var path = prefix ? prefix + '.' + keys[i] : keys[i];
+      names.push(path);
+      var value = obj[keys[i]];
+      if (value && typeof value === 'object' && !Array.isArray(value)) walk(value, path, depth + 1);
+    }
+  }
+  walk(event, '', 0);
+  console.log(label + ' keys: ' + names.join(','));
+}
+
 function composeReplyId_(e) {
   var gmail = e && e.gmail;
   if (gmail && gmail.messageId) return String(gmail.messageId);
@@ -40,21 +61,70 @@ function composeReplyId_(e) {
   return '';
 }
 
+function normalizeSubject_(subject) {
+  var text = String(subject || '').replace(/\s+/g, ' ').trim();
+  var changed = true;
+  while (changed && text) {
+    changed = false;
+    var next = text.replace(/^(?:re|fw|fwd)\s*:\s*/i, '').replace(/^\[[^\]]{0,40}\]\s*/, '');
+    if (next !== text) {
+      text = next.replace(/^\s+/, '');
+      changed = true;
+    }
+  }
+  return text;
+}
+
+function subjectKey_(subject) {
+  var norm = normalizeSubject_(subject);
+  var hash = 5381;
+  for (var i = 0; i < norm.length; i++) hash = (((hash * 33) ^ norm.charCodeAt(i)) >>> 0);
+  return 'glanceReply_' + hash.toString(16);
+}
+
+function userCache_() {
+  if (typeof CacheService === 'undefined' || !CacheService.getUserCache) return null;
+  return CacheService.getUserCache();
+}
+
+function rememberReply_(subject, text, messageId) {
+  var cache = userCache_();
+  var norm = normalizeSubject_(subject);
+  if (!cache || !norm || !text) return '';
+  var key = subjectKey_(norm);
+  cache.put(key, JSON.stringify({
+    subject: norm,
+    text: String(text),
+    messageId: String(messageId || '')
+  }), REPLY_CACHE_TTL);
+  return key;
+}
+
+function readReplyCache_(subjectOrKey) {
+  var cache = userCache_();
+  if (!cache || !subjectOrKey) return null;
+  var key = String(subjectOrKey).indexOf('glanceReply_') === 0 ? String(subjectOrKey) : subjectKey_(subjectOrKey);
+  var raw = cache.get(key);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (err) { return null; }
+}
+
+function composeSubject_(e) {
+  var meta = e && e.draftMetadata;
+  if (meta && meta.subject) return String(meta.subject);
+  var gmail = e && e.gmail;
+  if (gmail && gmail.subject) return String(gmail.subject);
+  return '';
+}
+
 function onGmailCompose(e) {
+  logEventKeys_('compose', e);
   var lang = Glance.i18n.locale(localeOf_(e));
   try {
-    var messageId = composeReplyId_(e);
-    if (!messageId) return [render_(Glance.cards.composeNeedsReply(lang))];
-    var existing = readComposeInsert_(messageId);
-    if (existing && existing.preview) {
-      return [render_(Glance.cards.composeInserted(existing.preview, lang))];
-    }
-    var opened = readOpen_(e, emptyRead_(e));
-    if (!opened) throw readFail_('open', emptyRead_(e));
-    var draftText = draftTextForOpen_(opened);
-    if (!draftText) return [render_(Glance.cards.composeNoReply(lang))];
-    var preview = Glance.intent.sanitizeTitle(draftText).slice(0, 240);
-    return [render_(Glance.cards.composeProposal(preview, messageId, lang))];
+    var saved = readReplyCache_(composeSubject_(e));
+    if (!saved || !saved.text) return [render_(Glance.cards.composeAskFirst(lang))];
+    var preview = Glance.intent.sanitizeTitle(saved.text).slice(0, 240);
+    return [render_(Glance.cards.composeProposal(preview, subjectKey_(saved.subject), lang))];
   } catch (err) {
     errorLog_(err);
     return [render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose'))];
@@ -62,18 +132,31 @@ function onGmailCompose(e) {
 }
 
 function onComposeDoIt(e) {
+  logEventKeys_('composeDoIt', e);
+  var lang = Glance.i18n.locale(localeOf_(e));
+  var key = e && e.parameters && e.parameters.replyKey ? String(e.parameters.replyKey) : '';
+  var saved = readReplyCache_(key || composeSubject_(e));
+  if (!saved || !saved.text) return update_(render_(Glance.cards.composeAskFirst(lang)));
+  return draftInsertResponse_(saved.text);
+}
+
+function onPrepareReply(e) {
+  logEventKeys_('prepareReply', e);
   var lang = Glance.i18n.locale(localeOf_(e));
   var messageId = composeReplyId_(e);
-  if (!messageId) return update_(render_(Glance.cards.composeNeedsReply(lang)));
-  if (!e.gmail) e.gmail = {};
-  if (!e.gmail.messageId) e.gmail.messageId = messageId;
+  if (!messageId) return update_(render_(Glance.cards.composeAskFirst(lang)));
   try {
+    if (!e.gmail || !e.gmail.accessToken) throw readFail_('no-token', emptyRead_(e));
+    GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
     var opened = readOpen_(e, emptyRead_(e));
     if (!opened) throw readFail_('open', emptyRead_(e));
     var draftText = draftTextForOpen_(opened);
     if (!draftText) return update_(render_(Glance.cards.composeNoReply(lang)));
-    saveComposeInsert_(messageId, { preview: Glance.intent.sanitizeTitle(draftText).slice(0, 240) });
-    return draftInsertResponse_(draftText);
+    rememberReply_(opened.subject, draftText, opened.messageId);
+    var message = GmailApp.getMessageById(messageId);
+    if (!message || typeof message.createDraftReply !== 'function') throw readFail_('reply', emptyRead_(e));
+    var draft = message.createDraftReply(draftText);
+    return CardService.newComposeActionResponseBuilder().setGmailDraft(draft).build();
   } catch (err) {
     errorLog_(err);
     return update_(render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose')));
@@ -129,16 +212,6 @@ function draftProcessForOpen_(opened) {
   return null;
 }
 
-function readComposeInsert_(draftId) {
-  var raw = PropertiesService.getUserProperties().getProperty(COMPOSE_INSERT_PREFIX + draftId);
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch (err) { return null; }
-}
-
-function saveComposeInsert_(draftId, record) {
-  PropertiesService.getUserProperties().setProperty(COMPOSE_INSERT_PREFIX + draftId, JSON.stringify(record || {}));
-}
-
 function onGmailMessageOpen(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
   var read = emptyRead_(e);
@@ -158,8 +231,14 @@ function onGmailMessageOpen(e) {
       planId: decision.planId,
       calendarService: calendarService
     });
-    if (!decision.speak) return [render_(silenceCard_(decision, opened.messageId, lang))];
-    return [render_(Glance.cards.proposal(decision, opened.messageId, lang))];
+    var replyText = draftTextForOpen_(opened);
+    if (replyText) rememberReply_(opened.subject, replyText, opened.messageId);
+    if (!decision.speak && !replyText) return [render_(silenceCard_(decision, opened.messageId, lang))];
+    var model = decision.speak
+      ? Glance.cards.proposal(decision, opened.messageId, lang)
+      : Glance.cards.replyOnly(opened.messageId, lang);
+    if (replyText) model.widgets.push(Glance.cards.prepareReplyButton(opened.messageId, lang));
+    return [render_(model)];
   } catch (err) {
     errorLog_(err);
     var snap = err && err.read ? err.read : read;
@@ -1096,7 +1175,7 @@ function render_(model) {
     var widget = widgets[i];
     if (widget.type === 'text') section.addWidget(text_(widget.text));
     if (widget.type === 'button' && widget.action === 'authorize') section.addWidget(authButton_(widget));
-    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo' || widget.action === 'onRemindMe' || widget.action === 'onComposeDoIt')) {
+    if (widget.type === 'button' && (widget.action === 'onDoIt' || widget.action === 'onUndo' || widget.action === 'onRemindMe' || widget.action === 'onComposeDoIt' || widget.action === 'onPrepareReply')) {
       section.addWidget(button_(widget));
     }
   }

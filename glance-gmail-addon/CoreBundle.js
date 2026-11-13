@@ -11246,6 +11246,7 @@ var GlanceI18n = (function () {
   var STR = {
     en: {
       doIt: 'Do it',
+      prepareReply: 'Prepare a reply',
       undo: 'Undo',
       couldntConfirm: "Couldn't confirm",
       couldntRead: "Couldn't read this message.",
@@ -11272,10 +11273,12 @@ var GlanceI18n = (function () {
       draftInserted: 'Inserted at the cursor. Edit it in Gmail.',
       draftNoUndo: 'Glance does not read this draft back, and does not undo it.',
       composeNeedsReply: 'Open Glance from a reply. This compose has no message to read.',
-      composeNoReply: 'This message has no reply to insert.'
+      composeNoReply: 'This message has no reply to insert.',
+      composeAskFirst: 'Open the message in Glance first and press Prepare a reply.'
     },
     he: {
       doIt: 'בצע',
+      prepareReply: 'הכן תשובה',
       undo: 'בטל',
       couldntConfirm: 'לא הצלחתי לאשר',
       couldntRead: 'לא הצלחתי לקרוא את ההודעה.',
@@ -11302,7 +11305,8 @@ var GlanceI18n = (function () {
       draftInserted: 'הוכנס במקום הסמן. ערכו אותו ב-Gmail.',
       draftNoUndo: 'Glance לא קורא את הטיוטה בחזרה, ולא מבטל אותה.',
       composeNeedsReply: 'פתחו את Glance מתשובה. לכתיבה הזו אין הודעה לקרוא.',
-      composeNoReply: 'בהודעה הזו אין תשובה להכניס.'
+      composeNoReply: 'בהודעה הזו אין תשובה להכניס.',
+      composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».'
     }
   };
 
@@ -12706,15 +12710,27 @@ var GlanceCards = (function () {
     ]);
   }
 
-  function composeDoItButton(messageId, lang) {
-    return button(lang, 'doIt', 'onComposeDoIt', { messageId: String(messageId || ''), source: 'compose' });
+  function composeDoItButton(replyKey, lang) {
+    return button(lang, 'doIt', 'onComposeDoIt', { replyKey: String(replyKey || ''), source: 'compose' });
   }
 
-  function composeProposal(preview, messageId, lang) {
+  function prepareReplyButton(messageId, lang) {
+    return button(lang, 'prepareReply', 'onPrepareReply', { messageId: String(messageId || ''), source: 'message' });
+  }
+
+  function composeProposal(preview, replyKey, lang) {
     var widgets = [text(lang, i18n().t(lang, 'draftReady'))];
     if (preview) widgets.push(text(lang, preview));
-    widgets.push(composeDoItButton(messageId, lang));
+    widgets.push(composeDoItButton(replyKey, lang));
     return card(lang, widgets);
+  }
+
+  function replyOnly(messageId, lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'draftReady'))]);
+  }
+
+  function composeAskFirst(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'composeAskFirst'))]);
   }
 
   function composeNeedsReply(lang) {
@@ -12767,6 +12783,9 @@ var GlanceCards = (function () {
     composeInserted: composeInserted,
     composeNeedsReply: composeNeedsReply,
     composeNoReply: composeNoReply,
+    composeAskFirst: composeAskFirst,
+    prepareReplyButton: prepareReplyButton,
+    replyOnly: replyOnly,
     spottedUnsupported: spottedUnsupported,
     planTypeLabel: planTypeLabel,
     homepage: homepage,
