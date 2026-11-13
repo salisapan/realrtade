@@ -10,6 +10,7 @@ const FlowLabsSwitches = (() => {
     { id: 'SYSTEM_NOTICE', who: 'התראת מערכת עם מועד', note: '"הפרויקט ייעצר", "הדומיין יפוג" הופכים למשימה' },
     { id: 'CHAT_TASK_CARD', who: 'צ\'אט: כרטיס עשה', note: 'וואטסאפ, מסנג\'ר ואינסטגרם: בקשה בצ\'אט מקבלת כרטיס' },
     { id: 'CHAT_PROMISE_CARD', who: 'צ\'אט: הבטחה אליך', note: 'הבטחה שקיבלת בצ\'אט נרשמת כ"ממתין ל..."' },
+    { id: 'META_CHAT_LANES', who: 'צ\'אטים של Meta (מסנג\'ר, אינסטגרם, וואטסאפ)', note: 'רישום סקריפטים לצ\'אטים של Meta אחרי הסכמה — כבוי ב-v1; לא נבדק בבדיקה חיה' },
     { id: 'MEET_LINK', who: 'קישור לשיחת וידאו של Google', note: 'שיחה שהוצעה מקבלת אירוע ביומן עם קישור לשיחת וידאו של Google' },
     { id: 'EVENT_CALL_LINK', who: 'קישור לשיחת וידאו באירוע קיים', note: 'מוסיף קישור לאירוע שאתה מארגן' },
     { id: 'TEAMS_MEETING', who: 'קישור Teams לשיחה', note: 'שיחה שהוצעה ב-Outlook מקבלת אירוע עם קישור Teams' },
@@ -18,6 +19,7 @@ const FlowLabsSwitches = (() => {
     { id: 'RECURRING_REMINDER', who: 'תזכורת חוזרת', note: 'התחייבות חוזרת הופכת לתזכורת חוזרת' },
     { id: 'RECURRING_TODO', who: 'משימה חוזרת', note: 'משימה של Microsoft שחוזרת על עצמה' },
     { id: 'WORKSPACE_FILE', who: 'מסמך, גיליון או מצגת של Google', note: 'קובץ ריק בשם שביקשו, ב-Drive' },
+    { id: 'GOOGLE_FORMS', who: 'טופס של Google (אחרי מסמך ב-Drive)', note: 'טופס ריק בשם שביקשו; בלי שאלות ובלי שליחה' },
     { id: 'ONEDRIVE_NEW_FILE', who: 'מסמך או גיליון של Microsoft', note: 'קובץ ריק בשם שביקשו, ב-OneDrive' },
     { id: 'SHAREPOINT_NEW_FILE', who: 'מסמך או גיליון באתר SharePoint', note: 'קובץ ריק בשם שביקשו, באתר אחד ששמו נכתב במייל' },
     { id: 'SHAREPOINT_SAVE_FILE', who: 'קובץ מצורף באתר SharePoint', note: 'שמירת הקובץ המצורף, כמו שהוא, באתר אחד ששמו נכתב במייל' },
@@ -29,6 +31,8 @@ const FlowLabsSwitches = (() => {
   ];
   const IDS = LIST.map((r) => r.id);
   function isOn(bag, id) { return Boolean(bag && bag[id] === true); }
+  // A Chrome Web Store install has update_url in its manifest (Chrome adds it). There Labs is locked: hidden and always off.
+  function storeLocked(manifest) { return Boolean(manifest && manifest.update_url); }
   // The object to store after one row is flipped. Only known ids are written; anything else in the bag is kept as it is.
   function flipped(bag, id, on) {
     const next = Object.assign({}, bag || {});
@@ -41,6 +45,6 @@ const FlowLabsSwitches = (() => {
     IDS.forEach((id) => { next = flipped(next, id, on); });
     return next;
   }
-  return { LIST, IDS, isOn, flipped, all };
+  return { LIST, IDS, isOn, storeLocked, flipped, all };
 })();
 if (typeof module !== 'undefined') module.exports = { FlowLabsSwitches };

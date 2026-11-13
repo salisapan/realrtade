@@ -23,6 +23,7 @@
 //   --strict  exit 1 unless promote is true (for CI)
 // No model is run; nothing leaves the machine.
 const fs = require('fs'), path = require('path');
+const LIB = require(path.join(__dirname, '..', '..', 'labeling', 'lib.cjs'));
 const ROOT = path.join(__dirname, '..', '..', '..');
 const MIN_OWNER = 200;
 const MIN_AGREED = 200;
@@ -103,7 +104,8 @@ function run(o) {
   // An agreed row counts only if two passes really agree: agreed:true and passes >= 2. It never counts as owner-verified.
   if (o.labels) String(o.labels).split(',').filter(Boolean).forEach((f) => read(f).forEach((l) => { labels[l.id] = l; }));
   Object.values(labels).forEach((l) => {
-    if (l.ownerVerified === true) ownerN++;
+    // a row that claims the own-use source must carry the connector's read-back proof (path A, owner 2026-10-13); the labeling tools enforce the rest
+    if (l.ownerVerified === true && (l.labeledBy !== 'sali:action' || LIB.isOwnUse(l))) ownerN++;
     else if (l.agreed === true && (l.passes || 0) >= 2) agreedN++;
   });
   const basePreds = read(o.base), only = new Set(basePreds.map((r) => r.id));

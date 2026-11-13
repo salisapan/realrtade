@@ -8,6 +8,10 @@
 const FlowChatDeliveryWindow = (() => {
   const NOUN_EN = /\b(?:your\s+(?:[a-z-]+\s+){0,2}(?:order|parcel|package|delivery|shipment|items?|groceries|furniture)|the\s+(?:courier|driver|delivery\s+(?:person|guy|man)|messenger)|our\s+(?:courier|driver))\b/i;
   const NOUN_HE = /(?:ההזמנה|החבילה|המשלוח|הפריט|הרהיט(?:ים)?|הקניות)\s+(?:שלך|שלכם|שלכן)|(?:השליח|הנהג|המשלוחן|שליח)|(?:הזמנתך|חבילתך|משלוחך)/;
+  // A person who comes to do work and tells the day and the hours ("The plumber will come between 8 and 12 on Tuesday", «הטכנאי יגיע ביום שלישי בין 8 ל-12»)
+  // is the same window; the hold is titled "Visit", not "Delivery".
+  const VISIT_EN = /\b(?:the|our|your)\s+(?:[a-z-]+\s+){0,1}(?:plumber|electrician|technician|installer|handyman|cleaner|painter|repairman|repair\s?man|engineer|locksmith|inspector|surveyor|contractor|gardener|mover|movers|exterminator)\b/i;
+  const VISIT_HE = /(?:^|[\s,.(])(?:ה)?(?:אינסטלטור|שרברב|חשמלאי|טכנאי|טכנאית|מתקין|מנקה|צבעי|מנעולן|מהנדס|קבלן|גנן|מדביר|מוביל|מובילים)(?![א-ת])/;
   const VERB_EN = /\b(?:will\s+(?:be\s+delivered|arrive|be\s+with\s+you|come|deliver)|(?:is|are)\s+(?:scheduled|expected|due|set)\s+(?:to\s+(?:arrive|be\s+delivered)|for\s+delivery|for)|arrives?|arriving|delivery\s+(?:is\s+)?(?:scheduled|set|planned)|out\s+for\s+delivery|delivering|will\s+be\s+there)\b/i;
   const VERB_HE = /(?:יגיע|תגיע|יגיעו|מגיע|מגיעה|יימסר|תימסר|יסופק|תסופק|מתוכנן|מתוכננת|צפוי|צפויה|בדרך\s+אליך|נמסר\s+אליך\s+ב|מגיע\s+אליך)/;
   // A look back, a failure, a cancellation, a pickup, a question, a tracking or survey line, an offer.
@@ -103,7 +107,8 @@ const FlowChatDeliveryWindow = (() => {
     if (raw.length > 260) return { kind: 'none', reason: 'long' };
     if (QUESTION.test(raw)) return { kind: 'none', reason: 'question' };
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-an-upcoming-delivery' };
-    if (!NOUN_EN.test(raw) && !NOUN_HE.test(raw)) return { kind: 'none', reason: 'no-delivery-noun' };
+    const visit = (VISIT_EN.test(raw) || VISIT_HE.test(raw)) && !NOUN_EN.test(raw) && !NOUN_HE.test(raw);
+    if (!visit && !NOUN_EN.test(raw) && !NOUN_HE.test(raw)) return { kind: 'none', reason: 'no-delivery-noun' };
     if (!VERB_EN.test(raw) && !VERB_HE.test(raw)) return { kind: 'none', reason: 'no-arrival-verb' };
     const X = extractApi();
     if (!X || typeof X.parseDate !== 'function' || typeof X.parseTime !== 'function') return { kind: 'none', reason: 'not-configured' };
@@ -125,7 +130,7 @@ const FlowChatDeliveryWindow = (() => {
     if (!(ahead >= 0 && ahead <= MAX_AHEAD_DAYS)) return { kind: 'none', reason: 'day-out-of-range' };
     const lastMin = (endH != null ? endH * 60 + endM : startH * 60 + startM);
     if (ahead === 0 && lastMin <= (at.getHours() * 60 + at.getMinutes())) return { kind: 'none', reason: 'already-past' };
-    return { kind: 'delivery', dateIso: d.iso, hour: startH, minute: startM, endHour: endH, endMinute: endM, durationMinutes: endH != null ? (endH * 60 + endM) - (startH * 60 + startM) : null, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
+    return { kind: 'delivery', visit: visit, dateIso: d.iso, hour: startH, minute: startM, endHour: endH, endMinute: endM, durationMinutes: endH != null ? (endH * 60 + endM) - (startH * 60 + startM) : null, lang: /[֐-׿]/.test(raw) ? 'he' : 'en' };
   }
 
   return { recognize: recognize };

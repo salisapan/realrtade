@@ -333,8 +333,13 @@ await ok('incremental optional scopes merge on Labs Teams or Outlook contacts', 
   assert.ok(merged.indexOf('Chat.Read') >= 0);
   assert.ok(merged.indexOf('Contacts.Read') >= 0);
   assert.ok(E.TEAMS_OPTIONAL_HOST_ORIGINS.indexOf('https://teams.microsoft.com/*') >= 0);
-  const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
-  assert.ok(/teams\.microsoft\.com/.test(manifest));
+  const manifestRaw = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
+  const manifest = JSON.parse(manifestRaw);
+  const optionalHosts = manifest.optional_host_permissions || [];
+  assert.ok(
+    !optionalHosts.some((h) => /teams\.microsoft\.com/i.test(String(h))),
+    'v1 manifest must not list Teams as optional_host_permissions (Labs requests it only after connect)'
+  );
   const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
   assert.ok(/flow:microsoft-optional-scopes/.test(bg) && /requestMicrosoftOptionalScopes/.test(bg));
 });
@@ -739,8 +744,8 @@ await ok('ecosystem checkbox scopesFor path ends subset of base ecosystem scopes
     store: { outlookAuth: { ecosystem: true, requestedScopes: MS_EXPECTED, token: { accessToken: 'old' }, account: { address: 'me@contoso.com' } } }
   });
   await inst.connect({ scopes: scopes });
-  const allowed = new Set(MS_EXPECTED.concat(['Calendars.ReadWrite', 'Sites.ReadWrite.All']));
-  const expectedReconnect = MS_EXPECTED.concat(['Calendars.ReadWrite', 'Sites.ReadWrite.All']);
+  const allowed = new Set(MS_EXPECTED.concat(['Calendars.ReadWrite', 'MailboxSettings.Read', 'Sites.ReadWrite.All']));
+  const expectedReconnect = MS_EXPECTED.concat(['Calendars.ReadWrite', 'MailboxSettings.Read', 'Sites.ReadWrite.All']);
   assert.ok(w.signInScopes.every((s) => allowed.has(s)));
   assert.ok(!w.signInScopes.some((s) => /^Group\./i.test(s)));
   assert.ok(w.signInScopes.indexOf('Chat.Read') < 0, 'Chat.Read is optional teamsChat only');
@@ -1187,6 +1192,70 @@ await ok('K3c: onMessage flow:microsoft-optional-scopes contacts bucket calls si
   assert.deepStrictEqual(sortScopes(gotScopes), sortScopes(MS_EXPECTED.concat(['Contacts.Read'])));
 });
 
+// Setup's "Add permission": Calendar and OneDrive must reach the consent window (signIn), not return scope-refused.
+// Files.ReadWrite is one of Connect's own scopes (CONNECT_SERVICES 'onedrive'); nothing else is added, never Mail.Send.
+for (const row of [
+  { scope: 'Files.ReadWrite', add: ['Files.ReadWrite'] },
+  { scope: 'Calendars.ReadWrite', add: ['Calendars.ReadWrite', 'MailboxSettings.Read'] },
+  { scope: 'Tasks.ReadWrite', add: ['Tasks.ReadWrite'] }
+]) {
+  await ok('K3d: outlook-consent-scope ' + row.scope + ' opens the consent window with only its own scopes', async () => {
+    const { dispatch, sandbox } = loadBackgroundMessageHarness({
+      stored: {
+        outlookAuth: {
+          ecosystem: true,
+          token: { accessToken: 'tok', grantedScopes: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'] },
+          requestedScopes: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'],
+          account: { address: 'me@outlook.com' }
+        }
+      }
+    });
+    vm.runInContext(`
+      globalThis.__k3dScopes = [];
+      FlowOutlookAuth.signIn = async function (_d, _c, _r, opts) {
+        globalThis.__k3dScopes.push((opts && opts.scopes) ? opts.scopes.slice() : []);
+        return { ok: true, token: { accessToken: 'new', grantedScopes: (opts && opts.scopes) || [], scope: ((opts && opts.scopes) || []).join(' ') } };
+      };
+    `, sandbox);
+    const out = await dispatch({ type: 'flow:outlook-consent-scope', scope: row.scope, policy: 'always' });
+    const asked = JSON.parse(JSON.stringify(vm.runInContext('globalThis.__k3dScopes', sandbox)));
+    assert.ok(out && out.reason !== 'scope-refused', JSON.stringify(out));
+    assert.strictEqual(asked.length, 1, 'one consent window: ' + JSON.stringify(asked));
+    assert.deepStrictEqual(sortScopes(asked[0]), sortScopes(['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'].concat(row.add)));
+    assert.ok(!asked[0].some((x) => /Mail\.Send|Shared$/i.test(x)));
+  });
+}
+
+for (const outcome of ['cancelled', 'missing-grant']) {
+  await ok('OneDrive incremental consent ' + outcome + ' preserves the mail-only token', async () => {
+    const old = { accessToken: 'mail-only', grantedScopes: ['Mail.Read', 'Mail.ReadWrite'] };
+    const { dispatch, sandbox, stored } = loadBackgroundMessageHarness({
+      stored: { outlookAuth: { token: old, requestedScopes: ['Mail.Read', 'Mail.ReadWrite'] } }
+    });
+    vm.runInContext(outcome === 'cancelled'
+      ? "FlowOutlookAuth.signIn = async () => ({ok:false,error:'cancelled'});"
+      : "FlowOutlookAuth.signIn = async () => ({ok:true,token:{accessToken:'no-files',grantedScopes:['Mail.Read','Mail.ReadWrite']}});", sandbox);
+    const result = await dispatch({ type: 'flow:outlook-consent-scope', scope: 'Files.ReadWrite' });
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.reason, outcome === 'cancelled' ? 'cancelled' : 'files-not-granted');
+    assert.strictEqual(stored.outlookAuth.token.accessToken, 'mail-only');
+    assert.ok(!stored.outlookAuth.token.grantedScopes.includes('Files.ReadWrite'));
+  });
+}
+
+await ok('K3e: MailboxSettings.Read, Sites.ReadWrite.All and Files.ReadWrite.All are still refused as their own consent', async () => {
+  const { dispatch } = loadBackgroundMessageHarness();
+  for (const scope of ['MailboxSettings.Read', 'Sites.ReadWrite.All', 'Files.ReadWrite.All', 'Mail.Send']) {
+    const out = await dispatch({ type: 'flow:outlook-consent-scope', scope: scope });
+    assert.strictEqual(out.reason, 'scope-refused', scope);
+  }
+});
+
+await ok('K3f: Setup Add permission never sends MailboxSettings.Read on its own', () => {
+  const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+  assert.ok(/MailboxSettings\.Read'\s*\?\s*'Calendars\.ReadWrite'/.test(popup), 'the popup maps MailboxSettings.Read to the Calendars.ReadWrite consent');
+});
+
 await ok('K3s: flow:microsoft-optional-scopes rejects foreign sender', async () => {
   const { dispatch } = loadBackgroundMessageHarness({
     stored: {
@@ -1319,6 +1388,22 @@ await ok('K2b: Labs TEAMS_MEETING flip via renderLabs click calls flow:microsoft
   assert.ok(sent.some((m) => m.type === 'flow:microsoft-optional-scopes' && m.bucket === 'teamsChat'), sent);
 });
 
+await ok('ecosystem calendar reconnect adds MailboxSettings.Read with Calendars.ReadWrite', async () => {
+  const { w, inst } = outlookConnectWorld({
+    store: {
+      outlookAuth: {
+        ecosystem: true,
+        requestedScopes: MS_EXPECTED.concat(['Calendars.ReadWrite', 'MailboxSettings.Read']),
+        token: { accessToken: 'old', grantedScopes: MS_EXPECTED.concat(['Calendars.ReadWrite']) },
+        account: { address: 'me@contoso.com' }
+      }
+    }
+  });
+  await inst.connect({ scopes: MS_EXPECTED.concat(['Calendars.ReadWrite']) });
+  assert.ok(w.signInScopes.indexOf('Calendars.ReadWrite') >= 0, w.signInScopes);
+  assert.ok(w.signInScopes.indexOf('MailboxSettings.Read') >= 0, w.signInScopes);
+});
+
 await ok('R4/R5: ecosystem reconnect keeps ticked Calendar (Calendars.ReadWrite)', async () => {
   const withCal = MS_EXPECTED.concat(['Calendars.ReadWrite']);
   const { w, inst } = outlookConnectWorld({
@@ -1336,7 +1421,7 @@ await ok('R4/R5: ecosystem reconnect keeps ticked Calendar (Calendars.ReadWrite)
   assert.ok(w.signInScopes.indexOf('Calendars.ReadWrite') >= 0, w.signInScopes);
   assert.ok(w.signInScopes.indexOf('Mail.Read') < 0, w.signInScopes);
   assert.ok(w.signInScopes.indexOf('Chat.Read') < 0, w.signInScopes);
-  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(MS_EXPECTED.concat(['Calendars.ReadWrite'])));
+  assert.deepStrictEqual(sortScopes(w.signInScopes), sortScopes(MS_EXPECTED.concat(['Calendars.ReadWrite', 'MailboxSettings.Read'])));
 });
 
 await ok('R4 popup: expired ecosystem reconnect pre-ticks Calendar and Connect sends Calendars.ReadWrite', async () => {

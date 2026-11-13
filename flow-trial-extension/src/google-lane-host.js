@@ -16,6 +16,8 @@ import '../core/event-call-link.js';
 import '../core/google-closes.js';
 import '../core/style-profile.js';
 import '../core/full-document-close.js';
+// FlowGoogleContacts: resolve a name in Google Contacts (G8), switch GOOGLE_CONTACTS, off.
+import '../core/google-contacts.js';
 import '../core/google-tasks.js';
 import '../core/google-task-close.js';
 import '../core/google-drive.js';
@@ -34,7 +36,7 @@ let laneSource = 'chrome';
 
 // The token of the account the person consented to in Glance, and only that.
 // The stored Connect token and Chrome's own token are both read, each one's
-// account comes from the Gmail profile, and the account recorded at Connect
+// account comes from the openid/userinfo email claim, and the account recorded at Connect
 // decides. Chrome's token is used only when it is the same account. Interactive
 // stays false. No e2e hook is required.
 const CONNECTED_ACCOUNT_KEY = 'googleConnectedAccount';
@@ -94,14 +96,14 @@ function identityToken() {
   });
 }
 
-// The address a token belongs to, from the Gmail profile (gmail.compose is
-// on the grant). A 401 here is this probe's answer: the token is kept.
+// The address a token belongs to, from the openid/userinfo email claim (already
+// on the manifest grant). A 401 here is this probe's answer: the token is kept.
 async function accountOfToken(token) {
   const hit = seenAccounts.get(token);
   if (hit && Date.now() - hit.at < SEEN_MS) return hit.email;
   let email = '';
   try {
-    const res = await fetch(laneUrl('https://gmail.googleapis.com/gmail/v1/users/me/profile'), {
+    const res = await fetch(laneUrl('https://www.googleapis.com/oauth2/v3/userinfo'), {
       method: 'GET',
       headers: { Authorization: 'Bearer ' + token }
     });
@@ -237,12 +239,37 @@ function noteGoogleAuthFailure(reason, account) {
     .then(() => chrome.storage.local.get([EVER_KEY, 'googleTasksAuth', 'googleWebAuth', 'glanceLaneUndo']))
     .then((bag) => {
       if (!priorGoogleRecord(bag)) return null;
+      const why = String(reason || '');
+      // A remote revoke / dead token: drop the stored grant so the popup shows
+      // Connect Google (same keys Disconnect clears). wrong-account only drops
+      // the pinned mailbox; missing-scope keeps Reconnect.
+      const clearGrant = why === '401' || why === 'revoked' || why === 'invalid_token' || why === 'invalid_grant' || why === 'not signed in';
+      if (clearGrant) {
+        const bridge = typeof globalThis !== 'undefined' ? globalThis.FlowGoogleAccess : null;
+        if (bridge && typeof bridge.clearRevoked === 'function') {
+          return Promise.resolve().then(() => bridge.clearRevoked(why)).catch(() => null);
+        }
+        return chrome.storage.local.remove([
+          'googleTasksAuth',
+          'googleWebAuth',
+          RECONNECT_KEY,
+          EVER_KEY,
+          'googleGrantedScopes',
+          'googleProfile',
+          CONNECTED_ACCOUNT_KEY,
+          'glanceOwnNames'
+        ]);
+      }
       const ever = bag && everConnectedRecord(bag[EVER_KEY]);
-      const flag = { needed: true, reason: String(reason || 'auth') };
+      const flag = { needed: true, reason: why || 'auth' };
       if (account) flag.account = String(account);
       const patch = { [RECONNECT_KEY]: flag };
       if (!ever) patch[EVER_KEY] = { connected: true };
-      return chrome.storage.local.set(patch);
+      const clearConnected = why === 'wrong-account' || why === 'account-unverified';
+      return chrome.storage.local.set(patch).then(() => {
+        if (!clearConnected) return null;
+        return chrome.storage.local.remove(CONNECTED_ACCOUNT_KEY);
+      });
     })
     .catch(() => {});
 }
@@ -455,6 +482,19 @@ async function storedTaskListId() {
   }
 }
 
+async function storedGrantedScopes() {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return null;
+    const bag = await chrome.storage.local.get('googleGrantedScopes');
+    const rec = bag && bag.googleGrantedScopes;
+    const raw = rec && rec.version;
+    if (raw == null) return null;
+    return String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
+  } catch (e) {
+    return null;
+  }
+}
+
 // The one list Glance writes to is titled Glance. It is looked up by title
 // first and made only when the account has none, once: concurrent callers
 // share one flight, and a failed read never leads to a create. The title is
@@ -515,6 +555,8 @@ async function resolveExistingTaskList() {
 // The owner's off switches live in one storage object. A missing key is off.
 async function laneSwitchOn(name) {
   try {
+    // A Chrome Web Store install (Chrome adds update_url) never turns a Labs switch on, whatever storage says.
+    if (chrome.runtime && typeof chrome.runtime.getManifest === 'function' && (chrome.runtime.getManifest() || {}).update_url) return false;
     const bag = await chrome.storage.local.get({ glanceSwitches: {} });
     return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
   } catch (e) { return false; }
@@ -544,7 +586,11 @@ async function seriesWanted(connectorId, msgInput, first) {
 }
 
 async function writeWithListRecovery(connectorId, msgInput, cred) {
-  const first = await prepareWrite(connectorId, msgInput, cred);
+  let first = await prepareWrite(connectorId, msgInput, cred);
+  if (connectorId === 'googleReplyDraft') {
+    const scopes = await storedGrantedScopes();
+    if (scopes) first = Object.assign({}, first, { grantedScopes: scopes });
+  }
   const rule = await seriesWanted(connectorId, msgInput, first);
   const meet = await meetWanted(connectorId, msgInput);
   if (rule || meet) {
@@ -702,7 +748,7 @@ async function prepareWrite(connectorId, input, cred) {
   if (connectorId === 'googleNewFile') {
     const W = globalThis.FlowWorkspaceFile;
     return {
-      flags: W ? { [W.SWITCH]: await laneSwitchOn(W.SWITCH) } : {},
+      flags: W ? { [W.SWITCH]: await laneSwitchOn(W.SWITCH), [W.FORMS_SWITCH]: await laneSwitchOn(W.FORMS_SWITCH) } : {},
       fileKind: params.fileKind || i.fileKind || '',
       name: params.name || i.name || '',
       now: new Date().toISOString()
@@ -868,8 +914,7 @@ function verifyUrlFor(connectorId, ref) {
     return id && r.taskListId ? 'https://tasks.googleapis.com/tasks/v1/lists/' + enc(r.taskListId) + '/tasks/' + enc(id) : '';
   }
   if (connectorId === 'gmailCompose' || connectorId === 'googleReplyDraft') {
-    const id = r.draftId;
-    return id ? 'https://gmail.googleapis.com/gmail/v1/users/me/drafts/' + enc(id) + '?format=minimal' : '';
+    return '';
   }
   const fileId = r.fileId || r.documentId || r.spreadsheetId;
   if (fileId && /^google(DriveSave|Doc|SheetAppend|NewFile)$/.test(connectorId)) {
@@ -946,13 +991,37 @@ function onLaneMessage(msg, sender, sendResponse) {
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }
+  if (msg.type === 'flow:google-contacts-plan') {
+    const G = globalThis.FlowGoogleContacts;
+    Promise.resolve((async () => {
+      if (!G || typeof G.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
+      if (!(await laneSwitchOn(G.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      const bag = await chrome.storage.local.get(['googleGrantedScopes', 'glanceUserContextV0']);
+      const grantedRec = bag.googleGrantedScopes;
+      const grantedScopes = grantedRec && typeof grantedRec.version === 'string'
+        ? grantedRec.version.split('\n').filter(Boolean)
+        : null;
+      const account = await readConnectedAccount();
+      const ctxRoot = bag.glanceUserContextV0;
+      const byAccount = ctxRoot && ctxRoot.byAccount && typeof ctxRoot.byAccount === 'object' ? ctxRoot.byAccount : {};
+      const profile = (account && byAccount[account]) || byAccount.default || {};
+      const text = String(msg.text || '').slice(0, 4000);
+      const choiceIndex = typeof msg.choiceIndex === 'number' ? msg.choiceIndex : undefined;
+      return G.plan(
+        { flags: { [G.SWITCH]: true }, text: text, choiceIndex: choiceIndex },
+        { http: laneHttp, grantedScopes: grantedScopes, profile: profile, flags: { [G.SWITCH]: true } }
+      );
+    })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
+    return true;
+  }
   if (msg.type === 'flow:google-new-file-plan') {
     // The page asks; the worker owns the switch. Off or silent: the page shows nothing.
     const W = globalThis.FlowWorkspaceFile;
     Promise.resolve((async () => {
       if (!W || typeof W.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
       if (!(await laneSwitchOn(W.SWITCH))) return { action: 'off', reason: 'switch-off' };
-      return W.plan({ flags: { [W.SWITCH]: true }, text: String(msg.text || '').slice(0, 4000) });
+      const forms = await laneSwitchOn(W.FORMS_SWITCH);
+      return W.plan({ flags: { [W.SWITCH]: true, [W.FORMS_SWITCH]: forms }, text: String(msg.text || '').slice(0, 4000) });
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;
   }
@@ -987,12 +1056,30 @@ function onLaneMessage(msg, sender, sendResponse) {
   }
   if (msg.type === 'flow:gmail-compose') {
     const Compose = typeof FlowGoogleCompose !== 'undefined' ? FlowGoogleCompose : globalThis.FlowGoogleCompose;
+    const Config = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : globalThis.FlowGoogleConfig;
     const input = msg.input || msg.payload || {};
-    if (!Compose || typeof Compose.fill !== 'function') {
-      sendResponse({ ok: false, reason: 'unavailable', preview: true, closes: false, sent: false });
-      return true;
-    }
-    sendResponse(Compose.fill(input, input.state || { to: '', subject: '', body: '', sendClicks: 0 }));
+    Promise.resolve((async () => {
+      if (!Compose || typeof Compose.fill !== 'function') {
+        return { ok: false, reason: 'unavailable', preview: true, closes: false, sent: false };
+      }
+      let scopes = null;
+      try {
+        const bag = await chrome.storage.local.get('googleGrantedScopes');
+        const rec = bag && bag.googleGrantedScopes;
+        scopes = rec && rec.version != null ? String(rec.version).split('\n').map((s) => s.trim()).filter(Boolean) : null;
+      } catch (e) { scopes = null; }
+      if (!Config || typeof Config.gmailDraftApiAllowed !== 'function' || !Config.gmailDraftApiAllowed(scopes)) {
+        return {
+          ok: false,
+          reason: 'compose-closed',
+          preview: true,
+          closes: false,
+          sent: false,
+          error: 'Open Reply first. Glance does not press Send.'
+        };
+      }
+      return Compose.fill(input, input.state || { to: '', subject: '', body: '', sendClicks: 0 });
+    })()).then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable', preview: true, closes: false, sent: false }));
     return true;
   }
   return undefined;
