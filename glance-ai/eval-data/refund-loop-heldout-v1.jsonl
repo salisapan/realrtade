@@ -1,0 +1,24 @@
+{"id":"ga01","part":"ask","lang":"he","to":"orders@bookstore.co.il","toName":"סטימצקי","text":"היי, קיבלתי ספר פגום. אבקש החזר כספי על ההזמנה 99812 בסך 84 ₪.","expect":"open"}
+{"id":"ga02","part":"ask","lang":"he","to":"hello@yoga-studio.co.il","toName":"סטודיו יוגה","text":"ביטלתי את המנוי בזמן ובכל זאת חויבתי. נא לזכות אותי ב-260 ₪ שנגבו החודש.","expect":"open"}
+{"id":"ga03","part":"ask","lang":"he","to":"service@electra.co.il","toName":"אלקטרה","text":"אפשר בבקשה להחזיר לי את הכסף על המזגן שהוחזר? 3,490 ₪.","expect":"open"}
+{"id":"ga04","part":"ask","lang":"he","to":"orders@bookstore.co.il","toName":"סטימצקי","text":"תודה, ההחזר הגיע לכרטיס.","expect":"none"}
+{"id":"ga05","part":"ask","lang":"he","to":"service@electra.co.il","toName":"אלקטרה","text":"כמה זמן לוקח בדרך כלל לקבל החזר אצלכם?","expect":"none"}
+{"id":"ga06","part":"ask","lang":"he","to":"yossi.k@gmail.com","toName":"יוסי","text":"יוסי, נא להחזיר לי את ה-150 ₪ על הכרטיסים.","expect":"none"}
+{"id":"ga07","part":"ask","lang":"en","to":"support@streamly.com","toName":"Streamly","text":"I was charged $14.99 after cancelling. Can I get a refund, please?","expect":"open"}
+{"id":"ga08","part":"ask","lang":"en","to":"care@airline-x.com","toName":"Airline X","text":"My flight was cancelled. I want my money back, not a voucher: $412.","expect":"open"}
+{"id":"ga09","part":"ask","lang":"en","to":"support@streamly.com","toName":"Streamly","text":"Do you offer refunds on annual plans?","expect":"none"}
+{"id":"ga10","part":"ask","lang":"en","to":"support@streamly.com","toName":"Streamly","text":"We will refund you the difference by Friday.","expect":"none"}
+{"id":"gr01","part":"reply","lang":"he","text":"שלום, הכסף יוחזר לכרטיס האשראי תוך 10 ימי עסקים.","expect":"approved"}
+{"id":"gr02","part":"reply","lang":"he","text":"נשמח לתת לך שובר בשווי 260 ₪ לשימוש בסטודיו.","expect":"store-credit"}
+{"id":"gr03","part":"reply","lang":"he","text":"ההחזר יבוצע לאחר שנקבל את המוצר במחסן.","expect":"needs-you"}
+{"id":"gr04","part":"reply","lang":"en","text":"We're sorry. Annual plans are non-refundable after 14 days.","expect":"declined"}
+{"id":"gr05","part":"reply","lang":"en","text":"Your refund to your original payment method was approved and should show in 3-5 business days.","expect":"approved"}
+{"id":"gr06","part":"reply","lang":"en","text":"We have issued a travel voucher for $412 to your account.","expect":"store-credit"}
+{"id":"gc01","part":"close","lang":"he","loop":{"merchant":"סטימצקי","email":"orders@bookstore.co.il","amount":84,"currency":"ILS"},"msg":{"fromEmail":"alerts@isracard.co.il","text":"זיכוי בסך 84 ₪ מבית העסק סטימצקי נקלט בכרטיסך."},"expect":"close"}
+{"id":"gc02","part":"close","lang":"he","loop":{"merchant":"סטודיו יוגה","email":"hello@yoga-studio.co.il","amount":260,"currency":"ILS"},"msg":{"fromEmail":"noreply@max.co.il","text":"זיכוי קאשבק בסך 260 ₪ מבית העסק סטודיו יוגה במסגרת הטבת מועדון."},"expect":"none"}
+{"id":"gc03","part":"close","lang":"he","loop":{"merchant":"אלקטרה","email":"service@electra.co.il","amount":3490,"currency":"ILS"},"msg":{"fromEmail":"service@cal-online.co.il","text":"זיכוי בסך 1,745 ₪ מבית העסק אלקטרה נקלט בכרטיסך."},"expect":"none"}
+{"id":"gc04","part":"close","lang":"he","loop":{"merchant":"אלקטרה","email":"service@electra.co.il","amount":3490,"currency":"ILS"},"msg":{"fromEmail":"service@cal-online.co.il","text":"זיכוי בסך 3,490.00 ₪ מבית העסק אלקטרה צריכה בע\"מ נקלט בכרטיסך."},"expect":"close"}
+{"id":"gc05","part":"close","lang":"he","loop":{"merchant":"סטימצקי","email":"orders@bookstore.co.il","amount":84,"currency":"ILS"},"msg":{"fromEmail":"alerts@isracard.co.il","text":"בוצע חיוב בסך 84 ₪ בבית העסק סטימצקי."},"expect":"none"}
+{"id":"gc06","part":"close","lang":"en","loop":{"merchant":"Streamly","email":"support@streamly.com","amount":14.99,"currency":"USD"},"msg":{"fromEmail":"service@paypal.com","text":"You've received a refund of $14.99 USD from STREAMLY.COM."},"expect":"close"}
+{"id":"gc07","part":"close","lang":"en","loop":{"merchant":"Airline X","email":"care@airline-x.com","amount":412,"currency":"USD"},"msg":{"fromEmail":"service@paypal.com","text":"Your refund of $412.00 USD from Airline X is pending."},"expect":"none"}
+{"id":"gc08","part":"close","lang":"en","loop":{"merchant":"Streamly","email":"support@streamly.com","amount":14.99,"currency":"USD"},"msg":{"fromEmail":"service@paypal.com","text":"You've received a refund of $14.99 USD from Netflix."},"expect":"none"}

@@ -47,10 +47,6 @@ var GlanceCards = (function () {
     return button(lang, 'doIt', 'onDoIt', { messageId: String(messageId || ''), source: 'message' });
   }
 
-  function composeDoItButton(draftId, lang) {
-    return button(lang, 'doIt', 'onComposeDoIt', { draftId: String(draftId || ''), source: 'compose' });
-  }
-
   function proposal(decision, messageId, lang) {
     var L = i18n();
     if (decision.kind === 'hold') {
@@ -147,8 +143,62 @@ var GlanceCards = (function () {
     ]);
   }
 
-  function quiet(lang) {
-    return card(lang, [text(lang, i18n().t(lang, 'quiet'))]);
+  function planTypeLabel(lang, planId) {
+    var id = String(planId || '').toLowerCase();
+    var en = {
+      'reply-track': 'reply & track',
+      'reply-fact': 'fact reply',
+      'log-it': 'log it',
+      'follow-through': 'follow-through',
+      'hold': 'calendar hold',
+      'schedule': 'schedule meeting',
+      'schedule-confirm': 'schedule meeting',
+      'file-it': 'save to Drive',
+      'attach-invite': 'attach to invite',
+      'clear-it': 'clear calendar',
+      'move-it': 'move calendar',
+      'create-missing': 'draft from template',
+      'file-on-hold': 'file on calendar',
+      'file-on-task': 'file on task',
+      'sheet': 'sheet'
+    };
+    var he = {
+      'reply-track': 'מעקב תשובה',
+      'reply-fact': 'תשובה על עובדה',
+      'log-it': 'תיעוד',
+      'follow-through': 'מעקב',
+      'hold': 'החזקה ביומן',
+      'schedule': 'תיאום פגישה',
+      'schedule-confirm': 'תיאום פגישה',
+      'file-it': 'שמירה ב-Drive',
+      'attach-invite': 'צירוף לזימון',
+      'clear-it': 'ביטול ביומן',
+      'move-it': 'הזזה ביומן',
+      'create-missing': 'טיוטה מתבנית',
+      'file-on-hold': 'קובץ ביומן',
+      'file-on-task': 'קובץ במשימה',
+      'sheet': 'גיליון'
+    };
+    var pack = lang === 'he' ? he : en;
+    return pack[id] || en[id] || id || 'close';
+  }
+
+  function quiet(lang, reason) {
+    var key = (!reason || reason === 'no-plan' || reason === 'intent-null' || reason === 'quiet') ? 'quietEmpty' : 'quiet';
+    return card(lang, [text(lang, i18n().t(lang, key))]);
+  }
+
+  function spottedUnsupported(decision, messageId, lang) {
+    var L = i18n();
+    var label = planTypeLabel(lang, decision.droppedPlanId || decision.planId);
+    return card(lang, [
+      text(lang, L.t(lang, 'spottedPrefix') + label),
+      button(lang, 'remindMe', 'onRemindMe', { messageId: String(messageId || ''), source: 'message' })
+    ]);
+  }
+
+  function composeDoItButton(draftId, lang) {
+    return button(lang, 'doIt', 'onComposeDoIt', { draftId: String(draftId || ''), source: 'compose' });
   }
 
   function composeProposal(preview, draftId, lang) {
@@ -175,12 +225,17 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'editedDraft'))]);
   }
 
-  function homepage(next, lang) {
+  function homepage(next, lang, buildSha) {
     var L = i18n();
-    if (!next || !next.title) return card(lang, [text(lang, L.t(lang, 'openMessage'))]);
+    if (!next || !next.title) {
+      var widgets = [text(lang, L.t(lang, 'openMessage'))];
+      if (buildSha) widgets.push(text(lang, L.t(lang, 'build') + ': ' + L.isolateLtr(buildSha)));
+      return card(lang, widgets);
+    }
     var widgets = [text(lang, L.t(lang, 'next')), text(lang, next.title)];
     if (next.due) widgets.push(dueLine(lang, next.due));
     widgets.push(button(lang, 'doIt', 'onDoIt', { messageId: 'prefetch', source: 'prefetch' }));
+    if (buildSha) widgets.push(text(lang, L.t(lang, 'build') + ': ' + L.isolateLtr(buildSha)));
     return card(lang, widgets);
   }
 
@@ -200,10 +255,12 @@ var GlanceCards = (function () {
     undone: undone,
     grant: grant,
     quiet: quiet,
-    homepage: homepage,
     composeProposal: composeProposal,
     draftProof: draftProof,
     editedDraft: editedDraft,
+    spottedUnsupported: spottedUnsupported,
+    planTypeLabel: planTypeLabel,
+    homepage: homepage,
     buttons: buttons
   };
 })();

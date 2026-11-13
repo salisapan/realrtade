@@ -12,7 +12,28 @@ const YES = [
   ['אל תשכח להביא את הטופס החתום ביום שני', '2026-10-26', /הטופס/],
   ['תזכור לשלוח את החשבונית מחר', '2026-10-24', /החשבונית/],
   ['שלא תשכח לשלם את המקדמה ביום חמישי', '2026-10-29', /המקדמה/],
-  ['אל תשכחי להתקשר לספק היום', '2026-10-23', /לספק/]
+  ['אל תשכחי להתקשר לספק היום', '2026-10-23', /לספק/],
+  // a plain imperative "bring" with the thing and a day (run 106)
+  ['Please bring your passport tomorrow', '2026-10-24', /passport/],
+  ['Bring the signed contract on Monday', '2026-10-26', /signed contract/],
+  ['Please bring a printed copy on Wednesday', '2026-10-28', /printed copy/],
+  ['תביא איתך את הרישיון מחר', '2026-10-24', /הרישיון/],
+  ['נא להביא את הטפסים ביום רביעי', '2026-10-28', /הטפסים/],
+  ['תביאי את הציוד ביום ראשון', '2026-10-25', /הציוד/],
+  // call or write to a third party on a day (run 115)
+  ['Call the plumber tomorrow and confirm the time', '2026-10-24', /Call the plumber/],
+  ['Please call the bank on Monday', '2026-10-26', /call the bank/],
+  ['Email the landlord on Wednesday', '2026-10-28', /Email the landlord/],
+  ['תתקשר לבנק ביום שני', '2026-10-26', /לבנק/],
+  ['תתקשר ליוסי מחר', '2026-10-24', /ליוסי/],
+  ['נא לתקשר ללקוח ביום חמישי', '2026-10-29', /ללקוח/],
+  // a friendly/gentle reminder, and a Hebrew «תזכורת: ל...» (run 117)
+  ['Friendly reminder to submit your expense report by Thursday', '2026-10-29', /expense report/],
+  ['A gentle reminder to pay the deposit on Monday', '2026-10-26', /deposit/],
+  ['Quick reminder to send the signed form on Wednesday', '2026-10-28', /signed form/],
+  ['תזכורת: להגיש את הדוח השבועי עד יום חמישי', '2026-10-29', /הדוח השבועי/],
+  ['תזכורת ידידותית: להחזיר את הטופס עד יום שלישי', '2026-10-27', /הטופס/],
+  ['תזכורת קטנה: לשלם את המקדמה ביום ראשון', '2026-10-25', /המקדמה/]
 ];
 for (const [text, day, what] of YES) {
   const r = R.recognize(text, NOW);
@@ -32,6 +53,20 @@ const NO = [
   ['אל תשכח להביא את הטופס ביום שני?', 'question'],
   ['Remember to call on 2025-01-02', 'past'],
   ['Remember the good times on Monday', 'no cue'],
+  ['Please bring your passport', 'no day'],
+  ['Can you bring your passport tomorrow?', 'question'],
+  ['I will bring the contract on Monday', 'own promise'],
+  ['Bring cash, parking is not free, see you tomorrow', 'no thing for the cue'],
+  ['תביא קפה', 'no day'],
+  ['Call me tomorrow', 'call me is the call-back ask'],
+  ['תתקשר אליי מחר', 'call me is the call-back ask'],
+  ['תתקשר לי ביום שלישי', 'call me is the call-back ask'],
+  ['I will call the bank tomorrow', 'own promise'],
+  ['Call the bank', 'no day'],
+  ['Can you call the bank on Monday?', 'question'],
+  ['Friendly reminder that the office is closed on Friday', 'a notice, not a thing to do'],
+  ['תזכורת: הפגישה מחר בשעה 10', 'a notice'],
+  ['תזכורת: להגיש את הדוח', 'no day'],
   ['', 'empty'],
   ['x'.repeat(300), 'long']
 ];

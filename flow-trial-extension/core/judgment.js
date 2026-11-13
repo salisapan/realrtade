@@ -76,7 +76,7 @@ const FlowJudgment = (() => {
   // addition below was verified against the full negative-test corpus in
   // test/intent-actions-corpus.cjs (vague asks, cold pitches, small talk)
   // before being kept.
-  const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|pay|remit|wire|settle|let (?:us|me) know)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise|pay|remit)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
+  const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|pay|remit|wire|settle|let (?:us|me) know|proofread|check|order|look over|take a look|fill (?:in|out)|complete|verify|validate)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise|pay|remit|acknowledge|reply|respond|revert|return|sign|approve|submit)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|(?:we|I)(?:'d| would) (?:be )?(?:grateful|thankful) (?:it )?if you|do you think you could|do you mind (?:send|upload|review|check|sign|fill|forward|share|updat|provid|resend)(?:ing)?\b|(?:^|[.!?]\s+|please\s+)make sure (?:that )?(?:the|we|all|this|it)\b|(?:please |kindly )?(?:get|come|write|reply|respond) back to me\b|kindly revert\b|please revert\b|let me know (?:your|what you|how you) (?:decision|thoughts|feedback|answer|availability|preference)|(?:we|I)(?:'d| would) appreciate (?:a |an |your |the )(?:quick |brief |prompt )?(?:update|reply|response|answer|confirmation|feedback|decision)|(?:we|I) need your (?:decision|answer|reply|response|signature|payment|go-?ahead)|need your (?:decision|answer|reply|response|signature|go-?ahead)|do let me know (?:by|whether|if)|if you could (?:please )?(?:send|share|forward|review|confirm|sign|approve|provide|upload|resend|check|take a look)|(?:we|I) need (?:the |your |that |those |these |a |an )(?!to\b)[^.?!\n]{1,50}?\bback(?=\s*(?:by|before|on|until|asap|today|tomorrow|this|next|end|[.!?,]|$))|(?:we|I) need (?:the |your |that |those |these |a |an )(?!to\b)[^.?!\n]{1,50}?\bfrom you\b|it would be (?:great|helpful|good|best|ideal|perfect) to (?:have|get|receive) (?:the |your |a |an )|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
   // A disagreement about money.
   const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|undercharged|incorrect (?:amount|invoice)|dispute|wrong amount|billing discrepancy|invoice error|charged incorrectly|duplicate charge|unauthorized charge)\b/i;
 
@@ -128,7 +128,76 @@ const FlowJudgment = (() => {
   // the same "asking you to do X" shape, each verified against the full
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
-  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|ת(?:אשר|אשרי|אשרו)\s+לי(?:\s+בבקשה)?(?![א-ת])|אפשר\s+ל(?:עדכן|תקן|סיים|הכין)(?![א-ת])[^?.!]{0,50}\sעד\s|(?:אשמח|נשמח)\s+ל(?:אישור|תשובה|עדכון|משוב|תגובה)\s+(?:שלך|שלכם|שלכן|ממך|ממכם)|אפשר\s+ש(?:ת|תי)(?:עיף|עיפי|סתכל|סתכלי|בדוק|בדקי|חתום|חתמי|אשר|אשרי|עדכן|עדכני|שלח|שלחי|חזור|חזרי|עבור|עברי|טפל|טפלי|סגור|סגרי)(?![א-ת])|(?:תוודא|תוודאי|תדאג|תדאגי)\s+ש?(?:ה|ל)|(?:תעיף|תעיפי)\s+מבט|אשמח ש(?:ת|תי)(?:חזור|חזרי|שלח|שלחי|עדכן|עדכני|אשר|אשרי|בדוק|בדקי|עבור|עברי|ענה|עני)(?![א-ת])|(?:אפשר|אשמח|נשמח)\s+לשמוע\s+(?:ממך|ממכם|ממך עדכון)|(?:אני|אנחנו)\s+(?:זקוק(?:ה|ים|ות)?|צריכ(?:ה|ים|ות)?|צריך)\s+(?:את\s+|ל)?(?:ה)?(?:חתימה|אישור|תשובה|החלטה|עדכון|תגובה|משוב)\s+(?:שלך|שלכם|ממך|ממכם)|(?:(?:אתה|את|אתם|אתן)\s+יכול(?:ה|ים|ות)?|היית(?:י)?\s+יכול(?:ה)?)\s+(?:בבקשה\s+)?ל(?:שלוח|העביר|אשר|בדוק|עבור|חתום|חזור|עדכן|שלם|הכין|סדר|תאם|מלא|הזמין|השיב|ענות|הוסיף|צרף|פתוח|ארגן|טפל|שמור|העלות|העלות|הגיש|הוציא|שחרר)(?![א-ת])|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  // A request verb that opens its clause, in the second person ("סאלי, תשלח לי את הסיכום עד מחר", "בבקשה שתף אותי
+  // בגיליון", "תוסיף משימה ל…"), and a dated "אשמח לתשובה לגבי … עד …". HANDOFF_HE only knew these behind תוכל / בבקשה ת /
+  // תשלח לי. The verb must open a clause and take an object, so "דנה תשלח לך" (third person), "אל תשלח" and reported
+  // speech after a colon ("היא אמרה: תשלח…") do not match; directedAsk() still drops a hedged or negated sentence.
+  // "תוסיף" counts only for a task or a reminder: "תוסיף את החוזה ליומן" is family B's file-on-calendar close.
+  // Left out on purpose: approve (the owner's approval rule makes that a task, not a reply), check, attach, and a money
+  // transfer ("תעביר את ה-₪89"), which stay with their own gates; so does a send-as-attachment sentence (מצורף / כקובץ),
+  // which is the file chain's. Forward counts only as "תעביר לי / העבר לי".
+  const IMPERATIVE_ASK_HE = /(?:^|[,.!?;—–]\s*|\s(?:ו?עדיין|אבל),?\s+)(?![^.?!\n]*(?:מצורפ|בצירוף|כקובץ))(?:(?:בבקשה\s+)?ת(?:שלח|שתף|עלה|עדכן|שיב|ענה|כין|סגור|טפל)י?|בבקשה\s+(?:שלח|שתף|העלה|עדכן|השב|ענה|הכן|עזור)|(?:שלח|שתף)(?=\s+(?:לי|אותי)))\s+(?:לי|אותי|את|ל[א-ת]+|על|עם|ב[א-ת]+)(?![א-ת])|(?:^|[,.!?;—–]\s*)(?:בבקשה\s+)?(?:תוסיף|תוסיפי|הוסף)\s+(?:משימה|תזכורת)(?![א-ת])|(?:^|[,.!?;—–]\s*)(?![^.?!\n]*(?:מצורפ|בצירוף|כקובץ))(?:בבקשה\s+)?(?:תעבירי?|העבר)\s+(?:לי|אותי)(?![א-ת])|(?:אשמח|נשמח)\s+ל(?:תשובה|עדכון)\s+(?:לגבי|על|בנוגע\s+ל)[^.?!\n]{1,60}\sעד\s/;
+  // Words in quotation marks are someone else's ("Dana wrote to the vendor \"please add a task …\""). The two new
+  // patterns below are read with every quoted span removed. An opening mark must follow a space, a colon or a
+  // bracket, so a Hebrew acronym's gershayim (דו"ח, מע"מ) is not a quotation.
+  function outsideQuotes(text) {
+    return String(text || '').replace(/(^|[\s:(\[])(?:"[^"\n]{2,240}"|“[^”\n]{2,240}”|«[^»\n]{2,240}»|„[^“”\n]{2,240}[“”])/g, '$1…');
+  }
+  // "Please add a task to …" asks for the task itself.
+  const ADD_TASK_ASK = /\bplease\s+(?:add|create|open|set up)\s+(?:a\s+)?(?:task|reminder|to-?do)\s+(?:to|for)\b/i;
+
+  // The two patterns above are new and broad, so they speak only on a message that shows no sign of anyone else's
+  // words anywhere in the raw body or the subject. One sign switches them off for the whole message; the older
+  // patterns and every other rule read the message exactly as before. Signs: any quote-cut line (QUOTE_START), a '>'
+  // line, a header-like line (From:/Sent:/Date:/To:/Cc:/Subject: and מאת:/נשלח:/תאריך:/אל:/עותק:/נושא:), "wrote:" in any of
+  // a few languages (כתב/ה/ו:), a reply header that names an <address> and ends in a colon, a separator rule, a
+  // forward/original banner, a client signature line with more text below it, a greeting after a sign-off (history
+  // pasted with no banner), a command in quotation marks, or a forward marker in the subject. A plain "Re:" subject is
+  // not a sign by itself: every reply carries it, and its quoted part is what the body signs catch.
+  const QUOTED_SIGNS = [
+    /^\s*>/m,
+    /^[ \t]*(?:From|Sent|Date|To|Cc|Subject|מאת|נשלח|תאריך|אל|עותק|נושא)[ \t]*[:：]/im,
+    /(?:\bwrote|\bescribió|\bescreveu|\bschrieb|\bécrit|\bscritto|написал[аи]?|كتب|כתב(?:ה|ו)?)\s*[:：]/i,
+    /<[^<>\s@]+@[^<>\s]+>[^\n]*[:：][ \t]*$/m,
+    /^[ \t]*(?:-{3,}|_{5,}|={5,}|\*{5,})/m,
+    /\b(?:original message|forwarded message|begin forwarded)\b|הודעה\s+(?:מקורית|שהועברה|מועברת)/i
+  ];
+  const CLIENT_SIGNATURE = /^[ \t]*(?:get outlook for (?:ios|android)|sent from (?:my )?(?:iphone|ipad|android|galaxy|samsung|outlook|mail for windows|yahoo mail)|נשלח מ(?:ה-?)?(?:iPhone|iPad|Android|Outlook|אייפון|גלקסי|סמסונג))[^\n]*$/im;
+  const SIGN_OFF = /^[ \t]*(?:thanks|thank you|best|best regards|regards|kind regards|cheers|תודה|תודה רבה|בתודה|בברכה|להתראות|שלך|שלכם)[ \t]*[,.!]?[ \t]*[^\n]{0,30}$/im;
+  const GREETING = /^[ \t]*(?:(?:hi|hello|hey|dear|good morning)(?![a-z])|שלום|היי|הי|בוקר טוב|ערב טוב|צהריים טובים)[^\n]{0,40}$/i;
+  const FORWARD_SUBJECT = /(?:^|[\s:\[(])(?:fwd?|fw|tr|wg|rv|enc|הועבר|העברה)[ \t]*[:：]/i;
+  const QUOTED_SPAN = /(?:^|[\s:(\[])(?:"([^"\n]{2,240})"|“([^”\n]{2,240})”|«([^»\n]{2,240})»|„([^“”\n]{2,240})[“”]|״([^״\n]{2,240})״)/g;
+  function quotedSign(raw, subject) {
+    const text = String(raw || '').replace(/\r\n?/g, '\n');
+    if (FORWARD_SUBJECT.test(String(subject || ''))) return true;
+    if (QUOTE_START.some((re) => re.test(text)) || QUOTED_SIGNS.some((re) => re.test(text))) return true;
+    const sig = CLIENT_SIGNATURE.exec(text);
+    if (sig && /\S/.test(text.slice(sig.index + sig[0].length))) return true;
+    const lines = text.split('\n');
+    let signedOff = false;
+    for (const line of lines) {
+      if (signedOff && GREETING.test(line)) return true;
+      if (SIGN_OFF.test(line)) signedOff = true;
+    }
+    let m; QUOTED_SPAN.lastIndex = 0;
+    while ((m = QUOTED_SPAN.exec(text))) {
+      const inner = m[1] || m[2] || m[3] || m[4] || m[5] || '';
+      if (IMPERATIVE_ASK_HE.test(inner) || ADD_TASK_ASK.test(inner) || /\bplease\b|בבקשה/i.test(inner)) return true;
+    }
+    return false;
+  }
+  // Open only when the caller read the raw message and found no sign. A caller that never asked stays on base.
+  function newAskOpen(raw, subject) { return !quotedSign(raw, subject); }
+  // The sender's own ask sits near the top. Only the first NEW_ASK_SPAN characters of the new content are read by
+  // the two new patterns, carried to the end of the sentence the limit falls in.
+  const NEW_ASK_SPAN = 600;
+  function newAskSpan(text) {
+    text = String(text || '');
+    if (text.length <= NEW_ASK_SPAN) return text;
+    const rest = text.slice(NEW_ASK_SPAN).search(/[.!?\n]/);
+    return rest === -1 ? text : text.slice(0, NEW_ASK_SPAN + rest + 1);
+  }
   // "Please follow up with Dana about the invoice" is an explicit ask, and
   // it never matched HANDOFF: "follow up" isn't in that verb list, and the
   // "send" later in the sentence isn't adjacent to "please". Kept out of
@@ -136,7 +205,7 @@ const FlowJudgment = (() => {
   // a hedge sitting in front of the phrase still kill them) instead of
   // HANDOFF's bare .test(), which cannot see "please don't follow up".
   const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|chase up|send (?:a |the )?reminder|send \w+ a reminder|please remind|please remember to)\b/i;
-  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
+  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי|(?:^|\s)תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|(?:^|\s)תזכור(?:י|ו)?\s+ל|(?:^|\s)אל\s+תשכח(?:י|ו)?\s+ל|(?:^|\s)(?:שלח|תשלח|לשלוח)\s+תזכורת/;
   // The sender wants a call or a meeting and is waiting for the reader to name a time. It goes through
   // directedAsk() like the follow-up asks, so a withdrawn or hedged ask stays quiet. A slot ask clears the
   // bar on its own: the close is a reply that offers times (the draft names two slots to fill, never a time).
@@ -270,13 +339,17 @@ const FlowJudgment = (() => {
   const WORK_ASK_HE = /(?:^|\s)(?:תכין|תכיני|תכינו|תכתוב|תכתבי|תכתבו|תיצור|תיצרי|תיצרו|תכניס|תכניסי|תכניסו|תסכם|תסכמי|תסכמו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?(?:את\s+)?(?:ה)?(?:מסמך\s+(?:סיכום|סטטוס|תקציב|הצעה|דוח)|טבלה|דוח|דו"ח|סיכום|נתונים|מספרים|גיליון|הצעה|מצגת)/;
   // Asks for an update or an introduction. Each names the reader as the one who acts ("update me", "introduce me"), so a
   // status line or a thank-you that merely mentions an update stays quiet. Kept out of HANDOFF so the quoted sentence is unchanged.
-  const STATUS_INTRO_ASK = /\b(?:(?:can|could|would|will) you (?:please )?(?:introduce|connect|put) me|(?:please )?(?:introduce|connect) me (?:to|with)|put me in touch with|what(?:'s| is) the (?:current )?status of|(?:please )?(?:keep|update) me (?:posted|updated|in the loop|on|about)|let me know (?:the status|once|when)\b[^.?!\n]{0,60}\b(?:by|before|today|tonight|tomorrow|this week|ready|done|sent|paid))/i;
-  const STATUS_INTRO_ASK_HE = /(?:^|\s)(?:תעדכן|תעדכני|תעדכנו|עדכן|עדכני)\s+אותי|(?:^|\s)מה\s+(?:ה)?סטטוס\s+של|אשמח\s+לעדכון|(?:^|\s)(?:תפגיש|תפגישי|תכיר|תכירי|תחבר|תחברי)\s+(?:אותי|לי)|(?:ש|ל)(?:תפגיש|תפגישי)\s+אותי|(?:ל)?הכיר\s+לי\s+את|להפגיש\s+אותי/;
+  const STATUS_INTRO_ASK = /\b(?:(?:can|could|would|will) you (?:please )?(?:introduce|connect|put) me|(?:please )?(?:introduce|connect) me (?:to|with)|put me in touch with|what(?:'s| is) the (?:current )?status of|(?:please )?(?:keep|update) me (?:posted|updated|in the loop|on|about)|(?:please )?(?:give|send|get) me (?:a |an )?(?:quick |brief |short |written )?(?:status |progress )?(?:update|report)\b|i need (?:a |an )?(?:quick |brief )?(?:status |progress )?update\b|(?:please )?(?:countersign|co-sign)\b|let me know (?:the status|once|when)\b[^.?!\n]{0,60}\b(?:by|before|today|tonight|tomorrow|this week|ready|done|sent|paid))/i;
+  const STATUS_INTRO_ASK_HE = /(?:^|\s)(?:תעדכן|תעדכני|תעדכנו|עדכן|עדכני)\s+אותי|(?:^|\s)מה\s+(?:ה)?סטטוס\s+של|(?:אשמח|נשמח)\s+(?:ל(?:קבל\s+)?)?עדכון|(?:^|\s)(?:תעדכן|תעדכני|תעדכנו)\s+(?:אותי\s+)?(?:את\s+)?(?:ה)?סטטוס|(?:^|\s)(?:תפגיש|תפגישי|תכיר|תכירי|תחבר|תחברי)\s+(?:אותי|לי)|(?:ש|ל)(?:תפגיש|תפגישי)\s+אותי|(?:ל)?הכיר\s+לי\s+את|להפגיש\s+אותי/;
+  // Asks for an account action: access, a password reset, a transfer, a copy of the reply. The lead ("please", "can you") is
+  // required, so "access has been granted" and "your password was reset" stay quiet. Kept out of HANDOFF like the two above.
+  const ACCOUNT_ASK = /\b(?:please|pls|plz|kindly|can you|can u|could you|could u|would you(?: please)?)\s+(?:walk\s+\w+\s+through\b|test\s+\S+(?:\s+\S+){0,3}\s+and\s+report\b|draft\s+(?:a|the)\s+(?:reply|response|email|message)\b|add\s+(?:the|this|my)\s+\S+\s+to\s+the\s+(?:shared|team|project)\b|send\s+(?:me|us)\s+(?:the|your)\s+(?:address|pics|photos|link|location)\b|(?:return|send back)\s+(?:the|a|your)\s+(?:signed|countersigned|completed)\s+(?:copy|form|contract|agreement|paperwork)\b|add\s+your\s+availability\b|make\s+(?:the|this|your)\s+(?:payment|deposit)\b(?!\s+(?:details|information|info|method|card|online|here|on|at|via))|(?:refund|credit)\s+(?:the|our|my)\s+(?:duplicate|double|extra|incorrect)\s+(?:charge|payment)\b|(?:grant|give)\s+(?:me|us|[a-z]+)\s+(?:\S+\s+){0,2}?access\b|reset\s+(?:my|our|the)\s+(?:password|login|2fa)\b|transfer\s+(?:the|our|my)\s+(?:domain|account|licen[sc]e)\b|(?:copy|cc|bcc)\s+me\b)/i;
+  const ACCOUNT_ASK_HE = /(?:^|\s)אפשר\s+ש(?:תביא|תביאי|תשלח|תשלחי|תעביר|תעבירי|תבדוק|תבדקי|תאסוף|תאספי|תזמין|תזמיני)\s+(?:לי|לנו|את)|(?:^|\s)(?:תעביר|תעבירי|תעבירו)\s+(?:לי\s+|לנו\s+)?ב(?:ביט|פייבוקס|פיי)\s+|(?:^|\s)(?:תבדוק|תבדקי|תבדקו)\s+אם\s+\S+(?:\s+\S+){0,4}\s+ו(?:תגיד|תגידי|תגידו)\s+(?:לי|לנו)|(?:^|\s)(?:תחזור|תחזרי|תחזרו)\s+אל(?:יי|ינו)\s+(?:עם|ב|לפני|עד)|(?:^|\s)(?:תאשר|תאשרי|תאשרו)\s+(?:לי\s+)?ש|(?:^|\s)(?:תוכל|תוכלי|תוכלו)\s+(?:ל)?(?:הוסיף|תקן|עדכן|שנות|הוסיף)\s+|(?:^|\s)(?:תתקן|תתקני|תתקנו|תוסיף|תוסיפי|תעדכן|תעדכני)\s+(?:בבקשה\s+)?את\s+(?:ה)?\S+\s+(?:ב|ל|ש)\S*\s+\S+\s+(?:עד|היום|עוד)|נשמח\s+ש(?:תשלח|תשלחי|תשלחו|תעביר|תעבירי|תעבירו|תחזור|תחזרי)|(?:^|\s)(?:אנחנו\s+מחכים|אני\s+מחכה|אנו\s+מחכים)\s+(?:ל(?:תשובה|אישור|עדכון|תגובה)|עד)|(?:^|\s)(?:שלח|שלחי|שלחו|תשלח|תשלחי|תשלחו|תעביר|תעבירי|תעבירו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?את\s+(?:ה)?(?:פרטי|שם\s+המשתמש|מספר|כתובת|קוד)|(?:^|\s)(?:תצרף|תצרפי|תצרפו|תרשום|תרשמי|תרשמו|תוסיף|תוסיפי|תוסיפו)\s+(?:אותי|אותנו)(?:\s+בבקשה)?\s+(?:ל|ב)|(?:^|\s)(?:תבדוק|תבדקי|תבדקו)\s+(?:בבקשה\s+)?\S+(?:\s+\S+){0,3}\s+ו(?:תחזור|תחזרי|תחזרו)\s+אל(?:יי|ינו)|(?:^|\s)(?:בצע|בצעי|בצעו)\s+(?:לי\s+|לנו\s+)?(?:בבקשה\s+)?את\s+(?:ה)?(?:תשלום|מקדמה)|(?:^|\s)(?:תוסיף|תוסיפי|תוסיפו)\s+(?:בבקשה\s+)?את\s+(?:ה)?זמינות\s+שלך|(?:^|\s)(?:תעלה|תעלי|תעלו|תעביר|תעבירי|תעבירו|תאפס|תאפסי|תאפסו|תשים|תשימי|תשימו)\s+(?:לי\s+)?(?:בבקשה\s+)?(?:(?:את\s+)?(?:ה)?(?:טופס|מסמך|קובץ|דומיין|סיסמה|חשבון|רישיון)|אותי\s+בעותק)|(?:^|\s)(?:תן|תני|תנו)\s+לי\s+גישה/;
   // A short direct question that asks the reader for a named thing ("יש קישור לזום ?", "Do you have the invoice?"). Chat and
   // mail both carry these; the length floor used to drop them on every surface. The whole message has to be the question, so a
   // longer text, a bare "really?" and a greeting stay on the normal path.
-  const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
-  const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
+  const SHORT_ASK_EN = /^(?:(?:hi|hey|hello)[,!]?\s+)?(?:(?:do|did) you (?:have|get|send)\b|(?:is|are) there (?:a|an|any)\b|would it be possible to (?:get|have|send|share)\b|are you able to (?:send|share|forward|review|confirm|sign|approve|provide|upload|resend|check|take a look|get me)\b|is it possible to (?:get|have|send|share)\b|(?:can|could|would) you (?:please )?(?:send|share|resend|forward)(?!\s+(?:that|it|this|those|these)\b)\b|any (?:update|news)\b|where(?:'s| is) (?:the|my)\b)[^.!?\n]{3,60}\s*\?$/i;
+  const SHORT_ASK_HE = /^(?:(?:היי|הי|שלום)[,!]?\s+)?(?:יש\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:ה)?(?:קישור|לינק|מסמך|חשבונית|הצעה|עדכון|לוגו|קובץ|מצגת|הקלטה|תמונות|טופס|חוזה|תיקייה)|(?:קיבלת(?:ם|י)?|ראית(?:ם|י)?)\s+(?:את\s+)?(?:ה)?(?:הצעת\s+(?:ה)?מחיר|הצעה|חשבונית|מסמך|קובץ|חוזה|מייל|הודעה)|אפשר\s+(?:לקבל|לשלוח)|תוכל(?:י|ו)?\s+לשלוח|מה\s+(?:ה)?(?:סטטוס|מצב)|איפה\s+(?:ה)?(?:קישור|לינק|מסמך|חשבונית))[^.!?\n]{0,60}\s*\?$/;
   function shortAskText(text) {
     const t = String(text || '').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').trim();
     if (t.length < 8 || t.length > 90) return false;
@@ -341,7 +414,16 @@ const FlowJudgment = (() => {
     // Outlook's Hebrew locale equivalent of the From:/Sent: header block
     // above — same no-\b rule applies to both מאת and נשלח.
     /^\s*מאת:\s.*$\n^\s*נשלח:\s/im,
-    /^\s*>{1,}\s?\S/m
+    /^\s*>{1,}\s?\S/m,
+    // The forward and reply headers source-text.js already cuts on the Outlook path, so the Gmail path (which only
+    // has this list) stops at the same line: a From: line followed by any second header line (Date:, To:, Subject:,
+    // not only Sent:), Gmail's Hebrew "ב-… <name> כתב/ה:" line without בתאריך, the Hebrew "-----הודעה מקורית-----"
+    // banner, Outlook's underscore rule and Apple Mail's "Begin forwarded message:".
+    /^\s*(?:From|מאת)\s*[:：]\s*.+$\n^\s*(?:Sent|Date|To|Subject|Cc|נשלח|תאריך|אל|נושא|עותק)\s*[:：]/im,
+    /^\s*ב-?.{5,80}\s(?:כתב|כתבה|כתבו)\s*[:：]\s*$/m,
+    /^\s*-{2,}\s*הודעה מקורית\s*-{2,}\s*$/m,
+    /^\s*_{5,}\s*$/m,
+    /^\s*Begin forwarded message:?\s*$/im
   ];
 
   // Smart/curly quotes and apostrophes — auto-inserted by iOS/macOS Mail,
@@ -602,7 +684,7 @@ const FlowJudgment = (() => {
     return saw;
   }
 
-  function score(text, domain, facts) {
+  function score(text, domain, facts, opts) {
     const signals = [];
     const add = (id, weight, why) => signals.push({ id, weight, why });
 
@@ -655,8 +737,8 @@ const FlowJudgment = (() => {
     // A clock in the text ("Tuesday at 3", "בשעה 16:00") belongs to the event and hold gates, which already decide it.
     const clockNamed = /\b(?:at|@)\s*\d{1,2}(?::\d{2})?\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b|בשעה\s*\d|(?:^|\s)ב-?\d{1,2}(?::\d{2})?(?:\s|$|[.,?!])/i.test(text);
     const slotAsk = !clockNamed && slotAskText(text);
-    const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE, STATUS_INTRO_ASK, STATUS_INTRO_ASK_HE], directedAsk);
-    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk;
+    const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE, STATUS_INTRO_ASK, STATUS_INTRO_ASK_HE, ACCOUNT_ASK, ACCOUNT_ASK_HE], directedAsk);
+    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk || (!!(opts && opts.newAskOpen === true) && anyOf(outsideQuotes(newAskSpan(text)), [IMPERATIVE_ASK_HE, ADD_TASK_ASK], directedAsk));
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
 
@@ -831,6 +913,7 @@ const FlowJudgment = (() => {
   function evaluate(text, domainId, ctx) {
     ctx = ctx || {};
     const domain = FLOW_DOMAINS.find((d) => d.id === domainId) || FLOW_DOMAINS[0];
+    const askGate = { newAskOpen: newAskOpen(text, ctx.subject) };
     // Judge what the sender just wrote, not the thread they wrote it on top of.
     text = newContent(text);
     const raw = FlowExtract.extract(text, { senderEmail: ctx.senderEmail, now: ctx.now });
@@ -845,7 +928,7 @@ const FlowJudgment = (() => {
       isReply: /^re:/i.test(ctx.subject || '')
     };
 
-    const s = score(text, domain, facts);
+    const s = score(text, domain, facts, askGate);
     facts.lost = s.flags.lost;
     facts.executed = s.flags.executed;
     facts.dispute = s.flags.dispute;
@@ -913,8 +996,8 @@ const FlowJudgment = (() => {
   // test/judgment-corpus.cjs) rather than re-deriving a second, potentially
   // drifting copy of the same judgment.
   return {
-    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, isNegatedBefore, score, newContent,
-    HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE, slotAskText, shortAskText, SLOT_ASKS, SLOT_ASKS_HE,
+    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, isNegatedBefore, score, newContent, newAskOpen,
+    HANDOFF, HANDOFF_HE, IMPERATIVE_ASK_HE, ADD_TASK_ASK, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE, slotAskText, shortAskText, SLOT_ASKS, SLOT_ASKS_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };
 })();

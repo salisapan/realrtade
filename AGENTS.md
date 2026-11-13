@@ -27,6 +27,10 @@ Every new rule or setting saved to the bots' shared memory must be added to `doc
 
 Run `scripts/graphify-setup.sh` once per checkout, then `graphify query "<question>"`, `graphify path`, `graphify explain` before reading or grepping code. Work that a routine or agent finishes and verifies goes to git on the working branch so every agent sees it. Rules: `docs/glance-ai/graphify.md`.
 
+## Surfaces — every Gmail change ships everywhere
+
+Standing rule (Sali, 22/10/2026 01:31): every feature, fix or behavior built for Gmail is automatically built for all surfaces too — Outlook, the Google/Microsoft tools, WhatsApp/Messenger/Instagram, the Chrome extension, the Gmail add-on (iPhone) and Safari iOS (once it exists) — without a separate ask. Every PR includes a surface table (done, n/a with reason, or follow-up). Gate and parity-check every surface. Full text: `docs/vault/shared-rules.md` (same block as Graphify).
+
 ## What changed in the code — read this before saying nothing shipped
 
 `docs/glance-ai/shipped-in-code.md` is generated from git (`scripts/what-changed.sh`): every commit that changed `core/`, `src/`, `manifest.json` or the Gmail add-on, with its files. The working branch is far ahead of `main` and the manifest on it is 0.9.56; the paragraph above that says 0.9.55 is the last package written up, not the last code. How detection is shared across Gmail, Outlook, the phone card and chat: `docs/glance-ai/one-algorithm.md`.

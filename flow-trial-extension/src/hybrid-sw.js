@@ -186,19 +186,30 @@ const FlowHybridSW = (() => {
     function handle(msg, sender) {
       if (!msg || typeof msg.type !== 'string') return undefined;
       const own = !sender || !sender.id || sender.id === (c.runtime && c.runtime.id);
-      if (!own) return Promise.resolve({ ok: false, reason: 'foreign-sender' });
       const fromPage = Boolean(sender && sender.tab);
       switch (msg.type) {
-        case 'flow:hybrid-status': return status();
-        case 'flow:hybrid-probe': return probe();
-        case 'flow:hybrid-consent': return fromPage ? Promise.resolve({ ok: false, reason: 'popup-only' }) : (cfg.enabled ? setConsent(msg.patch || {}) : Promise.resolve({ ok: false, reason: 'not-enabled' }));
-        case 'flow:hybrid-retry': return fromPage ? Promise.resolve({ ok: false, reason: 'popup-only' }) : (cfg.enabled ? reset() : Promise.resolve({ ok: false, reason: 'not-enabled' }));
-        case 'flow:hybrid-infer': return (async () => {
+        case 'flow:hybrid-status':
+          if (!own) return Promise.resolve({ ok: false, reason: 'foreign-sender' });
+          return status();
+        case 'flow:hybrid-probe':
+          if (!own) return Promise.resolve({ ok: false, reason: 'foreign-sender' });
+          return probe();
+        case 'flow:hybrid-consent':
+          if (!own) return Promise.resolve({ ok: false, reason: 'foreign-sender' });
+          return fromPage ? Promise.resolve({ ok: false, reason: 'popup-only' }) : (cfg.enabled ? setConsent(msg.patch || {}) : Promise.resolve({ ok: false, reason: 'not-enabled' }));
+        case 'flow:hybrid-retry':
+          if (!own) return Promise.resolve({ ok: false, reason: 'foreign-sender' });
+          return fromPage ? Promise.resolve({ ok: false, reason: 'popup-only' }) : (cfg.enabled ? reset() : Promise.resolve({ ok: false, reason: 'not-enabled' }));
+        case 'flow:hybrid-infer':
+          if (!own) return Promise.resolve({ ok: false, reason: 'foreign-sender' });
+          return (async () => {
           const s = await status();
           if (!s.isModelLoaded) return { ok: false, reason: 'not-loaded' };
           return toOffscreen({ type: 'hybrid:infer', prompt: String(msg.prompt || ''), opts: { maxTokens: msg.opts && msg.opts.maxTokens } });
         })();
-        case 'flow:execute': return (async () => {
+        case 'flow:execute':
+          if (!own) return Promise.resolve({ ok: false, reason: 'foreign-sender' });
+          return (async () => {
           const k = await consent();
           if (!cfg.enabled || !k.server) return { ok: false, reason: 'needs-consent' };
           const p = msg.payload || {};
@@ -210,7 +221,9 @@ const FlowHybridSW = (() => {
             return { ok: true, text: data.text };
           } catch (e) { return { ok: false, error: String(e && e.message || e).slice(0, 120), status: e && e.status }; }
         })();
-        case 'hybrid:state': return (async () => {
+        case 'hybrid:state':
+          if (!own) return Promise.resolve({ ok: false, reason: 'foreign-sender' });
+          return (async () => {
           if (sender && sender.tab) return { ok: false, reason: 'offscreen-only' };
           await onState(msg.state);
           return { ok: true };

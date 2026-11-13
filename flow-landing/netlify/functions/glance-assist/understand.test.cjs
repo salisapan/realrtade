@@ -52,7 +52,7 @@ const used = (store, subjectPrefix) => [...store.rows.entries()].filter(([k]) =>
   }
 
   console.log('\n--- refused before anything is asked or charged ---\n');
-  for (const [name, text, code] of [['an e-mail left in the text', 'Write to dana@example.com by [DATE_1]', 'pii'], ['a phone left in the text', 'Call me at +972-54-123-4567', 'pii'], ['an amount left in the text', 'Please pay $4,200 today', 'pii'], ['a real date left in the text', 'Send it by October 14, please', 'pii'], ['empty text', '   ', 'bad_request'], ['too long', 'x'.repeat(6001), 'bad_request']]) {
+  for (const [name, text, code] of [['an e-mail left in the text', 'Write to dana@example.com by [DATE_1]', 'pii'], ['a phone left in the text', 'Call me at +972-54-123-4567', 'pii'], ['an Israeli mobile left in the text', 'Call me at 054-1234567 [DATE_1]', 'pii'], ['an Israeli landline in brackets', 'Call (03) 555-1234 [DATE_1]', 'pii'], ['an amount left in the text', 'Please pay $4,200 today', 'pii'], ['a real date left in the text', 'Send it by October 14, please', 'pii'], ['empty text', '   ', 'bad_request'], ['too long', 'x'.repeat(6001), 'bad_request']]) {
     const m = make();
     const r = await m.u.read({ maskedText: text, installId: ID });
     check(name + ': ' + code + ', no call, nothing charged', r.body.code === code && m.calls.length === 0 && m.store.rows.size === 0, r);

@@ -104,6 +104,68 @@ test('(b) verified Drive save and draft show full handled, not partly handled', 
   await expect(receipt.locator('.flow-chip-handled')).toContainText('טופל');
   await expect(receipt).not.toContainText('טופל חלקית');
   await expect(receipt.locator('.flow-chip-handled-partial')).toHaveCount(0);
+  // Remount used to flash טופל חלקית: compose hand-off inflated Undo total.
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    const all = bag.glanceLaneUndo || {};
+    const rows = Object.keys(all).map((k) => all[k]).filter((r) => r && Array.isArray(r.steps) && r.steps.length);
+    if (!rows.length) return 'no-row';
+    const bad = rows.find((r) => r.partial === true && r.total > r.steps.length);
+    return bad ? 'partial-flash' : 'ok';
+  }, { timeout: 10000 }).toBe('ok');
+});
+
+test('(b2) remount after Drive+compose hand-off stays טופל, never טופל חלקית', async ({ glance }) => {
+  await glance.context.route('https://mail.google.com/e2e/**', (r) => r.fulfill({ status: 404, contentType: 'text/plain', body: 'page fetch' }));
+  await glance.seedGmail({ glanceUiLanguage: 'he' });
+  const page = await glance.openGmail({
+    messageId: 'm-polish-b2', threadId: 't-polish-b2', subject: 'Board pack',
+    senderEmail: 'dana@acme.io', senderName: 'Dana', ownEmail: SELF, to: [SELF], lang: 'he',
+    body: ASK, downloadUrl: BOARD,
+    composeReply: true, composeTo: 'dana@acme.io', composeSubject: 'Re: Board pack'
+  });
+  const chip = page.locator('div[role="main"] button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  await expect(page.locator('div[role="main"] .flow-chip-done')).toBeVisible({ timeout: 20000 });
+  // Leave and reopen the same mail so mountLaneReceipt repaints from storage.
+  await page.goto('about:blank');
+  const again = await glance.openGmail({
+    messageId: 'm-polish-b2', threadId: 't-polish-b2', subject: 'Board pack',
+    senderEmail: 'dana@acme.io', senderName: 'Dana', ownEmail: SELF, to: [SELF], lang: 'he',
+    body: ASK, downloadUrl: BOARD,
+    composeReply: true, composeTo: 'dana@acme.io', composeSubject: 'Re: Board pack'
+  });
+  const remount = again.locator('div[role="main"] .flow-chip-done, div[role="main"] .flow-chip-handled');
+  await expect(remount.first()).toBeVisible({ timeout: 20000 });
+  await expect(again.locator('div[role="main"]')).not.toContainText('טופל חלקית');
+});
+
+test('(b3) a full טופל with a compose hand-off leaves Google Connected, no «שלב אחד לא הושלם»', async ({ glance }) => {
+  // Gate (c) on e1695c85: this Do It set googleLaneWarning, and after a
+  // revoke and a full re-grant the popup still said «שלב אחד לא הושלם».
+  await glance.context.route('https://mail.google.com/e2e/**', (r) => r.fulfill({ status: 404, contentType: 'text/plain', body: 'page fetch' }));
+  await glance.seedGmail({ glanceUiLanguage: 'he' });
+  const page = await glance.openGmail({
+    messageId: 'm-polish-b3', threadId: 't-polish-b3', subject: 'Board pack',
+    senderEmail: 'dana@acme.io', senderName: 'Dana', ownEmail: SELF, to: [SELF], lang: 'he',
+    body: ASK, downloadUrl: BOARD,
+    // No Reply open, as in the live Gate: the draft step is a hand-off.
+    composeReply: false
+  });
+  const chip = page.locator('div[role="main"] button.flow-chip');
+  await expect(chip).toBeVisible({ timeout: 20000 });
+  await chip.click();
+  const receipt = page.locator('div[role="main"] .flow-chip-done');
+  await expect(receipt).toBeVisible({ timeout: 20000 });
+  await expect(receipt).not.toContainText('טופל חלקית');
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    return Boolean(bag.glanceLaneUndo && Object.keys(bag.glanceLaneUndo).length);
+  }, { timeout: 10000 }).toBe(true);
+  const bag = await glance.storage();
+  // connectorStatus reads this key: set, Google shows «שלב אחד לא הושלם» and not Connected.
+  expect(bag.googleLaneWarning || null).toBeNull();
 });
 
 test('(b) one closed step of two still yields partly handled copy', () => {
@@ -114,6 +176,10 @@ test('(b) one closed step of two still yields partly handled copy', () => {
   const copy = R.confirmation({ succeeded: 1, total: 2, priorCloses: 0, lang: 'he' });
   expect(copy.full).toBe(false);
   expect(copy.status).toBe('Partly handled.');
+  const fullMeta = R.laneUndoStoreMeta({ full: true, storedCount: 1, attemptedCount: 1 });
+  expect(fullMeta.total).toBe(1);
+  const partMeta = R.laneUndoStoreMeta({ full: false, storedCount: 1, attemptedCount: 2 });
+  expect(partMeta.total).toBe(2);
 });
 
 test('(c) receipt undo is a real button with a short label and rolls back', async ({ glance }) => {

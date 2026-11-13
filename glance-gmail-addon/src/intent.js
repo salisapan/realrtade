@@ -27,6 +27,23 @@ var GlanceIntent = (function () {
     return text;
   }
 
+  function englishMonthDayToSlash(segment) {
+    var m = String(segment || '').match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\s+(\d{1,2})\b/i);
+    if (!m) return segment;
+    var mo = MONTHS[m[1].toLowerCase()];
+    if (!mo) return segment;
+    return String(+m[2]) + '/' + String(mo);
+  }
+
+  function localizeEngineTitle(text, title) {
+    var t = String(title || '');
+    if (!t || !mailIsHebrew(text)) return sanitizeTitle(t);
+    if (!/\bby\b/i.test(t) && !/reply requested/i.test(t) && !/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i.test(t)) return sanitizeTitle(t);
+    t = t.replace(/\s+by\s+/gi, ' עד ');
+    t = t.replace(/\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+\d{1,2}\b/gi, englishMonthDayToSlash);
+    return sanitizeTitle(t);
+  }
+
   function pad(n) {
     n = Number(n);
     return (n < 10 ? '0' : '') + n;
@@ -133,29 +150,172 @@ var GlanceIntent = (function () {
     return { due: due, text: rest };
   }
 
-  function stripGreeting(raw) {
-    var text = collapse(raw);
-    text = text.replace(/^(?:hi|hello|hey)(?:\s+[^,]{1,40})?[,!]?\s+/i, '');
-    text = text.replace(/^dear\s+[^,]{1,40},\s+/i, '');
-    text = text.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
-    return text;
+  function readerNameList(ctx) {
+    var names = [];
+    if (ctx && ctx.userName) names.push(String(ctx.userName).toLowerCase());
+    if (ctx && ctx.ownNames) {
+      for (var i = 0; i < ctx.ownNames.length; i++) {
+        if (ctx.ownNames[i]) names.push(String(ctx.ownNames[i]).toLowerCase());
+      }
+    }
+    if (ctx && ctx.readerEmail) {
+      var local = String(ctx.readerEmail).split('@')[0] || '';
+      if (local) {
+        names.push(local.toLowerCase());
+        names.push(local.replace(/[._-]+/g, ' ').toLowerCase());
+      }
+    }
+    return names;
   }
 
-  // An explicit remember ask must start the message (after a short greeting).
-  // The same phrase buried after other sentences is not a local ask.
-  function buriedRemember(text) {
-    var head = String(text || '').split(/\nOn [A-Za-z]{3},/)[0].split(/\nwrote:/i)[0];
-    var raw = stripGreeting(head);
-    if (!raw) return false;
-    if (/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+/i.test(raw)) return false;
-    if (/^תזכיר(?:י)?\s+לי\s+/.test(raw) || /^אל תשכח(?:י)?\s+/.test(raw)) return false;
-    return /(?:^|[.!?]\s+)(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+/i.test(raw)
-      || /(?:^|[.!?]\s+)(?:תזכיר(?:י)?\s+לי|אל תשכח(?:י)?)\s+/.test(raw);
+  function nameIsReader(name, ctx) {
+    var who = String(name || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!who) return false;
+    var list = readerNameList(ctx);
+    for (var i = 0; i < list.length; i++) {
+      var n = list[i];
+      if (who === n || who.indexOf(n) !== -1 || n.indexOf(who) !== -1) return true;
+    }
+    return false;
   }
 
-  function localRemember(text, now, timeZone) {
-    var raw = stripGreeting(text);
+  function nameMatchesRecipient(who, recipients) {
+    if (typeof FlowNameMatch !== 'undefined' && FlowNameMatch.matchesRecipient) {
+      return FlowNameMatch.matchesRecipient(who, recipients);
+    }
+    var name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name || !recipients || !recipients.length) return false;
+    for (var i = 0; i < recipients.length; i++) {
+      var r = recipients[i] || {};
+      var display = String(r.name || '').toLowerCase().trim();
+      var local = String(r.localPart || (r.email ? r.email.split('@')[0] : '') || '').toLowerCase();
+      if (display && (name === display || name.indexOf(display) !== -1 || display.indexOf(name) !== -1)) return true;
+      if (local && (name === local || name.replace(/\s+/g, '') === local.replace(/[._-]+/g, ''))) return true;
+    }
+    return false;
+  }
+
+  function readerInTo(ctx) {
+    var email = String((ctx && ctx.readerEmail) || '').toLowerCase();
+    if (!email) return true;
+    var all = ((ctx && ctx.toRecipients) || []).concat((ctx && ctx.ccRecipients) || []);
+    if (!all.length) return true;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i] && String(all[i].email || '').toLowerCase() === email) return true;
+    }
+    return false;
+  }
+
+  function greetOnly(text) {
+    var t = String(text || '').trim();
+    if (!t) return false;
+    return /^(?:hi|hello|hey)\s+[A-Za-z][\w'’-]*\s*[!?.]?$/i.test(t)
+      || /^(?:שלום|היי|הי)\s+[\u0590-\u05FF][\u0590-\u05FF'’\s-]*\s*[!?.]?$/u.test(t);
+  }
+
+  function greetingToOther(text, ctx) {
+    var raw = String(text || '');
+    var m = raw.match(/^(?:hi|hello|hey)(?:\s+there)?\s+([^,!\n]{1,40})[,!]/i);
+    var hm = raw.match(/^(?:שלום|היי|הי)\s+([^,!\n]{1,40})(?:[,!]|\s*$)/);
+    var who = m ? m[1].trim() : (hm ? hm[1].trim() : '');
+    if (!who) return false;
+    if (/^(there|team|all|everyone)$/i.test(who)) return false;
+    if (nameIsReader(who, ctx)) return false;
+    if (!readerInTo(ctx)) return true;
+    var others = ((ctx && ctx.toRecipients) || []).concat((ctx && ctx.ccRecipients) || []).filter(function (r) {
+      return r && String(r.email || '').toLowerCase() !== String((ctx && ctx.readerEmail) || '').toLowerCase();
+    });
+    return nameMatchesRecipient(who, others);
+  }
+
+  function relayTargetIsThirdParty(who) {
+    var name = String(who || '').toLowerCase().replace(/[^\w\u0590-\u05FF'’\s-]/g, '').trim();
+    if (!name) return false;
+    if (/^(you|ya|u|me|us|your|yours|yourself|yourselves)$/.test(name)) return false;
+    if (/^(לך|לכם|לי|לנו|אותך|אתכם|אותי)$/.test(name)) return false;
+    return true;
+  }
+
+  function taskTitleIsMeaningful(title) {
+    var t = String(title || '').replace(/\s+/g, ' ').trim();
+    if (!t || t.length < 2) return false;
+    if (/^handle this note$/i.test(t)) return false;
+    if (t === 'לטפל בהערה') return false;
+    return true;
+  }
+
+  function stripSignatureFromText(text) {
+    var lines = String(text || '').split('\n');
+    var end = lines.length;
+    while (end > 0 && !String(lines[end - 1] || '').trim()) end--;
+    while (end > 0) {
+      var line = String(lines[end - 1] || '').trim();
+      if (!line) {
+        end--;
+        continue;
+      }
+      if (/^(?:thanks|thank you|best|regards|cheers|sincerely),?\.?$/i.test(line)) {
+        end--;
+        continue;
+      }
+      if (/^(?:תודה|בברכה|יום נעים),?\.?$/i.test(line)) {
+        end--;
+        continue;
+      }
+      if (lines.length > 1 && line.split(/\s+/).length === 1 && !/[.!?,:]/.test(line) && /^[\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z'’-]{0,50}$/.test(line)) {
+        end--;
+        continue;
+      }
+      break;
+    }
+    return lines.slice(0, end).join('\n').trim();
+  }
+
+  function mailLang(text) {
+    return mailIsHebrew(text) ? 'he' : 'en';
+  }
+
+  function spottedSheetPlan(prepared, hit) {
+    if (/\b(?:send|email|forward)\s+me\b[^.\n]{0,100}\b(?:sheet|spreadsheet|balance\s+sheet)\b/i.test(prepared)) return null;
+    if (!/\b(?:sheet|spreadsheet|excel)\b|(?:גיליון|טבלה|אקסל)/i.test(prepared)) return null;
+    var writeEn = /\b(?:record|add|put|enter|update|fill|log)\b/i;
+    var writeEnAsk = /\b(?:can|could|would)\s+you\b[^.\n]{0,80}\b(?:record|add|put|enter|update|fill|log)\b/i;
+    var writeHe = /(?:רשום|תרשום|להוסיף|לעדכן|להכניס|למלא|תמלא|תעדכן|תוסיף)/;
+    if (writeEn.test(prepared) || writeEnAsk.test(prepared) || writeHe.test(prepared)) return 'sheet';
+    if (hit && hit.intent && hit.intent.signals && hit.intent.signals.workAsk) return 'sheet';
+    return null;
+  }
+
+  function localRelayQuiet(raw) {
+    var text = String(raw || '');
+    if (/\b(?:please\s+)?remind\s+me\b/i.test(text)) return false;
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|תזכור(?:י|ו)?\s+לי|להזכיר\s+לי|אל\s+תשכח(?:י|ו)?\s+לי)\b/.test(text)) return false;
+    var enForgetRelay = text.match(/\b(?:please\s+)?(?:do not|don't|dont)\s+forget\s+to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enForgetRelay && relayTargetIsThirdParty(enForgetRelay[1])) return true;
+    var enRememberRelay = text.match(/\bplease remember to\s+(?:remind|tell|ask|notify|ping|nudge|check with)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\b/i);
+    if (enRememberRelay && relayTargetIsThirdParty(enRememberRelay[1])) return true;
+    var enVerb = text.match(/\b(?:remind|tell|ask|notify|ping|nudge)\s+([A-Za-z\u0590-\u05FF][\w\u0590-\u05FF'’-]{0,40})\s+(?:to|that)\b/i);
+    if (enVerb && relayTargetIsThirdParty(enVerb[1])) return true;
+    if (/אל\s+תשכח\s+להזכיר\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)/.test(text)) return true;
+    if (/תזכור\s+ל(?:הזכיר|זכיר)\s+ל(?!י(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותך|אתכם|אותי)[\u0590-\u05FF]{2,}/.test(text)) return true;
+    if (/תזכור\s+לשאול\s+את\s+/.test(text)) return true;
+    if (/תזכור\s+להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)/.test(text)) return true;
+    if (/להגיד\s+ל(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|כם(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|אותי|אותנו)[\u0590-\u05FF]{2,}/.test(text)) return true;
+    if (/לעדכן\s+אות(?!י(?:\s|[,،.!?]|$)|נו(?:\s|[,،.!?]|$)|ך(?:\s|[,،.!?]|$)|כם)/.test(text)) return true;
+    return false;
+  }
+
+  function localRemember(text, ctx) {
+    var now = ctx && ctx.now;
+    var timeZone = ctx && ctx.timeZone;
+    var raw = collapse(text);
     if (!raw || raw.length > 8000) return null;
+    if (localRelayQuiet(raw)) return null;
+    if (greetingToOther(raw, ctx)) return null;
+    raw = raw.replace(/^(?:hi|hello|hey)(?:\s+[^,!\n]{1,40})?[,!]\s*/i, '');
+    raw = raw.replace(/^dear\s+[^,]{1,40},\s+/i, '');
+    raw = raw.replace(/^(?:שלום|היי|הי)\s+[^,!\n]{1,40}[,!]\s*/, '');
+    raw = raw.replace(/^(?:שלום|היי|הי)\s*[,!]?\s+/, '');
     var match = raw.match(/^(?:please remember to|(?:do not|don't|dont) forget(?: to)?)\s+(.+)$/i);
     var lang = 'en';
     if (!match) {
@@ -192,9 +352,26 @@ var GlanceIntent = (function () {
   }
 
   // A draft or a file step is not rewritten into a task or an event.
-  function mapEngine(result, now, timeZone) {
+  var ADDON_UNSUPPORTED_PLAN = {
+    'reply-fact': true,
+    'file-it': true,
+    'attach-invite': true,
+    'create-missing': true,
+    'file-on-hold': true,
+    'file-on-task': true,
+    'clear-it': true,
+    'move-it': true
+  };
+
+  function mapEngine(result, now, timeZone, sourceText) {
     if (!result || !result.plan || !result.plan.steps) return null;
+    var planId = String(result.plan.id || '');
+    if (ADDON_UNSUPPORTED_PLAN[planId]) return null;
     var steps = result.plan.steps;
+    if (planId === 'reply-track') {
+      steps = steps.filter(function (st) { return st && st.kind === 'googleTask'; });
+      if (!steps.length) return null;
+    }
     if (!steps.length) return null;
     // The shared plan may carry a reply draft beside the task ("Draft reply" + "Task"). This card writes no draft, so it
     // offers the task or hold step only; the detection is the same one every surface made.
@@ -212,14 +389,23 @@ var GlanceIntent = (function () {
     if (steps.length === 1 && steps[0].kind === 'googleTask') {
       var taskParams = steps[0].params || {};
       var title = sanitizeTitle(taskParams.title || taskParams.what || steps[0].label || '');
-      if (!title) return null;
+      if (!taskTitleIsMeaningful(title) && result.intent && result.intent.entities) {
+        var alt = result.intent.entities.requestWhat || result.intent.entities.what;
+        if (alt) title = sanitizeTitle(alt);
+      }
+      if (!taskTitleIsMeaningful(title)) return null;
+      var dueIso = isoOrNull(taskParams.dateIso, now, timeZone);
+      if (planId === 'reply-track') {
+        title = replyTrackCardTitle(sourceText || '', title, dueIso);
+      }
+      title = localizeEngineTitle(sourceText || '', title);
       return {
         speak: true,
         source: 'engine',
         kind: 'task',
         title: title,
-        due: isoOrNull(taskParams.dateIso, now, timeZone),
-        lang: null,
+        due: dueIso,
+        lang: mailLang(sourceText || ''),
         reason: 'task',
         planId: result.plan.id || 'task'
       };
@@ -229,7 +415,8 @@ var GlanceIntent = (function () {
       var holdClock = clockOf(holdParams);
       var holdDate = isoOrNull(holdParams.dateIso, now, timeZone);
       var holdTitle = sanitizeTitle(holdParams.title || '');
-      if (!holdClock || !holdDate || !holdTitle || holdParams.requireTime === false) return null;
+      if (!holdClock || !holdDate || !holdTitle) return null;
+      if (holdParams.requireTime === false && !holdClock) return null;
       return {
         speak: true,
         source: 'engine',
@@ -240,7 +427,7 @@ var GlanceIntent = (function () {
         hour: holdClock.hour,
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
-        lang: null,
+        lang: mailLang(sourceText || ''),
         reason: 'hold',
         planId: 'hold'
       };
@@ -273,7 +460,7 @@ var GlanceIntent = (function () {
         quote: sanitizeTitle(calendarParams.quote || ''),
         taskTitle: taskTitle,
         taskDue: isoOrNull(reminderParams.dateIso, now, timeZone),
-        lang: null,
+        lang: mailLang(sourceText || ''),
         reason: 'schedule',
         planId: 'schedule'
       };
@@ -317,10 +504,9 @@ var GlanceIntent = (function () {
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n');
     if (typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.newContent === 'function') {
-      raw = FlowJudgment.newContent(raw);
+      return FlowJudgment.newContent(raw);
     }
-    var quote = raw.split(/\nOn [A-Za-z]{3},/)[0].split(/\nwrote:/i)[0];
-    return collapse(quote);
+    return raw;
   }
 
   // Card chrome follows the Gmail locale. The title written on the event
@@ -347,27 +533,6 @@ var GlanceIntent = (function () {
     return 'פגישה';
   }
 
-  function explicitIsraeliDate(text, now, timeZone) {
-    if (!mailIsHebrew(text)) return null;
-    var match = String(text || '').match(/(\d{1,2})[./](\d{1,2})(?:[./](20\d{2}))?/);
-    if (!match) return null;
-    var year = match[3] ? +match[3] : +todayIso(now, timeZone).slice(0, 4);
-    var iso = year + '-' + pad(+match[2]) + '-' + pad(+match[1]);
-    return validIso(iso) ? iso : null;
-  }
-
-  function applyHebrewExplicitDate(prepared, decision, now, timeZone) {
-    if (!decision || !decision.speak) return decision;
-    var explicit = explicitIsraeliDate(prepared, now, timeZone);
-    if (!explicit) return contentTitle(prepared, decision);
-    if (decision.kind === 'schedule' || decision.kind === 'hold') {
-      decision.dateIso = explicit;
-      decision.due = explicit;
-      if (decision.kind === 'schedule') decision.taskDue = explicit;
-    }
-    return contentTitle(prepared, decision);
-  }
-
   function writtenDate(text, dateIso) {
     var raw = String(text || '');
     var re = /(\d{1,2})[./](\d{1,2})(?:[./]\d{2,4})?/g;
@@ -387,7 +552,52 @@ var GlanceIntent = (function () {
     }
     if (fallback) return fallback;
     if (wantDay != null) return String(wantDay) + '/' + String(wantMonth);
+    var en = raw.match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\s+(\d{1,2})\b/i);
+    if (en) {
+      var mo = MONTHS[en[1].toLowerCase()];
+      if (mo) return String(+en[2]) + '/' + String(mo);
+    }
     return '';
+  }
+
+  function replyTrackCardTitle(text, rawTitle, dueIso) {
+    var title = String(rawTitle || '').trim();
+    var he = mailIsHebrew(text);
+    var isReplyLabel = /^reply requested\b/i.test(title);
+    if (!isReplyLabel && !(he && /reply requested/i.test(title))) return sanitizeTitle(title);
+    var sendReportEn = /\b(?:please\s+)?send\b[^.\n]{0,80}\breport\b/i.test(text);
+    var sendReportHe = /(?:בבקשה\s+)?תשלח[^.\n]{0,80}דוח/.test(text);
+    if (sendReportEn || sendReportHe) {
+      var dueSend = writtenDate(text, dueIso || '');
+      if (he) return dueSend ? sanitizeTitle('תשלח את הדוח עד ' + dueSend) : sanitizeTitle('תשלח את הדוח');
+      return dueSend ? sanitizeTitle('Send the report by ' + dueSend) : sanitizeTitle('Send the report');
+    }
+    var payEn = /\b(?:please\s+)?pay\b[^.\n]{0,100}\binvoice\b/i.test(text);
+    var payHe = /(?:בבקשה\s+)?(?:ל)?שלם[^.\n]{0,100}חשבונית/.test(text);
+    if (payEn || payHe) {
+      var amt = title.match(/,\s*((?:₪|\$|€|£)\s?[\d,]+(?:\.\d+)?)\s*$/);
+      if (!amt) amt = String(text || '').match(/((?:₪|\$|€|£)\s?[\d,]+(?:\.\d+)?)/);
+      if (!amt) {
+        var amtAfter = String(text || '').match(/([\d,]+(?:\.\d+)?)\s*(₪|\$|€|£)/);
+        if (amtAfter) amt = [amtAfter[0], amtAfter[2] + amtAfter[1]];
+      }
+      var suffix = amt ? ', ' + String(amt[1] || amt[0]).trim() : '';
+      if (he) {
+        if (/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\b/i.test(String(text || ''))) {
+          var dueEn = writtenDate(text, dueIso || '');
+          if (dueEn) return sanitizeTitle('לשלם חשבונית' + suffix + ' עד ' + dueEn);
+        }
+        return sanitizeTitle('לשלם חשבונית' + suffix);
+      }
+      return sanitizeTitle('Pay invoice' + suffix);
+    }
+    var due = writtenDate(text, dueIso || '');
+    if (he) {
+      if (due) return sanitizeTitle('להשיב עד ' + due);
+      return 'נדרשת תשובה';
+    }
+    if (due) return sanitizeTitle('Reply by ' + due);
+    return 'Reply requested';
   }
 
   function contentTitle(text, decision) {
@@ -406,7 +616,8 @@ var GlanceIntent = (function () {
     return decision;
   }
 
-  function silence(reason, planId) {
+  function silence(reason, planId, extra) {
+    extra = extra || {};
     return {
       speak: false,
       source: null,
@@ -415,67 +626,10 @@ var GlanceIntent = (function () {
       due: null,
       lang: null,
       reason: reason || 'quiet',
-      planId: planId || null
+      planId: planId || null,
+      droppedPlanId: extra.droppedPlanId || planId || null,
+      intentType: extra.intentType || null
     };
-  }
-
-  function hebrewScheduleFromIntent(prepared, intent, now, timeZone) {
-    if (!intent || intent.type !== 'event' || !mailIsHebrew(prepared)) return null;
-    var ent = intent.entities || {};
-    var dateIso = explicitIsraeliDate(prepared, now, timeZone) || isoOrNull(ent.dateIso, now, timeZone);
-    if (!dateIso) return null;
-    var clock = clockOf({ hour: ent.hour, minute: ent.minute });
-    var label = sanitizeTitle(intent.label || ent.what || '');
-    if (!label) return null;
-    var calendarParams = {
-      title: label,
-      dateIso: dateIso,
-      quote: prepared,
-      requireTime: Boolean(clock)
-    };
-    if (clock) {
-      calendarParams.hour = clock.hour;
-      calendarParams.minute = clock.minute;
-    }
-    return {
-      intent: intent,
-      plan: {
-        id: 'schedule',
-        steps: [
-          { kind: 'calendar', params: calendarParams },
-          { kind: 'googleTask', params: { title: label, dateIso: dateIso } }
-        ]
-      }
-    };
-  }
-
-  // Gmail add-on: Hebrew meetings the shared judge withholds still close as
-  // schedule (all-day or timed). A timed hold from the engine becomes schedule.
-  function normalizeEngineHit(prepared, hit, now, timeZone) {
-    if (!hit) return hit;
-    if (hit.plan && hit.plan.id === 'hold' && hit.plan.steps && hit.plan.steps[0] && mailIsHebrew(prepared)) {
-      var holdParams = (hit.plan.steps[0].params) || {};
-      if (Number.isInteger(holdParams.hour) && holdParams.requireTime === false) {
-        return {
-          intent: hit.intent,
-          plan: {
-            id: 'schedule',
-            steps: [
-              hit.plan.steps[0],
-              {
-                kind: 'googleTask',
-                params: {
-                  title: sanitizeTitle(holdParams.title || ''),
-                  dateIso: holdParams.dateIso || null
-                }
-              }
-            ]
-          }
-        };
-      }
-    }
-    if (hit.plan) return hit;
-    return hebrewScheduleFromIntent(prepared, hit.intent, now, timeZone) || hit;
   }
 
   function resolveTask(text, ctx) {
@@ -485,26 +639,44 @@ var GlanceIntent = (function () {
       err.diag = err.diag || 'judge';
       throw err;
     }
-    if (buriedRemember(prepared)) return silence('buried-remember', null);
-    var local = localRemember(prepared, ctx.now, ctx.timeZone);
+    var bodyText = stripSignatureFromText(prepared);
+    if (greetingToOther(prepared, ctx) || greetingToOther(bodyText, ctx)) return silence('hedge', null);
+    var local = localRemember(bodyText, ctx);
     if (local) return local;
     if (typeof ctx.engine === 'function') {
       var hit = null;
-      try { hit = ctx.engine(prepared, ctx); } catch (err) {
+      try { hit = ctx.engine(bodyText); } catch (err) {
         err.diag = err.diag || 'judge';
         throw err;
       }
-      hit = normalizeEngineHit(prepared, hit, ctx.now, ctx.timeZone);
-      var mapped = mapEngine(hit, ctx.now, ctx.timeZone);
-      if (mapped) return applyHebrewExplicitDate(prepared, mapped, ctx.now, ctx.timeZone);
-      if (hit && hit.plan && hit.plan.id) return silence('dropped', hit.plan.id);
+      var sheetOnly = spottedSheetPlan(bodyText, hit);
+      if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
+        if (sheetOnly) {
+          return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
+        }
+        return silence(String(hit.reason).slice(6), null);
+      }
+      if (sheetOnly) {
+        return silence('dropped', sheetOnly, { droppedPlanId: sheetOnly, intentType: hit && hit.intent && hit.intent.type ? hit.intent.type : null });
+      }
+      var mapped = mapEngine(hit, ctx.now, ctx.timeZone, bodyText);
+      if (mapped) return contentTitle(prepared, mapped);
+      if (hit && hit.plan && hit.plan.id) {
+        var dropId = spottedSheetPlan(prepared, hit) || hit.plan.id;
+        return silence('dropped', dropId, {
+          droppedPlanId: dropId,
+          intentType: hit.intent && hit.intent.type ? hit.intent.type : null
+        });
+      }
       if (hit && hit.intent && !hit.intent.type) return silence('intent-null', null);
+      if (greetOnly(bodyText) || greetOnly(prepared)) return silence('hedge', null);
       return silence('no-plan', null);
     }
     if (ctx.classifierResult) {
       var fromApi = mapClassifierResult(ctx.classifierResult, ctx.now, ctx.timeZone);
       if (fromApi) return fromApi;
     }
+    if (greetOnly(bodyText) || greetOnly(prepared)) return silence('hedge', null);
     return silence('quiet', null);
   }
 
@@ -516,9 +688,8 @@ var GlanceIntent = (function () {
     sanitizeTitle: sanitizeTitle,
     prepareText: prepareText,
     contentTitle: contentTitle,
-    silence: silence,
-    normalizeEngineHit: normalizeEngineHit,
-    buriedRemember: buriedRemember
+    replyTrackCardTitle: replyTrackCardTitle,
+    silence: silence
   };
 })();
 
