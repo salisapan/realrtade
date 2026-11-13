@@ -91,7 +91,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוח|זורם|מסתדר|מתאים)\s+לך\s+ש(?:נדבר|ניפגש|נשב|נעשה|נקבע)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוח|זורם)\s+לך\s+(?:פגישה|שיחה|זום|סינק|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:קובעים|נסגור)\s+(?:פגישה|שיחה|זום|סינק|ישיבה|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])נ?אשמח\s+(?:לפגוש\s+אותך|להיפגש|לשבת\s+איתך)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?פנ(?:ה|י|ו)\s+לי\s+(?:חצי\s+שעה|שעה|רבע\s+שעה|כמה\s+דקות)|(?:^|[^\u0590-\u05FF])אפנה\s+לך\s+(?:חצי\s+שעה|שעה|רבע\s+שעה)|(?:^|[^\u0590-\u05FF])תצטרפ(?:י|ו)?\s+אלינו\s+ל|(?:^|[^\u0590-\u05FF])(?:שריינתי|שמרתי)\s+לנו(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])הזמנתי\s+(?:לנו\s+)?חדר(?:\s+ישיבות)?(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])יש\s+לי\s+חלון(?![\u0590-\u05FF]))/;
 
   // "This is not happening at the time this message names."
   //
@@ -191,7 +191,7 @@ const FlowIntent = (() => {
   // no per-sentence negation/hedge check, so each addition below was
   // re-verified against the full negative-test corpus before being kept.
   const READER_COMMIT = /\b(you (?:agreed|committed|promised|confirmed) to|you (?:said|mentioned|indicated) you(?:'d| would)|you told (?:us|me) you(?:'d| would)|you'?re supposed to|you were (?:going|supposed) to|as (?:you|per your|we) (?:agreed|committed|promised|discussed)|confirming you(?:'ll| will)|per your commitment|as (?:discussed|promised|previously agreed),? you(?:'ll| will)|per our conversation,? you(?:'ll| will)|reminding you (?:that )?you (?:agreed|committed|promised) to)\b/i;
-  const READER_COMMIT_HE = /(כפי שהתחייבת|כמו שהתחייבת|כפי שסיכמת|כמו שסיכמת|את(?:ה)? התחייבת|כמו שאמרת ש|כפי שהבטחת|כמו שהבטחת|אתה אמור ל|את אמורה ל|היית אמור ל|היית אמורה ל|לפי הסיכום שלנו|בהתאם למה שסיכמנו|כפי שהיה מוסכם|כמו שהיה מוסכם)/;
+  const READER_COMMIT_HE = /(כפי שהתחייבת|כמו שהתחייבת|כפי שסיכמת|כמו שסיכמת|את(?:ה)? התחייבת|כמו שאמרת ש|כפי שהבטחת|כמו שהבטחת|אתה אמור ל|את אמורה ל|היית אמור ל|היית אמורה ל|לפי הסיכום שלנו|בהתאם למה שסיכמנו|כפי שהיה מוסכם|כמו שהיה מוסכם|(?<!לא )(?:התחייבת|הבטחת) (?:ל|ש)|סיכמנו ש(?:ת|י)|(?:אמרת|דיברנו|סוכם) ש(?:ת)|לפי מה שאמרת)/;
 
   // The one sentence a human would point to as "this is the ask" — reused
   // as the `what` entity rather than synthesizing new wording, the same
@@ -264,7 +264,9 @@ const FlowIntent = (() => {
   // "what" for a REQUEST, not re-tested for detection. A second, narrower
   // copy of "what counts as a request" here previously meant the detected
   // request and the quoted sentence could disagree.
-  const REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE, FlowJudgment.FOLLOW_UP_ASK, FlowJudgment.FOLLOW_UP_ASK_HE];
+  const BASE_REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE, FlowJudgment.FOLLOW_UP_ASK, FlowJudgment.FOLLOW_UP_ASK_HE].filter(Boolean);
+  // The two new ask patterns join only for a message with no sign of quoted or forwarded text (FlowJudgment.newAskOpen).
+  const OPEN_REQUEST_PATTERNS = BASE_REQUEST_PATTERNS.concat([FlowJudgment.IMPERATIVE_ASK_HE, FlowJudgment.ADD_TASK_ASK].filter(Boolean));
   // The sentence a dated commitment is quoting — the sender's own delivery
   // promise, or the agreement word. Used only after REQUEST has already
   // declined the message, so this doesn't steal an explicit ask.
@@ -476,6 +478,14 @@ const FlowIntent = (() => {
   // hedges, and they never reached this gate. כשיהיה לך and מתי שנוח are
   // "whenever you" / "when convenient".
   const SOFT_ASK_HE = /(?:^|\s)אולי|במידה ו|בהנחה ש|בכפוף ל|כשיהיה לך|מתי שנוח|אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|כשיתאפשר|בהזדמנות/;
+  // A tentative sender: the ask is open on the sender's side, not owed. Not "please", "if you could", "אם אפשר" or
+  // "when you get a chance": those are how a real ask is written, and they stay out of both lists.
+  const TENTATIVE_ASK = /\b(?:no pressure|only if you have (?:the )?time|if it works out)\b/i;
+  const TENTATIVE_ASK_HE = /אם\s+יסתדר|יכול\s+להיות\s+ש|(?:^|\s)ייתכן|אם\s+(?:זה\s+)?נוח\s+לך|אם\s+(?:זה\s+)?מתאים\s+לך|רק\s+אם\s+יש\s+לך\s+זמן/;
+  // The same softener as its own sentence after the ask ("Can you send me the report? No pressure."). The whole sentence
+  // has to be the softener: "Not sure if I sent the right link" or "ייתכן שאאחר" next to an ask are not about the ask.
+  const TENTATIVE_TAIL = /^(?:but\s+)?(?:no pressure|only if you have (?:the )?time|if it works out|(?:i(?:'|’)m\s+)?not sure (?:yet )?(?:if|whether|that) (?:we|it|this)(?:'ll| will)? (?:still )?(?:need|matter|happen)s?(?: it| this| that)?|(?:i(?:'|’)m\s+)?not sure yet what we(?:'ll| will) do)[.!…]*$/i;
+  const TENTATIVE_TAIL_HE = /^(?:אבל\s+)?(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|אם\s+יסתדר(?:\s+לך)?|אם\s+לא,?\s+(?:זה\s+)?(?:בסדר|לא\s+נורא)|רק\s+אם\s+יש\s+לך\s+זמן|(?:עוד\s+)?לא\s+בטוח(?:ה)?\s+ש(?:זה\s+(?:עדיין\s+)?רלוונטי|נצטרך(?:\s+אות[וה])?))[.!…]*$/;
   // "Can you agree to the proposal by Monday" is a handoff plus a date, so
   // the request gate would draft it as a follow-up close. Agreeing is the
   // decision the reader has not made. "Could you confirm the payment by
@@ -1206,6 +1216,9 @@ const FlowIntent = (() => {
 
   function classify(text, ctx) {
     ctx = ctx || {};
+    // Read on the raw message (ctx.rawText when the caller trimmed it, e.g. a phone signature), before any cut: one sign of quoted or forwarded text keeps the new ask patterns off.
+    const askGate = { newAskOpen: typeof FlowJudgment.newAskOpen === 'function' && FlowJudgment.newAskOpen(typeof ctx.rawText === 'string' ? ctx.rawText : text, ctx.subject) };
+    const REQUEST_PATTERNS = askGate.newAskOpen ? OPEN_REQUEST_PATTERNS : BASE_REQUEST_PATTERNS;
     text = FlowJudgment.newContent(text);
     // «האם תוכל לשלוח...?» and «האם אפשר לקבל...?» are the polite ask, the same as «תוכל לשלוח...?» and «אפשר לקבל...?». Only these two
     // openings: «האם אפשר לשלוח לך» asks whether the writer may send, and «האם שלחת» asks for a status.
@@ -1231,7 +1244,7 @@ const FlowIntent = (() => {
         facts.date = slot.date;
       }
     }
-    const s = FlowJudgment.score(text, domain, facts);
+    const s = FlowJudgment.score(text, domain, facts, askGate);
     // A bad deadline drops only the date. The reply stays, with no due date
     // and no quick-pick. A meeting conflict keeps both choices for the card.
     if (facts.date && (facts.date.contradictsWeekday || facts.date.invalidDate) && s.flags.handoff) {
@@ -1585,7 +1598,17 @@ const FlowIntent = (() => {
     // ותוכל, תשלח לי את הטיוטה") used to hide a later clear send. A later
     // handoff sentence that is not itself soft is the close.
     function sentenceIsSoft(sentence) {
-      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence);
+      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence) || TENTATIVE_ASK.test(sentence) || TENTATIVE_ASK_HE.test(sentence);
+    }
+    // Softener then "but"/"however"/"אבל" yields to the ask that follows ("no pressure, but please …").
+    // The softener alone is tentative; the contrast makes the ask firm.
+    const SOFT_THEN_BUT = /\b(?:no pressure|only if you have (?:the )?time|if it works out|no rush)\b[\s,.…:;—–-]*(?:but|however)\b/i;
+    const SOFT_THEN_BUT_HE = /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|אם\s+יסתדר(?:\s+לך)?|רק\s+אם\s+יש\s+לך\s+זמן|אם\s+(?:זה\s+)?נוח\s+לך|אם\s+(?:זה\s+)?מתאים\s+לך)[\s,.…:;—–-]*אבל/;
+    // Courtesy softeners only (not assuming / subject to / whenever you): a future date keeps these as a card.
+    function courtesySoftener(blob) {
+      const t = String(blob || '');
+      return TENTATIVE_ASK.test(t) || TENTATIVE_ASK_HE.test(t) || /\bno rush\b/i.test(t)
+        || /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)/.test(t);
     }
     let askIsSoft = Boolean(requestWhat) && sentenceIsSoft(requestWhat);
     // A slot ask with no ask sentence of its own ("אם יהיה לך זמן מתישהו אולי נדבר, לא דחוף") is soft when the text says so.
@@ -1603,6 +1626,12 @@ const FlowIntent = (() => {
         if (handoff && !sentenceIsSoft(sentence)) { askIsSoft = false; break; }
       }
     }
+    // A softener sentence next to an undated ask makes the ask tentative. A resolved future date is a firm ask and still shows.
+    if (!askIsSoft && requestWhat && !(hasResolvedDate && !isPast)
+        && String(text || '').split(/(?<=[.!?…])\s+|\n+/).some((p) => TENTATIVE_TAIL.test(p.trim()) || TENTATIVE_TAIL_HE.test(p.trim()))) askIsSoft = true;
+    // Same-sentence courtesy softener used to ignore a date and a following "but". Conditionals (assuming / whenever) stay soft even with a date.
+    if (askIsSoft && (SOFT_THEN_BUT.test(String(text || '')) || SOFT_THEN_BUT_HE.test(String(text || '')))) askIsSoft = false;
+    else if (askIsSoft && hasResolvedDate && !isPast && courtesySoftener(String(text || ''))) askIsSoft = false;
     // Names a silence the chip path already chose. It does not add a
     // return. quietHint is used only where classify already returned
     // type null with no type of its own.
@@ -2254,6 +2283,10 @@ const FlowIntent = (() => {
       return logged;
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {
+      // Owner decision 2026-10-14 (C-1, glance-ai/labeling/owner-rules.md 3b): a mail that only confirms an amount or an approved budget and asks
+      // nothing is silence. The engine still offers the confirmed-amount close by default; this option is the alignment, OFF until the host passes
+      // it (no host does yet, so nothing changes). test/confirmed-amount-silent-corpus.cjs.
+      if (ctx.confirmedAmountSilent === true && !requestEvidence) return stayQuiet('confirmed-amount-no-ask');
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
         what: whatText(text, DATED_COMMIT_PATTERNS) || labelFor(TYPES.DECISION_TO_LOG),
@@ -2303,6 +2336,11 @@ const FlowIntent = (() => {
     if (isDecision && contingent) return stayQuiet('hedge');
     if (isDecision && settled && (isPast || !(facts.date && facts.date.iso))) return stayQuiet('hedge');
     if (isDecision && facts.money && amountIsAmbiguous(text)) return stayQuiet('hedge');
+    // "We need to cancel the <call> on Tuesday at 3pm" is a cancelled time slot, not a deal outcome to log. LOST reads
+    // "cancel the" as "not going ahead", so a cancel with a clock time used to become a Log-it task at that time.
+    // Only a decision that rests on that cancel alone (no commit, execution or dispute) and names a clock is held quiet.
+    if (isDecision && s.flags.lost && !s.flags.commit && !s.flags.executed && !s.flags.dispute && clock && hasResolvedDate &&
+        /\bcancel(?:l?ing|l?ed)?\b/i.test(text)) return stayQuiet('hedge');
 
     // --- 4. DECISION_TO_LOG: an outcome someone reported — the chip's original job. ---
     if (isDecision) {

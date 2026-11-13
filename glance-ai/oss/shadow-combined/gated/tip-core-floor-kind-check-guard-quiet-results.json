@@ -1,6 +1,6 @@
 {
  "OSS 275 / tip": {
-  "wdi": 5,
+  "wdi": 6,
   "sil": 167,
   "miss": 58,
   "show": 108,
@@ -14,7 +14,7 @@
   ]
  },
  "OSS 275 / ai": {
-  "wdi": 0,
+  "wdi": 2,
   "sil": 167,
   "miss": 20,
   "show": 108,
@@ -112,7 +112,7 @@
   ]
  },
  "ALL pooled 786 / tip": {
-  "wdi": 26,
+  "wdi": 27,
   "sil": 464,
   "miss": 119,
   "show": 322,
@@ -126,7 +126,7 @@
   ]
  },
  "ALL pooled 786 / ai": {
-  "wdi": 14,
+  "wdi": 16,
   "sil": 464,
   "miss": 55,
   "show": 322,
@@ -210,7 +210,7 @@
   "cards": 64,
   "planned": 47,
   "watched": 32,
-  "cloud": 227,
+  "cloud": 228,
   "wrongModel": [],
   "wrongStep": [
    "v2syn-1100:task≠calendar"

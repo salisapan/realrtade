@@ -25,13 +25,14 @@ const FlowLabsSwitches = (() => {
     { id: 'SHAREPOINT_SAVE_FILE', who: 'קובץ מצורף באתר SharePoint', note: 'שמירת הקובץ המצורף, כמו שהוא, באתר אחד ששמו נכתב במייל' },
     { id: 'CHAT_CHASE_DRAFT', who: 'תזכורת בצ\'אט למי שמאחר', note: 'טיוטת תזכורת בתיבת הצ\'אט כשמשימת "מחכים ל..." עברה את היום שלה (לא נשלחת)' },
     { id: 'PLANNER_TASK', who: 'משימה בתוכנית עבודה של Microsoft', note: 'משימה בתוכנית ששמה בא במייל, בלי הקצאה לאף אחד' },
-    { id: 'GOOGLE_CONTACTS', who: 'אנשי קשר של Google', note: 'שאלה על כתובת או העברה לשם — מילוי טיוטה בגימייל בלבד, בלי שליחה' },
     { id: 'CONNECT_ECOSYSTEM', who: 'חיבור לפי מערכת', note: 'מסך חיבור אחד לכל מערכת (Google, Microsoft, Meta) — לא נבדק בבדיקה חיה' },
     { id: 'FULL_DOCUMENT_CLOSE', who: 'מסמך מלא בסגנון שלך', note: 'הצעת מחיר או מסמך מלא במסמך Google לפי סגנון הכתיבה שלך — לא נבדק בבדיקה חיה' },
     { id: 'USER_CONTEXT_WRITER', who: 'עדכון פרופיל מקומי', note: 'רושם בפרופיל המקומי איך טיפלת בדומה — לא נבדק בבדיקה חיה' }
   ];
   const IDS = LIST.map((r) => r.id);
   function isOn(bag, id) { return Boolean(bag && bag[id] === true); }
+  // A Chrome Web Store install has update_url in its manifest (Chrome adds it). There Labs is locked: hidden and always off.
+  function storeLocked(manifest) { return Boolean(manifest && manifest.update_url); }
   // The object to store after one row is flipped. Only known ids are written; anything else in the bag is kept as it is.
   function flipped(bag, id, on) {
     const next = Object.assign({}, bag || {});
@@ -44,6 +45,6 @@ const FlowLabsSwitches = (() => {
     IDS.forEach((id) => { next = flipped(next, id, on); });
     return next;
   }
-  return { LIST, IDS, isOn, flipped, all };
+  return { LIST, IDS, isOn, storeLocked, flipped, all };
 })();
 if (typeof module !== 'undefined') module.exports = { FlowLabsSwitches };
