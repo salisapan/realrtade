@@ -705,7 +705,8 @@ const FlowChatTaskCard = (() => {
       if ((held === appt || held === inv) && held.durationMinutes) holdMinutes = held.durationMinutes;
     } else {
       try {
-        judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
+        // directAskOn: plain business questions (two or more) in a one-to-one chat; this card already dropped groups, own and quoted text.
+        judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0, directAskOn: true, oneToOne: i.oneToOne === true && !i.group && !i.fromMe && !i.quoted });
       } catch (e) { judged = null; }
       // A payment asked with an amount and a day is read by its own reader (a task "Pay 1200 NIS · Dana"); the shared judge's generic
       // "Reply requested by Oct 27, ₪1,200" for the same words is the weaker reading and gives way to it.

@@ -63,7 +63,7 @@ So the unit of value is the **loop over a thread**, not the single mail: opened 
 
 | change | Gmail (extension) | Outlook (extension) | Gmail add-on (phone card) | chats: WhatsApp, Messenger, Instagram, Teams | Safari iOS |
 |---|---|---|---|---|---|
-| direct-ask reader | on | on | on for a task plan; a reply-only plan is left to the surfaces that can draft, as every reply plan there is | follow-up: a chat is mostly casual questions, so it needs its own corpus and a group check before it is turned on | n/a, the surface does not exist yet |
+| direct-ask reader | on | on | on for a task plan; a reply-only plan is left to the surfaces that can draft, as every reply plan there is | **done 2026-11-13** (section 7): one-to-one chats only, at least two business questions, a task to answer, no email draft | n/a, the surface does not exist yet |
 | the reply draft in the language of the ask; the answer frame for a mail of questions; no echo of the sender's greeting | done (shared composer) | done (same composer) | n/a, the card writes no draft | follow-up: the chat draft has its own composer | n/a |
 | follow loop: real outgoing asks open a loop; an opt-out and "we have our own systems" close it as declined; a Hebrew out-of-office holds it | done (shared `core/follow-up.js`) | done | n/a, no follow loop on the card | done where the chat lanes use the same follow loop | n/a |
 | Google Calendar notices are an automated sender | done | done | done | n/a | n/a |
@@ -84,3 +84,13 @@ Before: the way a person really asks in a business mail («נשמח לתאם פ�
 3. **The draft repeated the sender's greeting to the reader** ("Thanks. I'll follow up on: Hi Sali, could you..."). The quoted ask now starts at the ask.
 
 What this does NOT prove: the lab cannot run a writer against Google or Microsoft (no account, no browser), so "has a writer" is a registry check, not a proof that the write lands and reads back. That proof is ProofOfClose on a live Gate. Read from code only, not run: on Outlook the shared judge's reply plan still names a `googleTask` after the Outlook draft and a meeting names `calendar`; the Outlook host maps both at run time.
+
+## 7. Chats (2026-11-13): the direct-ask reader in WhatsApp, Messenger, Instagram and Teams
+
+Glance is on every platform the person works in, so the reader is not finished at email. A chat is different in three ways, and the reader is stricter there:
+
+- **One-to-one only, asserted by the host.** `src/chat-task-card.js` already drops groups, the person's own messages and quoted text; it now also passes `oneToOne: true` to the shared judge, and the judge reads nothing in a chat unless that is true (a group, a missing flag, or `fromMe` all stay silent).
+- **Questions only, and business-like ones.** Openers: what, which, how much or many, is there, do you have; «מה», «כמה», «איזה», «האם», «יש». Not where, when, who, why or how: those are everyday chat. At least four words each, and at least TWO such questions (one question in a chat is conversation, not a loop). The Hebrew bare imperative with a day is not read here: `core/chat-deadline-ask.js` owns it.
+- **No email draft.** The person types the answer in the chat. The card is a task to answer («לענות: <first question> (ועוד 1)» / "Reply: ... (+1 more)"), with no day invented, and it closes on the person's own reply in that chat, as the other chat cards do.
+
+Corpus: 11 chat checks added to `test/direct-ask-corpus.cjs` (36 in all). Still behind the existing `CHAT_TASK_CARD` Labs switch: the chat card itself is off by default, so the reader reaches a person only where they turned the chat card on. Not run against a live chat; the chat page parsers were not touched.

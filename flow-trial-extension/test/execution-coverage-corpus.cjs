@@ -41,23 +41,26 @@ const MAILS = [
 ];
 function run(surface, text, att) {
   const own = OWN[surface];
-  const input = { text, subject: 'Subject', sender: { name: 'Dana Levi', email: 'dana@acme.io' }, now: new Date(NOW), threadUrl: 'https://x/y', hasThreadAttachment: att > 0, attachmentCount: att, surface,
+  const input = { text, subject: 'Subject', sender: { name: 'Dana Levi', email: 'dana@acme.io' }, now: new Date(NOW), threadUrl: 'https://x/y', hasThreadAttachment: att > 0, attachmentCount: att, surface, oneToOne: surface === 'chat',
     to: [own], cc: [], ownAddresses: [own], ownNames: ['Sali', 'Sali Sapan', 'סאלי'], userName: 'Sali', direction: 'inbound', inbound: true, namesWaitDone: true, directAskOn: true };
   const r = J.judge(input, DEPS);
   return { r, input, kinds: r.show ? r.process.steps.map((s) => s.kind) : [], draft: r.show && r.process.steps.some((s) => /Draft$/.test(s.kind)) ? (J.draftText(r.process, input) || '') : null };
 }
 const isHeText = (t) => /[֐-׿]/.test(String(t || ''));
-let shown = 0;
+let shown = 0, expected = 30;
 for (const surface of ['gmail', 'outlook', 'chat']) {
   console.log('\n--- ' + surface + ' ---\n');
   for (const [name, text, att] of MAILS) {
     const x = run(surface, text, att);
+    // A chat has its own reader for the bare Hebrew imperative (core/chat-deadline-ask.js): the shared judge's direct-ask reader leaves it alone there.
+    if (surface === 'chat' && name === 'imperative HE') { check(surface + ' / ' + name + ': the shared direct-ask reader does not read it in a chat', !x.r.show, x.r.show && x.kinds); expected--; continue; }
     if (!x.r.show) { check(surface + ' / ' + name + ': offered', false, x.r.reason); continue; }
     shown++;
     const noWriter = x.kinds.filter((k) => !WRITERS.has(k)), noUndo = x.kinds.filter((k) => !UNDOERS.has(k));
     check(surface + ' / ' + name + ': every step has a writer and an undoer (' + x.kinds.join('+') + ')', !noWriter.length && !noUndo.length, { noWriter, noUndo });
     if (surface === 'outlook') check(surface + ' / ' + name + ': no Gmail draft and no Drive step on Outlook', !x.kinds.some((k) => k === 'gmailDraft' || k === 'driveFile' || k === 'driveDoc' || k === 'driveSheet'), x.kinds);
     if (surface === 'gmail') check(surface + ' / ' + name + ': no Outlook or OneDrive step on Gmail', !x.kinds.some((k) => /^(outlook|onedrive|sharepoint|microsoft)/.test(k)), x.kinds);
+    if (surface === 'chat' && /^questions/.test(name)) check(surface + ' / ' + name + ': in a chat the questions become one task to answer, no email draft', x.kinds.join() === 'googleTask', x.kinds);
     if (x.draft !== null) {
       const body = x.draft.split('\n').slice(0, 3).join(' ');
       check(surface + ' / ' + name + ': the draft is written in the language of the ask', isHeText(body) === isHeText(text), x.draft.slice(0, 120));
@@ -65,7 +68,7 @@ for (const surface of ['gmail', 'outlook', 'chat']) {
     }
   }
 }
-check('every mail was offered on every surface (30 plans checked)', shown === 30, shown);
+check('every mail was offered on every surface (' + expected + ' plans checked)', shown === expected, shown);
 
 console.log('\n--- the answer frame ---\n');
 const q = run('gmail', MAILS[7][1], 0);
