@@ -4856,6 +4856,16 @@ const FlowIntent = (() => {
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
   const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוח|זורם|מסתדר|מתאים)\s+לך\s+ש(?:נדבר|ניפגש|נשב|נעשה|נקבע)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוח|זורם)\s+לך\s+(?:פגישה|שיחה|זום|סינק|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:קובעים|נסגור)\s+(?:פגישה|שיחה|זום|סינק|ישיבה|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])נ?אשמח\s+(?:לפגוש\s+אותך|להיפגש|לשבת\s+איתך)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?פנ(?:ה|י|ו)\s+לי\s+(?:חצי\s+שעה|שעה|רבע\s+שעה|כמה\s+דקות)|(?:^|[^\u0590-\u05FF])אפנה\s+לך\s+(?:חצי\s+שעה|שעה|רבע\s+שעה)|(?:^|[^\u0590-\u05FF])תצטרפ(?:י|ו)?\s+אלינו\s+ל|(?:^|[^\u0590-\u05FF])(?:שריינתי|שמרתי)\s+לנו(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])הזמנתי\s+(?:לנו\s+)?חדר(?:\s+ישיבות)?(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])יש\s+לי\s+חלון(?![\u0590-\u05FF]))/;
+  // A note the person mails to themselves that asks to put a timed meeting on the calendar ("תשריין ביומן", "add it to my
+  // calendar") is that hold, not a Google Task. Without an ask like this a self-note stays the task it always was.
+  const SELF_CALENDAR_ASK_HE = /(?:^|[^\u0590-\u05FF])(?:(?:ת|ל)?שריי?ן(?![\u0590-\u05FF])|(?:תכניס|להכניס|תוסיף|להוסיף|תרשום|לרשום|תשים|לשים|תקבע|לקבוע)(?:י|ו)?(?:\s+\S+){0,3}?\s+(?:ל|ב)יומן(?![\u0590-\u05FF]))/;
+  const SELF_CALENDAR_ASK_EN = /\b(?:add|put|block|hold|save|pencil)\b(?:\s+\S+){0,4}?\s+(?:on|in|into|to)\s+(?:my|the)\s+calendar\b|\bcalendar\s+hold\b/i;
+  const SELF_CALENDAR_NEGATED = /(?:^|[^\u0590-\u05FF])אל\s+(?:ת?שריי?ן|תכניס|תוסיף|תרשום|תשים|תקבע)|\b(?:don['’]?t|do\s+not|no\s+need\s+to|never)\s+(?:add|put|block|hold|save|pencil)\b/i;
+  function selfCalendarAsk(text) {
+    const t = String(text || '');
+    if (SELF_CALENDAR_NEGATED.test(t)) return false;
+    return SELF_CALENDAR_ASK_HE.test(t) || SELF_CALENDAR_ASK_EN.test(t);
+  }
 
   // "This is not happening at the time this message names."
   //
@@ -6196,7 +6206,14 @@ const FlowIntent = (() => {
       if (replyCancelOnly(text)) intent.noReplyDraft = true;
       // A note the user sent to themselves is a task, for every kind.
       // The draft stays off. It is not Reply requested, and it is not quiet.
-      if (addressedToSelf(ctx)) {
+      // One exception: a timed meeting the note explicitly asks to put on the calendar ("תשריין ביומן") is that calendar hold.
+      const selfHold = addressedToSelf(ctx) && type === TYPES.SCHEDULED_EVENT && personalClose === 'calendar-hold'
+        && Boolean(facts && facts.date && facts.date.iso && facts.time) && !isPast && selfCalendarAsk(text);
+      if (selfHold) {
+        intent.noReplyDraft = true;
+        intent.selfHold = true;
+        delete intent.googleClose;
+      } else if (addressedToSelf(ctx)) {
         intent.noReplyDraft = true;
         intent.selfTask = true;
         // A note to self is the task. It is not a Drive save and not a draft.
@@ -6238,7 +6255,7 @@ const FlowIntent = (() => {
         intent.inviteDraft = invitePlan.draft;
       }
       // The task names the work. "Reply requested" is the draft, and this mail declined one.
-      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask) {
+      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask && !intent.selfHold) {
         const createTask = text.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n]+)/i);
         if (createTask) {
           let clause = createTask[1].trim();
@@ -6284,6 +6301,11 @@ const FlowIntent = (() => {
         // "Remind me to renew the domain on Friday" is that task, due Friday.
         // The day is already on facts. The task step reads entities.dateIso.
         if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && intent.entities && !intent.entities.dateIso) {
+          intent.entities.dateIso = facts.date.iso;
+        }
+        // Any note to self with a day still ahead is due that day: the card already shows it ("עד 22 בנוב׳"), so the task
+        // step must carry it too, or Do It writes a task with no due date.
+        if (!isPast && facts && facts.date && facts.date.iso && !facts.date.dropped && intent.entities && !intent.entities.dateIso && !intent.entities.overdueIso) {
           intent.entities.dateIso = facts.date.iso;
         }
       }
@@ -8270,6 +8292,26 @@ const FlowActions = (() => {
   // preference — one dismissal on a novel process is not a verdict.
   const DEMOTE_THRESHOLD = 3;
 
+  // "בשעה 10:00 עד 10:30" / "10:00-10:30" / "from 10:00 to 10:30": the end the message states, as minutes after the start
+  // the hold already uses. Only a range that starts at that same clock counts; anything else keeps the writer's default.
+  const CLOCK_RANGE = /(?:^|[^\d:])(\d{1,2})[:.](\d{2})\s*(?:עד|-|–|—|to|until|till)\s*(?:השעה\s+)?(\d{1,2})[:.](\d{2})(?![\d:])/gi;
+  function statedDurationMinutes(sources, hour, minute) {
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+    for (let s = 0; s < sources.length; s++) {
+      const text = String(sources[s] || '');
+      if (!text) continue;
+      CLOCK_RANGE.lastIndex = 0;
+      let m;
+      while ((m = CLOCK_RANGE.exec(text))) {
+        const h1 = Number(m[1]); const m1 = Number(m[2]); const h2 = Number(m[3]); const m2 = Number(m[4]);
+        if (h1 !== hour || m1 !== minute || h2 > 23 || m2 > 59) continue;
+        const span = (h2 * 60 + m2) - (h1 * 60 + m1);
+        if (span >= 5 && span <= 720) return span;
+      }
+    }
+    return null;
+  }
+
   function calendarAction(intent, e, ctx) {
     // A calendar hold's title is the sentence being closed. The schedule
     // processes keep the short "Meeting Sep 18" label — that path is a
@@ -8280,7 +8322,7 @@ const FlowActions = (() => {
     const hint = e.calendarOp === 'delete' ? 'Remove from Calendar: '
       : e.calendarOp === 'update' ? 'Move on Calendar: '
       : 'Add to Calendar: ';
-    return {
+    const step = {
       id: 'calendar',
       kind: 'calendar',
       // Short — this is a collapsed-by-default step label, not the whole
@@ -8309,6 +8351,9 @@ const FlowActions = (() => {
         threadUrl: ctx.threadUrl
       }
     };
+    const span = mutate ? null : statedDurationMinutes([e.what, ctx && ctx.text], e.hour, e.minute);
+    if (span) step.params.durationMinutes = span;
+    return step;
   }
 
   function draftAction(intent, e, ctx, hasAttachment) {

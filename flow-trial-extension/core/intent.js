@@ -92,6 +92,16 @@ const FlowIntent = (() => {
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
   const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוח|זורם|מסתדר|מתאים)\s+לך\s+ש(?:נדבר|ניפגש|נשב|נעשה|נקבע)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוח|זורם)\s+לך\s+(?:פגישה|שיחה|זום|סינק|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:קובעים|נסגור)\s+(?:פגישה|שיחה|זום|סינק|ישיבה|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])נ?אשמח\s+(?:לפגוש\s+אותך|להיפגש|לשבת\s+איתך)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?פנ(?:ה|י|ו)\s+לי\s+(?:חצי\s+שעה|שעה|רבע\s+שעה|כמה\s+דקות)|(?:^|[^\u0590-\u05FF])אפנה\s+לך\s+(?:חצי\s+שעה|שעה|רבע\s+שעה)|(?:^|[^\u0590-\u05FF])תצטרפ(?:י|ו)?\s+אלינו\s+ל|(?:^|[^\u0590-\u05FF])(?:שריינתי|שמרתי)\s+לנו(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])הזמנתי\s+(?:לנו\s+)?חדר(?:\s+ישיבות)?(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])יש\s+לי\s+חלון(?![\u0590-\u05FF]))/;
+  // A note the person mails to themselves that asks to put a timed meeting on the calendar ("תשריין ביומן", "add it to my
+  // calendar") is that hold, not a Google Task. Without an ask like this a self-note stays the task it always was.
+  const SELF_CALENDAR_ASK_HE = /(?:^|[^\u0590-\u05FF])(?:(?:ת|ל)?שריי?ן(?![\u0590-\u05FF])|(?:תכניס|להכניס|תוסיף|להוסיף|תרשום|לרשום|תשים|לשים|תקבע|לקבוע)(?:י|ו)?(?:\s+\S+){0,3}?\s+(?:ל|ב)יומן(?![\u0590-\u05FF]))/;
+  const SELF_CALENDAR_ASK_EN = /\b(?:add|put|block|hold|save|pencil)\b(?:\s+\S+){0,4}?\s+(?:on|in|into|to)\s+(?:my|the)\s+calendar\b|\bcalendar\s+hold\b/i;
+  const SELF_CALENDAR_NEGATED = /(?:^|[^\u0590-\u05FF])אל\s+(?:ת?שריי?ן|תכניס|תוסיף|תרשום|תשים|תקבע)|\b(?:don['’]?t|do\s+not|no\s+need\s+to|never)\s+(?:add|put|block|hold|save|pencil)\b/i;
+  function selfCalendarAsk(text) {
+    const t = String(text || '');
+    if (SELF_CALENDAR_NEGATED.test(t)) return false;
+    return SELF_CALENDAR_ASK_HE.test(t) || SELF_CALENDAR_ASK_EN.test(t);
+  }
 
   // "This is not happening at the time this message names."
   //
@@ -1432,7 +1442,14 @@ const FlowIntent = (() => {
       if (replyCancelOnly(text)) intent.noReplyDraft = true;
       // A note the user sent to themselves is a task, for every kind.
       // The draft stays off. It is not Reply requested, and it is not quiet.
-      if (addressedToSelf(ctx)) {
+      // One exception: a timed meeting the note explicitly asks to put on the calendar ("תשריין ביומן") is that calendar hold.
+      const selfHold = addressedToSelf(ctx) && type === TYPES.SCHEDULED_EVENT && personalClose === 'calendar-hold'
+        && Boolean(facts && facts.date && facts.date.iso && facts.time) && !isPast && selfCalendarAsk(text);
+      if (selfHold) {
+        intent.noReplyDraft = true;
+        intent.selfHold = true;
+        delete intent.googleClose;
+      } else if (addressedToSelf(ctx)) {
         intent.noReplyDraft = true;
         intent.selfTask = true;
         // A note to self is the task. It is not a Drive save and not a draft.
@@ -1474,7 +1491,7 @@ const FlowIntent = (() => {
         intent.inviteDraft = invitePlan.draft;
       }
       // The task names the work. "Reply requested" is the draft, and this mail declined one.
-      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask) {
+      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask && !intent.selfHold) {
         const createTask = text.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n]+)/i);
         if (createTask) {
           let clause = createTask[1].trim();
@@ -1520,6 +1537,11 @@ const FlowIntent = (() => {
         // "Remind me to renew the domain on Friday" is that task, due Friday.
         // The day is already on facts. The task step reads entities.dateIso.
         if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && intent.entities && !intent.entities.dateIso) {
+          intent.entities.dateIso = facts.date.iso;
+        }
+        // Any note to self with a day still ahead is due that day: the card already shows it ("עד 22 בנוב׳"), so the task
+        // step must carry it too, or Do It writes a task with no due date.
+        if (!isPast && facts && facts.date && facts.date.iso && !facts.date.dropped && intent.entities && !intent.entities.dateIso && !intent.entities.overdueIso) {
           intent.entities.dateIso = facts.date.iso;
         }
       }
