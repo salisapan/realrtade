@@ -1,0 +1,23 @@
+name: WhatsApp inquiry bot
+
+# Isolated unit tests for the Flow WhatsApp webhook. They use Node builtins
+# only (no npm install) and do not touch the Glance e2e / gate100 / Meta
+# lane jobs. The Meta chat lanes job remains non-blocking and may stay red.
+on:
+  pull_request:
+    branches:
+      - claude/install-uiux-pro-max-skill-a4agox
+  workflow_dispatch:
+
+jobs:
+  unit:
+    name: whatsapp unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run WhatsApp bot unit tests
+        run: node flow-landing/netlify/functions/whatsapp-webhook/whatsapp-webhook.test.cjs
