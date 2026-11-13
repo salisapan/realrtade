@@ -273,6 +273,7 @@ const FlowStepListView = (() => {
         he: he,
         uiLang: ui,
         intent: o.intent || '',
+        doItLabel: o.doItLabel || null,
         rows: painted,
         chip: chip,
         approve: approveFor(list),

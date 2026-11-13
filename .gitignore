@@ -80,3 +80,12 @@ graphify-out/
 flow-trial-extension/blob-report/
 flow-trial-extension/test-results-gate100/
 flow-trial-extension/gate100-results.json
+glance-ai/scoreboard/real-mail/private/
+glance-ai/model/v2x/
+glance-ai/labeling/teacher/*.cases.jsonl
+glance-ai/labeling/sealed/batch-009.cases.jsonl
+glance-ai/model/train/features-v23/
+glance-ai/model/train/features-v26/
+glance-ai/model/train/features-v28/
+glance-ai/model/train/features-v29/
+glance-ai/model/train/features-v31/
