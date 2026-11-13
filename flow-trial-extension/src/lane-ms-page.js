@@ -112,6 +112,21 @@
       status.textContent = 'Could not reach Outlook.';
       return;
     }
+    // Contacts only. A Teams draft is also posted:false with a draft, and that
+    // card stays "Not posted." below. Do not treat every unsent draft as a send.
+    if (res.connectorId === 'outlookContacts' && res.draft && res.posted === false) {
+      let draft = card.querySelector('.flow-lane-draft');
+      if (!draft) {
+        draft = document.createElement('div');
+        draft.className = 'flow-lane-draft';
+        card.appendChild(draft);
+      }
+      draft.textContent = res.draft || '';
+      status.textContent = res.written || 'Draft ready. You send it.';
+      const button = card.querySelector('.flow-lane-do');
+      if (button) button.hidden = true;
+      return;
+    }
     if (res.recipient && res.recipient.address) {
       let address = card.querySelector('.flow-lane-address');
       if (!address) {
