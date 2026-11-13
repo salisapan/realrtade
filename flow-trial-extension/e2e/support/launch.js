@@ -930,7 +930,7 @@ async function boot() {
     const closing = [];
     for (const p of context.pages()) {
       const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('instagram.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('instagram.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0 || url.indexOf('/dev/whatsapp-fixture.html') >= 0) {
         closing.push(p.close().catch(() => {}));
       }
     }
@@ -1127,7 +1127,14 @@ async function boot() {
 
   harness.openWhatsApp = async function openWhatsApp(html) {
     await watchSend();
-    return openDocument('https://web.whatsapp.com/', html);
+    const page = await openDocument('https://web.whatsapp.com/', html);
+    await evalWorker(async () => {
+      if (!globalThis.FlowChatOnDemand || !globalThis.FlowChatOnDemand.run) return;
+      const tabs = await chrome.tabs.query({ url: 'https://web.whatsapp.com/*' });
+      const tab = (tabs || []).slice().sort((a, b) => (b.id || 0) - (a.id || 0))[0];
+      if (tab) await globalThis.FlowChatOnDemand.run(chrome, tab, { surface: 'whatsapp', source: 'gesture' });
+    });
+    return page;
   };
 
   harness.openInstagram = async function openInstagram(html) {

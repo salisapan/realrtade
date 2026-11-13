@@ -17,6 +17,7 @@ const IMPORT_LINE = /^import \{ OAUTH_PUBLIC, publicClientId(?:, WEB_OAUTH_CLIEN
 const WEB_AUTH_IMPORT = /^import \{[^}]+\} from '\.\/google-web-auth\.js';\r?\n/m;
 const LADDER_IMPORT = /^import \{ LADDER \} from '\.\.\/config\/ladder\.public\.js';\r?\n/m;
 const CARRY_IMPORT = /^import \{ CARRY \} from '\.\.\/config\/carry\.public\.js';\r?\n/m;
+const FLAGS_IMPORT = /^import \{ GLANCE_FLAGS_PUBLIC_JWK, GLANCE_FLAGS_URL \} from '\.\.\/config\/glance-flags\.public\.js';\r?\n/m;
 const CONNECTORS_IMPORT = /^import \{ CONNECTORS \} from '\.\.\/config\/connectors\.public\.js';\r?\n/m;
 const LANE_HOST_IMPORT = /^import '\.\/google-lane-host\.js';\r?\n/m;
 const CLASSIC_IMPORT = /^import '((?:\.\.\/core|\.\.\/lane-chat|\.\.\/src|\.)\/[\w-]+\.js)';[^\n]*\r?\n/gm;
@@ -39,6 +40,7 @@ function backgroundScript() {
   const ladderCfg = fs.readFileSync(path.join(root, 'config', 'ladder.public.js'), 'utf8').replace(/^export const /m, 'const ');
   const carryCfg = fs.readFileSync(path.join(root, 'config', 'carry.public.js'), 'utf8').replace(/^export const /m, 'const ');
   const connectorsCfg = fs.readFileSync(path.join(root, 'config', 'connectors.public.js'), 'utf8').replace(/^export const /m, 'const ');
+  const flagsCfg = fs.readFileSync(path.join(root, 'config', 'glance-flags.public.js'), 'utf8').replace(/^export const /gm, 'const ');
   const hybridSw = fs.readFileSync(path.join(root, 'src', 'hybrid-sw.js'), 'utf8');
   // Classic scripts imported for their side effect (they set a global): inline them, with their CommonJS export line
   // turned into the same global assignment they make in the service worker.
@@ -51,7 +53,7 @@ function backgroundScript() {
     .replace(/\bOUTLOOK_AUTH_KEY\b/g, 'ECO_SW_OUTLOOK_AUTH_KEY')
     .replace(/\bOUTLOOK_STATE_KEY\b/g, 'ECO_SW_OUTLOOK_STATE_KEY')
     .replace(/\bOUTLOOK_PENDING_KEY\b/g, 'ECO_SW_OUTLOOK_PENDING_KEY');
-  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '').replace(LANE_HOST_IMPORT, '').replace(CONNECTORS_IMPORT, '').replace(CARRY_IMPORT, '').replace(ECOSYSTEM_SW_IMPORT, '');
+  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '').replace(LANE_HOST_IMPORT, '').replace(CONNECTORS_IMPORT, '').replace(CARRY_IMPORT, '').replace(FLAGS_IMPORT, '').replace(ECOSYSTEM_SW_IMPORT, '');
   bg = bg.replace(CLASSIC_IMPORT, (line, rel) => {
     const file = path.join(root, 'src', rel);
     const src = fs.readFileSync(file, 'utf8');
@@ -63,7 +65,7 @@ function backgroundScript() {
     throw new Error('background.js has an import the corpus harness does not load');
   }
   // hybrid-sw.js is a classic script that sets globalThis.FlowHybridSW when it is not run under Node's module system.
-  return oauth + '\n' + webAuth + '\n' + hybridCfg + '\n' + ladderCfg + '\n' + carryCfg + '\n' + connectorsCfg + '\n' + hybridSw.replace(/^if \(typeof module[\s\S]*$/m, 'globalThis.FlowHybridSW = FlowHybridSW;\n') + '\n' +
+  return oauth + '\n' + webAuth + '\n' + hybridCfg + '\n' + ladderCfg + '\n' + carryCfg + '\n' + connectorsCfg + '\n' + flagsCfg + '\n' + hybridSw.replace(/^if \(typeof module[\s\S]*$/m, 'globalThis.FlowHybridSW = FlowHybridSW;\n') + '\n' +
     classic.map((c) => '{\n' + c + '\n}').join('\n') + '\n' + ecoSw + '\n' + bg;
 }
 

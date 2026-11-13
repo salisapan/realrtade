@@ -45,6 +45,7 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
+import { GLANCE_FLAGS_PUBLIC_JWK, GLANCE_FLAGS_URL } from '../config/glance-flags.public.js';
 import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleMissingScopes, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
@@ -80,7 +81,12 @@ import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
 import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
+import '../lane-chat/surfaces.js'; // LANE_CHAT surface registry (W1)
+import '../core/chat-kill-switch.js'; // per-user + remote chat kill switch
+import '../core/whatsapp-web-gate.js'; // WhatsApp Web read flag, default off
+import './chat-on-demand.js'; // gesture-only chat lane injection
 // The worker cannot call import(). These are the helpers imported at the top of this file.
+globalThis.__glanceFlagsConfig = { URL: GLANCE_FLAGS_URL, PUBLIC_JWK: GLANCE_FLAGS_PUBLIC_JWK };
 globalThis.__glanceGoogleAuth = {
   GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
   webTokenUsable: webTokenUsable
@@ -659,7 +665,7 @@ const LANE_CHAT = [
   {
     id: 'glance-lane-whatsapp',
     origins: ['https://web.whatsapp.com/*'],
-    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js']
+    js: ['core/whatsapp-web-gate.js', 'core/fact-reply.js', 'core/close-chains.js', 'src/chat-redact.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js']
   },
   {
     id: 'glance-lane-messenger',
@@ -675,7 +681,7 @@ const LANE_CHAT = [
       'https://www.business.facebook.com/latest/inbox',
       'https://www.business.facebook.com/latest/inbox/*'
     ],
-    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js']
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-redact.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/messenger-parse.js', 'src/content-messenger.js']
   },
   {
     id: 'glance-lane-instagram',
@@ -685,7 +691,7 @@ const LANE_CHAT = [
       'https://instagram.com/direct',
       'https://instagram.com/direct/*'
     ],
-    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js']
+    js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-redact.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/group-word.js', 'src/instagram-parse.js', 'src/content-instagram.js']
   }
 ];
 
@@ -702,6 +708,7 @@ function laneChatScripts(lane) {
 const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];
 globalThis.__glanceLaneChatScripts = laneChatScripts;
 globalThis.__glanceLaneChatDefs = LANE_CHAT;
+globalThis.__glanceLaneChatCss = LANE_CHAT_CSS;
 
 async function clearLaneChats() {
   if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
@@ -742,7 +749,7 @@ async function restoreLaneChats() {
     const isMeta = metaChatLaneId(lane);
     const granted = isMeta ? metaGranted : waGranted;
     if (!granted || (isMeta && !metaLanesOn)) {
-      try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered */ }
+      try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id, lane.id + '-trigger'] }); } catch (e) { /* not registered */ }
       continue;
     }
     try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
@@ -782,6 +789,7 @@ async function restoreLaneChats() {
   }
 }
 
+if (typeof FlowChatOnDemand !== 'undefined' && FlowChatOnDemand.wire) FlowChatOnDemand.wire(chrome);
 dropLegacyWhatsApp();
 restoreSurfaces();
 restoreLaneChats();

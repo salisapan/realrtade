@@ -14,7 +14,7 @@ const LANES = [
     id: 'whatsapp',
     title: 'WhatsApp',
     origins: ['https://web.whatsapp.com/*'],
-    js: SCRIPTS.concat(['src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'])
+    js: SCRIPTS.concat(['core/whatsapp-web-gate.js', 'src/whatsapp-parse.js', 'src/content-whatsapp.js', 'src/content-whatsapp-draft.js'])
   },
   {
     id: 'messenger',
@@ -137,7 +137,8 @@ async function registerAll() {
   const scripting = typeof chrome !== 'undefined' && chrome.scripting;
   if (!scripting || !scripting.registerContentScripts) return;
   const ids = LANES.map((lane) => 'glance-lane-' + lane.id);
-  try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: ids }); } catch (e) { /* not registered yet */ }
+  const triggerIds = ids.map((id) => id + '-trigger');
+  try { if (scripting.unregisterContentScripts) await scripting.unregisterContentScripts({ ids: ids.concat(triggerIds) }); } catch (e) { /* not registered yet */ }
   await scripting.registerContentScripts(LANES.map((lane) => ({
     id: 'glance-lane-' + lane.id,
     matches: lane.origins,
@@ -171,21 +172,51 @@ function showButton(code) {
   } catch (e) { /* the page still shows the label */ }
 }
 
+async function rememberReadConsent(code) {
+  const box = doc.getElementById(isHe(code) ? 'meta-age-he' : 'meta-age-en');
+  if (!box || box.checked !== true) return;
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local || !chrome.storage.local.set) return;
+  try {
+    await chrome.storage.local.set({ glanceWhatsAppWebRead: true, glanceWhatsAppWebConsent: true });
+  } catch (e) { /* lanes still register; reading stays off until this write lands */ }
+}
+
 async function turnOn(code) {
   if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) { say(cannotAsk(code)); return; }
   let ok = false;
   try { ok = await chrome.permissions.request({ origins: metaOrigins() }); }
   catch (e) { ok = false; }
   if (!ok) { say(staysOff(code)); return; }
+  try { await rememberReadConsent(code); } catch (e) { /* reading stays off */ }
   try { await registerAll(); }
   catch (e) { say(readerFailed(code)); return; }
   if (list) list.replaceChildren();
   say(nowOn(code));
 }
 
+function paintDisclosure(code) {
+  const he = isHe(code);
+  const disc = (typeof FlowMetaConsent !== 'undefined' && FlowMetaConsent.disclosure) ? FlowMetaConsent.disclosure(code) : '';
+  const en = doc.getElementById('meta-disclosure-en');
+  const hi = doc.getElementById('meta-disclosure-he');
+  if (en) en.textContent = disc;
+  if (hi) hi.textContent = disc;
+  const ageEn = doc.getElementById('meta-age-en');
+  const ageHe = doc.getElementById('meta-age-he');
+  if (ageEn) ageEn.checked = false;
+  if (ageHe) ageHe.checked = false;
+}
+
+function ageOk(code) {
+  const he = isHe(code);
+  const box = doc.getElementById(he ? 'meta-age-he' : 'meta-age-en');
+  return box && box.checked === true;
+}
+
 async function start() {
   const code = await preferredLang();
   showCopy(code);
+  paintDisclosure(code);
   const on = await granted(metaOrigins());
   if (!on) { showButton(code); return; }
   try {

@@ -985,8 +985,13 @@ console.log('\n--- calendar evidence ---\n');
       new vm.Script(fs.readFileSync(path.join(ROOT, rel), 'utf8'), { filename: rel }).runInContext(ctx);
     });
     const key = surface.indexOf('whatsapp') >= 0 ? 'whatsapp' : (surface.indexOf('messenger') >= 0 ? 'messenger' : 'instagram');
+    if (key === 'whatsapp') {
+      w.__glanceWhatsAppWebRead = true;
+      w.__glanceWhatsAppWebConsent = true;
+    }
     if (o.beforeScan) o.beforeScan(w);
-    if (!o.skipScan) vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan()', ctx);
+    const scanArg = key === 'whatsapp' ? '{gesture:true}' : '';
+    if (!o.skipScan) vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan(' + scanArg + ')', ctx);
     await new Promise((r) => setTimeout(r, 30));
     const composer = w.document.querySelector('[data-glance-composer="1"]');
     const send = w.document.querySelector('[aria-label="Send"]');
@@ -1002,7 +1007,7 @@ console.log('\n--- calendar evidence ---\n');
       sendClicks: sendClicks,
       close() { w.close(); },
       window: w,
-      scan() { vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan()', ctx); }
+      scan() { vm.runInContext('globalThis.__glanceChatSurfaces["' + key + '"].scan(' + scanArg + ')', ctx); }
     };
   }
 

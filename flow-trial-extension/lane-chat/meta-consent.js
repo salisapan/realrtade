@@ -23,6 +23,14 @@
     en: 'Chats',
     he: 'צ׳אטים'
   };
+  const DISCLOSURE = {
+    en: 'Glance reads only the chat you have open, including messages from other people, and only after you click. It does not prefetch other chats and it does not scroll the list. That text may be sent to AI providers working for Glance to plan the close. It is kept for that session and then deleted. It is not used to train models. Glance is not approved by WhatsApp, and use on WhatsApp Web can put your WhatsApp account at risk. You are the only one who sends. Glance never sends. Withdraw this in Connections: Disconnect turns the reading off. You must be 18 or older.',
+    he: 'Glance קורא רק את הצ׳אט הפתוח, כולל הודעות של אנשים אחרים, ורק אחרי לחיצה. הוא לא טוען צ׳אטים מראש ולא גולל את הרשימה. הטקסט עשוי להישלח לספקי AI של Glance כדי לתכנן את הסגירה. הוא נשמר לסשן הזה ונמחק אחר כך. הוא לא משמש לאימון מודלים. Glance אינו מאושר על ידי WhatsApp, ושימוש ב-WhatsApp Web עלול לסכן את חשבון ה-WhatsApp. רק אתה שולח. Glance לא שולח. אפשר לחזור בך בחיבורים: ניתוק מכבה את הקריאה. עליך להיות בן 18 ומעלה.'
+  };
+  const AGE_COPY = {
+    en: 'I understand this and I am 18 or older',
+    he: 'הבנתי את זה ואני בן 18 ומעלה'
+  };
   const ORIGINS = (typeof FlowConnectEcosystem !== 'undefined' && FlowConnectEcosystem.META_ORIGINS)
     ? FlowConnectEcosystem.META_ORIGINS.slice()
     : [
@@ -89,8 +97,18 @@
     return link;
   }
 
+  function clearReadConsent(api) {
+    const chromeApi = api || globalThis.chrome;
+    try {
+      if (chromeApi && chromeApi.storage && chromeApi.storage.local && chromeApi.storage.local.remove) {
+        chromeApi.storage.local.remove(['glanceWhatsAppWebRead', 'glanceWhatsAppWebConsent']);
+      }
+    } catch (e) { /* withdraw is best-effort */ }
+  }
+
   function disconnect(chromeApi) {
     const api = chromeApi || globalThis.chrome;
+    clearReadConsent(api);
     if (!api || !api.permissions || typeof api.permissions.remove !== 'function') {
       return Promise.resolve({ ok: false });
     }
@@ -239,11 +257,23 @@
     });
   }
 
+  function disclosure(code) {
+    return heLang(code) ? DISCLOSURE.he : DISCLOSURE.en;
+  }
+
+  function ageLabel(code) {
+    return heLang(code) ? AGE_COPY.he : AGE_COPY.en;
+  }
+
   globalThis.FlowMetaConsent = {
     PAGE: PAGE,
     MESSAGE: MESSAGE,
     COPY: COPY,
     ON_COPY: ON_COPY,
+    DISCLOSURE: DISCLOSURE,
+    AGE_COPY: AGE_COPY,
+    disclosure: disclosure,
+    ageLabel: ageLabel,
     ORIGINS: ORIGINS,
     label: label,
     onLabel: onLabel,
