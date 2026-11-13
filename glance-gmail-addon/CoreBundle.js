@@ -2846,6 +2846,14 @@ const FlowCloseFamilies = (() => {
     // An English hedge, maybe, if you're free, and אולי win before a live ask.
     // "אם אפשר, תשלח" is still the ask. אם אפשר is not this hedge.
     const t = String(sentence || '');
+    // Softener then but/however/אבל, or a softener next to an explicit deadline, yields to the ask.
+    // "No rush, but please send by Friday" and "אין לחץ, אבל תשלח עד מחר" stay live.
+    if (/\b(?:no pressure|no rush|only if you have (?:the )?time|if it works out)\b[\s,.…:;—–-]*(?:but|however)\b/i.test(t)) return false;
+    if (/(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)[\s,.…:;—–-]*אבל/.test(t)) return false;
+    const softener = /\b(?:no pressure|no rush)\b/i.test(t) || /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)/.test(t);
+    const deadline = /\b(?:by|before|until|no later than)\s+(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|tomorrow|tonight|next\s+week|\d)/i.test(t)
+      || /עד\s+(?:יום\s+)?(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת|מחר)/.test(t);
+    if (softener && deadline) return false;
     if (HEDGE_EN.test(t)) return true;
     if (/(?:^|[^\u0590-\u05FF])אולי/.test(t)) return true;
     if (sentenceLiveAsk(t)) return false;
@@ -5153,6 +5161,14 @@ const FlowIntent = (() => {
   // hedges, and they never reached this gate. כשיהיה לך and מתי שנוח are
   // "whenever you" / "when convenient".
   const SOFT_ASK_HE = /(?:^|\s)אולי|במידה ו|בהנחה ש|בכפוף ל|כשיהיה לך|מתי שנוח|אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|כשיתאפשר|בהזדמנות/;
+  // A tentative sender: the ask is open on the sender's side, not owed. Not "please", "if you could", "אם אפשר" or
+  // "when you get a chance": those are how a real ask is written, and they stay out of both lists.
+  const TENTATIVE_ASK = /\b(?:no pressure|only if you have (?:the )?time|if it works out)\b/i;
+  const TENTATIVE_ASK_HE = /אם\s+יסתדר|יכול\s+להיות\s+ש|(?:^|\s)ייתכן|אם\s+(?:זה\s+)?נוח\s+לך|אם\s+(?:זה\s+)?מתאים\s+לך|רק\s+אם\s+יש\s+לך\s+זמן/;
+  // The same softener as its own sentence after the ask ("Can you send me the report? No pressure."). The whole sentence
+  // has to be the softener: "Not sure if I sent the right link" or "ייתכן שאאחר" next to an ask are not about the ask.
+  const TENTATIVE_TAIL = /^(?:but\s+)?(?:no pressure|only if you have (?:the )?time|if it works out|(?:i(?:'|’)m\s+)?not sure (?:yet )?(?:if|whether|that) (?:we|it|this)(?:'ll| will)? (?:still )?(?:need|matter|happen)s?(?: it| this| that)?|(?:i(?:'|’)m\s+)?not sure yet what we(?:'ll| will) do)[.!…]*$/i;
+  const TENTATIVE_TAIL_HE = /^(?:אבל\s+)?(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|אם\s+יסתדר(?:\s+לך)?|אם\s+לא,?\s+(?:זה\s+)?(?:בסדר|לא\s+נורא)|רק\s+אם\s+יש\s+לך\s+זמן|(?:עוד\s+)?לא\s+בטוח(?:ה)?\s+ש(?:זה\s+(?:עדיין\s+)?רלוונטי|נצטרך(?:\s+אות[וה])?))[.!…]*$/;
   // "Can you agree to the proposal by Monday" is a handoff plus a date, so
   // the request gate would draft it as a follow-up close. Agreeing is the
   // decision the reader has not made. "Could you confirm the payment by
@@ -6262,7 +6278,17 @@ const FlowIntent = (() => {
     // ותוכל, תשלח לי את הטיוטה") used to hide a later clear send. A later
     // handoff sentence that is not itself soft is the close.
     function sentenceIsSoft(sentence) {
-      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence);
+      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence) || TENTATIVE_ASK.test(sentence) || TENTATIVE_ASK_HE.test(sentence);
+    }
+    // Softener then "but"/"however"/"אבל" yields to the ask that follows ("no pressure, but please …").
+    // The softener alone is tentative; the contrast makes the ask firm.
+    const SOFT_THEN_BUT = /\b(?:no pressure|only if you have (?:the )?time|if it works out|no rush)\b[\s,.…:;—–-]*(?:but|however)\b/i;
+    const SOFT_THEN_BUT_HE = /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|אם\s+יסתדר(?:\s+לך)?|רק\s+אם\s+יש\s+לך\s+זמן|אם\s+(?:זה\s+)?נוח\s+לך|אם\s+(?:זה\s+)?מתאים\s+לך)[\s,.…:;—–-]*אבל/;
+    // Courtesy softeners only (not assuming / subject to / whenever you): a future date keeps these as a card.
+    function courtesySoftener(blob) {
+      const t = String(blob || '');
+      return TENTATIVE_ASK.test(t) || TENTATIVE_ASK_HE.test(t) || /\bno rush\b/i.test(t)
+        || /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)/.test(t);
     }
     let askIsSoft = Boolean(requestWhat) && sentenceIsSoft(requestWhat);
     // A slot ask with no ask sentence of its own ("אם יהיה לך זמן מתישהו אולי נדבר, לא דחוף") is soft when the text says so.
@@ -6280,6 +6306,12 @@ const FlowIntent = (() => {
         if (handoff && !sentenceIsSoft(sentence)) { askIsSoft = false; break; }
       }
     }
+    // A softener sentence next to an undated ask makes the ask tentative. A resolved future date is a firm ask and still shows.
+    if (!askIsSoft && requestWhat && !(hasResolvedDate && !isPast)
+        && String(text || '').split(/(?<=[.!?…])\s+|\n+/).some((p) => TENTATIVE_TAIL.test(p.trim()) || TENTATIVE_TAIL_HE.test(p.trim()))) askIsSoft = true;
+    // Same-sentence courtesy softener used to ignore a date and a following "but". Conditionals (assuming / whenever) stay soft even with a date.
+    if (askIsSoft && (SOFT_THEN_BUT.test(String(text || '')) || SOFT_THEN_BUT_HE.test(String(text || '')))) askIsSoft = false;
+    else if (askIsSoft && hasResolvedDate && !isPast && courtesySoftener(String(text || ''))) askIsSoft = false;
     // Names a silence the chip path already chose. It does not add a
     // return. quietHint is used only where classify already returned
     // type null with no type of its own.
