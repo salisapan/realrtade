@@ -145,15 +145,42 @@ const FlowGoogleDocs = (() => {
     try {
       const res = await http(req);
       const status = res && typeof res.status === 'number' ? res.status : 0;
-      return { status: status, ok: !!(res && (res.ok === true || (status >= 200 && status < 300))), json: res && res.json ? res.json : null };
+      return { status: status, ok: !!(res && (res.ok === true || (status >= 200 && status < 300))), json: res && res.json ? res.json : null, denial: res && res.denial ? res.denial : null, url: req && req.url };
     } catch (e) {
       return { status: 0, ok: false, json: null };
     }
   }
 
-  function authFail(status) {
-    if (status === 401 || status === 403) return { ok: false, reason: 'not-connected' };
-    return null;
+  // A refused write says why. drive-not-granted: the token lacks drive.file
+  // (Reconnect asks for it). docs-api-disabled / drive-api-disabled: the
+  // API is off in Glance's Cloud project (Reconnect cannot fix it). A 401,
+  // or a 403 that names nothing, stays not-connected.
+  function authFail(res) {
+    const status = res && res.status;
+    if (status !== 401 && status !== 403) return null;
+    const C = cfg();
+    const d = (res && res.denial) || (C && typeof C.googleDenial === 'function' ? C.googleDenial(status, res && res.json, res && res.url) : null);
+    const out = { ok: false, reason: 'not-connected', status: status };
+    if (d && d.googleReason) out.googleReason = d.googleReason;
+    if (d && d.service) out.service = d.service;
+    if (status === 403 && d) {
+      if (d.kind === 'scope') out.reason = 'drive-not-granted';
+      else if (d.kind === 'api-disabled') out.reason = /docs\.googleapis/.test(d.service || '') ? 'docs-api-disabled' : 'drive-api-disabled';
+      else if (d.kind === 'forbidden') out.reason = 'http-403';
+    }
+    return out;
+  }
+
+  // A Doc this lane created whose text could not be written is trashed, so a
+  // failed Do It does not leave an empty Doc behind in Drive.
+  async function trashCreated(http, id) {
+    const del = await call(http, {
+      method: 'PATCH',
+      url: FILES + '/' + encodeURIComponent(id),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trashed: true })
+    });
+    return !!(del.ok || del.status === 404);
   }
 
   function revisionIdOf(doc) {
@@ -184,8 +211,11 @@ const FlowGoogleDocs = (() => {
         ]
       })
     });
-    const denied = authFail(posted.status);
-    if (denied) return denied;
+    const denied = authFail(posted);
+    if (denied) {
+      if (created === true) denied.cleanedUp = await trashCreated(http, id);
+      return denied;
+    }
     const ref = { documentId: id, externalId: id, created: created === true, inserted: text, rangeName: mark };
     const base = { where: 'Google Docs', target: name || id, written: 'Doc · ' + (name || id), url: null };
     if (!posted.ok) return Object.assign({ ok: false, reason: 'http-' + posted.status, ref: created ? ref : null, proof: null }, base);
@@ -222,7 +252,7 @@ const FlowGoogleDocs = (() => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: name, mimeType: DOC_MIME })
     });
-    const denied = authFail(posted.status);
+    const denied = authFail(posted);
     if (denied) return denied;
     if (!posted.ok) return { ok: false, reason: 'http-' + posted.status };
     const file = posted.json || {};

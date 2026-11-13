@@ -71,6 +71,24 @@ function parseDriveUpload(buf) {
 // Drive answers only the fields it was asked for, and refuses a name it does
 // not know. The stand-in does the same, so a request for a field that does
 // not exist fails here the way it fails live.
+// Google's 403 bodies, as the live APIs send them.
+const GOOGLE_403_SCOPE = {
+  error: {
+    code: 403,
+    message: 'Request had insufficient authentication scopes.',
+    status: 'PERMISSION_DENIED',
+    details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'ACCESS_TOKEN_SCOPE_INSUFFICIENT', domain: 'googleapis.com', metadata: { service: 'drive.googleapis.com', method: 'google.apps.drive.v3.DriveFiles.Create' } }]
+  }
+};
+const GOOGLE_403_DOCS_DISABLED = {
+  error: {
+    code: 403,
+    message: 'Google Docs API has not been used in project 93977330357 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/docs.googleapis.com/overview?project=93977330357 then retry.',
+    status: 'PERMISSION_DENIED',
+    details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com', metadata: { service: 'docs.googleapis.com', consumer: 'projects/93977330357' } }]
+  }
+};
+
 const DRIVE_FIELDS = ['id', 'name', 'mimeType', 'trashed', 'parents', 'md5Checksum', 'headRevisionId', 'version', 'modifiedTime', 'webViewLink'];
 
 function driveFields(file, param) {
@@ -147,7 +165,9 @@ function startGoogleLaneServer() {
     failGets: [],
     rejectOnce: [],
     driveHits: [],
-    lagGets: []
+    lagGets: [],
+    forbids: [],
+    tokenScopes: null
   };
   seedLists();
 
@@ -178,6 +198,8 @@ function startGoogleLaneServer() {
     state.rejectOnce = [];
     state.driveHits = [];
     state.lagGets = [];
+    state.forbids = [];
+    state.tokenScopes = null;
     state.noMeetLink = false;
     state.tasks401AfterRefresh = false;
     state.tasks403Insufficient = false;
@@ -239,6 +261,17 @@ function startGoogleLaneServer() {
       const bearer = /^Bearer\s+\S+/.test(String(req.headers.authorization || ''));
       if (!e2ePath && !bearer) { send(res, 401, GOOGLE_AUTH_401); return; }
       if (!e2ePath && state.unauthorized.some((part) => path.indexOf(part) >= 0)) { send(res, 401, GOOGLE_AUTH_401); return; }
+      // A 403 with Google's own body: a missing scope, or an API that is not
+      // enabled in the Cloud project. Matched by path part and method.
+      if (!e2ePath) {
+        const hit = state.forbids.find((f) => path.indexOf(f.part) >= 0 && (!f.method || f.method === method));
+        if (hit) { state.calls[state.calls.length - 1].denied = 403; send(res, 403, hit.body); return; }
+      }
+      if (method === 'GET' && path === '/oauth2/v3/tokeninfo') {
+        const all = 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks';
+        send(res, 200, { scope: state.tokenScopes == null ? all : state.tokenScopes, email: state.account });
+        return;
+      }
 
       if (method === 'GET' && path === '/v1/people:searchContacts') {
         const q = String(url.searchParams.get('query') || '').toLowerCase();
@@ -688,6 +721,9 @@ function startGoogleLaneServer() {
         driveHits: (files) => { state.driveHits = (files || []).slice(); },
         lagGets: (part, count) => { state.lagGets.push({ part: part, left: count }); },
         failGet: (part) => { state.failGets.push(part); },
+        forbid: (part, method, body) => { state.forbids.push({ part: part, method: method || '', body: body }); },
+        clearForbids: () => { state.forbids = []; },
+        setTokenScopes: (scope) => { state.tokenScopes = scope; },
         clearFailGets: () => { state.failGets = []; },
         events: () => state.events,
         tasks: () => state.tasks,
@@ -732,4 +768,4 @@ function startGoogleLaneServer() {
   });
 }
 
-module.exports = { startGoogleLaneServer };
+module.exports = { startGoogleLaneServer, GOOGLE_403_SCOPE, GOOGLE_403_DOCS_DISABLED };

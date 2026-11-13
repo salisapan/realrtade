@@ -291,12 +291,37 @@ function criticalUrl(url) {
 // It does not say the token is wrong, so it neither flags Reconnect nor
 // triggers a refresh. Only the Tasks, Calendar, Drive, Docs, Sheets and
 // Gmail hosts can end the grant.
+// A 403 is a missing scope only when Google says so (or says nothing). An
+// API that is not enabled in the Cloud project, a quota, or a file
+// permission is that API's answer: Reconnect cannot fix it, so it is not
+// flagged, and the writer names it instead of looping on Reconnect.
+function denialOf(res, url) {
+  const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : globalThis.FlowGoogleConfig;
+  if (!res || (res.status !== 401 && res.status !== 403)) return null;
+  if (!C || typeof C.googleDenial !== 'function') return { kind: res.status === 401 ? 'auth' : 'unknown', googleReason: '', service: '' };
+  return C.googleDenial(res.status, res.json, url);
+}
+
+function noteDenial(res, url, denial) {
+  if (!denial || denial.kind === 'auth') return Promise.resolve();
+  try { console.info('[Glance] google denial ' + res.status + ' ' + denial.kind + ' ' + (denial.service || '-') + ' ' + (denial.googleReason || '-')); } catch (e) { /* no console */ }
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve();
+  return Promise.resolve()
+    .then(() => chrome.storage.local.set({ googleLastDenial: { status: res.status, kind: denial.kind, service: denial.service || '', googleReason: denial.googleReason || '', at: Date.now() } }))
+    .catch(() => {});
+}
+
 function settleAuth(res, url) {
   if (!res) return Promise.resolve(res);
   if (url && !criticalUrl(url)) return Promise.resolve(res);
   if (res.status === 401 || res.status === 403) {
-    const reason = res.status === 403 ? 'missing scope' : '401';
-    return noteGoogleAuthFailure(reason).then(() => res);
+    const denial = denialOf(res, url);
+    if (denial) res.denial = denial;
+    return noteDenial(res, url, denial).then(() => {
+      if (res.status === 401) return noteGoogleAuthFailure('401');
+      if (denial && (denial.kind === 'api-disabled' || denial.kind === 'forbidden')) return null;
+      return noteGoogleAuthFailure('missing scope');
+    }).then(() => res);
   }
   return Promise.resolve(res);
 }
@@ -487,6 +512,8 @@ async function storedGrantedScopes() {
     if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return null;
     const bag = await chrome.storage.local.get('googleGrantedScopes');
     const rec = bag && bag.googleGrantedScopes;
+    // What Google actually granted wins over the list that was asked for.
+    if (rec && Array.isArray(rec.granted)) return rec.granted.map((s) => String(s || '').trim()).filter(Boolean);
     const raw = rec && rec.version;
     if (raw == null) return null;
     return String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
@@ -652,6 +679,24 @@ async function guardedWrite(connectorId, input, ctx) {
     }));
   }
   if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked, null, c.lang);
+  // A Doc needs drive.file. A grant known to lack it is not sent to Google:
+  // the card asks Reconnect, and Reconnect asks Google's consent for it.
+  if (connectorId === 'googleDoc' || connectorId === 'googleDocFull') {
+    const Config = globalThis.FlowGoogleConfig;
+    const scopes = await storedGrantedScopes();
+    if (Config && typeof Config.hasScope === 'function' && Config.hasScope(scopes, Config.SCOPE_DRIVE_FILE) === false) {
+      await noteGoogleAuthFailure('missing scope');
+      return {
+        ok: false,
+        reason: 'drive-not-granted',
+        missingScope: 'drive.file',
+        needsReconnect: true,
+        reconnectLabel: reconnectWords(),
+        written: '',
+        proof: null
+      };
+    }
+  }
   const result = await writeWithListRecovery(connectorId, input, picked.ok ? picked : null);
   if (result && picked.ok && result.ok !== undefined) result.account = picked.email;
   return result;
@@ -682,6 +727,22 @@ function csvRow(csv) {
   return cells.length ? cells : null;
 }
 
+// The due day the card showed. The step's own date wins, as before. A card whose step carries no date still showed the
+// day from the mail's facts ("עד 22 בנוב׳"); that fallback is what background.js's taskClosePayload always used, and the
+// lane dropped it. A facts day already behind today is not a due date. core/google-tasks.js posts it as midnight UTC and
+// its read-back refuses Handled when the task comes back without that day.
+function laneTaskDue(i, params) {
+  const planned = (params && params.dateIso) || (i && i.dueIso) || null;
+  if (planned) return planned;
+  const facts = i && i.facts;
+  const iso = facts && facts.date && typeof facts.date.iso === 'string' ? facts.date.iso.trim() : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const pad = (v) => String(v).padStart(2, '0');
+  const now = new Date();
+  const today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+  return iso >= today ? iso : null;
+}
+
 async function prepareWrite(connectorId, input, cred) {
   const i = input || {};
   const params = i.params || {};
@@ -690,7 +751,7 @@ async function prepareWrite(connectorId, input, cred) {
       title: i.title || i.label || params.title || params.what || i.subject || '',
       taskListId: i.taskListId || params.taskListId || await storedTaskListId() || await resolveExistingTaskList() || '@default',
       notes: i.notes || '',
-      dueIso: params.dateIso || i.dueIso || null
+      dueIso: laneTaskDue(i, params)
     };
   }
   if (connectorId === 'googleTaskClose') {
@@ -841,6 +902,9 @@ function localizeUndo(result) {
 
 function decorate(result) {
   const value = localizeUndo(result);
+  if (value && value.ok === false && value.reason === 'drive-not-granted') {
+    return Promise.resolve(Object.assign({}, value, { missingScope: 'drive.file', needsReconnect: true, reconnectLabel: reconnectWords() }));
+  }
   if (!value || value.ok !== false || value.reason !== 'not-connected') return Promise.resolve(value);
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve(value);
   return Promise.resolve()
@@ -1030,6 +1094,13 @@ function onLaneMessage(msg, sender, sendResponse) {
     Promise.resolve((async () => {
       if (!F || typeof F.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
       if (!(await laneSwitchOn(F.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      // A known grant list without drive.file cannot create the Doc. Ask to
+      // reconnect. An unknown list is not treated as a refusal.
+      const scopes = await storedGrantedScopes();
+      const Config = globalThis.FlowGoogleConfig;
+      if (Config && typeof Config.hasScope === 'function' && Config.hasScope(scopes, Config.SCOPE_DRIVE_FILE) === false) {
+        return { action: 'reconnect', reason: 'drive-scope' };
+      }
       return F.plan({
         flags: { [F.SWITCH]: true },
         text: String(msg.text || '').slice(0, 8000),

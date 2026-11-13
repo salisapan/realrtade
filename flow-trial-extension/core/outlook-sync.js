@@ -351,3 +351,4 @@ const FlowOutlookSync = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlookSync };
+else if (typeof globalThis !== 'undefined') globalThis.FlowOutlookSync = FlowOutlookSync;

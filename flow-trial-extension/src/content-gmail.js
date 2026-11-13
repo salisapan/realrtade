@@ -629,7 +629,8 @@ function glanceUiCopy(kind) {
       hasThreadAttachment: Boolean(ctx.hasThreadAttachment),
       executionMemory: ctx.executionMemory || null,
       attachFile: ctx.attachFile || null,
-      text: text
+      text: text,
+      subject: ctx.subject || ''
     }) : null;
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent: intent };
     return { show: true, intent: intent, process: process };
@@ -2332,7 +2333,7 @@ function glanceUiCopy(kind) {
     // A new empty Google Doc, Sheet or Slides deck asked for by name ("Can you create a shared doc called
     // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
     // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
-    if (inboundMail && usingGoogle && await showFullDocumentChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
+    if (usingGoogle && await showFullDocumentChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showGoogleContactsChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showRecurringChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
@@ -2379,8 +2380,9 @@ function glanceUiCopy(kind) {
           ? FlowIncomingJudge.namedQuietOf(text, {}) : null);
       // A contacts lookup is named on the page: contacts are not in v1, and a skip with no reason is not allowed.
       if (reason === 'contacts-unavailable') paintGmailWhy(message, 'contacts-unavailable', FlowDisplay.whyNotShownLine('contacts-unavailable', glanceUiHebrew() ? 'he' : 'en'));
-      logScanSkip(messageId, reason || 'no-chip-candidate');
-      recordSilence(messageId, reason, {
+      const silenceReason = engineSilenceReason(intent, reason);
+      logScanSkip(messageId, silenceReason);
+      recordSilence(messageId, silenceReason, {
         family: intent.closeFamily || intent.quiet,
         clocks: (String(text).match(/\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b/gi) || []).join(' ').slice(0, 80),
         debug: debug
@@ -2594,12 +2596,15 @@ function glanceUiCopy(kind) {
       threadUrl: threadUrl(legacyId),
       hasThreadAttachment: Boolean(chosenAttachment) || Boolean(attachFile),
       executionMemory: executionMemory,
-      attachFile: attachFile
+      attachFile: attachFile,
+      // The hold's event title is the meeting subject (FlowActions.calendarAction).
+      subject: subject
     });
     let process = planned && planned.process;
     if (!process) {
       logScanSkip(messageId, 'no-process');
       void flushSuggest(false);
+      recordSilence(messageId, 'no-process');
       return;
     }
     // A reply draft is saved in the thread by its id. With no thread id and
@@ -3341,13 +3346,44 @@ function glanceUiCopy(kind) {
     host.appendChild(node);
   }
 
+  // A known Drive grant is missing. The card asks to reconnect and does not
+  // fall through to a task. Nothing is written.
+  function paintFullDocumentReconnect(message, c) {
+    if (!message || message.querySelector('.flow-chip-host')) return;
+    const he = glanceUiHebrew() || /[\u0590-\u05FF]/.test(String((c && c.text) || ''));
+    const host = el('div', 'flow-chip-host');
+    stampHost(host);
+    host.setAttribute('dir', he ? 'rtl' : 'ltr');
+    host.setAttribute('lang', he ? 'he' : 'en');
+    host.appendChild(el('p', 'flow-chip-label', he
+      ? 'חסרה הרשאת Drive. חבר מחדש את Google כדי להכין את המסמך. לא נכתב דבר.'
+      : 'Drive permission is missing. Reconnect Google to prepare the document. Nothing was written.'));
+    const btn = el('button', 'flow-chip-reconnect', glanceShow(glanceUiCopy('reconnect')));
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      btn.textContent = he ? 'מתחבר…' : 'Connecting…';
+      sendRuntime({ type: 'flow:google-reconnect', account: '' }).then((res) => {
+        btn.disabled = false;
+        btn.textContent = glanceShow(glanceUiCopy('reconnect'));
+        if (res && res.ok) {
+          host.remove();
+          scanReadingPane();
+        }
+      });
+    });
+    host.appendChild(btn);
+    if (message.firstChild) message.insertBefore(host, message.firstChild);
+    else message.appendChild(host);
+  }
+
   // A full quote/proposal Doc in the person's writing style (switch FULL_DOCUMENT_CLOSE, off).
   // One Do It creates the Doc for preview; Glance never sends mail.
   async function showFullDocumentChip(message, c) {
-    try {
-      const st = await FlowStorage.get();
-      if (glanceLabsLocked() || !(st && st.glanceSwitches && st.glanceSwitches.FULL_DOCUMENT_CLOSE === true)) return false;
-    } catch (e) { return false; }
+    if (glanceLabsLocked() || !(await glanceSwitchOn('FULL_DOCUMENT_CLOSE'))) {
+      try { console.info('[Glance] full-document plan', 'off', glanceLabsLocked() ? 'labs-locked' : 'switch-off'); } catch (e) { /* no console */ }
+      return false;
+    }
     const lang = mailLanguage({ bodyText: c.text });
     let styleSummary = null;
     try {
@@ -3356,6 +3392,7 @@ function glanceUiCopy(kind) {
       }
     } catch (e) { styleSummary = null; }
     const template = await readCompanyTemplate();
+    const started = Date.now();
     let plan = null;
     try {
       plan = await sendRuntime(Object.assign({
@@ -3366,12 +3403,25 @@ function glanceUiCopy(kind) {
         companyTemplate: template
       }, laneAccountContext()));
     } catch (e) { plan = null; }
+    try {
+      const action = plan && plan.action ? String(plan.action) : 'none';
+      let reason = plan && plan.reason ? String(plan.reason) : '';
+      if (!reason && plan && plan.built && plan.built.blank) reason = 'blank';
+      if (!reason && action === 'offer') reason = 'ready';
+      if (!reason) reason = 'no-response';
+      console.info('[Glance] full-document plan', action, reason);
+    } catch (e) { /* no console */ }
+    try { console.info('[Glance] full-document plan ms', Date.now() - started); } catch (e) { /* no console */ }
+    if (plan && plan.action === 'reconnect') {
+      paintFullDocumentReconnect(message, c);
+      return true;
+    }
     if (!plan || plan.action !== 'offer' || !plan.built || plan.built.blank) return false;
     const he = lang === 'he';
     const title = (plan.built && plan.built.title) || (plan.googleClose && plan.googleClose.templateName) || 'Document';
     const process = {
       id: 'full-document',
-      name: title,
+      name: plan.cardLine || title,
       closingLine: plan.cardLine,
       closedLine: he ? 'המסמך מוכן לעיון — לא נשלח.' : 'Document ready to preview — not sent.',
       steps: [{
@@ -3385,6 +3435,7 @@ function glanceUiCopy(kind) {
     };
     const intent = Object.assign({}, c.intent, {
       label: plan.cardLine || title,
+      selfTask: false,
       type: (c.intent && c.intent.type) || 'request',
       googleClose: plan.googleClose || null
     });
@@ -4141,7 +4192,10 @@ function glanceUiCopy(kind) {
         const zone = await glanceUserTimeZone();
         if (zone) params.timeZone = zone;
       }
-      params.title = renderedTitleFor(ctx, params.title);
+      // The card label for a hold ("שריין ג׳ 10:00") stays on the card
+      // and in Activity. The event itself keeps the planned title (the
+      // meeting subject, or the sentence when the subject is empty).
+      params.title = artifactTitleFor(ctx, params.title);
       // The worker adds a Meet link only when this text proposes a video call and
       // the MEET_LINK switch is on (off by default). Text stays local.
       if (ctx && ctx.bodyText) params.callText = String(ctx.bodyText).slice(0, 1500);
@@ -4288,8 +4342,24 @@ function glanceUiCopy(kind) {
     console.log('[Glance] scan skip:', String(reason || 'unknown'), messageId || '');
   }
 
+  // A named quiet keeps its code. A typeless miss whose only day is already
+  // gone is the past-date silence. Anything else is no-chip-candidate. The
+  // reason is a short code; it never includes the body.
+  function engineSilenceReason(intent, reason) {
+    if (reason) return reason;
+    const date = intent && intent.facts && intent.facts.date;
+    const iso = date && typeof date.iso === 'string' ? date.iso : '';
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+    if ((date && date.dropped) || (iso && iso < today)) return 'past-date';
+    return 'no-chip-candidate';
+  }
+
   function recordSilence(messageId, reason, detail) {
     void flushSuggest(false);
+    // One line per engine silence: the reason code and the message id only. No body text, no address.
+    console.log('[Glance] silent:', reason, messageId);
     if (!messageId || !reason || typeof FlowStorage.recordSilence !== 'function') return;
     FlowStorage.recordSilence({ messageId: messageId, reason: reason })
       .catch((e) => console.error('[Glance] failed to record a silence decision', e));
@@ -4357,26 +4427,36 @@ function glanceUiCopy(kind) {
     return (g && g.artifact) || (ctx && ctx.process && ctx.process.id) || 'unknown';
   }
 
-  let userContextSwitchOn = null;
-  async function userContextEnabled() {
-    if (userContextSwitchOn != null) return userContextSwitchOn;
+  // FlowStorage.get() only returns its own defaults, so a Labs row stored in
+  // glanceSwitches is invisible there. Read the same object the popup writes,
+  // on every event, so turning the row on is seen without reloading Gmail.
+  async function glanceSwitchOn(name) {
+    if (glanceLabsLocked()) return false;
     try {
-      const st = await FlowStorage.get();
-      userContextSwitchOn = !glanceLabsLocked() && !!(st && st.glanceSwitches && st.glanceSwitches.USER_CONTEXT_WRITER === true);
-    } catch (e) { userContextSwitchOn = false; }
-    return userContextSwitchOn;
+      const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+      return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
+    } catch (e) { return false; }
+  }
+
+  async function userContextEnabled() {
+    if (glanceLabsLocked()) return false;
+    return glanceSwitchOn('USER_CONTEXT_WRITER');
   }
 
   function userContextEvent(ev) {
     if (!chromeLive()) return;
-    userContextEnabled().then((on) => {
+    userContextEnabled().then(async (on) => {
       if (!on) return;
-      const lane = laneAccountContext();
+      let accountKey = '';
+      try {
+        const lane = laneAccountContext();
+        accountKey = lane.tabAccount || await readStoredOwnEmail() || '';
+      } catch (e) { accountKey = ''; }
       try {
         chrome.runtime.sendMessage({
           type: 'flow:user-context-event',
           event: ev,
-          accountKey: lane.tabAccount || 'default'
+          accountKey: accountKey || 'default'
         });
       } catch (e) { /* worker off */ }
     });
@@ -5026,7 +5106,10 @@ function glanceUiCopy(kind) {
         } else if (!payload) {
           result = { action, response: { ok: false, reason: 'unclear' } };
         } else {
-          const response = await sendExecuteAction(payload);
+          let response = await sendExecuteAction(payload);
+          // No answer at all (the worker did not register the handler) is a
+          // failure with a name, not an empty "unconfirmed".
+          if (!response || typeof response !== 'object') response = { ok: false, reason: 'no-response' };
           if (ctx && ctx.previewOnly && response && response.ok === true) {
             response.preview = true;
             response.closes = false;
@@ -5039,10 +5122,205 @@ function glanceUiCopy(kind) {
           }
         }
       }
+      if (action && action.kind === 'calendar') logCalendarHold(calendarHoldOutcome(result.response));
+      if (action && action.kind === 'driveDoc' && ctx && ctx.previewOnly) logFullDocument(fullDocumentOutcome(result.response));
       results.push(result);
       if (onStepDone) onStepDone(result, results.length, actions.length);
     }
     return results;
+  }
+
+  // A calendar hold that did not land is never a silent "unconfirmed". The
+  // card says what happened in the UI language and, when Google needs the
+  // person (an expired or missing token, the Calendar scope not granted),
+  // offers Reconnect. result: created | unverified | failed. reason: a short
+  // code, never the mail text.
+  function calendarHoldOutcome(response) {
+    const r = response && typeof response === 'object' ? response : null;
+    if (r && r.ok === true) {
+      return { result: 'created', reason: r.proof && r.proof.fetchedBack === true ? 'verified' : 'unproved', line: '', reconnect: false };
+    }
+    const raw = r && typeof r.reason === 'string' && r.reason ? r.reason : 'no-response';
+    if (raw === 'unverified' || (r && r.unverified === true && r.ref)) {
+      return { result: 'unverified', reason: 'unverified', line: '', reconnect: false };
+    }
+    const he = glanceUiHebrew();
+    const lead = he ? 'לא נוצר אירוע ביומן — ' : 'No calendar event was created — ';
+    if (raw === 'not-connected') {
+      return {
+        result: 'failed',
+        reason: r && r.needsReconnect ? 'token-expired' : 'not-connected',
+        reconnect: true,
+        line: lead + (he
+          ? 'החיבור ל-Google פג או לא פעיל. לחץ «' + glanceUiCopy('reconnect') + '» ואז «בצע» שוב.'
+          : 'the Google connection expired or is off. Press ' + glanceUiCopy('reconnect') + ', then Do It again.')
+      };
+    }
+    if (raw === 'calendar-not-granted' || raw === 'missing-scope') {
+      return {
+        result: 'failed',
+        reason: 'calendar-scope-missing',
+        reconnect: true,
+        line: lead + (he
+          ? 'ל-Glance אין הרשאה ליומן Google. לחץ «' + glanceUiCopy('reconnect') + '» ואשר את היומן.'
+          : 'Glance is not allowed to use Google Calendar. Press ' + glanceUiCopy('reconnect') + ' and allow Calendar.')
+      };
+    }
+    if (raw === 'account-unverified') {
+      return { result: 'failed', reason: raw, reconnect: true, line: lead + reasonMessageRaw(r) };
+    }
+    if (raw === 'unknown' || raw === 'unavailable' || raw === 'no-response') {
+      return {
+        result: 'failed',
+        reason: raw === 'unknown' ? 'handler-unpublished' : (raw === 'no-response' ? 'no-response' : 'worker-unavailable'),
+        reconnect: false,
+        line: lead + (he ? 'רכיב היומן של Glance לא נטען. רענן את Gmail ונסה שוב.' : "Glance's calendar writer did not load. Refresh Gmail and try again.")
+      };
+    }
+    if (raw === 'verify_failed' || raw === 'proof_pending') {
+      return {
+        result: 'failed',
+        reason: raw,
+        reconnect: false,
+        line: lead + (he ? 'Google לא החזיר את האירוע אחרי הכתיבה, ולכן הוא הוסר. נסה שוב.' : 'Google did not return the event after the write, so it was removed. Try again.')
+      };
+    }
+    if (/^http-\d+$/.test(raw)) {
+      return {
+        result: 'failed',
+        reason: raw,
+        reconnect: false,
+        line: lead + (he ? 'Google החזיר שגיאה (' + raw.slice(5) + '). נסה שוב.' : 'Google answered with an error (' + raw.slice(5) + '). Try again.')
+      };
+    }
+    return { result: 'failed', reason: raw, reconnect: Boolean(r && r.needsReconnect), line: lead + reasonMessageRaw(r) };
+  }
+
+  // The full-document Doc (FULL_DOCUMENT_CLOSE) the same way: a Doc that was
+  // not created is never a silent "unconfirmed". A missing drive.file grant
+  // names the Drive permission and offers Reconnect, which asks Google's
+  // consent for it. An API that is off in Glance's Cloud project says so and
+  // does not offer Reconnect, because Reconnect cannot fix it.
+  function fullDocumentOutcome(response) {
+    const r = response && typeof response === 'object' ? response : null;
+    if (r && r.ok === true) {
+      return { result: 'created', reason: r.proof && r.proof.fetchedBack === true ? 'verified' : 'unproved', line: '', reconnect: false };
+    }
+    const raw = r && typeof r.reason === 'string' && r.reason ? r.reason : 'no-response';
+    const he = glanceUiHebrew();
+    const lead = he ? 'לא נוצר מסמך ב-Google — ' : 'No Google Doc was created — ';
+    const google = r && r.googleReason ? String(r.googleReason) : '';
+    if (raw === 'drive-not-granted' || raw === 'missing-scope') {
+      return {
+        result: 'failed',
+        reason: 'drive-scope-missing',
+        reconnect: true,
+        google: google,
+        line: lead + (he
+          ? 'ל-Glance אין הרשאה ליצור קבצים ב-Google Drive. לחץ «' + glanceUiCopy('reconnect') + '» ואשר את הגישה ל-Drive במסך ההרשאות של Google.'
+          : 'Glance does not have the Google Drive permission (create files, drive.file). Press ' + glanceUiCopy('reconnect') + ' and allow Drive on Google’s permission screen.')
+      };
+    }
+    if (raw === 'not-connected') {
+      return {
+        result: 'failed',
+        reason: r && r.needsReconnect ? 'token-expired' : 'not-connected',
+        reconnect: true,
+        google: google,
+        line: lead + (he
+          ? 'החיבור ל-Google פג או לא פעיל. לחץ «' + glanceUiCopy('reconnect') + '» ואז «בצע» שוב.'
+          : 'the Google connection expired or is off. Press ' + glanceUiCopy('reconnect') + ', then Do It again.')
+      };
+    }
+    if (raw === 'docs-api-disabled' || raw === 'drive-api-disabled') {
+      const api = raw === 'docs-api-disabled' ? 'Google Docs API' : 'Google Drive API';
+      const apiHe = raw === 'docs-api-disabled' ? 'שירות המסמכים של Google' : 'שירות Drive של Google';
+      return {
+        result: 'failed',
+        reason: raw,
+        reconnect: false,
+        google: google,
+        line: lead + (he
+          ? apiHe + ' לא מופעל בפרויקט הענן של Glance. חיבור מחדש לא יפתור את זה.' + (r && r.cleanedUp === true ? ' לא נשאר מסמך ריק ב-Drive.' : '')
+          : api + ' is not enabled in Glance’s Google Cloud project. Reconnecting will not fix this.' + (r && r.cleanedUp === true ? ' No empty Doc was left in Drive.' : ''))
+      };
+    }
+    if (raw === 'unknown' || raw === 'unavailable' || raw === 'no-response') {
+      return {
+        result: 'failed',
+        reason: raw === 'unknown' ? 'handler-unpublished' : (raw === 'no-response' ? 'no-response' : 'worker-unavailable'),
+        reconnect: false,
+        google: google,
+        line: lead + (he ? 'רכיב המסמכים של Glance לא נטען. רענן את Gmail ונסה שוב.' : "Glance's document writer did not load. Refresh Gmail and try again.")
+      };
+    }
+    if (raw === 'verify_failed' || raw === 'proof_pending') {
+      return {
+        result: 'failed',
+        reason: raw,
+        reconnect: false,
+        google: google,
+        line: lead + (he ? 'Google לא החזיר את המסמך אחרי הכתיבה. נסה שוב.' : 'Google did not return the document after the write. Try again.')
+      };
+    }
+    if (/^http-\d+$/.test(raw)) {
+      return {
+        result: 'failed',
+        reason: raw,
+        reconnect: false,
+        google: google,
+        line: lead + (he ? 'Google החזיר שגיאה (' + raw.slice(5) + (google ? ' · ' + google : '') + '). נסה שוב.' : 'Google answered with an error (' + raw.slice(5) + (google ? ' · ' + google : '') + '). Try again.')
+      };
+    }
+    return { result: 'failed', reason: raw, reconnect: Boolean(r && r.needsReconnect), google: google, line: lead + reasonMessageRaw(r) };
+  }
+
+  function logFullDocument(outcome) {
+    const o = outcome || {};
+    console.log('[Glance] full-document write ' + (o.result || 'failed') + ' ' + (o.reason || 'unknown'));
+    if (o.google) console.log('[Glance] full-document google ' + o.google);
+  }
+
+  function fullDocumentFailure(results, ctx) {
+    if (!ctx || !ctx.previewOnly) return null;
+    for (const r of results || []) {
+      if (!r || !r.action || r.action.kind !== 'driveDoc') continue;
+      if (r.response && r.response.skipped) continue;
+      const o = fullDocumentOutcome(r.response);
+      if (o.result === 'failed') return { result: r, outcome: o };
+    }
+    return null;
+  }
+
+  function logCalendarHold(outcome) {
+    const o = outcome || {};
+    console.log('[Glance] calendar hold ' + (o.result || 'failed') + ' ' + (o.reason || 'unknown'));
+  }
+
+  // The failure line sits on the card in full (the step row truncates in a
+  // narrow pane), with Reconnect when Google needs the person.
+  function paintHoldError(host, chip, outcome, response) {
+    if (!host || !outcome || !outcome.line) return;
+    setChipState(chip, 'flow-chip-error', outcome.line);
+    host.querySelectorAll('.flow-chip-hold-error').forEach((n) => n.remove());
+    const box = el('div', 'flow-chip-hold-error', glanceShow(outcome.line));
+    box.setAttribute('role', 'alert');
+    box.setAttribute('dir', glanceUiHebrew() ? 'rtl' : 'ltr');
+    box.setAttribute('data-glance-hold-reason', outcome.reason || '');
+    if (outcome.reason === 'drive-scope-missing') box.setAttribute('data-glance-missing-scope', 'drive.file');
+    host.appendChild(box);
+    if (outcome.reconnect) offerReconnect(host, chip, response || {});
+    else host.querySelectorAll('.flow-chip-reconnect').forEach((n) => n.remove());
+  }
+
+  function calendarHoldFailure(results) {
+    for (const r of results || []) {
+      if (!r || !r.action || r.action.kind !== 'calendar') continue;
+      if (r.response && r.response.skipped) continue;
+      const o = calendarHoldOutcome(r.response);
+      if (o.result === 'failed') return { result: r, outcome: o };
+    }
+    return null;
   }
 
   // Reverses the successful chain and undoes it one step at a time, stopping
@@ -5312,6 +5590,7 @@ function glanceUiCopy(kind) {
         if (result && result.ok) {
           if (done.replaceChildren) done.replaceChildren(el('span', 'flow-chip-label', result.written || ''));
           noteLaneTaskUndone(messageNode, messageId, record);
+          userContextEvent({ type: 'undo', partyKey: 'unknown', intentFamily: 'task', at: new Date().toISOString() });
           return;
         }
         if (result && result.partial) {
@@ -5462,6 +5741,12 @@ function glanceUiCopy(kind) {
           FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: messageId, reason: 'undo' })
             .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
         }
+        userContextEvent({
+          type: 'undo',
+          partyKey: (row.sender && (row.sender.email || row.sender)) || 'unknown',
+          intentFamily: row.processId || 'task',
+          at: new Date().toISOString()
+        });
         done.replaceChildren(el('span', 'flow-chip-label', (result && result.written) || copy.undoneLine));
         const mark = typeof FlowStorage.markGoogleTaskUndone === 'function'
           ? FlowStorage.markGoogleTaskUndone(messageId, copy.ref, row.threadId)
@@ -5527,7 +5812,10 @@ function glanceUiCopy(kind) {
         }
       });
     });
-    const actionsRow = el('div', 'flow-chip-actions-row');
+    // flow-chip-actions, like every other receipt: flow-chip-actions-row is
+    // the collapsed pill row (max-height 0, opacity 0 until the chip is
+    // expanded), which left this Undo invisible and unclickable.
+    const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     done.appendChild(actionsRow);
     placeReceipt(host, chip, done);
@@ -5703,12 +5991,23 @@ function glanceUiCopy(kind) {
       if (res && res.ok) {
         btn.remove();
         setChipState(chip, 'flow-chip-error', he ? 'החיבור התחדש. לחץ שוב על Do It.' : 'Reconnected. Press Do It again.');
+        const note = host.querySelector('.flow-chip-hold-error');
+        if (note) note.textContent = glanceShow(he ? 'החיבור התחדש. לחץ «בצע» שוב.' : 'Reconnected. Press Do It again.');
         return;
       }
       btn.disabled = false;
       btn.textContent = label;
       const named = res && res.account ? res.account : '';
       const want = res && res.wanted ? res.wanted : (response.reconnectAccount || '');
+      if (res && res.reason === 'partial-grant') {
+        const noDrive = Array.isArray(res.missing) && res.missing.indexOf('drive.file') >= 0;
+        setChipState(chip, 'flow-chip-error', he
+          ? (noDrive ? 'Google לא אישר את הגישה ל-Drive. לחץ שוב «' + glanceUiCopy('reconnect') + '» וסמן את Drive במסך ההרשאות.' : 'Google לא אישר את כל ההרשאות. לחץ שוב «' + glanceUiCopy('reconnect') + '» וסמן את כולן.')
+          : (noDrive ? 'Google did not allow Drive. Press ' + glanceUiCopy('reconnect') + ' again and tick Drive on the permission screen.' : 'Google did not allow every permission. Press ' + glanceUiCopy('reconnect') + ' again and tick them all.'));
+        const note = host.querySelector('.flow-chip-hold-error');
+        if (note) note.textContent = glanceShow(he ? 'Google לא אישר את הגישה ל-Drive. לא נכתב דבר.' : 'Google did not allow Drive. Nothing was written.');
+        return;
+      }
       const line = res && res.reason === 'wrong-account' && named
         ? (he ? 'התחברת עם ' + named + ', אבל Gmail פתוח על ' + want + '. נסה שוב עם ' + want + '.' : 'You signed in as ' + named + ', but this Gmail tab is ' + want + '. Try again as ' + want + '.')
         : (he ? 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש. לא נכתב דבר.' : "Couldn't verify the account — reconnect Google. Nothing was written.");
@@ -5728,6 +6027,12 @@ function glanceUiCopy(kind) {
 
     if (!succeeded.length && orphans.length) {
       showUnverifiedReceipt(host, chip, ctx, results, orphans);
+      return;
+    }
+    const holdFail = !succeeded.length ? (calendarHoldFailure(results) || fullDocumentFailure(results, ctx)) : null;
+    if (holdFail) {
+      paintHoldError(host, chip, holdFail.outcome, holdFail.result.response);
+      noteLaneOutcome(results);
       return;
     }
     const refused = results.find(accountRefusal);
@@ -5794,6 +6099,15 @@ function glanceUiCopy(kind) {
       setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (results[0] && results[0].response), ctx));
       noteLaneOutcome(results);
       return;
+    }
+    if (succeeded.some((r) => r && r.response && r.response.proof && r.response.proof.fetchedBack === true)) {
+      userContextEvent({
+        type: 'approved',
+        partyKey: userContextParty(ctx),
+        intentFamily: userContextFamily(ctx),
+        fetchedBack: true,
+        at: new Date().toISOString()
+      });
     }
 
     const done = el('div', 'flow-chip flow-chip-done');
@@ -5874,6 +6188,7 @@ function glanceUiCopy(kind) {
           writeLaneUndoRow(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(left), { partial: left.length < counted.length, total: counted.length }, ctx.laneIds);
           FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
           FlowStorage.calibrate('undo', ctx.intent.type);
+          userContextEvent({ type: 'undo', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() });
           // The full close is no longer true, so a later message in this
           // matter may speak again. Independent of the receipt text below.
           if (typeof FlowCloseMemory !== 'undefined') {
@@ -6165,7 +6480,11 @@ function glanceUiCopy(kind) {
       if (host.__glanceSteps && result && result.action) {
         const proved = result.response && result.response.proof && result.response.proof.fetchedBack === true;
         const next = (result.response && result.response.ok) ? (proved ? 'verified' : 'verifying') : 'failed';
-        host.__glanceSteps.setRow(result.action.id, next, next === 'failed' ? reasonMessage(result.response, ctx) : null);
+        const hold = next !== 'failed' ? null
+          : (result.action.kind === 'calendar' ? calendarHoldOutcome(result.response)
+            : (result.action.kind === 'driveDoc' && ctx && ctx.previewOnly ? fullDocumentOutcome(result.response) : null));
+        const why = next === 'failed' ? (hold && hold.result === 'failed' ? glanceShow(hold.line) : reasonMessage(result.response, ctx)) : null;
+        host.__glanceSteps.setRow(result.action.id, next, why, hold && hold.result === 'failed' ? { blocker: true } : null);
       }
       if (result.response && result.response.ok) {
         doneVerbs.push(STEP_DONE_VERB[result.action.kind] || 'completed one step');
@@ -6176,7 +6495,18 @@ function glanceUiCopy(kind) {
 
     runActionsSequentially(liveSteps, ctx, onStepDone)
       .then(async (results) => { await showMultiActionReceipt(host, chip, ctx, results); checkBrief(); })
-      .catch(() => setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'));
+      .catch(() => {
+        setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.');
+        if (liveSteps.some((s) => s && s.kind === 'calendar')) {
+          const o = calendarHoldOutcome({ ok: false, reason: 'unavailable' });
+          logCalendarHold({ result: 'failed', reason: 'exception' });
+          paintHoldError(host, chip, o, null);
+        } else if (ctx && ctx.previewOnly && liveSteps.some((s) => s && s.kind === 'driveDoc')) {
+          const o = fullDocumentOutcome({ ok: false, reason: 'unavailable' });
+          logFullDocument({ result: 'failed', reason: 'exception' });
+          paintHoldError(host, chip, o, null);
+        }
+      });
   }
 
   async function onDismiss(host, ctx) {
@@ -6761,6 +7091,17 @@ function glanceUiCopy(kind) {
     return true;
   }
 
+  function rescanOpenMailForSwitches() {
+    const open = currentContext && currentContext.message;
+    if (open && open.querySelectorAll) {
+      open.querySelectorAll('.flow-chip-host').forEach((host) => {
+        if (host.getAttribute('data-glance-chain') === 'task-proof' || host.hasAttribute('data-glance-verifying')) return;
+        host.remove();
+      });
+    }
+    scanReadingPane();
+  }
+
   if (chromeLive()) chrome.storage.onChanged.addListener((changes) => {
     if (!chromeLive()) return;
     if (changes.onboarded || changes.domainId || changes.connectorId) init();
@@ -6771,6 +7112,7 @@ function glanceUiCopy(kind) {
         scanReadingPane();
       }).catch(() => {});
     }
+    if (changes.glanceSwitches) rescanOpenMailForSwitches();
   });
 
   globalThis.__glanceGmailPage = {

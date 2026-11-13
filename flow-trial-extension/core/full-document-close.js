@@ -10,7 +10,8 @@ const FlowFullDocumentClose = (() => {
   const TITLE_PLACEHOLDER = '[כותרת / title]';
 
   const ASK_EN = /\b(?:send|prepare|draft|write|put together|share)\b.{0,40}\b(?:the\s+)?(?:quote|quotation|proposal|contract|agreement|sow|statement of work)\b/i;
-  const ASK_HE = /(?:שלח|שלחי|הכן|הכיני|תכין|תכיני|להכין|נא\s+להכין).{0,40}(?:הצעת\s*מחיר|הצעה|חוזה|הסכם)/u;
+  const ASK_HE = /(?:שלח|שלחי|הכן|הכיני|תכין|תכיני|להכין|נא\s+להכין).{0,40}(?:הצעת\s*מחיר|הצעה|חוזה|הסכם)|(?:אפשר\s+לקבל|(?<!לא\s)לקבל|בקשה\s+ל)\s*הצעת\s*מחיר/u;
+  const PARTY_PLACEHOLDER = '[לקוח / party]';
   const CREATE_ONLY = /\bcreate\s+(?:a\s+)?(?:shared\s+)?(?:doc|document|sheet|spreadsheet|deck|slides?)\b/i;
   const ASK_CONTENT_IN_MAIL = /\b(?:write|summarize|draft)\b.{0,30}\b(?:in the (?:email|mail)|one-?page summary)\b/i;
 
@@ -96,8 +97,30 @@ const FlowFullDocumentClose = (() => {
     return Object.assign({}, close, { filled: filled, missing: missing });
   }
 
+  function ensurePartyPlaceholder(close) {
+    if (!close) return close;
+    const slots = close.slots || [];
+    if (slots.indexOf('party') === -1) return close;
+    const filled = Object.assign({}, close.filled || {});
+    if (filled.party) return close;
+    filled.party = PARTY_PLACEHOLDER;
+    const missing = (close.missing || []).filter((name) => name !== 'party' && !filled[name]);
+    return Object.assign({}, close, { filled: filled, missing: missing });
+  }
+
+  function fallbackQuoteTemplate(text, lang) {
+    if (!/(?:הצעת\s*מחיר|\b(?:quote|quotation)\b)/i.test(String(text || ''))) return null;
+    return {
+      artifact: 'quote',
+      kind: 'doc',
+      name: lang === 'he' ? 'הצעת מחיר' : 'Quote',
+      slots: ['party', 'amount', 'title']
+    };
+  }
+
   function applyPreviewPlaceholders(close, sourceText) {
     let c = stripInventedAmounts(close, sourceText);
+    c = ensurePartyPlaceholder(c);
     c = ensurePricePlaceholder(c, sourceText);
     c = ensureTitlePlaceholder(c);
     const filled = c.filled || {};
@@ -160,9 +183,10 @@ const FlowFullDocumentClose = (() => {
     if (!C || typeof C.consider !== 'function') return { action: 'silence', reason: 'not-configured' };
 
     const amount = input.amount || extractAmount(text);
+    const lang = input.lang === 'he' ? 'he' : 'en';
     const consider = C.consider({
       text: text,
-      template: input.template || input.companyTemplate || null,
+      template: input.template || input.companyTemplate || fallbackQuoteTemplate(text, lang),
       dateIso: input.dateIso || null,
       dateText: input.dateText || null,
       amount: amount,
@@ -205,7 +229,8 @@ const FlowFullDocumentClose = (() => {
     applyPreviewPlaceholders,
     amountInText,
     PRICE_PLACEHOLDER,
-    TITLE_PLACEHOLDER
+    TITLE_PLACEHOLDER,
+    PARTY_PLACEHOLDER
   };
 })();
 

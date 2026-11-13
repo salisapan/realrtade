@@ -1656,6 +1656,7 @@ async function commitGoogleWebAuth(record, epoch) {
   });
 }
 
+let lastGoogleGrantCheck = null;
 async function runGoogleWebAuth(interactive) {
   if (!GOOGLE_WEB_CLIENT_ID) {
     throw new Error('Glance’s backup Google sign-in isn’t configured on this build yet.');
@@ -1668,24 +1669,48 @@ async function runGoogleWebAuth(interactive) {
   const scopes = await googleManifestScopes();
   // After Disconnect the window must show Google's consent screen, so a
   // Cancel there cannot hand back the old grant.
-  const forceConsent = interactive ? await googleConsentRequired() : false;
+  const scopeConsent = interactive ? await googleScopeConsentNeeded() : false;
+  const forceConsent = interactive ? (scopeConsent || await googleConsentRequired()) : false;
+  const prompt = interactive ? (forceConsent ? 'consent select_account' : 'select_account') : 'none';
   const url = googleImplicitAuthUrl({
     clientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri,
     scopes,
     state,
-    prompt: interactive ? (forceConsent ? 'consent select_account' : 'select_account') : 'none',
+    prompt: prompt,
     loginHint: hint
   });
-  const resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
+  let resultUrl;
+  try {
+    resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
+  } catch (flowErr) {
+    if (interactive) await glanceAuthLog({ call: 'launchWebAuthFlow', result: 'error', interactive: true, prompt: prompt, message: flowErr && flowErr.message });
+    throw flowErr;
+  }
   if (epoch !== googleWebAuthEpoch) throw new Error('Google sign-in was closed or denied.');
   const parsed = parseGoogleImplicitRedirect(resultUrl, state);
   // A consent with boxes left unticked is not kept: the token cannot write,
-  // and keeping it made the next Connect reuse it without a window.
-  const missing = googleMissingScopes(parsed.scope, scopes);
-  if (missing.length) {
+  // and keeping it made the next Connect reuse it without a window. A
+  // redirect with no scope says nothing, so tokeninfo is asked instead.
+  let check = grantedCheck(parsed.scope, scopes);
+  if (!check.known && interactive) check = grantedCheck(await googleTokenInfoScopes(parsed.accessToken), scopes);
+  lastGoogleGrantCheck = check;
+  if (interactive) {
+    await glanceAuthLog({
+      call: 'launchWebAuthFlow',
+      result: check.missing.length ? 'partial' : 'ok',
+      interactive: true,
+      prompt: prompt,
+      message: check.known
+        ? (check.missing.length ? 'missing: ' + check.missing.map(shortScopeName).join(' ') : 'granted: ' + check.granted.map(shortScopeName).join(' '))
+        : 'granted scopes unknown'
+    });
+  }
+  if (check.missing.length) {
     const partial = new Error('Google did not grant every permission Glance needs. Connect Google again and tick every box.');
     partial.code = 'partial-grant';
+    partial.missing = check.missing.slice();
+    partial.check = check;
     throw partial;
   }
   const record = { accessToken: parsed.accessToken, source: 'web', obtainedAt: Date.now() };
@@ -1806,16 +1831,67 @@ async function readGoogleGrantedScopes() {
   return bag[GOOGLE_GRANTED_SCOPES_KEY] || null;
 }
 
-async function writeGoogleGrantedScopes(status, source) {
+// version is the manifest list that was asked for (googleScopeAction
+// compares it). granted / missing are what Google actually returned, when
+// the redirect or tokeninfo said so: the Doc lane reads granted.
+async function writeGoogleGrantedScopes(status, source, check) {
   const scopes = await googleManifestScopes();
-  await chrome.storage.local.set({
-    [GOOGLE_GRANTED_SCOPES_KEY]: {
-      version: scopeVersion(scopes),
-      status: status,
-      source: source || null,
-      at: Date.now()
+  const rec = {
+    version: scopeVersion(scopes),
+    status: status,
+    source: source || null,
+    at: Date.now()
+  };
+  if (check && Array.isArray(check.granted)) rec.granted = check.granted.slice();
+  if (check && Array.isArray(check.missing)) rec.missing = check.missing.slice();
+  await chrome.storage.local.set({ [GOOGLE_GRANTED_SCOPES_KEY]: rec });
+}
+
+function shortScopeName(scope) {
+  return String(scope || '').replace('https://www.googleapis.com/auth/', '');
+}
+
+// What the token actually carries, from Google's tokeninfo. null when
+// tokeninfo did not answer: unknown is not a refusal. The token is sent only
+// to Google and is never logged.
+async function googleTokenInfoScopes(token) {
+  if (!token) return null;
+  try {
+    const res = await fetch(glanceE2eRewrite('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(token)));
+    if (!res || !res.ok) return null;
+    const data = await res.json();
+    const raw = data && typeof data.scope === 'string' ? data.scope : '';
+    return raw ? raw : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// required minus what Google says is missing. Unknown (no scope string)
+// leaves granted null and missing empty.
+function grantedCheck(scopeString, required) {
+  if (typeof scopeString !== 'string' || !scopeString.trim()) return { known: false, granted: null, missing: [] };
+  const missing = googleMissingScopes(scopeString, required);
+  return { known: true, granted: required.filter((s) => missing.indexOf(s) < 0), missing: missing };
+}
+
+// The interactive ask must show Google's consent screen when a scope the
+// lanes need is missing: the Reconnect flag says a write was refused for a
+// missing scope, or the last grant is known to lack one. include_granted_scopes
+// keeps what was already granted; prompt=consent makes Google ask for the rest.
+async function googleScopeConsentNeeded() {
+  try {
+    const bag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY]);
+    const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+    if (flag && flag.needed && flag.reason === 'missing scope') return true;
+    const rec = bag && bag[GOOGLE_GRANTED_SCOPES_KEY];
+    if (rec && Array.isArray(rec.missing) && rec.missing.length) return true;
+    if (rec && Array.isArray(rec.granted)) {
+      const required = await googleManifestScopes();
+      if (required.some((s) => rec.granted.indexOf(s) < 0)) return true;
     }
-  });
+  } catch (e) { /* no storage: the normal chooser */ }
+  return false;
 }
 
 // One shared ask. Drops the cached Chrome token and the stored web token,
@@ -1826,10 +1902,37 @@ async function upgradeGoogleScopesOnce() {
   if (!googleScopeUpgradeFlight) {
     let flight;
     flight = (async () => {
+      const scopeAsk = await googleScopeConsentNeeded();
       await clearCachedChromeGoogleTokens();
       await clearGoogleWebAuth();
       try {
         const token = await getGoogleAuthToken(true);
+        // A write was refused for a missing scope: check what this token
+        // really carries before calling it a connection.
+        if (scopeAsk) {
+          const required = await googleManifestScopes();
+          const check = grantedCheck(await googleTokenInfoScopes(token), required);
+          await glanceAuthLog({
+            call: 'getAuthToken',
+            result: check.missing.length ? 'partial' : 'ok',
+            interactive: true,
+            message: check.known ? (check.missing.length ? 'missing: ' + check.missing.map(shortScopeName).join(' ') : 'granted: ' + check.granted.map(shortScopeName).join(' ')) : 'granted scopes unknown'
+          });
+          if (check.missing.length) {
+            await writeGoogleGrantedScopes('asked', 'chrome', check);
+            const partial = new Error('Google did not grant every permission Glance needs. Connect Google again and tick every box.');
+            partial.code = 'partial-grant';
+            partial.missing = check.missing.slice();
+            throw partial;
+          }
+          if (check.known) {
+            await writeGoogleGrantedScopes('granted', 'chrome', check);
+            await recordGoogleConsent(token, 'chrome');
+            const keptChecked = await rememberUpgradedGoogleToken(token, 'chrome');
+            if (!keptChecked) throw new Error('Google sign-in was closed or denied.');
+            return { token: token, source: 'chrome' };
+          }
+        }
         await writeGoogleGrantedScopes('granted', 'chrome');
         // The chooser token lives in Chrome's cache, which this function
         // just cleared. A later silent getAuthToken does not see it, and
@@ -1841,18 +1944,21 @@ async function upgradeGoogleScopesOnce() {
         return { token: token, source: 'chrome' };
       } catch (err) {
         const message = err && err.message;
+        if (err && err.code === 'partial-grant') throw err;
         if (!shouldFallbackFromGetAuthToken(message, { interactive: true })) {
           await writeGoogleGrantedScopes('asked', 'chrome');
           throw err;
         }
         try {
+          lastGoogleGrantCheck = null;
           const saved = await runGoogleWebAuth(true);
           await recordGoogleConsent(saved.accessToken, 'web');
-          await writeGoogleGrantedScopes('granted', 'web');
+          const known = lastGoogleGrantCheck && lastGoogleGrantCheck.known ? lastGoogleGrantCheck : null;
+          await writeGoogleGrantedScopes('granted', 'web', known);
           await clearGoogleReconnect();
           return { token: saved.accessToken, source: 'web' };
         } catch (webErr) {
-          await writeGoogleGrantedScopes('asked', 'web');
+          await writeGoogleGrantedScopes('asked', 'web', webErr && webErr.check ? webErr.check : null);
           throw webErr;
         }
       }
@@ -2541,16 +2647,37 @@ globalThis.FlowGoogleAccess = {
   }
 };
 
-async function rememberGoogleAuthResult(res) {
+async function rememberGoogleAuthResult(res, url) {
   if (!res) return res;
   if (res.status === 401) {
     // Survived the silent refresh+retry: the grant is gone. Clear so the
     // popup does not keep saying Connected until Disconnect is clicked.
     await clearGoogleAuthForRevocation('401');
   } else if (res.status === 403) {
-    await markGoogleReconnect('missing scope');
+    // Only a 403 that says the token lacks a scope (or says nothing) asks
+    // Reconnect. An API that is off in the Cloud project, a quota or a file
+    // permission is not fixed by Reconnect, so it does not loop on it.
+    const denial = await googleDenialOf(res, url);
+    if (!denial || denial.kind === 'scope' || denial.kind === 'unknown') await markGoogleReconnect('missing scope');
   }
   return res;
+}
+
+async function googleDenialOf(res, url) {
+  const C = globalThis.FlowGoogleConfig;
+  if (!C || typeof C.googleDenial !== 'function') return null;
+  let json = null;
+  try {
+    if (res && typeof res.clone === 'function') json = await res.clone().json();
+  } catch (e) { json = null; }
+  const denial = C.googleDenial(res.status, json, url);
+  if (denial && denial.kind !== 'auth') {
+    try { console.info('[Glance] google denial ' + res.status + ' ' + denial.kind + ' ' + (denial.service || '-') + ' ' + (denial.googleReason || '-')); } catch (e) { /* no console */ }
+    try {
+      await chrome.storage.local.set({ googleLastDenial: { status: res.status, kind: denial.kind, service: denial.service || '', googleReason: denial.googleReason || '', at: Date.now() } });
+    } catch (e) { /* diagnostics only */ }
+  }
+  return denial;
 }
 
 // options.soft marks a best-effort read (a thread lookup, a probe). Its 401
@@ -2592,16 +2719,16 @@ async function googleAuthedFetch(baseUrl, path, rawOptions) {
   }));
   const res = await doFetch(cred.token);
   if (soft) return res;
-  if (res.status !== 401) return rememberGoogleAuthResult(res);
+  if (res.status !== 401) return rememberGoogleAuthResult(res, baseUrl + path);
   // A cached token can go stale without Chrome knowing yet. One silent
   // refresh and one retry, then fail loudly. The refresh stays silent:
   // prompt=none may run for a web token; a consent window may not. The token
   // is dropped only when the refresh says the grant was revoked.
   const next = await refreshLaneCredential(cred);
-  if (next && next.revoked) return rememberGoogleAuthResult(res);
+  if (next && next.revoked) return rememberGoogleAuthResult(res, baseUrl + path);
   let retryToken = cred.token;
   if (next && next.token && (next.source !== 'chrome' || await chromeTokenIsConsented(next.token))) retryToken = next.token;
-  return rememberGoogleAuthResult(await doFetch(retryToken));
+  return rememberGoogleAuthResult(await doFetch(retryToken), baseUrl + path);
 }
 
 function googleTasksAuthedFetch(path, options) {
@@ -3395,7 +3522,27 @@ async function googleCalendarChange(p, op) {
   };
 }
 
+// Same rule as FlowActions.holdSubjectTitle: reply prefixes and
+// bracket tags like [G-Calendar] are stripped from the Subject line.
+function cleanMailSubject(subject) {
+  if (typeof FlowActions !== 'undefined' && typeof FlowActions.holdSubjectTitle === 'function') {
+    return FlowActions.holdSubjectTitle(subject);
+  }
+  let s = String(subject || '')
+    .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  let prev = '';
+  while (s && s !== prev) {
+    prev = s;
+    s = s.replace(/^(?:(?:re|fw|fwd|השב|תגובה|הועבר)\s*:\s*)+/ig, '').trim();
+    s = s.replace(/^\[[^\[\]]+\]\s*/g, '').trim();
+  }
+  return s;
+}
+
 async function googleCalendarWrite(p) {
+
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
   const params = p.params || {};
   if (params.calendarOp === 'delete' || params.calendarOp === 'update') {
@@ -3441,6 +3588,8 @@ async function googleCalendarWrite(p) {
   // same fact the chip proposed — not only a title and an attribution line.
   const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim() : '';
   if (quote) descriptionLines.push(quote.slice(0, QUOTE_MAX_CHARS));
+  const subjectLine = cleanMailSubject(params.subject);
+  if (subjectLine) descriptionLines.push('Subject: ' + subjectLine);
   if (linkedFile) descriptionLines.push('File: ' + linkedFile.name + '\n' + linkedFile.url);
   if (shareUrl) descriptionLines.push(shareUrl);
   if (p.threadUrl) descriptionLines.push('Open in Gmail: ' + p.threadUrl);
@@ -7610,7 +7759,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:google-reconnect') {
     if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
-    return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => ({ ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
+    return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => (e && e.code === 'partial-grant'
+      ? { ok: false, reason: 'partial-grant', missing: (Array.isArray(e.missing) ? e.missing : []).map(shortScopeName) }
+      : { ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
   }
 
   if (msg.type === 'flow:microsoft-optional-scopes') {

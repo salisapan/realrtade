@@ -1330,3 +1330,4 @@ const FlowOutlook = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlook };
+else if (typeof globalThis !== 'undefined') globalThis.FlowOutlook = FlowOutlook;

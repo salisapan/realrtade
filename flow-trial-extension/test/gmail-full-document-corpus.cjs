@@ -20,6 +20,10 @@ const bg = read('src', 'background.js');
 
 check('lane maps googleDocFull to FlowGoogleDocs', /googleDocFull: 'FlowGoogleDocs'/.test(lane));
 check('host imports full-document-close and answers the plan with the switch', /full-document-close\.js/.test(host) && /flow:google-full-document-plan/.test(host) && /laneSwitchOn\(F\.SWITCH\)/.test(host));
+check('a known grant without drive.file asks to reconnect', /reason: 'drive-scope'/.test(host) && /plan\.action === 'reconnect'/.test(gmail) && /paintFullDocumentReconnect\(/.test(gmail));
+check('page logs the plan action and reason', /\[Glance\] full-document plan', action, reason/.test(gmail));
+check('a Labs switch change rescans the open mail', /changes\.glanceSwitches/.test(gmail) && /rescanOpenMailForSwitches/.test(gmail));
+check('the worker can see FlowGoogleCloses', /globalThis\.FlowGoogleCloses = FlowGoogleCloses/.test(read('core', 'google-closes.js')));
 check('Gmail shows a card only when the worker offers a non-blank build', /showFullDocumentChip\(/.test(gmail) && /flow:google-full-document-plan/.test(gmail) && /plan\.built\.blank/.test(gmail));
 check('full-document inject carries built body and previewOnly', /googleBuilt: plan\.built/.test(gmail) && /previewOnly: true/.test(gmail));
 check('Do It marks lane writes as preview when previewOnly', /ctx\.previewOnly/.test(gmail) && /response\.preview = true/.test(gmail));
@@ -66,7 +70,7 @@ check('stray digit in title does not block price stripping', (() => {
 check('worker imports style-profile for lane writes', /style-profile\.js/.test(host));
 check('googleDocFull verify uses Drive files API', /connectorId === 'googleDocFull'/.test(host) && /drive\/v3\/files/.test(host));
 check('gmail-new-file verify regex restored', /google\(DriveSave\|Doc\|SheetAppend\|NewFile\)/.test(host));
-check('page gates full-document plan on FULL_DOCUMENT_CLOSE', /FULL_DOCUMENT_CLOSE === true/.test(gmail));
+check('page gates full-document plan on FULL_DOCUMENT_CLOSE', /glanceSwitchOn\('FULL_DOCUMENT_CLOSE'\)/.test(gmail) && /glanceLabsLocked\(\)/.test(gmail));
 check('previewOnly false would fail preview receipt path', !/previewOnly:\s*false/.test(gmail));
 check('undo learning only on successful undo', /if \(undone && undone\.ok\)/.test(gmail) && /type: 'undo'/.test(gmail));
 check('Do It emits approved learning event', /type: 'approved'/.test(gmail));
