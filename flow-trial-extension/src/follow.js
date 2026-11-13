@@ -408,7 +408,7 @@ const FlowFollow = (() => {
       const why = String(best.reply.why || '');
       note('heldOpen', { text: best.text, counterpart: watch.counterpart, reason: /waiting on someone/.test(why) ? 'it is with someone else' : /not clearly/.test(why) ? 'too short to be an answer' : /interim/.test(why) ? 'still working on it' : /ack/.test(why) ? 'only a thank-you' : 'unrelated' });
     }
-    const res = FlowFollowUp.applyReply(watch, best.reply, Date.now());
+    const res = FlowFollowUp.applyReply(watch, best.reply, Date.now(), best.text);
     if (res.none) return;
     recordReply(watch, best.reply, lastId);
     // An answer that came in another app than the one the loop was opened in says so, in the loop and in the receipt.
@@ -425,6 +425,11 @@ const FlowFollow = (() => {
     else if (res.claimedOnly) {
       // They wrote "attached" and nothing came through. Say so once; the loop stays open.
       if (!watch.claimedFileAt) receipt(whoOf(best.sender) + ' said the file is attached, but no file came through. I kept the loop open.', null);
+    }
+    else if (res.partial) {
+      // They wrote back but answered only some of what you asked: the loop stays open on the rest, and the reminder moves.
+      await moveTask(Object.assign({}, watch, patch), patch.chaseIso);
+      receipt(whoOf(best.sender) + ' replied, but did not answer everything you asked. Still open: ' + (res.remaining || []).slice(0, 3).join(' / ') + '. I kept the loop open and will look again on ' + dayLabel(patch.chaseIso) + '.', null);
     }
     else if (res.rescheduled) await promised(watch, best.sender, patch);
     else if (res.confirm) paidCard(next, best.sender);

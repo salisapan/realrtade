@@ -24,10 +24,10 @@ for (const r of rows) {
   if (r.reply !== null) {
     const auto = F.isAutoReply(r.reply, r.from);
     const rep = F.classifyReply(r.reply, w, { now: NOW, email: r.from });
-    const ap = F.applyReply(w, rep, NOW);
-    got = ap.bounced ? 'flag(bounced)' : ap.none ? (auto || rep.outcome === 'auto' ? 'hold(auto)' : 'none') : ap.close ? 'close(' + rep.outcome + ')' : 'open(' + rep.outcome + ')';
+    const ap = F.applyReply(w, rep, NOW, r.reply);
+    got = ap.partial ? 'open(partial)' : ap.bounced ? 'flag(bounced)' : ap.none ? (auto || rep.outcome === 'auto' ? 'hold(auto)' : 'none') : ap.close ? 'close(' + rep.outcome + ')' : 'open(' + rep.outcome + ')';
   }
-  const ok = (r.expect === 'close' && /^close/.test(got)) || (r.expect === 'hold' && /^hold/.test(got)) || (r.expect === 'open' && got === 'open') || (r.expect === 'flag' && /flag/.test(got)) || (r.expect === 'close-part' && /^(close|open\(ack|open\(promised)/.test(got));
+  const ok = (r.expect === 'close' && /^close/.test(got)) || (r.expect === 'hold' && /^hold/.test(got)) || (r.expect === 'open' && got === 'open') || (r.expect === 'flag' && /flag/.test(got)) || (r.expect === 'partial' && got === 'open(partial)');
   if (ok) right++;
   out.push([r.id, r.expect, got + ' kind=' + w.kind + ' dir=' + w.direction, ok ? 'ok' : 'DIFF', r.note]);
 }

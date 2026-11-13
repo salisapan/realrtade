@@ -67,5 +67,36 @@ for (const [name, text, from] of [['Hebrew', BOUNCE_HE, 'postmaster@acme.io'], [
 check('an out-of-office is still a hold, not a bounce', F.classifyReply('Hi, I am out of office until October 18th. Best regards, Maya.', loop(OUT), { now: NOW, email: 'maya@acme.io' }).outcome === 'auto');
 check('a real answer that mentions delivery is not a bounce', F.classifyReply('Thanks, the delivery of the contract is planned for Tuesday.', loop(OUT), { now: NOW, email: 'dana@acme.io' }).outcome !== 'bounced');
 
+console.log('\n--- an ask with several parts: a reply that answers only some of them does not close the loop ---\n');
+const MULTI = 'מיכל שלום,\n\nהמועד מתאים לנו מצוין. אשמח שתשלחי זימון זום לכל המשתתפים.\n\nכדי שההדגמה תהיה על משהו אמיתי אצלכם, נשמח לדעת מראש: על איזה תהליך תרצו לראות את ההדגמה? ומי ישתתף מטעמכם?\n\nתודה';
+function afterText(out, reply, from) {
+  const w = loop(out); if (!w) return { w: null };
+  const rep = F.classifyReply(reply, w, { now: NOW, email: from || 'dana@acme.io' });
+  return { w, rep, ap: F.applyReply(w, rep, NOW, reply) };
+}
+{
+  const w = loop(MULTI);
+  check('a message that asks for three things opens one loop with its three parts', w && Array.isArray(w.parts) && w.parts.length === 3 && w.parts.every((p) => p.status === 'open'), w && w.parts);
+  const SINGLE = loop('דנה שלום,\n\nאפשר לשלוח לי את החוזה החתום עד יום חמישי?\nתודה');
+  check('a single ask opens a loop with no parts', SINGLE && !SINGLE.parts, SINGLE && SINGLE.parts);
+  const r1 = afterText(MULTI, 'https://openu.zoom.us/my/abc\n\nבברכה,\nמיכל');
+  check('a reply that is only the meeting link answers the invitation part and leaves the two questions open', r1.ap.partial === true && !r1.ap.close && r1.ap.remaining.length === 2 && r1.ap.patch.stage === 'partial', [r1.ap.partial, r1.ap.remaining]);
+  check('the partial patch keeps the loop waiting and moves the chase day', !r1.ap.patch.status && r1.ap.patch.chaseIso && r1.ap.patch.parts.filter((p) => p.status === 'answered').length === 1, r1.ap.patch);
+  const r2 = afterText(MULTI, 'תודה מיכל, נעבור על זה ונחזור אליך.');
+  check('a short reply that answers none of the parts stays open on all of them', r2.ap.partial === true && r2.ap.remaining.length === 3 || r2.ap.none === true || (r2.rep.outcome !== 'closed'), [r2.rep.outcome, r2.ap.remaining]);
+  const long = 'שלום, נשמח להציג על תהליך קליטת עובדים חדשים. ישתתפו שלושה אנשים מהמחלקה: מנהלת המערכות, איש הכספים ואני. את הזימון לזום שלחתי עכשיו לכולם, ואם צריך משהו נוסף תגידו.';
+  const r3 = afterText(MULTI, long);
+  check('a real, longer answer closes the loop as before (closing wrongly is the worse mistake)', r3.ap.close === true && !r3.ap.partial, [r3.rep.outcome, r3.ap.partial]);
+  const r4 = afterText(MULTI, 'תהליך קליטת עובדים. ישתתפו שלושה אנשים מהמחלקה. הזימון בדרך, https://openu.zoom.us/my/abc');
+  check('a reply that answers every part by its words and a link closes it', r4.ap.close === true, [r4.rep.outcome, r4.ap.partial, r4.ap.remaining]);
+  const w2 = Object.assign({}, w, { patch: null });
+  const state1 = Object.assign({}, w, r1.ap.patch);
+  const r5 = F.applyReply(state1, F.classifyReply('תהליך קליטת עובדים ומי ישתתף: שלושה אנשים.', state1, { now: NOW, email: 'dana@acme.io' }), NOW, 'תהליך קליטת עובדים ומי ישתתף: שלושה אנשים.');
+  check('the next reply that answers the rest closes it', r5.close === true, r5);
+  check('a decline still closes a loop with parts', afterText(MULTI, 'אנחנו לא מעוניינים, תודה.').ap.close === true);
+  check('a loop with parts is not changed by a bounce or an out-of-office', afterText(MULTI, 'שלום, מחוץ למשרד עד ה 13/11/2026 עם גישה מוגבלת למייל.').ap.none === true);
+  check('open parts are listed', F.openParts(Object.assign({}, w, r1.ap.patch)).length === 2 && F.openParts({ parts: null }).length === 0);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

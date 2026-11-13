@@ -22,7 +22,7 @@
 //   { id, threadId, messageId, subject, counterpart:{email,name}, kind,
 //     what, amount:{value,currency,raw}|null, deadlineIso, chaseIso,
 //     createdAt, status:'waiting'|'resolved'|'stopped', resolvedAt, taskRef,
-//     stage:'waiting'|'nudged'|'promised'|'yours'|'bounced', nudges, nudgedAt, promisedIso,
+//     stage:'waiting'|'nudged'|'promised'|'yours'|'bounced'|'partial', parts:[{key,text,kind,status,answeredAt}]|null, nudges, nudgedAt, promisedIso,
 //     lastReplyAt, closedAs:'replied'|'paid'|'declined'|'manual'|null }
 //
 // A watch is an OPEN LOOP: something you are owed, kept open until reality
@@ -314,7 +314,57 @@ const FlowFollowUp = (() => {
     const r = clientRequests.classifyOutgoingRequest(text, { now: c.now, generic: true });
     return r && r.items && r.items.length ? r : null;
   }
+  // ---- parts: one outgoing message, several asks (2026-11-13, owner: break every task into its parts, on every surface) ----------------------------
+  // A message that asks for several things ("send the invitation ... tell us which process, and who joins") opens ONE loop with its parts. A reply
+  // that answers only some of them must not close it (the real thread where a meeting link arrived and the two questions asked with it did not).
+  // Parts are the message's own sentences that ask (a question, or the ask patterns above); at least two make a loop with parts. The wording of a
+  // part is the person's own, clipped; Glance writes nothing.
+  const PART_STOP = new Set(['the','and','for','you','your','yours','with','that','this','have','has','what','which','who','whom','how','can','could','would','will','please','thanks','thank','are','was','were','from','about','also','any','all','not','but','our','their','them','there','here','when','where','just','let','know','send','sent','want','need','את','של','על','עם','אני','אתם','אתה','את','לנו','לכם','לך','גם','כדי','מאוד','שלי','שלכם','זה','זאת','או','אם','מה','מי','איזה','איזו','אילו','אשמח','נשמח','תודה','בבקשה','לדעת','מראש','שני','דברים','יש','היה','תהיה','כל','כן','לא','אבל','רק','עוד','כאן','שם','מתי','איפה']);
+  function partTokens(t) { return String(t || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3 && !PART_STOP.has(w)); }
+  function isAskSentence(sn) {
+    if (words(sn) < 3 || COURTESY.test(sn)) return false;
+    if (/\?\s*$/.test(sn)) return true;
+    return ASK_EN.some((r) => r.test(sn)) || ASK_HE.some((r) => r.test(sn));
+  }
+  function partsOf(text) {
+    const body = String(text || '').replace(/^\s*(?:hi|hello|dear|שלום|היי)[^\n]{0,30}\n/i, '');
+    const asks = sentences(body).map((x) => x.replace(/^(?:\d{1,2}[.)]|[-*•])\s*/, '').trim()).filter(isAskSentence);
+    if (asks.length < 2) return null;
+    // A lead-in before a colon ("to make the demo real, we would like to know: which process?") is not the part: the part is what follows it.
+    const own = asks.map((t) => { const k = t.lastIndexOf(':'); return k > 0 && words(t.slice(k + 1)) >= 3 ? t.slice(k + 1).trim() : t; });
+    return own.slice(0, 6).map((t, i) => ({ key: 'p' + (i + 1), text: clip(t, 120), kind: /\?\s*$/.test(t) ? 'question' : 'request', status: 'open' }));
+  }
+  const LINK_PART = /(?:\bzoom\b|\bmeet\b|\bteams\b|\binvit|\blink\b|\bcalendar\b|זימון|זום|קישור|כתובת)/i;
+  const HAS_LINK = /(?:https?:\/\/|\[URL\]|\bzoom\.us\b|\bmeet\.google\b|\bteams\.microsoft\b)/i;
+  // Which open parts does this reply answer? Words in common with the part, or (for a part that asks for a link or an invitation) a link.
+  // One word of the part in the reply counts (a stem match, because Hebrew inflects: ישתתף / ישתתפו): the rule errs toward "answered", because the only
+  // thing a wrong "answered" does is give back today's behaviour (the reply closes the loop); a wrong "open" would hold a loop that is done.
+  function sameStem(a, b) { return a === b || (a.length >= 5 && b.length >= 5 && a.slice(0, 4) === b.slice(0, 4)); }
+  function partAnswered(part, reply) {
+    const pt = partTokens(part.text); const rt = partTokens(reply);
+    if (pt.some((w) => rt.some((r) => sameStem(w, r)))) return true;
+    return LINK_PART.test(part.text) && HAS_LINK.test(reply);
+  }
+  function openParts(w) { return Array.isArray(w && w.parts) ? w.parts.filter((p) => p && p.status !== 'answered') : []; }
+  // A short reply that answers none of what is still open is not the answer: the loop stays open on the rest.
+  const SHORT_REPLY_WORDS = 14;
+  function partialByParts(watch, text, t) {
+    if (!Array.isArray(watch.parts) || watch.parts.length < 2 || typeof text !== 'string' || !text.trim()) return null;
+    const body = stripGreeting(text);
+    const parts = watch.parts.map((p) => (p.status === 'answered' || partAnswered(p, body)) ? Object.assign({}, p, { status: 'answered', answeredAt: p.answeredAt || t }) : p);
+    const remaining = parts.filter((p) => p.status !== 'answered');
+    if (!remaining.length) return null;                           // every part is answered: the loop closes as before
+    if (words(body) > SHORT_REPLY_WORDS) return null;            // a real, longer answer: it is read as the answer (closing wrongly is the worse mistake)
+    return { patch: { lastReplyAt: t, stage: 'partial', parts, chaseIso: rechaseDate(watch.kind, t, null) }, partial: true, remaining: remaining.map((p) => p.text) };
+  }
+
   function classifyOutgoing(text, ctx) {
+    const r = classifyOutgoingItems(text, ctx);
+    if (!r || r.direction === 'mine') return r;
+    const parts = partsOf(text);
+    return parts ? Object.assign({}, r, { parts }) : r;
+  }
+  function classifyOutgoingItems(text, ctx) {
     const c = ctx || {};
     const base = classifyOutgoingBase(text, c);
     const it = itemsOf(text, c);
@@ -508,6 +558,8 @@ const FlowFollowUp = (() => {
       personKey: a.personKey || null,
       kind: ask.kind,
       what: ask.what,
+      // The parts of an ask that asked for several things (see partsOf); null for a single ask.
+      parts: Array.isArray(ask.parts) && ask.parts.length >= 2 ? ask.parts : null,
       amount: ask.amount || null,
       deadlineIso: ask.deadlineIso || null,
       chaseIso: ask.chaseIso,
@@ -829,15 +881,19 @@ const FlowFollowUp = (() => {
   //   { patch, close, confirm, rescheduled }
   // `close` loops end; `confirm` means "ask the person if it was paid";
   // `rescheduled` means the chase day moved and the Task should follow.
-  function applyReply(watch, reply, now) {
+  function applyReply(watch, reply, now, replyText) {
     const t = typeof now === 'number' ? now : Date.now();
     if (!watch || watch.status !== 'waiting' || isMine(watch) || isClock(watch) || !reply || reply.outcome === 'auto') return { none: true };
     // The mail never arrived. Not a reply: the loop stays open, is flagged, and is not chased until the person has sent it again.
     if (reply.outcome === 'bounced') return { patch: { stage: 'bounced', bouncedAt: t }, bounced: true };
     const seen = { lastReplyAt: t };
     switch (reply.outcome) {
-      case 'closed':
+      case 'closed': {
+        // The ask had several parts and this reply answers none of the rest: it stays open, on the rest (`replyText` is the reply's own text).
+        const part = reply.delivered === 'file' ? null : partialByParts(watch, replyText, t);
+        if (part) return part;
         return { patch: Object.assign({}, seen, { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: reply.delivered === 'file' ? 'delivered' : 'replied', deliveredFiles: reply.fileNames ? reply.fileNames.slice(0, 5) : null }), close: true };
+      }
       case 'paid':
         return { patch: Object.assign({}, seen, { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'paid' }), close: true };
       case 'promised': {
@@ -1336,7 +1392,7 @@ const FlowFollowUp = (() => {
 
   return {
     KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, fromProposal, deliversPromise, deliversFor, closeAsKept, closeFromTask, taskRefsToCheck, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
-    repliedSince, isAutoReply, isBounce, isBounced, unbouncePatch, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
+    repliedSince, partsOf, openParts, isAutoReply, isBounce, isBounced, unbouncePatch, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
     nextNudgeLevel, missedAskIn, missedPromiseIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay,
     applyReplyItems, decideItem, itemCounts, hasItems,
     nextMove, moveDonePatch, moveDismissPatch, releasePatch

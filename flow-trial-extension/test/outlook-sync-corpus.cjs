@@ -407,6 +407,21 @@ console.log('\n--- a bounce on Outlook (2026-11-13): the message never arrived -
   check('Outlook: the next message of yours after a bounce clears the flag', q && q.patch.stage === 'waiting' && q.patch.bouncedAt === null, resend.patches);
 }
 
+console.log('\n--- parts on Outlook (2026-11-13): a reply that answers only some of what was asked ---\n');
+{
+  const MULTI = 'Dana, could you send me the invitation for the demo? Also, which process would you like to see? And who from your side will join?';
+  const asked = mine('cp', MULTI, 3);
+  const r0 = plan([asked]);
+  const offer = r0.offers[0];
+  check('Outlook: a message that asks for three things opens a loop with its parts', offer && offer.ask.parts && offer.ask.parts.length === 3, offer && offer.ask.parts);
+  const w = loop('cp', { messageId: asked.id, parts: offer && offer.ask.parts, what: MULTI.slice(0, 80) });
+  const linkOnly = theirs('cp', 'https://contoso.zoom.us/j/123456 Best, Dana', 1, 'Re: Lease');
+  const r = plan([asked, linkOnly], [w]);
+  const p = r.patches.find((x) => x.id === w.id);
+  check('Outlook: a reply that is only the invitation link keeps the loop open on the two questions', p && p.patch.stage === 'partial' && !p.patch.status && p.patch.parts.filter((x) => x.status === 'open').length === 2, r.patches);
+  check('Outlook: the person is told what is still open', r.lines.some((l) => /did not answer everything/.test(l)), r.lines);
+}
+
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
 console.log('TOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);
