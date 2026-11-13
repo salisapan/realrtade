@@ -58,13 +58,19 @@ const FlowReplyMeaning = (() => {
     /\bgo(?:ing)? with (?:another|a different|someone else|a competitor|other)\b|\b(?:it|this|that)(?:['’]s| is) not (?:for (?:us|me)|(?:the )?right (?:fit|time))\b|\bnot (?:a|the) (?:right )?(?:fit|match|priority)\b/i,
     /\b(?:won['’]t|will not|not going to|not gonna) be (?:proceeding|moving forward|going ahead|continuing|pursuing|taking (?:this|it) (?:on|further))\b/i,
     /\b(?:won['’]t|will not|unable to|not going to|not gonna) be able to (?:take|do|help|make|attend|sign|accept|proceed|commit|join|participate|support)\b/i,
-    /^(?:no|nope|nah|no thanks|no thank you|not (?:now|this time|possible|happening))[.!,]?(?:\s|$)/i
+    /^(?:no|nope|nah|no thanks|no thank you|not (?:now|this time|possible|happening))[.!,]?(?:\s|$)/i,
+    // An opt-out, and "we already have our own": found on the owner's real threads (2026-11-12), where a one-word opt-out read as an
+    // acknowledgement and the loop would have chased a person who asked to be left alone.
+    /^(?:please )?(?:unsubscribe|remove(?: me)?(?: from (?:your|this|the) (?:mailing )?list)?|stop (?:emailing|contacting|writing to) (?:me|us)|take me off (?:your|this|the) list)[.!]?\s*$/i,
+    /\bwe (?:already )?(?:have|use|work with) (?:our own|an? in-?house|internal|an existing) (?:system|systems|solution|solutions|tool|tools|team|vendor|provider)\b/i
   ];
   const DECLINE_HE = [
     /לא (?:אוכל|נוכל|אצליח|נצליח|אשלם|נשלם|אחתום|נחתום|אאשר|נאשר|מעוניין|מעוניינת|מעוניינים|רלוונטי|רלוונטית|ממשיכים|נמשיך|מתקדמים|נתקדם|מסכים|מסכימה|מסכימים)/,
     /החלטנו (?:שלא|לא|לוותר|לבטל)|החלטתי (?:שלא|לא|לוותר|לבטל)|נאלצ(?:ים|ת|ה)? (?:לסרב|לוותר|לבטל)|מסרב|מסרבת|מבטל(?:ים|ת)?|ביטלנו|ביטלתי/,
     /לא מתאים (?:לנו|לי)|לא רלוונטי (?:לנו|לי|כרגע)|(?:נלך|נבחר|בחרנו|נעבוד) עם (?:ספק|גורם|חברה) אח(?:ר|רת)/,
     /^(?:לא תודה|ממש לא|לא)[.!,]?\s*$/,
+    /^(?:נא |בבקשה )?(?:הסר|הסירו|להסיר|הסר אותי|הסירו אותי|להסיר אותי)(?: מרשימת התפוצה| מהרשימה)?[.!]?\s*$/,
+    /יש לנו (?:כבר )?(?:מערכ(?:ת|ות)|פתרו(?:ן|נות)|ספק|כלי(?:ם)?) (?:פנימי(?:ת|ות|ים)?|משלנו|קיימ(?:ת|ות|ים)?|אחר(?:ת|ות|ים)?)/,
     /אין צורך \(ואי אפשר\) ל|אי אפשר לאשר/
   ];
   // "I can't do Tuesday, how about Wednesday?" is a counter-offer, not a no.

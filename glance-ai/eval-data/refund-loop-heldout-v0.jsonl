@@ -1,0 +1,38 @@
+{"id":"fa01","part":"ask","lang":"he","to":"service@shop.co.il","toName":"שופ","text":"שלום, חויבתי פעמיים על הזמנה 4471. אבקש להחזיר לי את החיוב הכפול על סך 189 ₪.","expect":"open"}
+{"id":"fa02","part":"ask","lang":"he","to":"info@galil-tours.co.il","toName":"טיולי גליל","text":"אבקש לבטל את העסקה ולזכות את הכרטיס שלי ב-450 ₪.","expect":"open"}
+{"id":"fa03","part":"ask","lang":"he","to":"tickets@heichal.co.il","toName":"היכל התרבות","text":"נא להחזיר לי את 320 ש\"ח על הכרטיסים להופעה שבוטלה.","expect":"open"}
+{"id":"fa04","part":"ask","lang":"he","to":"care@fashionplus.co.il","toName":"אופנה פלוס","text":"היי, אני מבקשת החזר כספי מלא על המעיל שהחזרתי לסניף ביום שלישי.","expect":"open"}
+{"id":"fa05","part":"ask","lang":"he","to":"service@shop.co.il","toName":"שופ","text":"מה מדיניות ההחזרים שלכם על מוצר שנפתח?","expect":"none"}
+{"id":"fa06","part":"ask","lang":"he","to":"service@shop.co.il","toName":"שופ","text":"אם זה לא יסתדר עד שבוע הבא אולי אבקש החזר.","expect":"none"}
+{"id":"fa07","part":"ask","lang":"he","to":"service@shop.co.il","toName":"שופ","text":"תודה על ההחזר, קיבלתי את הכסף.","expect":"none"}
+{"id":"fa08","part":"ask","lang":"he","to":"dana.cohen@gmail.com","toName":"דנה","text":"דנה, אחזיר לך את ה-200 ₪ מחר בביט.","expect":"none"}
+{"id":"fa09","part":"ask","lang":"en","to":"support@shop.com","toName":"Shop","text":"Hi, please refund the duplicate charge of ₪189 on order #4471.","expect":"open"}
+{"id":"fa10","part":"ask","lang":"en","to":"help@comfychairs.co.il","toName":"Comfy Chairs","text":"Could you please issue a refund for the damaged chair (₪640)?","expect":"open"}
+{"id":"fa11","part":"ask","lang":"en","to":"hello@makerspace.com","toName":"Maker Space","text":"I'd like a full refund for the cancelled workshop, please.","expect":"open"}
+{"id":"fa12","part":"ask","lang":"en","to":"billing@cloudapp.io","toName":"CloudApp","text":"Please reverse the $49 charge from yesterday, I cancelled before the renewal.","expect":"open"}
+{"id":"fa13","part":"ask","lang":"en","to":"support@shop.com","toName":"Shop","text":"What's your refund policy for opened items?","expect":"none"}
+{"id":"fa14","part":"ask","lang":"en","to":"support@shop.com","toName":"Shop","text":"Thanks for the refund, all good on my side.","expect":"none"}
+{"id":"fa15","part":"ask","lang":"en","to":"john@gmail.com","toName":"John","text":"I'll refund you the $30 tomorrow.","expect":"none"}
+{"id":"fa16","part":"ask","lang":"en","to":"support@shop.com","toName":"Shop","text":"If it doesn't arrive by Friday I may ask for a refund.","expect":"none"}
+{"id":"fr01","part":"reply","lang":"en","text":"Your refund of ₪189 has been processed and will appear on your statement within 5-10 business days.","expect":"approved"}
+{"id":"fr02","part":"reply","lang":"en","text":"Unfortunately this order is not eligible for a refund.","expect":"declined"}
+{"id":"fr03","part":"reply","lang":"en","text":"Could you send us your order number so we can look into it?","expect":"needs-you"}
+{"id":"fr04","part":"reply","lang":"en","text":"Thank you for contacting us. We will get back to you shortly.","expect":"none"}
+{"id":"fr05","part":"reply","lang":"he","text":"ההחזר אושר ויופיע בכרטיס האשראי שלך תוך 14 ימי עסקים.","expect":"approved"}
+{"id":"fr06","part":"reply","lang":"he","text":"לצערנו לא נוכל להחזיר את הכסף על פריט שנפתח.","expect":"declined"}
+{"id":"fr07","part":"reply","lang":"he","text":"נא לשלוח לנו צילום של החשבונית כדי שנוכל לטפל.","expect":"needs-you"}
+{"id":"fr08","part":"reply","lang":"he","text":"פנייתך התקבלה ותטופל בהקדם.","expect":"none"}
+{"id":"fc01","part":"close","lang":"he","loop":{"merchant":"שופ","email":"service@shop.co.il","amount":189,"currency":"ILS"},"msg":{"fromEmail":"alerts@isracard.co.il","text":"זיכוי בסך 189 ₪ מבית העסק שופ בע\"מ נקלט בכרטיסך המסתיים ב-4580."},"expect":"close"}
+{"id":"fc02","part":"close","lang":"he","loop":{"merchant":"טיולי גליל","email":"info@galil-tours.co.il","amount":450,"currency":"ILS"},"msg":{"fromEmail":"noreply@max.co.il","text":"בוצע זיכוי של 450.00 ₪ בכרטיס המסתיים ב-1234. בית עסק: טיולי גליל."},"expect":"close"}
+{"id":"fc03","part":"close","lang":"he","loop":{"merchant":"אופנה פלוס","email":"care@fashionplus.co.il","amount":null,"currency":"ILS"},"msg":{"fromEmail":"service@cal-online.co.il","text":"עדכון: זיכוי בסך 890 ₪ מבית העסק אופנה פלוס נקלט בכרטיסך."},"expect":"close"}
+{"id":"fc04","part":"close","lang":"he","loop":{"merchant":"שופ","email":"service@shop.co.il","amount":189,"currency":"ILS"},"msg":{"fromEmail":"alerts@isracard.co.il","text":"זיכוי בסך 189 ₪ מבית העסק שופ יבוצע בחיוב הבא."},"expect":"none"}
+{"id":"fc05","part":"close","lang":"he","loop":{"merchant":"שופ","email":"service@shop.co.il","amount":189,"currency":"ILS"},"msg":{"fromEmail":"alerts@isracard.co.il","text":"בוצע חיוב בסך 189 ₪ בבית העסק שופ בכרטיסך המסתיים ב-4580."},"expect":"none"}
+{"id":"fc06","part":"close","lang":"he","loop":{"merchant":"שופ","email":"service@shop.co.il","amount":189,"currency":"ILS"},"msg":{"fromEmail":"alerts@isracard.co.il","text":"זיכוי בסך 189 ₪ מבית העסק סופר-פארם נקלט בכרטיסך."},"expect":"none"}
+{"id":"fc07","part":"close","lang":"he","loop":{"merchant":"שופ","email":"service@shop.co.il","amount":189,"currency":"ILS"},"msg":{"fromEmail":"service@shop.co.il","text":"שלום, ההחזר על סך 189 ₪ בוצע בהצלחה."},"expect":"none"}
+{"id":"fc08","part":"close","lang":"he","loop":{"merchant":"שופ","email":"service@shop.co.il","amount":189,"currency":"ILS"},"msg":{"fromEmail":"isracard.alerts@gmail.com","text":"זיכוי בסך 189 ₪ מבית העסק שופ נקלט בכרטיסך."},"expect":"none"}
+{"id":"fc09","part":"close","lang":"en","loop":{"merchant":"Maker Space","email":"hello@makerspace.com","amount":49,"currency":"USD"},"msg":{"fromEmail":"service@paypal.com","text":"You've received a refund of $49.00 USD from Maker Space."},"expect":"close"}
+{"id":"fc10","part":"close","lang":"en","loop":{"merchant":"Comfy Chairs","email":"help@comfychairs.co.il","amount":640,"currency":"ILS"},"msg":{"fromEmail":"alerts@cal-online.co.il","text":"A credit of ₪640.00 from COMFY CHAIRS was posted to your card ending 5521."},"expect":"close"}
+{"id":"fc11","part":"close","lang":"en","loop":{"merchant":"Maker Space","email":"hello@makerspace.com","amount":49,"currency":"USD"},"msg":{"fromEmail":"service@paypal.com","text":"Your refund of $49.00 USD from Maker Space is pending."},"expect":"none"}
+{"id":"fc12","part":"close","lang":"en","loop":{"merchant":"Maker Space","email":"hello@makerspace.com","amount":49,"currency":"USD"},"msg":{"fromEmail":"service@paypal.com","text":"You sent a refund of $49.00 USD to Dana Levi."},"expect":"none"}
+{"id":"fc13","part":"close","lang":"en","loop":{"merchant":"Maker Space","email":"hello@makerspace.com","amount":49,"currency":"USD"},"msg":{"fromEmail":"hello@makerspace.com","text":"We have issued your refund of $49. It may take a few days to show."},"expect":"none"}
+{"id":"fc14","part":"close","lang":"en","loop":{"merchant":"Maker Space","email":"hello@makerspace.com","amount":49,"currency":"USD"},"msg":{"fromEmail":"service@paypal.com","text":"You've received a refund of $25.00 USD from Maker Space."},"expect":"none"}

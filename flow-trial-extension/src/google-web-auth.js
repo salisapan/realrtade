@@ -28,13 +28,12 @@ const UNCONFIRMED_HE = 'לא הצלחתי לאמת שלא השתנה — השא�
 // Used only when manifest oauth2.scopes is missing. Keep this list identical
 // to manifest.json so a fallback grant covers the same APIs as getAuthToken.
 export const GOOGLE_OAUTH_SCOPES = [
-  'https://www.googleapis.com/auth/tasks',
   'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/gmail.compose',
-  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/tasks',
   'https://www.googleapis.com/auth/drive.file',
   'openid',
-  'https://www.googleapis.com/auth/userinfo.profile'
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email'
 ];
 
 const WEB_TOKEN_SKEW_MS = 60 * 1000;
@@ -84,6 +83,19 @@ export function scopeVersion(scopes) {
   return cleaned.join('\n');
 }
 
+function grantedCoversRequired(grantedVersion, requiredScopes) {
+  const required = scopeVersion(requiredScopes).split('\n').filter(Boolean);
+  if (!required.length) return false;
+  const granted = scopeVersion(
+    typeof grantedVersion === 'string' ? grantedVersion.split('\n') : grantedVersion
+  ).split('\n').filter(Boolean);
+  if (!granted.length) return false;
+  for (let i = 0; i < required.length; i++) {
+    if (granted.indexOf(required[i]) < 0) return false;
+  }
+  return true;
+}
+
 // 'use' keeps the silent path. 'upgrade' drops the cached token and asks
 // once. A cancel on this version stays quiet until the next Connect.
 export function googleScopeAction(stored, requiredScopes, mode) {
@@ -92,9 +104,11 @@ export function googleScopeAction(stored, requiredScopes, mode) {
   const version = rec && typeof rec.version === 'string' ? rec.version : '';
   const status = rec && rec.status;
   const same = Boolean(required) && version === required;
+  const covers = Boolean(required) && version && grantedCoversRequired(version, requiredScopes);
+  const current = same || covers;
   const interactive = mode === 'interactive' || mode === true;
-  if (same && status === 'granted') return 'use';
-  if (!interactive && same && status === 'asked') return 'use';
+  if (current && status === 'granted') return 'use';
+  if (!interactive && current && status === 'asked') return 'use';
   return 'upgrade';
 }
 
@@ -191,11 +205,33 @@ export function parseGoogleImplicitRedirect(redirectUrl, expectedState) {
   }
   const expiresRaw = pick('expires_in');
   const expiresIn = expiresRaw == null || expiresRaw === '' ? null : Number(expiresRaw);
+  const scopeRaw = pick('scope');
   return {
     accessToken: accessToken.trim(),
     expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : null,
-    email: emailFromIdToken(pick('id_token'))
+    email: emailFromIdToken(pick('id_token')),
+    scope: typeof scopeRaw === 'string' ? scopeRaw : null
   };
+}
+
+// Google's consent screen lets each box be unticked. The implicit redirect's
+// scope is what was actually granted. A required scope missing from it means
+// the token cannot write, so it is not a connection. No scope in the redirect
+// says nothing either way: nothing is reported missing.
+const SCOPE_ALIASES = {
+  'https://www.googleapis.com/auth/userinfo.email': 'email',
+  'https://www.googleapis.com/auth/userinfo.profile': 'profile'
+};
+export function googleMissingScopes(grantedScope, requiredScopes) {
+  if (typeof grantedScope !== 'string' || !grantedScope.trim()) return [];
+  const granted = grantedScope.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+  const required = Array.isArray(requiredScopes) ? requiredScopes : [];
+  return required.filter((s) => {
+    const want = String(s || '').trim();
+    if (!want || granted.indexOf(want) >= 0) return false;
+    const alias = SCOPE_ALIASES[want];
+    return !(alias && granted.indexOf(alias) >= 0);
+  });
 }
 
 // Browser UI language. he and he-IL use the Hebrew refusal. Anything else
@@ -262,8 +298,17 @@ export function googleConnectionState(auth, reconnect, extras) {
   const connectLabel = english ? 'Connect Google' : GOOGLE_CONNECT_LABEL;
   const warningLabel = english ? 'A step did not finish' : 'שלב אחד לא הושלם';
   const connected = had && !needs && !warn;
+  // Disconnect cleared Glance, but Google did not confirm the revoke. Say so
+  // instead of implying the access is gone.
+  const pending = Boolean(extra.revokePending && extra.revokePending.needed) && !connected;
+  const revokeNote = pending
+    ? (english
+      ? 'Disconnected in Glance. Google did not confirm removing access. You can remove Glance at myaccount.google.com/connections.'
+      : 'נותק ב-Glance. Google לא אישר את הסרת הגישה. אפשר להסיר את Glance ב-myaccount.google.com/connections.')
+    : '';
   return {
     connected: connected,
+    revokeNote: revokeNote,
     needsReconnect: needs,
     warning: warn,
     reconnectLabel: needs ? reconnectLabel : GOOGLE_RECONNECT_LABEL,

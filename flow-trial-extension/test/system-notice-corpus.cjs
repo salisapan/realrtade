@@ -35,6 +35,24 @@ for (const [email, text, due, act] of POS) {
   const r = detect(email, text);
   check('notice: ' + text.slice(0, 40), r && r.dueIso === due && act.test(r.action + ' ' + r.title), r);
 }
+// Israeli services and a numeric Hebrew date (run 119): day first, a known domain only, never a lookalike, a newsletter or a version number.
+const IL = [
+  ['noreply@iec.co.il', 'החשבון שלך יחויב ב-5.11. יש לעדכן פרטי תשלום.', '2026-11-05', /IEC/],
+  ['noreply@gov.il', 'רישיון העסק שלך יפוג ב-15.11.2026. יש לחדש את הרישיון.', '2026-11-15', /gov\.il/],
+  ['billing@cellcom.co.il', 'השירות שלך יושעה עד 30/11. יש לעדכן פרטי תשלום.', '2026-11-30', /Cellcom/],
+  ['billing@bezeq.co.il', 'Your service will be suspended on 3 November 2026. Please update your payment method.', '2026-11-03', /Bezeq/]
+];
+for (const [email, text, due, who] of IL) {
+  const r = detect(email, text);
+  check('Israeli notice: ' + text.slice(0, 30), r && r.dueIso === due && who.test(r.title), r);
+}
+for (const [email, text, why] of [
+  ['noreply@evil-iec.co.il', 'החשבון שלך יחויב ב-5.11. יש לעדכן פרטי תשלום.', 'a lookalike domain'],
+  ['x@iec.co.il.evil.io', 'החשבון שלך יחויב ב-5.11. יש לעדכן פרטי תשלום.', 'a domain that only starts like a known one'],
+  ['news@iec.co.il', 'מבצע! הצטרפו לניוזלטר שלנו, הנחה עד 5.11. יש לעדכן פרטים', 'a promotion'],
+  ['noreply@iec.co.il', 'גרסה 5.11 של האפליקציה יצאה. יש לעדכן', 'a version number'],
+  ['billing@netlify.com', 'Your project will be paused on 5/11 unless you update your billing details.', 'English 5/11 is ambiguous']
+]) check('no Israeli notice (' + why + ')', detect(email, text) === null, detect(email, text));
 check('the title carries the provider and the date', /\(Netlify\) by Oct 28$/.test(detect(POS[0][0], POS[0][1]).title));
 check('a Hebrew title uses the Hebrew date form', /עד 5\.11$/.test(detect(POS[5][0], POS[5][1]).title));
 check('a subdomain of a known service counts', Boolean(detect('x@mail.netlify.com', POS[0][1])));

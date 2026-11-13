@@ -23,23 +23,25 @@
     en: 'Chats',
     he: 'צ׳אטים'
   };
-  const ORIGINS = [
-    'https://web.whatsapp.com/*',
-    'https://www.messenger.com/*',
-    'https://messenger.com/*',
-    'https://www.facebook.com/messages',
-    'https://www.facebook.com/messages/*',
-    'https://facebook.com/messages',
-    'https://facebook.com/messages/*',
-    'https://business.facebook.com/latest/inbox',
-    'https://business.facebook.com/latest/inbox/*',
-    'https://www.business.facebook.com/latest/inbox',
-    'https://www.business.facebook.com/latest/inbox/*',
-    'https://www.instagram.com/direct',
-    'https://www.instagram.com/direct/*',
-    'https://instagram.com/direct',
-    'https://instagram.com/direct/*'
-  ];
+  const ORIGINS = (typeof FlowConnectEcosystem !== 'undefined' && FlowConnectEcosystem.META_ORIGINS)
+    ? FlowConnectEcosystem.META_ORIGINS.slice()
+    : [
+      'https://web.whatsapp.com/*',
+      'https://www.messenger.com/*',
+      'https://messenger.com/*',
+      'https://www.facebook.com/messages',
+      'https://www.facebook.com/messages/*',
+      'https://facebook.com/messages',
+      'https://facebook.com/messages/*',
+      'https://business.facebook.com/latest/inbox',
+      'https://business.facebook.com/latest/inbox/*',
+      'https://www.business.facebook.com/latest/inbox',
+      'https://www.business.facebook.com/latest/inbox/*',
+      'https://www.instagram.com/direct',
+      'https://www.instagram.com/direct/*',
+      'https://instagram.com/direct',
+      'https://instagram.com/direct/*'
+    ];
 
   function label(code) {
     const raw = String(code || '').toLowerCase();
@@ -100,9 +102,21 @@
         resolve({ ok: ok !== false });
       }
       try {
-        const result = api.permissions.remove({ origins: ORIGINS.slice() }, done);
+        const result = api.permissions.remove({ origins: ORIGINS.slice() }, (ok) => {
+          const hook = globalThis.FlowProfileHook;
+          if (hook && typeof hook.onDisconnect === 'function') {
+            try { hook.onDisconnect('meta'); } catch (e) { /* profile store not wired */ }
+          }
+          done(ok);
+        });
         if (result && typeof result.then === 'function') {
-          result.then(done, () => done(false));
+          result.then((ok) => {
+            const hook = globalThis.FlowProfileHook;
+            if (hook && typeof hook.onDisconnect === 'function') {
+              try { hook.onDisconnect('meta'); } catch (e) { /* profile store not wired */ }
+            }
+            done(ok);
+          }, () => done(false));
         }
       } catch (e) {
         done(false);
@@ -235,6 +249,7 @@
     onLabel: onLabel,
     paintLink: paintLink,
     paintConnection: paintConnection,
-    open: open
+    open: open,
+    disconnect: disconnect
   };
 })();

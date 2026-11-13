@@ -94,7 +94,7 @@ function sandbox(switches, remote) {
   console.log('\n--- the write path, read as source ---\n');
   const w = fn('outlookMeetingWrite');
   check('the series is asked for only through the switch helper, after the invite refusal', w.indexOf("reason: 'refused'") < w.indexOf('outlookSeriesWanted(params.callText, dateIso)') && /if \(series\) body\.recurrence = series\.recurrence;/.test(w));
-  check('the rule is read back before the snapshot; no match deletes the event', w.indexOf('outlookSeriesRuleOk(event.id') < w.indexOf('outlookEventRead(event.id)') && /reason: 'series-failed'/.test(w) && /method: 'DELETE'/.test(w));
+  check('the rule is read back before the snapshot; no match deletes the event', w.indexOf('outlookSeriesRuleOk(event.id') < w.indexOf('outlookEventRead(event.id,') && /reason: 'series-failed'/.test(w) && /method: 'DELETE'/.test(w));
   check('it composes with the Teams link and says it repeats only when it does', /isOnlineMeeting = true/.test(w) && /\(series \? ' · repeats' : ''\)/.test(w));
   check('no guest, nothing sent', /attendees\.length\) \|\| body\.isOnlineMeeting/.test(w) && !/sendMail|Mail\.Send/.test(w));
   check('the event read selects the recurrence', /OUTLOOK_EVENT_SELECT = '[^']*recurrence'/.test(bg));
