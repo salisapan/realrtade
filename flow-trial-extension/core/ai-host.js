@@ -64,7 +64,9 @@ const FlowAiHost = (() => {
       deps.mask = (text) => {
         const m = ER.maskForServer(text, S, MI);
         if (!m.ok) return m;
-        if (IL_PHONE.test(m.text)) return { ok: false, reason: 'pii-blocked' };
+        // The mask now replaces a local Israeli phone with a placeholder (red team 2026-10-16, core/mask-ids.js). A mail that carries one still
+        // never goes to the cloud: the original is checked too, so the device-mask change keeps this refusal exactly as it was.
+        if (IL_PHONE.test(text) || IL_PHONE.test(m.text)) return { ok: false, reason: 'pii-blocked' };
         return { ok: true, text: m.text, unmask: (x) => MI.unmask(x, m.tokenMap) };
       };
     }

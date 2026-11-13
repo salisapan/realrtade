@@ -26,6 +26,15 @@ const FlowTier0Guard = (() => {
   const FRAUD_HE = /חשבון\s+(?:ה)?בנק\s+(?:ה)?(?:חדש|שלנו\s+השתנה)|(?:ל)?חשבון\s+(?:ה)?חדש|פרטי\s+(?:ה)?(?:בנק|חשבון)\s+(?:ה)?(?:חדשים|השתנו|עודכנו)|שינוי\s+(?:ב)?פרטי\s+(?:ה)?(?:בנק|חשבון)|כרטיס(?:י)?\s+(?:ה)?מתנה|גיפט\s*-?\s*קארד|ביטקוין|קריפטו|מטבע(?:ות)?\s+דיגיטלי|ארנק\s+(?:דיגיטלי|קריפטו)|(?:דחוף|מיד|מייד|עכשיו)[^.\n]{0,30}(?:להעביר|העבר|תעביר|העבירו)\s+[$₪€£\d]|(?:להעביר|העבר|תעביר|העבירו)\s+[$₪€£]?[\d,.]+\s*(?:₪|ש"ח|ש״ח|\$|€)?[^.\n]{0,30}(?:מיד|מייד|עכשיו|דחוף)|העבר\s+את\s+כל\s+(?:ה)?(?:חשבוניות|מיילים|קבצים|מסמכים)|לחשבון\s+\d{2}-\d{3}/;
 
   const clean = (x) => String(x == null ? '' : x).replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '');
+  // Red team 2026-11-06 (docs/glance-ai/red-team.md): the same injection with a zero-width mark inside a word, full-width or Cyrillic
+  // lookalike letters, spaced-out letters, or in other words ("Forget everything above", «תתעלם מכל מה שנאמר לך קודם») got the engine's own
+  // card. core/ai-floor.js folds the text and reads those (red team 2026-10-30); this guard uses the same reading so the two never drift.
+  function sibling(globalValue, file, name) {
+    if (globalValue) return globalValue;
+    try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
+  }
+  const floor = sibling(typeof FlowAiFloor !== 'undefined' ? FlowAiFloor : null, './ai-floor.js', 'FlowAiFloor');
+  const fold = (x) => (floor && typeof floor.fold === 'function' ? floor.fold(x) : x);
   function enabled(flags) { return !!(flags && flags[SWITCH] === true); }
 
   // check(mail) -> null | 'guard:injection' | 'guard:payment-fraud'. mail: { text (the person's own part), body? (the whole mail), subject }.
@@ -35,7 +44,9 @@ const FlowTier0Guard = (() => {
     const own = clean(mail.text) + '\n' + clean(mail.subject);
     const full = clean(mail.body != null ? mail.body : mail.text) + '\n' + clean(mail.subject);
     if (INJECT_EN.test(full) || INJECT_HE.test(full)) return 'guard:injection';
-    if (FRAUD_EN.test(own) || FRAUD_HE.test(own)) return 'guard:payment-fraud';
+    if (floor && typeof floor.injected === 'function' && floor.injected(full)) return 'guard:injection';
+    const ownF = fold(own);
+    if (FRAUD_EN.test(own) || FRAUD_HE.test(own) || FRAUD_EN.test(ownF) || FRAUD_HE.test(ownF)) return 'guard:payment-fraud';
     return null;
   }
 
