@@ -12140,17 +12140,11 @@ var GlanceProof = (function () {
     return instant;
   }
 
-  function offsetText(totalMinutes) {
-    var sign = totalMinutes >= 0 ? '+' : '-';
-    var abs = Math.abs(totalMinutes);
-    return sign + pad(Math.floor(abs / 60)) + ':' + pad(abs % 60);
-  }
-
-  // Local midnight in the user's zone. The date in the string is the due date.
-  function dueRfc3339(dateIso, timeZone) {
-    var zone = ianaZone(timeZone) || 'Asia/Jerusalem';
-    var ms = wallToUtcMs(dateIso, 0, 0, 0, zone);
-    return dateIso + 'T00:00:00' + offsetText(Math.round(zoneOffsetMs(ms, zone) / 60000));
+  // Google Tasks keeps only the date of `due`. It converts the value to UTC and drops the time, so local
+  // midnight with a positive offset (2026-11-18T00:00:00+02:00 = 2026-11-17T22:00Z) lands one day early.
+  // UTC midnight of the wanted date is the value the API documents and returns, in every zone.
+  function dueRfc3339(dateIso) {
+    return String(dateIso) + 'T00:00:00.000Z';
   }
 
   function instantUtc(dateIso, hour, minute, timeZone) {
@@ -12181,16 +12175,12 @@ var GlanceProof = (function () {
     return civil - offMin * 60000;
   }
 
-  function normalizeDue(value, timeZone) {
+  // A task due is a date, not an instant: Google returns UTC midnight of that date. Read the date as written;
+  // converting it into a zone west of UTC would move it a day back.
+  function normalizeDue(value) {
     if (value == null || value === '') return null;
     var match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
-    if (!match) return null;
-    var zone = ianaZone(timeZone);
-    if (!zone || String(value).trim().length === 10) return match[1];
-    var ms = parsePointMs(value, zone);
-    if (ms == null) return match[1];
-    var p = zoneParts(ms, zone);
-    return p.year + '-' + pad(p.month) + '-' + pad(p.day);
+    return match ? match[1] : null;
   }
 
   function snapshotOf(task, listId, timeZone) {
@@ -12360,7 +12350,7 @@ var GlanceExecute = (function () {
     var zone = Proof.ianaZone(proposal.timeZone) || 'Asia/Jerusalem';
     var resource = { title: proposal.title };
     if (proposal.notes) resource.notes = String(proposal.notes).slice(0, 2000);
-    if (proposal.due && /^\d{4}-\d{2}-\d{2}$/.test(proposal.due)) resource.due = Proof.dueRfc3339(proposal.due, zone);
+    if (proposal.due && /^\d{4}-\d{2}-\d{2}$/.test(proposal.due)) resource.due = Proof.dueRfc3339(proposal.due);
     var inserted;
     try { inserted = api.insert(proposal.listId, resource); } catch (err) { return failedWrite_('write', err); }
     if (!inserted || !inserted.id) return { confirmed: false, reason: 'write' };
@@ -12368,6 +12358,12 @@ var GlanceExecute = (function () {
     try { fetched = api.get(proposal.listId, inserted.id); } catch (err) { return failedWrite_('fetch', err); }
     var cmp = Proof.compareCreated(inserted, fetched, zone);
     if (!cmp.ok) return { confirmed: false, reason: 'mismatch' };
+    // The read-back must carry the date the card showed, not only match the insert reply.
+    // A task on the wrong day is taken back (it is the one we just wrote) rather than left behind.
+    if (resource.due && Proof.normalizeDue(fetched.due) !== proposal.due) {
+      try { api.remove(proposal.listId, inserted.id); } catch (err) { /* reported as unconfirmed either way */ }
+      return { confirmed: false, reason: 'due-mismatch' };
+    }
     return {
       confirmed: true,
       snapshot: Proof.snapshotOf(fetched, proposal.listId, zone),
@@ -12499,8 +12495,8 @@ var GlanceExecute = (function () {
     instantUtc: function (dateIso, hour, minute, timeZone) {
       return proofLib().instantUtc(dateIso, hour, minute, timeZone);
     },
-    dueRfc3339: function (dateIso, timeZone) {
-      return proofLib().dueRfc3339(dateIso, timeZone);
+    dueRfc3339: function (dateIso) {
+      return proofLib().dueRfc3339(dateIso);
     },
     performCreateEvent: performCreateEvent,
     performUndoEvent: performUndoEvent,

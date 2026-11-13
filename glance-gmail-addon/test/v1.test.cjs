@@ -20,6 +20,13 @@ const NOW = new Date('2026-10-15T12:00:00Z');
 const TZ = 'UTC';
 let failures = 0;
 
+// Google Tasks stores `due` as a date only: it converts the value to UTC and keeps that day,
+// then returns UTC midnight of it. Test doubles use this so a wrong day cannot hide.
+function googleTaskDue(value) {
+  if (!value) return null;
+  return new Date(value).toISOString().slice(0, 10) + 'T00:00:00.000Z';
+}
+
 function check(name, cond, detail) {
   if (cond) console.log('PASS:', name);
   else {
@@ -433,9 +440,12 @@ console.log('\n--- calendar proof ---');
     execute.instantUtc('2026-10-22', 14, 0, fromObject.start.timeZone) === '2026-10-22T11:00:00Z',
     fromObject);
   check('a missing zone falls back to Asia/Jerusalem', fallback.start.timeZone === 'Asia/Jerusalem');
-  check('a task due is RFC3339 in that zone',
-    execute.dueRfc3339('2026-10-22', 'Asia/Jerusalem') === '2026-10-22T00:00:00+03:00' &&
-    execute.dueRfc3339('2026-10-22', 'America/New_York') === '2026-10-22T00:00:00-04:00');
+  check('a task due is UTC midnight of that date, in every zone',
+    execute.dueRfc3339('2026-10-22', 'Asia/Jerusalem') === '2026-10-22T00:00:00.000Z' &&
+    execute.dueRfc3339('2026-10-22', 'America/New_York') === '2026-10-22T00:00:00.000Z');
+  check('the Tasks double drops local midnight east of UTC to the day before (the Gate 04e115ab off-by-one)',
+    googleTaskDue('2026-11-18T00:00:00+02:00') === '2026-11-17T00:00:00.000Z' &&
+    googleTaskDue(execute.dueRfc3339('2026-11-18', 'Asia/Jerusalem')) === '2026-11-18T00:00:00.000Z');
 }
 function memoryCalendar() {
   const calls = [];
@@ -548,31 +558,49 @@ function memoryCalendar() {
   };
   check('the same instant hashes equal in that zone', proof.contentHash(localEvent) === proof.contentHash(zuluEvent) && proof.contentHash(localEvent) !== proof.contentHash(movedEvent));
 }
-{
+function googleTasksClient(store) {
   const calls = [];
-  const client = {
+  return {
     calls: calls,
     insert: function (listId, resource) {
       calls.push(resource.due);
-      return { id: 'task-z', title: resource.title, due: resource.due, etag: 'e1', updated: 'u1' };
+      store.task = { id: 'task-z', title: resource.title, due: googleTaskDue(resource.due), etag: 'e1', updated: 'u1' };
+      return JSON.parse(JSON.stringify(store.task));
     },
     get: function () {
-      return { id: 'task-z', title: 'send the contract', due: '2026-10-21T21:00:00.000Z', etag: 'e1', updated: 'u1' };
+      calls.push('get');
+      return store.task ? JSON.parse(JSON.stringify(store.task)) : null;
     },
-    remove: function () { calls.push('remove'); }
+    remove: function () { calls.push('remove'); store.task = null; }
   };
-  const result = execute.performCreate({ listId: 'list', title: 'send the contract', due: '2026-10-22', timeZone: 'Asia/Jerusalem' }, client);
-  check('a task due is written in the user zone', calls[0] === '2026-10-22T00:00:00+03:00', calls[0]);
-  check('a task read-back in that zone keeps 22/10', result.confirmed === true && result.view.due === '2026-10-22' && result.snapshot.timeZone === 'Asia/Jerusalem', result);
-  const again = {
-    calls: [],
-    get: function () {
-      this.calls.push('get');
-      return { id: 'task-z', title: 'send the contract', due: '2026-10-21T21:00:00.000Z', etag: 'e1', updated: 'u1' };
-    },
-    remove: function () { this.calls.push('remove'); }
+}
+for (const zone of ['Asia/Jerusalem', 'America/New_York', 'Pacific/Kiritimati']) {
+  const store = {};
+  const client = googleTasksClient(store);
+  const result = execute.performCreate({ listId: 'list', title: 'send the contract', due: '2026-11-18', timeZone: zone }, client);
+  check('a task due 18/11 is written as UTC midnight (' + zone + ')', client.calls[0] === '2026-11-18T00:00:00.000Z', client.calls[0]);
+  check('Google Tasks keeps 18/11 and the read-back says 18/11 (' + zone + ')',
+    result.confirmed === true && store.task.due === '2026-11-18T00:00:00.000Z' && result.view.due === '2026-11-18' && result.snapshot.due === '2026-11-18',
+    { result: result, stored: store.task });
+  const undoClient = googleTasksClient(store);
+  check('undo matches that due and deletes (' + zone + ')',
+    execute.performUndo(result.snapshot, undoClient).action === 'deleted' && undoClient.calls.join(',') === 'get,remove',
+    undoClient.calls);
+}
+{
+  const store = {};
+  const shifted = googleTasksClient(store);
+  const insertOnce = shifted.insert;
+  // The server answers with the day before on both the insert and the read (what the +02:00 write did live).
+  shifted.insert = function (listId, resource) {
+    insertOnce(listId, resource);
+    store.task.due = '2026-11-17T00:00:00.000Z';
+    return JSON.parse(JSON.stringify(store.task));
   };
-  check('undo compares the task due in that zone', execute.performUndo(result.snapshot, again).action === 'deleted' && again.calls.join(',') === 'get,remove', again.calls);
+  const result = execute.performCreate({ listId: 'list', title: 'send the contract', due: '2026-11-18', timeZone: 'Asia/Jerusalem' }, shifted);
+  check('a read-back on another day is not confirmed and the wrong-day task is taken back',
+    result.confirmed === false && result.reason === 'due-mismatch' && shifted.calls.indexOf('remove') !== -1 && store.task === null,
+    { result: result, calls: shifted.calls });
 }
 
 console.log('\n--- prefetch and classifier stubs ---');
@@ -793,7 +821,7 @@ console.log('\n--- message path parity ---');
           const task = {
             id: 'task-' + state.taskSeq++,
             title: resource.title,
-            due: resource.due || null,
+            due: googleTaskDue(resource.due),
             notes: resource.notes || '',
             etag: 'e1',
             updated: 'u1'
@@ -1686,7 +1714,7 @@ console.log('\n--- message path parity ---');
     typeof zonedEvent.start.timeZone === 'string' &&
     zonedEvent.end.timeZone === 'Asia/Jerusalem' &&
     execute.instantUtc('2026-10-22', 14, 0, zonedEvent.start.timeZone) === '2026-10-22T11:00:00Z' &&
-    zonedTask.due === '2026-10-22T00:00:00+03:00' &&
+    zonedTask.due === '2026-10-22T00:00:00.000Z' &&
     linesOf(zonedDo).join('\n').indexOf('2026-10-22 14:00') !== -1,
     { event: zonedEvent, due: zonedTask && zonedTask.due, lines: linesOf(zonedDo) });
 
@@ -1811,6 +1839,47 @@ console.log('\n--- message path parity ---');
     bareLines.indexOf('פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».') !== -1 &&
     bareLines.indexOf('אין מה לסגור') === -1,
     bareLines);
+
+  // Gate 04e115ab: ai.local.flow mailed itself. A note to self has no reply (FlowIntent: selfTask, noReplyDraft),
+  // so «הכן תשובה» is not offered and compose has nothing to insert. That is the product rule, not a bug.
+  // A self-note meeting is a task unless it asks for the calendar («תשריין ביומן») — then it is the hold.
+  {
+    const realSession = sandbox.Session;
+    sandbox.Session = {
+      getActiveUser: function () { return { getEmail: function () { return 'ai.local.flow@gmail.com'; } }; },
+      getScriptTimeZone: function () { return 'Asia/Jerusalem'; }
+    };
+    const selfOpen = function (id, subject, body) {
+      reset();
+      state.messages[id] = gmailMessage({
+        id: id, threadId: 't' + id, subject: subject, plain: body, html: '<div>' + body + '</div>',
+        from: 'flow <ai.local.flow@gmail.com>', to: 'ai.local.flow@gmail.com', date: new Date('2026-10-15T08:00:00Z')
+      });
+      const ev = { gmail: { messageId: id, accessToken: 'token', threadId: 't' + id }, commonEventObject: { userLocale: 'he', timeZone: { id: 'Asia/Jerusalem', offset: 10800000 } } };
+      return { ev: ev, card: openMessage(ev)[0] };
+    };
+    const selfR = selfOpen('self04eR', 'שאלה על החשבונית 13/11 ב', 'היי, תוכל לשלוח לי את החשבונית של חודש אוקטובר? תודה, רוני');
+    check('a self-sent question offers its task, not «הכן תשובה», and stores no reply',
+      buttonsOf(selfR.card).filter((b) => b.action === 'onPrepareReply').length === 0 &&
+      buttonsOf(selfR.card).filter((b) => b.action === 'onDoIt').length === 1 &&
+      Object.keys(state.cache).length === 0,
+      { lines: linesOf(selfR.card), buttons: buttonsOf(selfR.card).map((b) => plain(b.text)) });
+    const selfC = selfOpen('self04eC', '[G-Calendar] פגישה עם דנה על הספקים', 'נקבעה פגישה ביום ד\' הקרוב ב-11:00.');
+    const selfCDo = doIt(Object.assign({}, selfC.ev, { parameters: { messageId: 'self04eC', source: 'message' } })).card;
+    const selfCTask = state.tasks[Object.keys(state.tasks)[0]];
+    check('a self-note meeting without a calendar ask is a task due that Wednesday, kept on that day by Google Tasks',
+      Object.keys(state.events).length === 0 && selfCTask && selfCTask.due === '2026-10-21T00:00:00.000Z' &&
+      linesOf(selfCDo).join('\n').indexOf('2026-10-21') !== -1,
+      { task: selfCTask, lines: linesOf(selfCDo) });
+    const selfHold = selfOpen('self04eH', '[G-Calendar] פגישה עם דנה על הספקים', 'בוא נקבע פגישה עם דנה על הספקים ביום רביעי 21/10 בשעה 11:00 עד 11:30. תשריין ביומן.');
+    doIt(Object.assign({}, selfHold.ev, { parameters: { messageId: 'self04eH', source: 'message' } }));
+    const holdIds = Object.keys(state.events);
+    const holdEv = holdIds.length === 1 ? state.events[holdIds[0]] : null;
+    check('a self-note that says «תשריין ביומן» writes the hold at 11:00 on 21/10 and no task',
+      holdEv && holdEv.start.dateTime === '2026-10-21T11:00:00' && Object.keys(state.tasks).length === 0,
+      { events: state.events, tasks: state.tasks });
+    sandbox.Session = realSession;
+  }
   check('compose does not send', !/GmailDraft\.send|GmailApp\.sendEmail|gmail\.send|sendEmail|Drafts\.send|MailApp|\.send\(/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));
 }
 
