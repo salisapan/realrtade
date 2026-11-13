@@ -6298,16 +6298,10 @@ const FlowIntent = (() => {
         const labelNow = String(intent.label || '').trim();
         if (!/^(?:Decision|החלטה): \S/.test(labelNow) && !usableSelfTitle(labelNow)) return stayQuiet('hedge', { noRescue: true });
         if (intent.confidence === 'low') intent.confidence = 'high';
-        // "Remind me to renew the domain on Friday" is that task, due Friday.
-        // The day is already on facts. The task step reads entities.dateIso.
-        if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && intent.entities && !intent.entities.dateIso) {
-          intent.entities.dateIso = facts.date.iso;
-        }
-        // Any note to self with a day still ahead is due that day: the card already shows it ("עד 22 בנוב׳"), so the task
-        // step must carry it too, or Do It writes a task with no due date.
-        if (!isPast && facts && facts.date && facts.date.iso && !facts.date.dropped && intent.entities && !intent.entities.dateIso && !intent.entities.overdueIso) {
-          intent.entities.dateIso = facts.date.iso;
-        }
+        // The task is due the day in the sentence it is about, not the first
+        // day in a mail that also books a meeting ("meet on the 17th, and
+        // remind me to send the quote by the 22nd").
+        applyTaskClauseDate(intent, text, ctx.now, facts, isPast);
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
       // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
@@ -8207,7 +8201,77 @@ const FlowIntent = (() => {
     if (/^ל[\u0590-\u05FF]/.test(clause)) return clipTitle(clause);
     return '';
   }
+  function sentencesOfTask(text) {
+    return String(text || '').split(/\r?\n+|(?<=[.!?؟])\s+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function dateFactsOf(text, now) {
+    if (!text || typeof FlowExtract === 'undefined' || typeof FlowExtract.extract !== 'function') return null;
+    const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : null;
+    const src = D && typeof D.normalize === 'function' ? D.normalize(String(text), now) : String(text);
+    try {
+      const got = FlowExtract.extract(src, { now: now });
+      return got && got.date ? got : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function taskClauseFor(text, label, entities) {
+    const sentences = sentencesOfTask(text);
+    const remind = sentences.find((s) => /(?:^|[^\u0590-\u05FF])תזכיר(?:י|ו)?\s+לי(?![\u0590-\u05FF])|\bremind me to\b/i.test(s));
+    if (remind) return remind;
+    const needles = [label, entities && entities.requestWhat]
+      .map((v) => String(v || '').replace(/\s+/g, ' ').trim())
+      .filter((v) => v.length >= 4);
+    for (let i = 0; i < needles.length; i++) {
+      const n = needles[i];
+      const hit = sentences.find((s) => s.indexOf(n) !== -1 || n.indexOf(s) !== -1);
+      if (hit) return hit;
+    }
+    return sentences.length === 1 ? sentences[0] : '';
+  }
+  function applyTaskClauseDate(intent, text, now, facts, isPast) {
+    if (!intent || !intent.entities) return;
+    const clause = taskClauseFor(text, intent.label, intent.entities);
+    const clauseFacts = dateFactsOf(clause, now);
+    const clauseDate = clauseFacts && clauseFacts.date;
+    if (clauseDate && clauseDate.iso && !clauseDate.dropped && !isPastDate(clauseDate.iso, now)) {
+      intent.entities.dateIso = clauseDate.iso;
+      intent.entities.when = humanWhen(clauseDate, clauseFacts.time || null);
+      if (!(clauseFacts.time && Number.isInteger(clauseFacts.time.hour))) {
+        delete intent.entities.hour;
+        delete intent.entities.minute;
+      } else {
+        intent.entities.hour = clauseFacts.time.hour;
+        intent.entities.minute = clauseFacts.time.minute || 0;
+      }
+      return;
+    }
+    // "Remind me to renew the domain on Friday" is that task, due Friday.
+    // The day is already on facts. The task step reads entities.dateIso.
+    if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && !intent.entities.dateIso) {
+      intent.entities.dateIso = facts.date.iso;
+    }
+    // Any note to self with a day still ahead is due that day: the card already shows it ("עד 22 בנוב׳"), so the task
+    // step must carry it too, or Do It writes a task with no due date.
+    if (!isPast && facts && facts.date && facts.date.iso && !facts.date.dropped && !intent.entities.dateIso && !intent.entities.overdueIso) {
+      intent.entities.dateIso = facts.date.iso;
+    }
+    // A day that only lives in another sentence (the meeting) is not this task's due day.
+    const kept = intent.entities.dateIso;
+    if (kept && clause && !dateFactsOf(clause, now)) {
+      const slash = heSlashDate(kept);
+      const owns = (slash && clause.indexOf(slash) !== -1) || clause.indexOf(kept) !== -1;
+      if (!owns) {
+        intent.entities.dateIso = null;
+        intent.entities.when = null;
+        delete intent.entities.hour;
+        delete intent.entities.minute;
+      }
+    }
+  }
+
   function selfAskTitle(text, subject, ctx) {
+
     const raw = String(text || '');
     const invite = attachToInvitePlan(raw);
     if (invite) return invite.label;
