@@ -5,11 +5,12 @@ Glance closes open loops. Gmail is where it starts today.
 Source: `git log origin/claude/install-uiux-pro-max-skill-a4agox --since=2026-10-20` limited to `flow-trial-extension/core`, `flow-trial-extension/src`, `flow-trial-extension/manifest.json` and `glance-gmail-addon/`. Regenerate: `scripts/what-changed.sh 2026-10-20 > docs/glance-ai/shipped-in-code.md`.
 
 - Extension version in `manifest.json` on the branch: 0.9.56
-- Commits on the working branch that are not on `main`: 202. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
-- Lines changed in core, src and the add-on since `main`: 82 files changed, 9688 insertions(+), 628 deletions(-)
+- Commits on the working branch that are not on `main`: 204. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
+- Lines changed in core, src and the add-on since `main`: 82 files changed, 9755 insertions(+), 632 deletions(-)
 
 | Commit | When | What it changed in code | Files in core, src or the add-on |
 |---|---|---|---|
+| d7bc5a0c | 2026-11-13 | Follow loop: an ask with several parts stays open until its parts are answered | core/README.md core/follow-up.js core/outlook-sync.js src/follow.js  |
 | 2502747e | 2026-11-13 | Follow loop: a delivery failure is its own outcome (bounced) | core/README.md core/follow-up.js core/outlook-sync.js src/follow.js  |
 | b8ef96bf | 2026-11-13 | Direct-ask reader in one-to-one chats (WhatsApp, Messenger, Instagram, Teams) | core/README.md core/incoming-judge.js src/chat-task-card.js glance-gmail-addon/CoreBundle.js  |
 | 828cac0e | 2026-11-13 | Gmail: offer Connect Google instead of dropping the card (#274) | core/display-copy.js src/background.js src/content-gmail.js src/step-kit.js  |
