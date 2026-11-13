@@ -101,6 +101,25 @@ const FlowGoogleCalendar = (() => {
     return Number.isInteger(n) && n >= 5 && n <= 720 ? n : DURATION_MIN;
   }
 
+  // Same rule as FlowActions.holdSubjectTitle: reply prefixes and
+  // bracket tags like [G-Calendar] are stripped from the Subject line.
+  function cleanMailSubject(subject) {
+    if (typeof FlowActions !== 'undefined' && typeof FlowActions.holdSubjectTitle === 'function') {
+      return FlowActions.holdSubjectTitle(subject);
+    }
+    let s = String(subject || '')
+      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    let prev = '';
+    while (s && s !== prev) {
+      prev = s;
+      s = s.replace(/^(?:(?:re|fw|fwd|השב|תגובה|הועבר)\s*:\s*)+/ig, '').trim();
+      s = s.replace(/^\[[^\[\]]+\]\s*/g, '').trim();
+    }
+    return s;
+  }
+
   function eventBody(input) {
     const i = input || {};
     const date = isoDate(i.dateIso);
@@ -127,15 +146,19 @@ const FlowGoogleCalendar = (() => {
     const quote = i.quote ? String(i.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
     const lines = [];
     if (quote && quote !== title) lines.push(quote);
+    const subjectLine = cleanMailSubject(i.subject);
+    if (subjectLine) lines.push('Subject: ' + subjectLine);
     if (link && name) {
       lines.push('File: ' + name);
       lines.push(link);
-    } else if (quote) {
-      lines.push(quote);
+    }
+    const unique = [];
+    for (let k = 0; k < lines.length; k++) {
+      if (unique.indexOf(lines[k]) === -1) unique.push(lines[k]);
     }
     return {
       summary: name || title,
-      description: lines.join('\n'),
+      description: unique.join('\n'),
       start: { dateTime: startIso, timeZone: zone },
       end: { dateTime: endIso, timeZone: zone },
       attendees: []
@@ -390,6 +413,7 @@ const FlowGoogleCalendar = (() => {
     durationOf: durationOf,
     hasWriteScope: hasWriteScope,
     eventBody: eventBody,
+    cleanMailSubject: cleanMailSubject,
     contentHash: contentHash,
     whenLabel: whenLabel,
     createRequest: createRequest,
