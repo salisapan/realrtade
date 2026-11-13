@@ -20,6 +20,10 @@ const bg = read('src', 'background.js');
 
 check('lane maps googleDocFull to FlowGoogleDocs', /googleDocFull: 'FlowGoogleDocs'/.test(lane));
 check('host imports full-document-close and answers the plan with the switch', /full-document-close\.js/.test(host) && /flow:google-full-document-plan/.test(host) && /laneSwitchOn\(F\.SWITCH\)/.test(host));
+check('a known grant without drive.file asks to reconnect', /reason: 'drive-scope'/.test(host) && /plan\.action === 'reconnect'/.test(gmail) && /paintFullDocumentReconnect\(/.test(gmail));
+check('page logs the plan action and reason', /\[Glance\] full-document plan', action, reason/.test(gmail));
+check('a Labs switch change rescans the open mail', /changes\.glanceSwitches/.test(gmail) && /rescanOpenMailForSwitches/.test(gmail));
+check('the worker can see FlowGoogleCloses', /globalThis\.FlowGoogleCloses = FlowGoogleCloses/.test(read('core', 'google-closes.js')));
 check('Gmail shows a card only when the worker offers a non-blank build', /showFullDocumentChip\(/.test(gmail) && /flow:google-full-document-plan/.test(gmail) && /plan\.built\.blank/.test(gmail));
 check('full-document inject carries built body and previewOnly', /googleBuilt: plan\.built/.test(gmail) && /previewOnly: true/.test(gmail));
 check('Do It marks lane writes as preview when previewOnly', /ctx\.previewOnly/.test(gmail) && /response\.preview = true/.test(gmail));

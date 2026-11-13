@@ -1046,6 +1046,13 @@ function onLaneMessage(msg, sender, sendResponse) {
     Promise.resolve((async () => {
       if (!F || typeof F.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
       if (!(await laneSwitchOn(F.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      // A known grant list without drive.file cannot create the Doc. Ask to
+      // reconnect. An unknown list is not treated as a refusal.
+      const scopes = await storedGrantedScopes();
+      const Config = globalThis.FlowGoogleConfig;
+      if (Config && typeof Config.hasScope === 'function' && Config.hasScope(scopes, Config.SCOPE_DRIVE_FILE) === false) {
+        return { action: 'reconnect', reason: 'drive-scope' };
+      }
       return F.plan({
         flags: { [F.SWITCH]: true },
         text: String(msg.text || '').slice(0, 8000),

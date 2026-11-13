@@ -179,3 +179,4 @@ const FlowStyle = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStyle };
+else if (typeof globalThis !== 'undefined') globalThis.FlowStyle = FlowStyle;

@@ -749,3 +749,4 @@ const FlowGoogleCloses = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowGoogleCloses };
+else if (typeof globalThis !== 'undefined') globalThis.FlowGoogleCloses = FlowGoogleCloses;

@@ -3341,10 +3341,44 @@ function glanceUiCopy(kind) {
     host.appendChild(node);
   }
 
+  // A known Drive grant is missing. The card asks to reconnect and does not
+  // fall through to a task. Nothing is written.
+  function paintFullDocumentReconnect(message, c) {
+    if (!message || message.querySelector('.flow-chip-host')) return;
+    const he = glanceUiHebrew() || /[\u0590-\u05FF]/.test(String((c && c.text) || ''));
+    const host = el('div', 'flow-chip-host');
+    stampHost(host);
+    host.setAttribute('dir', he ? 'rtl' : 'ltr');
+    host.setAttribute('lang', he ? 'he' : 'en');
+    host.appendChild(el('p', 'flow-chip-label', he
+      ? 'חסרה הרשאת Drive. חבר מחדש את Google כדי להכין את המסמך. לא נכתב דבר.'
+      : 'Drive permission is missing. Reconnect Google to prepare the document. Nothing was written.'));
+    const btn = el('button', 'flow-chip-reconnect', glanceShow(glanceUiCopy('reconnect')));
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      btn.textContent = he ? 'מתחבר…' : 'Connecting…';
+      sendRuntime({ type: 'flow:google-reconnect', account: '' }).then((res) => {
+        btn.disabled = false;
+        btn.textContent = glanceShow(glanceUiCopy('reconnect'));
+        if (res && res.ok) {
+          host.remove();
+          scanReadingPane();
+        }
+      });
+    });
+    host.appendChild(btn);
+    if (message.firstChild) message.insertBefore(host, message.firstChild);
+    else message.appendChild(host);
+  }
+
   // A full quote/proposal Doc in the person's writing style (switch FULL_DOCUMENT_CLOSE, off).
   // One Do It creates the Doc for preview; Glance never sends mail.
   async function showFullDocumentChip(message, c) {
-    if (glanceLabsLocked() || !(await glanceSwitchOn('FULL_DOCUMENT_CLOSE'))) return false;
+    if (glanceLabsLocked() || !(await glanceSwitchOn('FULL_DOCUMENT_CLOSE'))) {
+      try { console.info('[Glance] full-document plan', 'off', glanceLabsLocked() ? 'labs-locked' : 'switch-off'); } catch (e) { /* no console */ }
+      return false;
+    }
     const lang = mailLanguage({ bodyText: c.text });
     let styleSummary = null;
     try {
@@ -3364,13 +3398,25 @@ function glanceUiCopy(kind) {
         companyTemplate: template
       }, laneAccountContext()));
     } catch (e) { plan = null; }
+    try {
+      const action = plan && plan.action ? String(plan.action) : 'none';
+      let reason = plan && plan.reason ? String(plan.reason) : '';
+      if (!reason && plan && plan.built && plan.built.blank) reason = 'blank';
+      if (!reason && action === 'offer') reason = 'ready';
+      if (!reason) reason = 'no-response';
+      console.info('[Glance] full-document plan', action, reason);
+    } catch (e) { /* no console */ }
     try { console.info('[Glance] full-document plan ms', Date.now() - started); } catch (e) { /* no console */ }
+    if (plan && plan.action === 'reconnect') {
+      paintFullDocumentReconnect(message, c);
+      return true;
+    }
     if (!plan || plan.action !== 'offer' || !plan.built || plan.built.blank) return false;
     const he = lang === 'he';
     const title = (plan.built && plan.built.title) || (plan.googleClose && plan.googleClose.templateName) || 'Document';
     const process = {
       id: 'full-document',
-      name: title,
+      name: plan.cardLine || title,
       closingLine: plan.cardLine,
       closedLine: he ? 'המסמך מוכן לעיון — לא נשלח.' : 'Document ready to preview — not sent.',
       steps: [{
@@ -3384,6 +3430,7 @@ function glanceUiCopy(kind) {
     };
     const intent = Object.assign({}, c.intent, {
       label: plan.cardLine || title,
+      selfTask: false,
       type: (c.intent && c.intent.type) || 'request',
       googleClose: plan.googleClose || null
     });
@@ -6789,6 +6836,17 @@ function glanceUiCopy(kind) {
     return true;
   }
 
+  function rescanOpenMailForSwitches() {
+    const open = currentContext && currentContext.message;
+    if (open && open.querySelectorAll) {
+      open.querySelectorAll('.flow-chip-host').forEach((host) => {
+        if (host.getAttribute('data-glance-chain') === 'task-proof' || host.hasAttribute('data-glance-verifying')) return;
+        host.remove();
+      });
+    }
+    scanReadingPane();
+  }
+
   if (chromeLive()) chrome.storage.onChanged.addListener((changes) => {
     if (!chromeLive()) return;
     if (changes.onboarded || changes.domainId || changes.connectorId) init();
@@ -6799,6 +6857,7 @@ function glanceUiCopy(kind) {
         scanReadingPane();
       }).catch(() => {});
     }
+    if (changes.glanceSwitches) rescanOpenMailForSwitches();
   });
 
   globalThis.__glanceGmailPage = {
