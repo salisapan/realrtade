@@ -737,32 +737,40 @@
     return text.slice(0, OFFICE_READ_MAX_CHARS);
   }
 
+  // A Chrome Web Store install (Chrome adds update_url to the manifest) never turns a Labs switch on,
+  // whatever storage says. Unpacked/dev installs have no update_url and keep Labs working.
+  function glanceLabsLocked() {
+    try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
+  }
+  // The direct-ask second read (plain questions a person puts to the reader; a Hebrew bare imperative with a day): on, on every surface that
+  // runs the shared judge, by the owner's approval of 2026-11-12. To turn it off, set this to false.
+  const directAskSwitch = true;
   // glanceSwitches.SYSTEM_NOTICE (off): a known service's deadline notice becomes a To Do task (core/system-notice.js).
   let systemNoticeSwitch = false;
   try {
-    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { systemNoticeSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); }).catch(() => {});
-    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) systemNoticeSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.SYSTEM_NOTICE === true); });
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { systemNoticeSwitch = !glanceLabsLocked() && !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) systemNoticeSwitch = !glanceLabsLocked() && !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.SYSTEM_NOTICE === true); });
   } catch (e) { systemNoticeSwitch = false; }
 
   // glanceSwitches.BOOKING_NOTICE (off): a booking confirmation becomes a calendar hold, a pickup with a last day a To Do task.
   let bookingNoticeSwitch = false;
   try {
-    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { bookingNoticeSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.BOOKING_NOTICE === true); }).catch(() => {});
-    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) bookingNoticeSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.BOOKING_NOTICE === true); });
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { bookingNoticeSwitch = !glanceLabsLocked() && !!(bag.glanceSwitches && bag.glanceSwitches.BOOKING_NOTICE === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) bookingNoticeSwitch = !glanceLabsLocked() && !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.BOOKING_NOTICE === true); });
   } catch (e) { bookingNoticeSwitch = false; }
 
   // glanceSwitches.PAYMENT_ASK (off): "Please transfer 500 NIS by Sunday" becomes a To Do task Pay 500 NIS due that day. Glance pays nothing.
   let paymentAskSwitch = false;
   try {
-    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { paymentAskSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.PAYMENT_ASK === true); }).catch(() => {});
-    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) paymentAskSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.PAYMENT_ASK === true); });
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { paymentAskSwitch = !glanceLabsLocked() && !!(bag.glanceSwitches && bag.glanceSwitches.PAYMENT_ASK === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) paymentAskSwitch = !glanceLabsLocked() && !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.PAYMENT_ASK === true); });
   } catch (e) { paymentAskSwitch = false; }
 
   // glanceSwitches.TASK_ASK (off): a reminder or a deadline asked without a question, or a call-back request, becomes a To Do task due that day.
   let taskAskSwitch = false;
   try {
-    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { taskAskSwitch = !!(bag.glanceSwitches && bag.glanceSwitches.TASK_ASK === true); }).catch(() => {});
-    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) taskAskSwitch = !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.TASK_ASK === true); });
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { taskAskSwitch = !glanceLabsLocked() && !!(bag.glanceSwitches && bag.glanceSwitches.TASK_ASK === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) taskAskSwitch = !glanceLabsLocked() && !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.TASK_ASK === true); });
   } catch (e) { taskAskSwitch = false; }
 
   // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
@@ -816,6 +824,7 @@
     });
     const judgeWith = (text) => FlowIncomingJudge.judge({
       systemNoticeOn: systemNoticeSwitch === true,
+      directAskOn: directAskSwitch !== false,
       bookingNoticeOn: bookingNoticeSwitch === true,
       paymentAskOn: paymentAskSwitch === true,
       taskAskOn: taskAskSwitch === true,
@@ -5444,6 +5453,7 @@
         });
         return FlowIncomingJudge.judge({
           systemNoticeOn: systemNoticeSwitch === true,
+      directAskOn: directAskSwitch !== false,
           bookingNoticeOn: bookingNoticeSwitch === true,
           paymentAskOn: paymentAskSwitch === true,
           taskAskOn: taskAskSwitch === true,

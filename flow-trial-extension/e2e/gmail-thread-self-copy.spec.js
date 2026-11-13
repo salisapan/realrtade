@@ -96,3 +96,13 @@ test('with no ask in the thread at all, a copy of the account stays quiet and sa
   await expect(page.locator('.flow-chip-host')).toHaveCount(0);
   expect(skips(logs).join('\n')).toContain('no-incoming-message');
 });
+
+// Live Gate 77961fb (9/11): "Can you call the bank before Thursday?" folded under its
+// automatic "Fwd:" copy to info@. Gmail ignores a click on the folded row itself, so the
+// ask must be opened with a click inside the row, then judged.
+test('live Gate D shape: a folded English ask under its Fwd: copy to info@ opens and shows the card', async ({ glance }) => {
+  const body = 'Can you call the bank before Thursday?';
+  const { page } = await open(glance, [ask({ collapsed: true, body, senderName: 'Sali Sapan' }), own({ body })]);
+  await expect(card(page)).toBeVisible({ timeout: 8000 });
+  await expect(page.locator('[data-legacy-message-id="m-copy"] .flow-chip-host')).toHaveCount(0);
+});

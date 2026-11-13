@@ -158,7 +158,8 @@ check('rm-103 a suggestion to talk does not close the loop', outcome('[NAME] ש�
 check('rm-104 לא הבנתי is not a bare no', outcome('שלום, לא הבנתי אם מדובר על מערכת לניהול קריאות? יודעת לנהל מלאי וחלפים? תודה [NAME]', replyW) !== 'declined');
 check('rm-111 Hebrew absence is an auto-reply', outcome('שלום, לרגל חופשה אעדר מהמשרד עד ליום [DATE] למקרים דחופים יש לפנות ל[NAME] [EMAIL]', replyW) === 'auto');
 check('rm-113 Hebrew absence is an auto-reply', outcome('שלום, בתקופה הקרובה אעדר מ[ORG]. לסיוע ותמיכה ניתן לפנות במייל [EMAIL]', replyW) === 'auto');
-check('rm-114 a recipient bounce is not an answer', outcome('Message blocked. Your message to [EMAIL] has been blocked. The response from the remote server was: 550 5.4.1 Recipient address rejected: Access denied.', replyW) === 'auto');
+// 2026-11-13: a delivery failure is its own outcome (`bounced`: the loop is flagged, not chased); it was `auto` before. Still never an answer.
+check('rm-114 a recipient bounce is not an answer', outcome('Message blocked. Your message to [EMAIL] has been blocked. The response from the remote server was: 550 5.4.1 Recipient address rejected: Access denied.', replyW) === 'bounced');
 check('a bare לא still declines', outcome('לא', replyW) === 'declined');
 check('לא תודה still declines', outcome('לא תודה', replyW) === 'declined');
 check('please direct this to accounting declines', outcome('Please direct this to our accounting department.', replyW) === 'declined');

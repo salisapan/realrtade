@@ -387,7 +387,10 @@ function engineHit_(text, opened, now) {
       now: now,
       surface: 'gmail',
       attachmentCount: opened.attachmentCount == null ? 0 : opened.attachmentCount,
-      inbound: true
+      inbound: true,
+      // The direct-ask second read, on by the owner's approval of 2026-11-12 (the same reader as the extension). This card writes a task or a
+      // hold; a reply-only plan (plain questions) is left to the surfaces that can draft, as every reply plan is.
+      directAskOn: true
     });
     if (!judged || !judged.show) {
       return { intent: judged ? judged.intent : null, plan: null, reason: judged ? judged.reason : null };
