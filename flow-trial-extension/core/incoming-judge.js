@@ -483,7 +483,8 @@ const FlowIncomingJudge = (() => {
       threadUrl: i.threadUrl || null,
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
       executionMemory: i.executionMemory || null,
-      text: vetoText
+      text: vetoText,
+      subject: i.subject || ''
     };
     // The show decision uses the unrewritten plan. A later Meeting or task
     // rewrite must not open a surface this plan leaves quiet.

@@ -31,6 +31,7 @@ const files = [
   'actions.js',
   'resolution.js',
   'system-notice.js',
+  'draft-reply.js',
   'incoming-judge.js'
 ].map((name) => path.join(core, name)).concat([
   'i18n.js',
@@ -40,7 +41,8 @@ const files = [
   'execute.js',
   'cards.js',
   'prefetch.js',
-  'remote.js'
+  'remote.js',
+  'draft-compose.js'
 ].map((name) => path.join(src, name)));
 
 const header = [
@@ -62,6 +64,7 @@ const footer = [
   '  cards: GlanceCards,',
   '  prefetch: GlancePrefetch,',
   '  remote: GlanceRemote,',
+  '  draftCompose: GlanceDraftCompose,',
   '  classify: function (text, ctx) { return FlowIntent.classify(text, ctx || {}); },',
   '  plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },',
   '  judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }',

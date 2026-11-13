@@ -682,6 +682,22 @@ function csvRow(csv) {
   return cells.length ? cells : null;
 }
 
+// The due day the card showed. The step's own date wins, as before. A card whose step carries no date still showed the
+// day from the mail's facts ("עד 22 בנוב׳"); that fallback is what background.js's taskClosePayload always used, and the
+// lane dropped it. A facts day already behind today is not a due date. core/google-tasks.js posts it as midnight UTC and
+// its read-back refuses Handled when the task comes back without that day.
+function laneTaskDue(i, params) {
+  const planned = (params && params.dateIso) || (i && i.dueIso) || null;
+  if (planned) return planned;
+  const facts = i && i.facts;
+  const iso = facts && facts.date && typeof facts.date.iso === 'string' ? facts.date.iso.trim() : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const pad = (v) => String(v).padStart(2, '0');
+  const now = new Date();
+  const today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+  return iso >= today ? iso : null;
+}
+
 async function prepareWrite(connectorId, input, cred) {
   const i = input || {};
   const params = i.params || {};
@@ -690,7 +706,7 @@ async function prepareWrite(connectorId, input, cred) {
       title: i.title || i.label || params.title || params.what || i.subject || '',
       taskListId: i.taskListId || params.taskListId || await storedTaskListId() || await resolveExistingTaskList() || '@default',
       notes: i.notes || '',
-      dueIso: params.dateIso || i.dueIso || null
+      dueIso: laneTaskDue(i, params)
     };
   }
   if (connectorId === 'googleTaskClose') {
