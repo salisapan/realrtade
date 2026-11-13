@@ -1818,6 +1818,13 @@ console.log('\n--- message path parity ---');
     composeLog.indexOf('draftMetadata.subject') !== -1 &&
     composeLog.indexOf('פגישה') === -1,
     { buttons: composeButtons.map((item) => plain(item.text)), log: composeLog });
+  for (const marked of ['\u200fRe: \u200fפגישה עם דנה', '\u202bRE:  פגישה עם דנה\u202c ', '\u2067Re: Fwd: פגישה עם דנה\u2069']) {
+    const markedCard = openCompose(Object.assign({}, composeEvent, { draftMetadata: { subject: marked } }))[0];
+    check('compose finds the stored reply when the subject carries bidi marks ' + JSON.stringify(marked),
+      buttonsOf(markedCard).length === 1 && buttonsOf(markedCard)[0].action === 'onComposeDoIt' &&
+      buttonsOf(markedCard)[0].params.replyKey === composeButtons[0].params.replyKey,
+      linesOf(markedCard));
+  }
   const inserted = composeDoIt(Object.assign({}, composeEvent, {
     parameters: { replyKey: composeButtons[0].params.replyKey, source: 'compose' }
   }));

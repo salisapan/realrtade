@@ -62,7 +62,9 @@ function composeReplyId_(e) {
 }
 
 function normalizeSubject_(subject) {
-  var text = String(subject || '').replace(/\s+/g, ' ').trim();
+  // Bidi and zero-width marks (RLM/LRM, embeddings, isolates, BOM) are invisible in a Hebrew subject
+  // but change the key, so the compose lookup would miss the reply «הכן תשובה» stored.
+  var text = String(subject || '').replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '').replace(/\s+/g, ' ').trim();
   var changed = true;
   while (changed && text) {
     changed = false;
