@@ -1071,6 +1071,75 @@ const FlowJudgment = (() => {
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
   const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|(?<!לא\s)נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|(?<!לא\s)נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|ת(?:אשר|אשרי|אשרו)\s+לי(?:\s+בבקשה)?(?![א-ת])|אפשר\s+ל(?:עדכן|תקן|סיים|הכין)(?![א-ת])[^?.!]{0,50}\sעד\s|(?:אשמח|נשמח)\s+ל(?:אישור|תשובה|עדכון|משוב|תגובה)\s+(?:שלך|שלכם|שלכן|ממך|ממכם)|אפשר\s+ש(?:ת|תי)(?:עיף|עיפי|סתכל|סתכלי|בדוק|בדקי|חתום|חתמי|אשר|אשרי|עדכן|עדכני|שלח|שלחי|חזור|חזרי|עבור|עברי|טפל|טפלי|סגור|סגרי)(?![א-ת])|(?:תוודא|תוודאי|תדאג|תדאגי)\s+ש?(?:ה|ל)|(?:תעיף|תעיפי)\s+מבט|אשמח ש(?:ת|תי)(?:חזור|חזרי|שלח|שלחי|עדכן|עדכני|אשר|אשרי|בדוק|בדקי|עבור|עברי|ענה|עני)(?![א-ת])|(?:אפשר|אשמח|נשמח)\s+לשמוע\s+(?:ממך|ממכם|ממך עדכון)|(?:אני|אנחנו)\s+(?:זקוק(?:ה|ים|ות)?|צריכ(?:ה|ים|ות)?|צריך)\s+(?:את\s+|ל)?(?:ה)?(?:חתימה|אישור|תשובה|החלטה|עדכון|תגובה|משוב)\s+(?:שלך|שלכם|ממך|ממכם)|(?:(?:אתה|את|אתם|אתן)\s+יכול(?:ה|ים|ות)?|היית(?:י)?\s+יכול(?:ה)?)\s+(?:בבקשה\s+)?ל(?:שלוח|העביר|אשר|בדוק|עבור|חתום|חזור|עדכן|שלם|הכין|סדר|תאם|מלא|הזמין|השיב|ענות|הוסיף|צרף|פתוח|ארגן|טפל|שמור|העלות|העלות|הגיש|הוציא|שחרר)(?![א-ת])|(?:^|\s)אם אפשר(?:\s*[,،])?\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  // A request verb that opens its clause, in the second person ("סאלי, תשלח לי את הסיכום עד מחר", "בבקשה שתף אותי
+  // בגיליון", "תוסיף משימה ל…"), and a dated "אשמח לתשובה לגבי … עד …". HANDOFF_HE only knew these behind תוכל / בבקשה ת /
+  // תשלח לי. The verb must open a clause and take an object, so "דנה תשלח לך" (third person), "אל תשלח" and reported
+  // speech after a colon ("היא אמרה: תשלח…") do not match; directedAsk() still drops a hedged or negated sentence.
+  // "תוסיף" counts only for a task or a reminder: "תוסיף את החוזה ליומן" is family B's file-on-calendar close.
+  // Left out on purpose: approve (the owner's approval rule makes that a task, not a reply), check, attach, and a money
+  // transfer ("תעביר את ה-₪89"), which stay with their own gates; so does a send-as-attachment sentence (מצורף / כקובץ),
+  // which is the file chain's. Forward counts only as "תעביר לי / העבר לי".
+  const IMPERATIVE_ASK_HE = /(?:^|[,.!?;—–]\s*|\s(?:ו?עדיין|אבל),?\s+)(?![^.?!\n]*(?:מצורפ|בצירוף|כקובץ))(?:(?:בבקשה\s+)?ת(?:שלח|שתף|עלה|עדכן|שיב|ענה|כין|סגור|טפל)י?|בבקשה\s+(?:שלח|שתף|העלה|עדכן|השב|ענה|הכן|עזור)|(?:שלח|שתף)(?=\s+(?:לי|אותי)))\s+(?:לי|אותי|את|ל[א-ת]+|על|עם|ב[א-ת]+)(?![א-ת])|(?:^|[,.!?;—–]\s*)(?:בבקשה\s+)?(?:תוסיף|תוסיפי|הוסף)\s+(?:משימה|תזכורת)(?![א-ת])|(?:^|[,.!?;—–]\s*)(?![^.?!\n]*(?:מצורפ|בצירוף|כקובץ))(?:בבקשה\s+)?(?:תעבירי?|העבר)\s+(?:לי|אותי)(?![א-ת])|(?:אשמח|נשמח)\s+ל(?:תשובה|עדכון)\s+(?:לגבי|על|בנוגע\s+ל)[^.?!\n]{1,60}\sעד\s/;
+  // Words in quotation marks are someone else's ("Dana wrote to the vendor \"please add a task …\""). The two new
+  // patterns below are read with every quoted span removed. An opening mark must follow a space, a colon or a
+  // bracket, so a Hebrew acronym's gershayim (דו"ח, מע"מ) is not a quotation.
+  function outsideQuotes(text) {
+    return String(text || '').replace(/(^|[\s:(\[])(?:"[^"\n]{2,240}"|“[^”\n]{2,240}”|«[^»\n]{2,240}»|„[^“”\n]{2,240}[“”])/g, '$1…');
+  }
+  // "Please add a task to …" asks for the task itself.
+  const ADD_TASK_ASK = /\bplease\s+(?:add|create|open|set up)\s+(?:a\s+)?(?:task|reminder|to-?do)\s+(?:to|for)\b/i;
+
+  // The two patterns above are new and broad, so they speak only on a message that shows no sign of anyone else's
+  // words anywhere in the raw body or the subject. One sign switches them off for the whole message; the older
+  // patterns and every other rule read the message exactly as before. Signs: any quote-cut line (QUOTE_START), a '>'
+  // line, a header-like line (From:/Sent:/Date:/To:/Cc:/Subject: and מאת:/נשלח:/תאריך:/אל:/עותק:/נושא:), "wrote:" in any of
+  // a few languages (כתב/ה/ו:), a reply header that names an <address> and ends in a colon, a separator rule, a
+  // forward/original banner, a client signature line with more text below it, a greeting after a sign-off (history
+  // pasted with no banner), a command in quotation marks, or a forward marker in the subject. A plain "Re:" subject is
+  // not a sign by itself: every reply carries it, and its quoted part is what the body signs catch.
+  const QUOTED_SIGNS = [
+    /^\s*>/m,
+    /^[ \t]*(?:From|Sent|Date|To|Cc|Subject|מאת|נשלח|תאריך|אל|עותק|נושא)[ \t]*[:：]/im,
+    /(?:\bwrote|\bescribió|\bescreveu|\bschrieb|\bécrit|\bscritto|написал[аи]?|كتب|כתב(?:ה|ו)?)\s*[:：]/i,
+    /<[^<>\s@]+@[^<>\s]+>[^\n]*[:：][ \t]*$/m,
+    /^[ \t]*(?:-{3,}|_{5,}|={5,}|\*{5,})/m,
+    /\b(?:original message|forwarded message|begin forwarded)\b|הודעה\s+(?:מקורית|שהועברה|מועברת)/i
+  ];
+  const CLIENT_SIGNATURE = /^[ \t]*(?:get outlook for (?:ios|android)|sent from (?:my )?(?:iphone|ipad|android|galaxy|samsung|outlook|mail for windows|yahoo mail)|נשלח מ(?:ה-?)?(?:iPhone|iPad|Android|Outlook|אייפון|גלקסי|סמסונג))[^\n]*$/im;
+  const SIGN_OFF = /^[ \t]*(?:thanks|thank you|best|best regards|regards|kind regards|cheers|תודה|תודה רבה|בתודה|בברכה|להתראות|שלך|שלכם)[ \t]*[,.!]?[ \t]*[^\n]{0,30}$/im;
+  const GREETING = /^[ \t]*(?:(?:hi|hello|hey|dear|good morning)(?![a-z])|שלום|היי|הי|בוקר טוב|ערב טוב|צהריים טובים)[^\n]{0,40}$/i;
+  const FORWARD_SUBJECT = /(?:^|[\s:\[(])(?:fwd?|fw|tr|wg|rv|enc|הועבר|העברה)[ \t]*[:：]/i;
+  const QUOTED_SPAN = /(?:^|[\s:(\[])(?:"([^"\n]{2,240})"|“([^”\n]{2,240})”|«([^»\n]{2,240})»|„([^“”\n]{2,240})[“”]|״([^״\n]{2,240})״)/g;
+  function quotedSign(raw, subject) {
+    const text = String(raw || '').replace(/\r\n?/g, '\n');
+    if (FORWARD_SUBJECT.test(String(subject || ''))) return true;
+    if (QUOTE_START.some((re) => re.test(text)) || QUOTED_SIGNS.some((re) => re.test(text))) return true;
+    const sig = CLIENT_SIGNATURE.exec(text);
+    if (sig && /\S/.test(text.slice(sig.index + sig[0].length))) return true;
+    const lines = text.split('\n');
+    let signedOff = false;
+    for (const line of lines) {
+      if (signedOff && GREETING.test(line)) return true;
+      if (SIGN_OFF.test(line)) signedOff = true;
+    }
+    let m; QUOTED_SPAN.lastIndex = 0;
+    while ((m = QUOTED_SPAN.exec(text))) {
+      const inner = m[1] || m[2] || m[3] || m[4] || m[5] || '';
+      if (IMPERATIVE_ASK_HE.test(inner) || ADD_TASK_ASK.test(inner) || /\bplease\b|בבקשה/i.test(inner)) return true;
+    }
+    return false;
+  }
+  // Open only when the caller read the raw message and found no sign. A caller that never asked stays on base.
+  function newAskOpen(raw, subject) { return !quotedSign(raw, subject); }
+  // The sender's own ask sits near the top. Only the first NEW_ASK_SPAN characters of the new content are read by
+  // the two new patterns, carried to the end of the sentence the limit falls in.
+  const NEW_ASK_SPAN = 600;
+  function newAskSpan(text) {
+    text = String(text || '');
+    if (text.length <= NEW_ASK_SPAN) return text;
+    const rest = text.slice(NEW_ASK_SPAN).search(/[.!?\n]/);
+    return rest === -1 ? text : text.slice(0, NEW_ASK_SPAN + rest + 1);
+  }
   // "Please follow up with Dana about the invoice" is an explicit ask, and
   // it never matched HANDOFF: "follow up" isn't in that verb list, and the
   // "send" later in the sentence isn't adjacent to "please". Kept out of
@@ -1287,7 +1356,16 @@ const FlowJudgment = (() => {
     // Outlook's Hebrew locale equivalent of the From:/Sent: header block
     // above — same no-\b rule applies to both מאת and נשלח.
     /^\s*מאת:\s.*$\n^\s*נשלח:\s/im,
-    /^\s*>{1,}\s?\S/m
+    /^\s*>{1,}\s?\S/m,
+    // The forward and reply headers source-text.js already cuts on the Outlook path, so the Gmail path (which only
+    // has this list) stops at the same line: a From: line followed by any second header line (Date:, To:, Subject:,
+    // not only Sent:), Gmail's Hebrew "ב-… <name> כתב/ה:" line without בתאריך, the Hebrew "-----הודעה מקורית-----"
+    // banner, Outlook's underscore rule and Apple Mail's "Begin forwarded message:".
+    /^\s*(?:From|מאת)\s*[:：]\s*.+$\n^\s*(?:Sent|Date|To|Subject|Cc|נשלח|תאריך|אל|נושא|עותק)\s*[:：]/im,
+    /^\s*ב-?.{5,80}\s(?:כתב|כתבה|כתבו)\s*[:：]\s*$/m,
+    /^\s*-{2,}\s*הודעה מקורית\s*-{2,}\s*$/m,
+    /^\s*_{5,}\s*$/m,
+    /^\s*Begin forwarded message:?\s*$/im
   ];
 
   // Smart/curly quotes and apostrophes — auto-inserted by iOS/macOS Mail,
@@ -1548,7 +1626,7 @@ const FlowJudgment = (() => {
     return saw;
   }
 
-  function score(text, domain, facts) {
+  function score(text, domain, facts, opts) {
     const signals = [];
     const add = (id, weight, why) => signals.push({ id, weight, why });
 
@@ -1602,7 +1680,7 @@ const FlowJudgment = (() => {
     const clockNamed = /\b(?:at|@)\s*\d{1,2}(?::\d{2})?\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b|בשעה\s*\d|(?:^|\s)ב-?\d{1,2}(?::\d{2})?(?:\s|$|[.,?!])/i.test(text);
     const slotAsk = !clockNamed && slotAskText(text);
     const workAsk = anyOf(text, [WORK_ASK, WORK_ASK_HE, STATUS_INTRO_ASK, STATUS_INTRO_ASK_HE, ACCOUNT_ASK, ACCOUNT_ASK_HE], directedAsk);
-    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk;
+    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk || (!!(opts && opts.newAskOpen === true) && anyOf(outsideQuotes(newAskSpan(text)), [IMPERATIVE_ASK_HE, ADD_TASK_ASK], directedAsk));
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
 
@@ -1777,6 +1855,7 @@ const FlowJudgment = (() => {
   function evaluate(text, domainId, ctx) {
     ctx = ctx || {};
     const domain = FLOW_DOMAINS.find((d) => d.id === domainId) || FLOW_DOMAINS[0];
+    const askGate = { newAskOpen: newAskOpen(text, ctx.subject) };
     // Judge what the sender just wrote, not the thread they wrote it on top of.
     text = newContent(text);
     const raw = FlowExtract.extract(text, { senderEmail: ctx.senderEmail, now: ctx.now });
@@ -1791,7 +1870,7 @@ const FlowJudgment = (() => {
       isReply: /^re:/i.test(ctx.subject || '')
     };
 
-    const s = score(text, domain, facts);
+    const s = score(text, domain, facts, askGate);
     facts.lost = s.flags.lost;
     facts.executed = s.flags.executed;
     facts.dispute = s.flags.dispute;
@@ -1859,8 +1938,8 @@ const FlowJudgment = (() => {
   // test/judgment-corpus.cjs) rather than re-deriving a second, potentially
   // drifting copy of the same judgment.
   return {
-    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, isNegatedBefore, score, newContent,
-    HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE, slotAskText, shortAskText, SLOT_ASKS, SLOT_ASKS_HE,
+    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, isNegatedBefore, score, newContent, newAskOpen,
+    HANDOFF, HANDOFF_HE, IMPERATIVE_ASK_HE, ADD_TASK_ASK, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE, slotAskText, shortAskText, SLOT_ASKS, SLOT_ASKS_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };
 })();
@@ -2846,6 +2925,14 @@ const FlowCloseFamilies = (() => {
     // An English hedge, maybe, if you're free, and אולי win before a live ask.
     // "אם אפשר, תשלח" is still the ask. אם אפשר is not this hedge.
     const t = String(sentence || '');
+    // Softener then but/however/אבל, or a softener next to an explicit deadline, yields to the ask.
+    // "No rush, but please send by Friday" and "אין לחץ, אבל תשלח עד מחר" stay live.
+    if (/\b(?:no pressure|no rush|only if you have (?:the )?time|if it works out)\b[\s,.…:;—–-]*(?:but|however)\b/i.test(t)) return false;
+    if (/(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)[\s,.…:;—–-]*אבל/.test(t)) return false;
+    const softener = /\b(?:no pressure|no rush)\b/i.test(t) || /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)/.test(t);
+    const deadline = /\b(?:by|before|until|no later than)\s+(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|tomorrow|tonight|next\s+week|\d)/i.test(t)
+      || /עד\s+(?:יום\s+)?(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת|מחר)/.test(t);
+    if (softener && deadline) return false;
     if (HEDGE_EN.test(t)) return true;
     if (/(?:^|[^\u0590-\u05FF])אולי/.test(t)) return true;
     if (sentenceLiveAsk(t)) return false;
@@ -4768,7 +4855,7 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוח|זורם|מסתדר|מתאים)\s+לך\s+ש(?:נדבר|ניפגש|נשב|נעשה|נקבע)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוח|זורם)\s+לך\s+(?:פגישה|שיחה|זום|סינק|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:קובעים|נסגור)\s+(?:פגישה|שיחה|זום|סינק|ישיבה|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])נ?אשמח\s+(?:לפגוש\s+אותך|להיפגש|לשבת\s+איתך)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?פנ(?:ה|י|ו)\s+לי\s+(?:חצי\s+שעה|שעה|רבע\s+שעה|כמה\s+דקות)|(?:^|[^\u0590-\u05FF])אפנה\s+לך\s+(?:חצי\s+שעה|שעה|רבע\s+שעה)|(?:^|[^\u0590-\u05FF])תצטרפ(?:י|ו)?\s+אלינו\s+ל|(?:^|[^\u0590-\u05FF])(?:שריינתי|שמרתי)\s+לנו(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])הזמנתי\s+(?:לנו\s+)?חדר(?:\s+ישיבות)?(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])יש\s+לי\s+חלון(?![\u0590-\u05FF]))/;
 
   // "This is not happening at the time this message names."
   //
@@ -4941,7 +5028,9 @@ const FlowIntent = (() => {
   // "what" for a REQUEST, not re-tested for detection. A second, narrower
   // copy of "what counts as a request" here previously meant the detected
   // request and the quoted sentence could disagree.
-  const REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE, FlowJudgment.FOLLOW_UP_ASK, FlowJudgment.FOLLOW_UP_ASK_HE];
+  const BASE_REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE, FlowJudgment.FOLLOW_UP_ASK, FlowJudgment.FOLLOW_UP_ASK_HE].filter(Boolean);
+  // The two new ask patterns join only for a message with no sign of quoted or forwarded text (FlowJudgment.newAskOpen).
+  const OPEN_REQUEST_PATTERNS = BASE_REQUEST_PATTERNS.concat([FlowJudgment.IMPERATIVE_ASK_HE, FlowJudgment.ADD_TASK_ASK].filter(Boolean));
   // The sentence a dated commitment is quoting — the sender's own delivery
   // promise, or the agreement word. Used only after REQUEST has already
   // declined the message, so this doesn't steal an explicit ask.
@@ -5153,6 +5242,14 @@ const FlowIntent = (() => {
   // hedges, and they never reached this gate. כשיהיה לך and מתי שנוח are
   // "whenever you" / "when convenient".
   const SOFT_ASK_HE = /(?:^|\s)אולי|במידה ו|בהנחה ש|בכפוף ל|כשיהיה לך|מתי שנוח|אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|כשיתאפשר|בהזדמנות/;
+  // A tentative sender: the ask is open on the sender's side, not owed. Not "please", "if you could", "אם אפשר" or
+  // "when you get a chance": those are how a real ask is written, and they stay out of both lists.
+  const TENTATIVE_ASK = /\b(?:no pressure|only if you have (?:the )?time|if it works out)\b/i;
+  const TENTATIVE_ASK_HE = /אם\s+יסתדר|יכול\s+להיות\s+ש|(?:^|\s)ייתכן|אם\s+(?:זה\s+)?נוח\s+לך|אם\s+(?:זה\s+)?מתאים\s+לך|רק\s+אם\s+יש\s+לך\s+זמן/;
+  // The same softener as its own sentence after the ask ("Can you send me the report? No pressure."). The whole sentence
+  // has to be the softener: "Not sure if I sent the right link" or "ייתכן שאאחר" next to an ask are not about the ask.
+  const TENTATIVE_TAIL = /^(?:but\s+)?(?:no pressure|only if you have (?:the )?time|if it works out|(?:i(?:'|’)m\s+)?not sure (?:yet )?(?:if|whether|that) (?:we|it|this)(?:'ll| will)? (?:still )?(?:need|matter|happen)s?(?: it| this| that)?|(?:i(?:'|’)m\s+)?not sure yet what we(?:'ll| will) do)[.!…]*$/i;
+  const TENTATIVE_TAIL_HE = /^(?:אבל\s+)?(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|אם\s+יסתדר(?:\s+לך)?|אם\s+לא,?\s+(?:זה\s+)?(?:בסדר|לא\s+נורא)|רק\s+אם\s+יש\s+לך\s+זמן|(?:עוד\s+)?לא\s+בטוח(?:ה)?\s+ש(?:זה\s+(?:עדיין\s+)?רלוונטי|נצטרך(?:\s+אות[וה])?))[.!…]*$/;
   // "Can you agree to the proposal by Monday" is a handoff plus a date, so
   // the request gate would draft it as a follow-up close. Agreeing is the
   // decision the reader has not made. "Could you confirm the payment by
@@ -5883,6 +5980,9 @@ const FlowIntent = (() => {
 
   function classify(text, ctx) {
     ctx = ctx || {};
+    // Read on the raw message (ctx.rawText when the caller trimmed it, e.g. a phone signature), before any cut: one sign of quoted or forwarded text keeps the new ask patterns off.
+    const askGate = { newAskOpen: typeof FlowJudgment.newAskOpen === 'function' && FlowJudgment.newAskOpen(typeof ctx.rawText === 'string' ? ctx.rawText : text, ctx.subject) };
+    const REQUEST_PATTERNS = askGate.newAskOpen ? OPEN_REQUEST_PATTERNS : BASE_REQUEST_PATTERNS;
     text = FlowJudgment.newContent(text);
     // «האם תוכל לשלוח...?» and «האם אפשר לקבל...?» are the polite ask, the same as «תוכל לשלוח...?» and «אפשר לקבל...?». Only these two
     // openings: «האם אפשר לשלוח לך» asks whether the writer may send, and «האם שלחת» asks for a status.
@@ -5908,7 +6008,7 @@ const FlowIntent = (() => {
         facts.date = slot.date;
       }
     }
-    const s = FlowJudgment.score(text, domain, facts);
+    const s = FlowJudgment.score(text, domain, facts, askGate);
     // A bad deadline drops only the date. The reply stays, with no due date
     // and no quick-pick. A meeting conflict keeps both choices for the card.
     if (facts.date && (facts.date.contradictsWeekday || facts.date.invalidDate) && s.flags.handoff) {
@@ -6262,7 +6362,17 @@ const FlowIntent = (() => {
     // ותוכל, תשלח לי את הטיוטה") used to hide a later clear send. A later
     // handoff sentence that is not itself soft is the close.
     function sentenceIsSoft(sentence) {
-      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence);
+      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence) || TENTATIVE_ASK.test(sentence) || TENTATIVE_ASK_HE.test(sentence);
+    }
+    // Softener then "but"/"however"/"אבל" yields to the ask that follows ("no pressure, but please …").
+    // The softener alone is tentative; the contrast makes the ask firm.
+    const SOFT_THEN_BUT = /\b(?:no pressure|only if you have (?:the )?time|if it works out|no rush)\b[\s,.…:;—–-]*(?:but|however)\b/i;
+    const SOFT_THEN_BUT_HE = /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|אם\s+יסתדר(?:\s+לך)?|רק\s+אם\s+יש\s+לך\s+זמן|אם\s+(?:זה\s+)?נוח\s+לך|אם\s+(?:זה\s+)?מתאים\s+לך)[\s,.…:;—–-]*אבל/;
+    // Courtesy softeners only (not assuming / subject to / whenever you): a future date keeps these as a card.
+    function courtesySoftener(blob) {
+      const t = String(blob || '');
+      return TENTATIVE_ASK.test(t) || TENTATIVE_ASK_HE.test(t) || /\bno rush\b/i.test(t)
+        || /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)/.test(t);
     }
     let askIsSoft = Boolean(requestWhat) && sentenceIsSoft(requestWhat);
     // A slot ask with no ask sentence of its own ("אם יהיה לך זמן מתישהו אולי נדבר, לא דחוף") is soft when the text says so.
@@ -6280,6 +6390,12 @@ const FlowIntent = (() => {
         if (handoff && !sentenceIsSoft(sentence)) { askIsSoft = false; break; }
       }
     }
+    // A softener sentence next to an undated ask makes the ask tentative. A resolved future date is a firm ask and still shows.
+    if (!askIsSoft && requestWhat && !(hasResolvedDate && !isPast)
+        && String(text || '').split(/(?<=[.!?…])\s+|\n+/).some((p) => TENTATIVE_TAIL.test(p.trim()) || TENTATIVE_TAIL_HE.test(p.trim()))) askIsSoft = true;
+    // Same-sentence courtesy softener used to ignore a date and a following "but". Conditionals (assuming / whenever) stay soft even with a date.
+    if (askIsSoft && (SOFT_THEN_BUT.test(String(text || '')) || SOFT_THEN_BUT_HE.test(String(text || '')))) askIsSoft = false;
+    else if (askIsSoft && hasResolvedDate && !isPast && courtesySoftener(String(text || ''))) askIsSoft = false;
     // Names a silence the chip path already chose. It does not add a
     // return. quietHint is used only where classify already returned
     // type null with no type of its own.
@@ -6984,6 +7100,11 @@ const FlowIntent = (() => {
     if (isDecision && contingent) return stayQuiet('hedge');
     if (isDecision && settled && (isPast || !(facts.date && facts.date.iso))) return stayQuiet('hedge');
     if (isDecision && facts.money && amountIsAmbiguous(text)) return stayQuiet('hedge');
+    // "We need to cancel the <call> on Tuesday at 3pm" is a cancelled time slot, not a deal outcome to log. LOST reads
+    // "cancel the" as "not going ahead", so a cancel with a clock time used to become a Log-it task at that time.
+    // Only a decision that rests on that cancel alone (no commit, execution or dispute) and names a clock is held quiet.
+    if (isDecision && s.flags.lost && !s.flags.commit && !s.flags.executed && !s.flags.dispute && clock && hasResolvedDate &&
+        /\bcancel(?:l?ing|l?ed)?\b/i.test(text)) return stayQuiet('hedge');
 
     // --- 4. DECISION_TO_LOG: an outcome someone reported — the chip's original job. ---
     if (isDecision) {
@@ -10124,6 +10245,7 @@ const FlowIncomingJudge = (() => {
     // A Date from another realm (a test sandbox, an iframe) fails instanceof and used to fall back to the real clock.
     const now = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
     let intent = intentApi.classify(text, {
+      rawText: prepareForJudge(i.text),
       senderEmail: sender.email || null,
       senderName: sender.name || null,
       subject: i.subject || '',

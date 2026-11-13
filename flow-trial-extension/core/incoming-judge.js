@@ -360,6 +360,7 @@ const FlowIncomingJudge = (() => {
     // A Date from another realm (a test sandbox, an iframe) fails instanceof and used to fall back to the real clock.
     const now = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
     let intent = intentApi.classify(text, {
+      rawText: prepareForJudge(i.text),
       senderEmail: sender.email || null,
       senderName: sender.name || null,
       subject: i.subject || '',
