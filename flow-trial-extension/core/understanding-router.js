@@ -16,6 +16,7 @@ const FlowUnderstandingRouter = (() => {
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
   }
   const U = sibling(typeof FlowUnderstanding !== 'undefined' ? FlowUnderstanding : null, './understanding.js', 'FlowUnderstanding');
+  const multi = () => sibling(typeof FlowModelMulti !== 'undefined' ? FlowModelMulti : null, './model-multi.js', 'FlowModelMulti'); // aiMultiV1
   const kindCheck = () => sibling(typeof FlowKindCheck !== 'undefined' ? FlowKindCheck : null, './kind-check.js', 'FlowKindCheck'); // aiKindCheckV1
   const ER = sibling(typeof FlowExecRouter !== 'undefined' ? FlowExecRouter : null, './exec-router.js', 'FlowExecRouter');
 
@@ -92,15 +93,26 @@ const FlowUnderstandingRouter = (() => {
     if (!t0.possible) { trace.push('tier0:nothing'); return out('SILENT', 0, { reason: 'no-possible-intention' }); }
     if (!U) return out('SILENT', 0, { reason: 'no-validator' });
 
+    const propose = (u) => (KC ? KC.proposal(U, u, pctx) : U.proposal(u, pctx));
+    // A Tier 2 answer quotes the masked text: its quoted words go back to the person's own words before the floor, the plan and the
+    // card see them ("…the signed lease [DATE_1]?" -> "…the signed lease by Friday?"). The dates were already read unmasked.
+    const unmasked = (p, unmask) => {
+      if (!unmask || !p || p.step === 'SILENT') return p;
+      const back = (x) => { if (typeof x !== 'string') return x; try { const y = unmask(x); return typeof y === 'string' && y ? y : x; } catch (e) { return x; } };
+      return Object.assign({}, p, { askSpan: back(p.askSpan), evidence: back(p.evidence) });
+    };
+    const MM = flags.aiMultiV1 === true ? multi() : null;
     const decide = (v, tier, unmask) => {
       if (!v.ok) return out('SILENT', tier, { reason: 'invalid:' + v.reason, drops: v.drops });
-      let p = KC ? KC.proposal(U, v.understanding, pctx) : U.proposal(v.understanding, pctx);
-      // A Tier 2 answer quotes the masked text: its quoted words go back to the person's own words before the floor, the plan and the
-      // card see them ("…the signed lease [DATE_1]?" -> "…the signed lease by Friday?"). The dates were already read unmasked.
-      if (unmask && p.step !== 'SILENT') {
-        const back = (x) => { if (typeof x !== 'string') return x; try { const y = unmask(x); return typeof y === 'string' && y ? y : x; } catch (e) { return x; } };
-        p = Object.assign({}, p, { askSpan: back(p.askSpan), evidence: back(p.evidence) });
+      if (MM) {
+        // aiMultiV1 (off): every intention on its own, each through the floor; the first that passes leads, the rest ride along.
+        const all = MM.proposals(propose, v.understanding, pctx).map((p) => unmasked(p, unmask));
+        const passed = [], held = [];
+        for (const p of all) { const f = floor(p, input, deps); if (f.pass) passed.push(Object.assign({}, p, { step: f.step })); else held.push(f.reason); }
+        if (!passed.length) return out('SILENT', tier, { reason: all.length ? held[0] : 'model:' + (propose(v.understanding).reason || 'no-actionable-intention'), understanding: v.understanding, drops: v.drops });
+        return out(passed[0].step, tier, { proposal: passed[0], proposals: passed, held, understanding: v.understanding, drops: v.drops });
       }
+      const p = unmasked(propose(v.understanding), unmask);
       if (p.step === 'SILENT') return out('SILENT', tier, { reason: 'model:' + p.reason, understanding: v.understanding, drops: v.drops });
       const f = floor(p, input, deps);
       if (!f.pass) return out('SILENT', tier, { reason: f.reason, proposal: p, understanding: v.understanding, drops: v.drops });

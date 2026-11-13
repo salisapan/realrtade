@@ -55,7 +55,10 @@ function glanceUiCopy(kind) {
   } catch (e) { /* the lines below are the same table when the shared one is absent */ }
   const he = glanceUiHebrew();
   if (kind === 'reconnect') return he ? 'חבר מחדש את Google' : 'Reconnect Google';
+  if (kind === 'connectGoogle') return he ? 'התחבר ל-Google' : 'Connect Google';
   if (kind === 'connect') return he ? 'התחבר ל-Google בחלון Glance קודם.' : 'Connect Google in the Glance popup first.';
+  if (kind === 'connecting') return he ? 'מתחבר…' : 'Connecting…';
+  if (kind === 'connectFailed') return he ? 'החיבור נכשל.' : 'Connection failed.';
   if (kind === 'edited') return he ? 'שינית את זה. Undo השאיר אותו כמו שהוא.' : 'You edited this. Undo left it alone.';
   if (kind === 'still') return he ? 'עדיין שם — משימת Google לא הוסרה.' : 'Still there — the Google Task was not removed.';
   if (kind === 'calendar') return he ? 'אין מועד אחד לאירוע הזה.' : 'No single time for this event.';
@@ -74,6 +77,11 @@ function glanceUiCopy(kind) {
 }
 
 (function flowGmailWatcher() {
+  // A Chrome Web Store install (Chrome adds update_url to the manifest) never turns a Labs switch on,
+  // whatever storage says. Unpacked/dev installs have no update_url and keep Labs working.
+  function glanceLabsLocked() {
+    try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
+  }
   // A second injection in this same world must not start another watcher.
   // After an update the old world is gone, so this guard is false and the
   // new files run. The service worker removes leftover chips first.
@@ -1616,7 +1624,7 @@ function glanceUiCopy(kind) {
     // A known service's notice with a deadline and a preventing action is a task with the date (core/system-notice.js).
     // Off unless glanceSwitches.SYSTEM_NOTICE is true.
     let noticeOn = false;
-    try { const bag = await chrome.storage.local.get({ glanceSwitches: {} }); noticeOn = !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); } catch (e) { noticeOn = false; }
+    try { const bag = await chrome.storage.local.get({ glanceSwitches: {} }); noticeOn = !glanceLabsLocked() && !!(bag.glanceSwitches && bag.glanceSwitches.SYSTEM_NOTICE === true); } catch (e) { noticeOn = false; }
     if (noticeOn && typeof FlowSystemNotice !== 'undefined' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.noticeIntent === 'function' && base && base.inbound !== false) {
       const notice = FlowSystemNotice.detect({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now });
       if (notice) return FlowIncomingJudge.noticeIntent(FlowIntent, notice);
@@ -1627,7 +1635,7 @@ function glanceUiCopy(kind) {
     if (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.bookingNotice === 'function' && base && base.inbound !== false && ctx.senderIsUser !== true) {
       let bag = null;
       try { bag = await chrome.storage.local.get({ glanceSwitches: {} }); } catch (e) { bag = null; }
-      const sw = (bag && bag.glanceSwitches) || {};
+      const sw = (!glanceLabsLocked() && bag && bag.glanceSwitches) || {};
       const judgeIn = { text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null };
       if (sw.BOOKING_NOTICE === true) {
         const gone = await cancelledHoldIntent(prepared, ctx.senderEmail);
@@ -1660,7 +1668,10 @@ function glanceUiCopy(kind) {
       // The same second read Outlook's judge runs when the classifier finds nothing: a do-it ask with a named day, a timed
       // proposal asked back, an answer-needing ask with a date. Nothing is sent; the plan is the usual card.
       const q0 = intent && intent.quiet ? intent.quiet : null;
-      const hit = FlowIncomingJudge.secondRead({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true }, q0);
+      // The direct-ask second read (plain questions a person puts to the reader; a Hebrew bare imperative with a day): on, on every
+      // surface that runs the shared judge, by the owner's approval of 2026-11-12 after the run on his real mailbox. To turn it off, pass false.
+      const directAskOn = true;
+      const hit = FlowIncomingJudge.secondRead({ directAskOn, text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true }, q0);
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
     return intent || { type: null };
@@ -1845,12 +1856,18 @@ function glanceUiCopy(kind) {
     return rows;
   }
 
-  // A folded row opens with a click on the row. Once per row, so a row that
-  // does not open is reported as it is and not clicked again.
+  // A folded row opens with a click inside the row. Live Gmail (9/11) ignores a
+  // click whose target is the div.kv row itself; a click on its content
+  // (.adf / .gs / the snippet .iA) opens it. Once per row, so a row that does
+  // not open is reported as it is and not clicked again.
+  function foldedClickTarget(node) {
+    if (!node || !node.querySelector) return node;
+    return node.querySelector('.adf, .gs, .iA') || node.firstElementChild || node;
+  }
   function openFoldedRow(node) {
     if (!node || node.getAttribute('data-glance-folded-click') === '1') return false;
     node.setAttribute('data-glance-folded-click', '1');
-    try { node.click(); return true; } catch (e) { return false; }
+    try { foldedClickTarget(node).click(); return true; } catch (e) { return false; }
   }
 
   async function scanReadingPane() {
@@ -2469,11 +2486,13 @@ function glanceUiCopy(kind) {
     // screen, never before and never from a settings page. Covers both "not
     // onboarded yet" and "onboarded, but to a stale non-Google connectorId"
     // (see the comment above this function's earlier connectorId check) —
-    // either way, the account isn't actually ready to write to Google, and
-    // ensureGoogleAutoConnect() is the one path that can fix that silently.
+    // either way, the account isn't actually ready to write to Google.
+    // Silent auto-connect is tried once. If it fails, the card still paints
+    // with a single Connect Google action (interactive, on click only) so a
+    // new store user sees the suggestion instead of a silent drop.
+    let needsGoogleConnect = false;
     if (!usingGoogle && !(await ensureGoogleAutoConnect())) {
-      logScanSkip(messageId, 'google-connect');
-      return;
+      needsGoogleConnect = true;
     }
 
     let attachFile = null;
@@ -2608,7 +2627,8 @@ function glanceUiCopy(kind) {
       // removed it anyway.
       bodyText: text,
       executionMemory: executionMemory,
-      app: 'gmail'
+      app: 'gmail',
+      needsGoogleConnect: needsGoogleConnect
     });
     watchCopiedOnly(message, messageId, text, ownEmail, audience);
     // Re-injecting after Gmail rebuilds the node is now expected behaviour,
@@ -3326,7 +3346,7 @@ function glanceUiCopy(kind) {
   async function showFullDocumentChip(message, c) {
     try {
       const st = await FlowStorage.get();
-      if (!(st && st.glanceSwitches && st.glanceSwitches.FULL_DOCUMENT_CLOSE === true)) return false;
+      if (glanceLabsLocked() || !(st && st.glanceSwitches && st.glanceSwitches.FULL_DOCUMENT_CLOSE === true)) return false;
     } catch (e) { return false; }
     const lang = mailLanguage({ bodyText: c.text });
     let styleSummary = null;
@@ -3668,7 +3688,46 @@ function glanceUiCopy(kind) {
     return true;
   }
 
+  // Interactive Connect Google from a card click. Never used by the silent
+  // auto-connect path. On success the card continues into its normal Do It;
+  // nothing runs until the owner clicks.
+  async function connectGoogleFromCard() {
+    const res = await sendRuntime({ type: 'flow:connect', connectorId: 'googleTasks', interactive: true });
+    if (!(res && res.ok)) return res || { ok: false, reason: 'failed' };
+    await FlowStorage.set({ onboarded: true, connectorId: 'googleTasks' });
+    state = await FlowStorage.get();
+    chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: 'googleTasks', via: 'card' } });
+    return { ok: true };
+  }
+
+  async function onConnectGoogleOrDoIt(host, chip, ctx, liveSteps) {
+    if (ctx && ctx.needsGoogleConnect) {
+      setChipState(chip, 'flow-chip-pending', glanceShow(glanceUiCopy('connecting')));
+      let res = null;
+      try { res = await connectGoogleFromCard(); } catch (e) { res = { ok: false, reason: 'failed' }; }
+      if (!(res && res.ok)) {
+        setChipState(chip, 'flow-chip-error', glanceShow(glanceUiCopy('connectFailed')));
+        const label = glanceShow(glanceUiCopy('connectGoogle'));
+        const dark = chip && chip.querySelector && chip.querySelector('.doit-dark');
+        if (dark) {
+          dark.textContent = label;
+          dark.setAttribute('aria-label', label);
+          chip.setAttribute('aria-label', label);
+          chip.disabled = false;
+          chip.removeAttribute('data-glance-chip-state');
+        } else if (chip && chip.replaceChildren) {
+          chip.className = 'flow-chip';
+          chip.replaceChildren(el('span', 'shell'), el('span', 'ring'), el('span', 'shine'), el('span', 'flow-chip-do-label', label));
+        }
+        return;
+      }
+      ctx.needsGoogleConnect = false;
+    }
+    return onDoIt(host, chip, ctx, liveSteps);
+  }
+
   function injectChip(messageNode, ctx) {
+
     void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
     if (!ctx) return;
@@ -3785,8 +3844,8 @@ function glanceUiCopy(kind) {
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().doIt));
-    chip.addEventListener('click', () => onDoIt(host, chip, ctx, liveSteps));
+    chip.appendChild(el('span', 'flow-chip-do-label', ctx.needsGoogleConnect ? glanceShow(glanceUiCopy('connectGoogle')) : glanceChrome().doIt));
+    chip.addEventListener('click', () => onConnectGoogleOrDoIt(host, chip, ctx, liveSteps));
     mainRow.appendChild(chip);
 
     host.appendChild(mainRow);
@@ -3799,6 +3858,7 @@ function glanceUiCopy(kind) {
         lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
         uiLang: lang,
         surface: 'gmail',
+        doItLabel: ctx.needsGoogleConnect ? glanceShow(glanceUiCopy('connectGoogle')) : null,
         dateChoices: ctx.process.dateChoices || null,
         onDateChoice: (iso) => {
           if (typeof FlowActions !== 'undefined' && FlowActions.chooseDate) FlowActions.chooseDate(ctx.process, iso);
@@ -3809,7 +3869,7 @@ function glanceUiCopy(kind) {
         onDoIt: (button) => {
           if (button && button.disabled) return;
           if (ctx.process.needsDateChoice) return;
-          onDoIt(host, button, ctx, liveSteps);
+          onConnectGoogleOrDoIt(host, button, ctx, liveSteps);
         },
         onDismiss: () => onDismiss(host, ctx),
         onChange: (next) => {
@@ -3817,7 +3877,7 @@ function glanceUiCopy(kind) {
           liveSteps.length = 0;
           picked.forEach((step) => liveSteps.push(step));
         },
-        onRetry: () => onDoIt(host, host.querySelector('button.flow-chip') || host.querySelector('.do-halo'), ctx, liveSteps)
+        onRetry: () => onConnectGoogleOrDoIt(host, host.querySelector('button.flow-chip') || host.querySelector('.do-halo'), ctx, liveSteps)
       });
       const draft = ctx.process.steps.find((step) => step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId);
       if (draft) host.appendChild(buildAttachChooser(draft, ctx));
@@ -3836,7 +3896,7 @@ function glanceUiCopy(kind) {
           liveSteps.length = 0;
           picked.forEach((step) => liveSteps.push(step));
         },
-        onRetry: () => onDoIt(host, chip, ctx, liveSteps)
+        onRetry: () => onConnectGoogleOrDoIt(host, chip, ctx, liveSteps)
       });
       host.__glanceSteps = view;
       const draft = ctx.process.steps.find((step) => step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId);
@@ -4302,7 +4362,7 @@ function glanceUiCopy(kind) {
     if (userContextSwitchOn != null) return userContextSwitchOn;
     try {
       const st = await FlowStorage.get();
-      userContextSwitchOn = !!(st && st.glanceSwitches && st.glanceSwitches.USER_CONTEXT_WRITER === true);
+      userContextSwitchOn = !glanceLabsLocked() && !!(st && st.glanceSwitches && st.glanceSwitches.USER_CONTEXT_WRITER === true);
     } catch (e) { userContextSwitchOn = false; }
     return userContextSwitchOn;
   }
@@ -4854,7 +4914,11 @@ function glanceUiCopy(kind) {
     if (!chromeLive()) return;
     const store = chrome.storage && chrome.storage.local;
     if (!store) return;
-    const lane = (results || []).filter((r) => r && r.action && laneConnectorId(r.action.kind));
+    // A reply-draft hand-off (preview, closes nothing) and a skipped step are
+    // not failed writes, the same rule as the receipt. Counting them set the
+    // warning on a full «טופל», and it then kept Google off Connected.
+    const lane = (results || []).filter((r) => r && r.action && laneConnectorId(r.action.kind)
+      && !draftHandOff(r) && !(r.response && r.response.skipped));
     if (!lane.length) return;
     const ok = lane.some((r) => r.response && r.response.ok);
     const failed = lane.some((r) => !(r.response && r.response.ok));
@@ -5804,7 +5868,10 @@ function glanceUiCopy(kind) {
           // longer holds.
           const gone = new Set(result.undoneIds);
           const left = succeeded.concat(extra).filter((r) => !gone.has(r.action.id));
-          writeLaneUndoRow(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(left), { partial: left.length < results.length, total: results.length }, ctx.laneIds);
+          // Hand-offs and skipped steps never count toward "partial" — only
+          // real attempted writes do (same rule as the close receipt).
+          const counted = results.filter((r) => r && r.action && !(r.response && r.response.skipped) && !draftHandOff(r));
+          writeLaneUndoRow(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(left), { partial: left.length < counted.length, total: counted.length }, ctx.laneIds);
           FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
           FlowStorage.calibrate('undo', ctx.intent.type);
           // The full close is no longer true, so a later message in this
@@ -5944,7 +6011,19 @@ function glanceUiCopy(kind) {
     });
     if (meetingNote) bookkeeping.push(meetingNote);
     noteLaneOutcome(results);
-    bookkeeping.push(rememberLaneUndo(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(succeeded.concat(extra)), ctx.laneIds, { total: results.length }));
+    // A compose hand-off (preview that closes nothing) is still one entry in
+    // `results`, but it is not a failed write. Counting it as total made a
+    // full Drive save remount as "טופל חלקית" when only the Drive step was
+    // stored for Undo. Match the receipt: hand-offs and skips do not count,
+    // and a full close never stores partial.
+    {
+      const undoSteps = laneUndoStepsOf(succeeded.concat(extra));
+      const counted = results.filter((r) => r && r.action && !(r.response && r.response.skipped) && !draftHandOff(r));
+      const meta = (typeof FlowReceipt !== 'undefined' && FlowReceipt.laneUndoStoreMeta)
+        ? FlowReceipt.laneUndoStoreMeta({ full: copy.full, storedCount: undoSteps.length, attemptedCount: counted.length })
+        : (copy.full ? { total: undoSteps.length } : { total: Math.max(counted.length, undoSteps.length) });
+      bookkeeping.push(rememberLaneUndo(ctx.legacyMessageId || ctx.messageId, undoSteps, ctx.laneIds, meta));
+    }
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a

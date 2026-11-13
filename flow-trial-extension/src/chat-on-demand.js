@@ -1,6 +1,7 @@
 // Service-worker side: inject lane scripts on gesture (action, command, or in-page button).
 const FlowChatOnDemand = (() => {
   const INJECTED = new Set();
+  const fixturePorts = new Set();
 
   function laneDefs() {
     if (typeof globalThis.__glanceLaneChatDefs === 'undefined' || !Array.isArray(globalThis.__glanceLaneChatDefs)) return [];
@@ -114,6 +115,42 @@ const FlowChatOnDemand = (() => {
     return { ok: true, scan: first };
   }
 
+  function scanFixturePage(tab) {
+    const tabId = tab && tab.id;
+    const tabUrl = String((tab && tab.url) || '');
+    const rows = [];
+    fixturePorts.forEach((port) => rows.push(port));
+    const urlOf = (p) => String(p.__fixtureUrl || (p.sender && p.sender.url) || '');
+    const sameUrl = (p) => {
+      const url = urlOf(p);
+      return Boolean(tabUrl) && Boolean(url) && (url === tabUrl || url.indexOf(tabUrl) === 0 || tabUrl.indexOf(url) === 0);
+    };
+    let port = rows.find((p) => p.sender && p.sender.tab && p.sender.tab.id === tabId && (!tabUrl || sameUrl(p) || !urlOf(p)));
+    if (!port) port = rows.find(sameUrl);
+    if (!port && rows.length === 1) port = rows[0];
+    if (!port) return Promise.resolve({ ok: false, reason: 'no-scan', ports: rows.length });
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        try { port.onMessage.removeListener(onMsg); } catch (e) { /* port already gone */ }
+        resolve({ ok: false, reason: 'no-scan' });
+      }, 2000);
+      function onMsg(msg) {
+        clearTimeout(timer);
+        try { port.onMessage.removeListener(onMsg); } catch (e) { /* port already gone */ }
+        if (!msg || msg.type === 'flow:fixture-hello') return;
+        if (msg.ok === false) resolve({ ok: false, reason: msg.reason || 'no-scan', scan: msg });
+        else resolve({ ok: true, scan: msg });
+      }
+      try {
+        port.onMessage.addListener(onMsg);
+        port.postMessage({ type: 'flow:fixture-scan', url: tabUrl });
+      } catch (e) {
+        clearTimeout(timer);
+        resolve({ ok: false, reason: 'inject-failed' });
+      }
+    });
+  }
+
   async function whatsappGate(api) {
     const G = globalThis.FlowWhatsAppWebGate;
     if (!G) return { ok: false, reason: 'flag-off' };
@@ -137,19 +174,11 @@ const FlowChatOnDemand = (() => {
     // gesture in the chat-lane spec. It is not WhatsApp Web and it does not
     // read a person's chats. Production web.whatsapp.com stays behind the gate.
     if (fixture && surfaceKey === 'whatsapp') {
-      // The fixture is an extension page. Its scan lives in the page, so the
-      // gesture is a message, not an injected script.
-      return new Promise((resolve) => {
-        try {
-          api.tabs.sendMessage(tab.id, { type: 'flow:fixture-scan' }, (r) => {
-            let err = null;
-            try { err = api.runtime && api.runtime.lastError; } catch (e) { err = e; }
-            if (err) { resolve({ ok: false, reason: 'inject-failed' }); return; }
-            if (!r || r.ok === false) resolve({ ok: false, reason: (r && r.reason) || 'no-scan', scan: r });
-            else resolve({ ok: true, scan: r });
-          });
-        } catch (e) { resolve({ ok: false, reason: 'inject-failed' }); }
-      });
+      // The fixture is an extension page. Script injection needs a host permission
+      // this build does not declare, and tabs.sendMessage never reaches an
+      // extension page. The page keeps a port open; the gesture asks that port
+      // to run the stub scan. web.whatsapp.com stays on the gate below.
+      return scanFixturePage(tab);
     }
     if (surfaceKey === 'whatsapp') {
       const decision = await whatsappGate(api);
@@ -209,6 +238,16 @@ const FlowChatOnDemand = (() => {
   function wire(chromeApi) {
     const api = chromeApi || globalThis.chrome;
     if (!api || !api.runtime) return;
+    if (api.runtime.onConnect) {
+      api.runtime.onConnect.addListener((port) => {
+        if (!port || port.name !== 'glance-fixture-scan') return;
+        fixturePorts.add(port);
+        port.onMessage.addListener((msg) => {
+          if (msg && msg.type === 'flow:fixture-hello' && msg.url) port.__fixtureUrl = String(msg.url);
+        });
+        port.onDisconnect.addListener(() => fixturePorts.delete(port));
+      });
+    }
     if (api.commands && api.commands.onCommand) {
       api.commands.onCommand.addListener(async (command) => {
         if (command !== 'glance-analyze-chat') return;

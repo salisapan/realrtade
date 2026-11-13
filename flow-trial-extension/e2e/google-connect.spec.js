@@ -32,6 +32,13 @@ test('Disconnect does not silently reconnect until Connect is clicked', async ({
     if (pages > pagesBefore) return 'popup';
     return 'quiet';
   }).toBe('quiet');
+  // Gate D: the grant is revoked at Google, not only cleared here.
+  const revokeCalls = await glance.evaluateWorker(() => (globalThis.__glanceE2e.calls || [])
+    .filter((c) => String(c.url).indexOf('https://oauth2.googleapis.com/revoke') === 0));
+  expect(revokeCalls.length).toBeGreaterThan(0);
+  expect(revokeCalls.every((c) => c.method === 'POST')).toBe(true);
+  expect(revokeCalls.some((c) => new URLSearchParams(c.body).get('token') === 'ya29.e2e')).toBe(true);
+  expect(revokeCalls.every((c) => c.url.indexOf('ya29') === -1)).toBe(true);
 
   await (await connectButton(page)).click();
   await expect(page.locator('#statusPill')).toHaveText('Google connected');
@@ -55,6 +62,49 @@ test('Disconnect does not silently reconnect until Connect is clicked', async ({
   await expect(page.locator('#statusPill')).toHaveText('Google connected');
   await expect(page.locator('[data-provider="google"]')).toHaveCount(1);
   await expect(page.locator('[data-provider="meta"]')).toHaveCount(1);
+});
+
+test('after Disconnect the next Connect asks Google for consent, and Cancel stays not connected', async ({ glance }) => {
+  const page = await glance.openPopup();
+  await (await connectButton(page)).click();
+  await expect(page.locator('#statusPill')).toHaveText('Google connected');
+  await page.getByRole('button', { name: 'Disconnect' }).click();
+  await expect(await connectButton(page)).toBeVisible();
+  const marked = await glance.storage();
+  expect(marked.googleConsentRequired && marked.googleConsentRequired.needed).toBe(true);
+
+  // Browser sign-in off: Connect goes to the Google web window, where the
+  // person presses Cancel on the consent screen.
+  await glance.evaluateWorker(() => {
+    const e = globalThis.__glanceE2e;
+    e.flows = [];
+    e.savedGoogleAuthToken = e.googleAuthToken;
+    e.googleAuthToken = function (interactive) {
+      e.authCalls.push({ interactive: Boolean(interactive), at: Date.now() });
+      return Promise.reject(new Error('The user turned off browser signin'));
+    };
+    e.webFlowError = 'The user did not approve access.';
+  });
+  try {
+    await (await connectButton(page)).click();
+    await expect(page.locator('.conn-err')).toBeVisible();
+    const flows = await glance.flows();
+    const windows = flows.filter((f) => f.interactive === true);
+    expect(windows.length).toBeGreaterThan(0);
+    expect((new URL(windows[0].url).searchParams.get('prompt') || '').split(' ')).toContain('consent');
+    const bag = await glance.storage();
+    expect(bag.googleTasksAuth || null).toBe(null);
+    expect(bag.googleConsentRequired && bag.googleConsentRequired.needed).toBe(true);
+    await expect(page.locator('#statusPill')).toHaveText('לא מחובר');
+  } finally {
+    // The worker outlives this test; later tests expect the stock hooks.
+    await glance.evaluateWorker(() => {
+      const e = globalThis.__glanceE2e;
+      if (e.savedGoogleAuthToken) e.googleAuthToken = e.savedGoogleAuthToken;
+      delete e.savedGoogleAuthToken;
+      delete e.webFlowError;
+    });
+  }
 });
 
 test('an expired implicit token tries prompt=none before Reconnect', async ({ glance }) => {

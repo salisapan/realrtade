@@ -148,7 +148,7 @@ const FlowPmfMetrics = (() => {
   // COUNTS only: an event name and a variant, never text, an address, a subject or a name. Nothing here
   // sends anything; a future upload of these counts goes through the same anonymous install-id pipe as
   // the weekly habit, and turning it on is the owner's decision with the privacy page changed in the same commit.
-  const EXPERIMENTS = { 'carry-next-move': { arms: ['A', 'B'] }, 'invoice-loop': { arms: ['A', 'B'] }, 'receipt-owed': { arms: ['A', 'B'] } };
+  const EXPERIMENTS = { 'carry-next-move': { arms: ['A', 'B'] }, 'invoice-loop': { arms: ['A', 'B'] }, 'receipt-owed': { arms: ['A', 'B'] }, 'refund-loop': { arms: ['A', 'B'] } };
   // Each event is one counter. A move's type is part of the name so the fold never needs free text.
   const AB_EVENTS = [
     'loop_stuck',              // a loop reached its fourth chase day with no answer (both arms)
@@ -171,7 +171,15 @@ const FlowPmfMetrics = (() => {
     'receipt_sent_seen',       // both: a receipt to that payer was seen going out (the person's file or the system's copy)
     'receipt_owed_released',   // B: the person said it was not needed
     'receipt_owed_past_due',   // B: still open on its chase day
-    'receipt_owed_reopened'    // B: the person reopened a receipt Glance had closed: the wrong-close signal
+    'receipt_owed_reopened',   // B: the person reopened a receipt Glance had closed: the wrong-close signal
+    // refund-loop (REFUND_LOOP, core/refund-loop.js): B carries a refund the person asked for until the credit lands;
+    // both arms count the refunds asked and the credits seen, so the rate compares carrying with not carrying.
+    'refund_asked',            // both: the person sent a refund request to a business
+    'refund_loop_shown',       // B: the refund line was shown
+    'refund_money_back',       // both: a card, bank or app credit from that merchant for that amount was seen
+    'refund_not_back_by_day',  // B: the merchant's day passed with no credit
+    'refund_released',         // B: the person let it go (store credit taken, or not worth it)
+    'refund_reopened'          // B: the person reopened a refund Glance had closed: the wrong-close signal
   ];
   function fnv(str) {
     let h = 2166136261 >>> 0;
@@ -225,6 +233,11 @@ const FlowPmfMetrics = (() => {
         receiptReleased: rate(g('receipt_owed_released'), g('receipt_owed_opened')),
         receiptPastDue: rate(g('receipt_owed_past_due'), g('receipt_owed_opened')),
         receiptWrongClose: rate(g('receipt_owed_reopened'), g('receipt_sent_seen')),
+        refundAsked: g('refund_asked'),
+        refundBack: rate(g('refund_money_back'), g('refund_asked')),
+        refundNotBack: rate(g('refund_not_back_by_day'), g('refund_loop_shown')),
+        refundReleased: rate(g('refund_released'), g('refund_loop_shown')),
+        refundWrongClose: rate(g('refund_reopened'), g('refund_money_back')),
         counts: Object.assign({}, c)
       };
     });

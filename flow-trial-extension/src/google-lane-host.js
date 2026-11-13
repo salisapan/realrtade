@@ -239,12 +239,32 @@ function noteGoogleAuthFailure(reason, account) {
     .then(() => chrome.storage.local.get([EVER_KEY, 'googleTasksAuth', 'googleWebAuth', 'glanceLaneUndo']))
     .then((bag) => {
       if (!priorGoogleRecord(bag)) return null;
+      const why = String(reason || '');
+      // A remote revoke / dead token: drop the stored grant so the popup shows
+      // Connect Google (same keys Disconnect clears). wrong-account only drops
+      // the pinned mailbox; missing-scope keeps Reconnect.
+      const clearGrant = why === '401' || why === 'revoked' || why === 'invalid_token' || why === 'invalid_grant' || why === 'not signed in';
+      if (clearGrant) {
+        const bridge = typeof globalThis !== 'undefined' ? globalThis.FlowGoogleAccess : null;
+        if (bridge && typeof bridge.clearRevoked === 'function') {
+          return Promise.resolve().then(() => bridge.clearRevoked(why)).catch(() => null);
+        }
+        return chrome.storage.local.remove([
+          'googleTasksAuth',
+          'googleWebAuth',
+          RECONNECT_KEY,
+          EVER_KEY,
+          'googleGrantedScopes',
+          'googleProfile',
+          CONNECTED_ACCOUNT_KEY,
+          'glanceOwnNames'
+        ]);
+      }
       const ever = bag && everConnectedRecord(bag[EVER_KEY]);
-      const flag = { needed: true, reason: String(reason || 'auth') };
+      const flag = { needed: true, reason: why || 'auth' };
       if (account) flag.account = String(account);
       const patch = { [RECONNECT_KEY]: flag };
       if (!ever) patch[EVER_KEY] = { connected: true };
-      const why = String(reason || '');
       const clearConnected = why === 'wrong-account' || why === 'account-unverified';
       return chrome.storage.local.set(patch).then(() => {
         if (!clearConnected) return null;
@@ -535,6 +555,8 @@ async function resolveExistingTaskList() {
 // The owner's off switches live in one storage object. A missing key is off.
 async function laneSwitchOn(name) {
   try {
+    // A Chrome Web Store install (Chrome adds update_url) never turns a Labs switch on, whatever storage says.
+    if (chrome.runtime && typeof chrome.runtime.getManifest === 'function' && (chrome.runtime.getManifest() || {}).update_url) return false;
     const bag = await chrome.storage.local.get({ glanceSwitches: {} });
     return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
   } catch (e) { return false; }
