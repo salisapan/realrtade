@@ -3686,30 +3686,36 @@
   async function renderLog() {
     beginRender();
     const revAtLog = whyRev;
+    let snapshot = null;
     try {
     paintActivityShell();
     await ensureOutlookMigrated();
-    const s = await FlowStorage.get();
-    renderWeekStat(s);
-    renderCloseQuality(s);
-    renderQuiet(s);
-    await renderStillOpenQuality(s);
-    await renderLearned();
-    await renderLedger();
-    renderSensitivity(s);
-    await renderMemoryInsight(s);
-    renderReferral(s);
+    snapshot = await FlowStorage.get();
     const host = document.getElementById('log-list');
     const empty = document.getElementById('log-empty');
     host.replaceChildren();
     // "shown" entries are noise once the outcome is known; the log should read as
     // a record of what happened, not a stream of every evaluation.
-    const rows = activityRows(s.log || []);
+    const rows = activityRows(snapshot.log || []);
     empty.hidden = rows.length > 0;
     rows.forEach((e) => host.appendChild(logRow(e)));
-    const whyNow = (revAtLog !== whyRev && state) ? ((state.glanceWhyList) || whyRowsFrom(state)) : whyRowsFrom(s);
+    const whyNow = (revAtLog !== whyRev && state) ? ((state.glanceWhyList) || whyRowsFrom(state)) : whyRowsFrom(snapshot);
     paintWhyList(host, whyNow);
     } finally { endRender(); }
+    // The list and its scroll are already on screen. The summaries below must
+    // not hold that paint: a slow read used to leave a new row off the list.
+    if (!snapshot) return;
+    try {
+      renderWeekStat(snapshot);
+      renderCloseQuality(snapshot);
+      renderQuiet(snapshot);
+      renderSensitivity(snapshot);
+      renderReferral(snapshot);
+      await renderStillOpenQuality(snapshot);
+      await renderLearned();
+      await renderLedger();
+      await renderMemoryInsight(snapshot);
+    } catch (e) { /* the list already shows the rows */ }
   }
 
   // A Google Task undo used to append a second row and leave the written
