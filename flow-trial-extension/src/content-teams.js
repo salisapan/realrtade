@@ -65,12 +65,13 @@
     try { chrome.runtime.sendMessage({ type: 'flow:surface-health', id: 'teams', ok: ok, reason: reason || null }, () => void chrome.runtime.lastError); } catch (e) { /* page closing */ }
   }
 
-  function whyNot(reason, key) {
-    const line = '[Glance] whyNotShown: ' + reason;
+  function whyNot(reason, detail) {
+    const extra = detail ? ' ' + String(detail) : '';
+    const line = '[Glance] whyNotShown: ' + reason + extra;
     try { console.info(line); } catch (e) { /* no console */ }
     try {
       const node = document.querySelector('[data-glance-quiet]');
-      if (node) { node.hidden = false; node.textContent = line + (key ? ' ' + key : ''); }
+      if (node) { node.hidden = false; node.textContent = line; }
     } catch (e) { /* gone */ }
   }
 
@@ -131,22 +132,48 @@
     finish.catch(() => whyNot('draft-failed', key)).finally(() => { inflight.delete(key); });
   }
 
+  async function offerLoop(main, last, party, threadId) {
+    const text = last.text || P.textOf(last.node);
+    const id = last.id || '';
+    const key = (threadId || '') + '\n' + id + '\n' + text;
+    if (!text || inflight.has(key)) return;
+    inflight.add(key);
+    const input = P.judgeInput(last, party, { oneToOne: true, group: false, key: key, now: Date.now(), selfChat: true });
+    const asLoop = Object.assign({}, input, { fromMe: false, own: false, selfChat: true, oneToOne: true, group: false });
+    const finish = (async () => {
+      if (typeof FlowChatTaskCard === 'undefined') { whyNot('card-missing', threadId); return; }
+      FlowChatTaskCard.sync(key);
+      const offered = await FlowChatTaskCard.offer(asLoop);
+      if (!(offered && offered.shown)) whyNot((offered && offered.reason) || 'silence', threadId);
+    })();
+    finish.catch(() => whyNot('draft-failed', threadId)).finally(() => { inflight.delete(key); });
+    await finish;
+  }
+
   async function scan() {
     if (!P.page(location.href) && !isFixturePath()) { whyNot('not-teams-page', location.href); return; }
     if (isFixturePath() && !(await readDevFlag())) { whyNot('dev-fixture-off', location.href); return; }
     const main = root();
+    const found = P.identify(location.href, main);
+    if (!found.id) {
+      report(false, 'chat-not-identified');
+      whyNot('chat-not-identified', P.missingSignals(found.signals));
+      return;
+    }
     const kind = P.threadKind(main);
-    if (kind === 'group') { report(true); whyNot('not-one-to-one', P.titleOf(main)); return; }
+    if (kind === 'group') { report(true); whyNot('not-one-to-one', found.signals.title || found.id); return; }
     const oneToOne = kind === 'dm';
-    const title = P.titleOf(main);
-    const threadId = P.threadIdFor(location.href, title, main);
-    if (!threadId) { report(false, 'chat-not-identified'); whyNot('chat-not-identified', location.href); return; }
+    const title = found.signals.title || P.titleOf(main);
     const list = await loadMessages(main);
-    if (!list.length) { report(false, 'no-messages-recognised'); whyNot('no-messages-recognised', location.href); return; }
+    if (!list.length) { report(false, 'no-messages-recognised'); whyNot('no-messages-recognised', 'bubbles=0'); return; }
     report(true);
-    const party = { name: title || 'Teams chat', email: null };
+    const party = { name: P.partyName(title) || 'Teams chat', email: null };
     try { document.documentElement.setAttribute('data-glance-lane-teams', 'on'); } catch (e) { /* */ }
-    await maybeAct(main, list, party, oneToOne, threadId);
+    if (found.signals.self) {
+      await offerLoop(main, list[list.length - 1], party, found.id);
+      return;
+    }
+    await maybeAct(main, list, party, oneToOne, found.id);
   }
 
   function schedule() {

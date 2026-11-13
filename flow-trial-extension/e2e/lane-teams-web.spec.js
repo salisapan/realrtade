@@ -55,6 +55,35 @@ async function injectTeamsLane(glance, page) {
   for (const file of files) await page.addScriptTag({ url: base + file });
 }
 
+function bodyOf(html) {
+  const m = String(html || '').match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  return m ? m[1] : html;
+}
+
+async function openV2(glance, html, switches) {
+  if (server.reset) server.reset();
+  server.setAccount('me@x.com');
+  await glance.seedGmail(Object.assign({
+    googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' },
+    glanceDevFixture: true
+  }, switches ? { glanceSwitches: switches } : {}));
+  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
+  const page = await glance.context.newPage();
+  const logs = [];
+  page.on('console', (msg) => logs.push(msg.text()));
+  const shell = String(html || '').indexOf('chat-pane-main') >= 0 && String(html || '').indexOf('chat-title') < 0 && String(html || '').indexOf('chat-header-title') < 0;
+  await page.goto('chrome-extension://' + glance.extensionId + '/dev/teams-fixture.html' + (shell ? '?shell=1' : ''), { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.evaluate((inner) => { document.body.innerHTML = inner; }, bodyOf(html));
+  await injectTeamsLane(glance, page);
+  page.__glanceLogs = logs;
+  return page;
+}
+
+async function openShell(glance) {
+  const page = await openV2(glance, '<div role="main" data-tid="chat-pane-main"></div><p data-glance-quiet hidden></p>', { CHAT_TASK_CARD: true });
+  return page;
+}
+
 async function openTeams(glance, bodyRow, switches) {
   if (server.reset) server.reset();
   server.setAccount('me@x.com');
@@ -310,6 +339,42 @@ test('registered Teams script injects on teams.live.com/v2, including a nested f
     fs.rmSync(extDir, { recursive: true, force: true });
     fs.rmSync(userData, { recursive: true, force: true });
   }
+});
+
+test('teams.live.com v2 self-chat: the bubble already on screen becomes a card', async ({ glance }) => {
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures/teams-v2-self.html'), 'utf8');
+  const page = await openV2(glance, html, { CHAT_TASK_CARD: true });
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  expect((page.__glanceLogs || []).some((line) => line.indexOf('chat-not-identified') >= 0)).toBe(false);
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+});
+
+test('teams.live.com v2 one-to-one: the existing last bubble becomes a card', async ({ glance }) => {
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures/teams-v2-dm.html'), 'utf8');
+  const page = await openV2(glance, html, { CHAT_TASK_CARD: true });
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+});
+
+test('teams.live.com v2: switching chats evaluates the bubble already in the new chat', async ({ glance }) => {
+  const selfHtml = fs.readFileSync(path.join(__dirname, 'fixtures/teams-v2-self.html'), 'utf8');
+  const dmHtml = fs.readFileSync(path.join(__dirname, 'fixtures/teams-v2-dm.html'), 'utf8');
+  const page = await openV2(glance, selfHtml, { CHAT_TASK_CARD: true });
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.evaluate((inner) => { document.body.innerHTML = inner; }, bodyOf(dmHtml));
+  await page.evaluate(() => {
+    if (globalThis.__glanceChatSurfaces && globalThis.__glanceChatSurfaces.teams) return globalThis.__glanceChatSurfaces.teams.scan();
+    return null;
+  });
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('[data-tid="chat-header-title"]')).toHaveText('Dana Cohen');
+});
+
+test('teams.live.com v2: a shell with no chat logs the missing signals', async ({ glance }) => {
+  const page = await openShell(glance);
+  await expect.poll(() => (page.__glanceLogs || []).some((line) => line.indexOf('[Glance] whyNotShown: chat-not-identified') >= 0 && line.indexOf('urlChatId=missing') >= 0 && line.indexOf('title=missing') >= 0 && line.indexOf('headerAria=missing') >= 0), { timeout: 20000 }).toBe(true);
+  const line = (page.__glanceLogs || []).find((item) => item.indexOf('chat-not-identified') >= 0) || '';
+  expect(line).not.toMatch(/תוכל|סיכום|review the draft/);
+  await expect(page.locator(CARD)).toHaveCount(0);
 });
 
 test('a reply draft is inserted in the composer and is not sent', async ({ glance }) => {

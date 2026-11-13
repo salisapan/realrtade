@@ -41,6 +41,29 @@ const vague = P.judgeInput({ author: 'them', text: 'Thanks, got it!', id: 'v' },
 check('unsure line is still shaped for silence', vague.text === 'Thanks, got it!' && vague.fromMe === false);
 
 check('chat id from Teams URL', P.chatIdFromHref('https://teams.microsoft.com/l/chat/19%3aabc%40thread.v2/conversations') === '19:abc@thread.v2');
+check('v2 hash chat id', P.chatIdFromHref('https://teams.live.com/v2/#/l/chat/19%3Aabc%40thread.v2/conversations') === '19:abc@thread.v2');
+check('v2 self notes id', P.chatIdFromHref('https://teams.live.com/v2/#/conversations/48:notes') === '48:notes');
+
+const selfHtml = '<div role="main" data-tid="chat-pane-main"><div data-tid="chat-header"><h2 data-tid="chat-title" role="heading" aria-level="2" aria-label="sali sapan (You)">sali sapan (You)</h2></div>' +
+  '<div data-tid="message-pane-list"><div data-tid="message-author-name">You</div>' +
+  '<div data-tid="chat-pane-message" id="m-self" role="group" aria-label="You"><div data-tid="message-body"><p dir="auto">תוכל לשלוח לי את הסיכום עד מחר?</p></div></div></div></div>';
+const self = dom(selfHtml);
+const selfRows = P.messagesFromDom(self);
+const selfId = P.identify('https://teams.live.com/v2/', self);
+check('v2 self header is the chat', selfId.id === 'teams:title:sali sapan (you)' && selfId.signals.self === true && selfId.signals.title === 'sali sapan (You)', selfId);
+check('v2 self bubble is read', selfRows.length === 1 && selfRows[0].author === 'me' && /סיכום/.test(selfRows[0].text), selfRows[0]);
+
+const dm = dom('<div role="main" data-tid="chat-pane-main" data-conversation-id="19:dana@thread.v2"><div data-tid="chat-header" aria-label="Dana Cohen"><span data-tid="chat-header-title">Dana Cohen</span></div>' +
+  '<div data-tid="message-author-name">Dana Cohen</div><div data-tid="chat-pane-message" id="m-dm"><div data-tid="message-body-content" dir="auto">Can you review the draft by Wednesday?</div></div></div>');
+const dmRows = P.messagesFromDom(dm);
+const dmId = P.identify('https://teams.live.com/v2/', dm);
+check('v2 one-to-one uses the header and the dom id', dmId.signals.domChatId === '19:dana@thread.v2' && dmId.signals.self === false && dmId.signals.title === 'Dana Cohen', dmId);
+check('v2 one-to-one bubble is them', dmRows.length === 1 && dmRows[0].author === 'them' && /review the draft/.test(dmRows[0].text), dmRows[0]);
+
+const blank = dom('<div role="main" data-tid="chat-pane-main"></div>');
+const missed = P.identify('https://teams.live.com/v2/', blank);
+check('a shell with no header is not a chat', missed.id === '');
+check('a miss names the missing signals and not the message', P.missingSignals(missed.signals) === 'urlChatId=missing domChatId=missing title=missing headerAria=missing' && P.missingSignals(missed.signals).indexOf('סיכום') < 0);
 
 if (failures) process.exit(1);
 console.log('teams-parse-corpus: all passed');

@@ -9,6 +9,8 @@ updated: 2026-11-13
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-11-13 · Teams web lane, after the live Gate on `d552e0e4`: a teams.live.com v2 self-chat ("(You)") and a one-to-one are identified from the header, the hash, or a conversation id in the DOM. The bubble already on screen is offered, including a self-chat. A miss logs the missing signals and not the message. Hosts stay optional. Gate: not run live on this head · Cursor · [[open-tasks]] row 69
+
 - 2026-11-13 · Teams web lane, after the live Gate on `771d48f4`: the registered script matches `teams.live.com` and `teams.microsoft.com` at the root and under `/v2/`, in every frame, and logs when it injects. Untick removes both optional hosts. They stay out of every other manifest key. No new Graph scope. Gate: not run live on this head · Cursor · [[open-tasks]] row 69
 
 - 2026-11-13 · Owner (Sali, «כן, להפעיל את Teams»): Teams web hosts `https://teams.microsoft.com/*` and `https://teams.live.com/*` are optional only. The Teams box asks for them on the click. The lane registers only after the grant, and stays quiet if they are refused or removed. No new Graph scope. Gate: not run live · Cursor · [[open-tasks]] row 69, `flow-landing/privacy.html`
