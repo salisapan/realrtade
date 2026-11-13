@@ -208,21 +208,12 @@ var GlanceCards = (function () {
     return card(lang, widgets);
   }
 
-  function draftProof(view, lang, opts) {
-    opts = opts || {};
+  function composeInserted(preview, lang) {
     var L = i18n();
-    var widgets = [
-      text(lang, L.t(lang, 'inDraft')),
-      text(lang, view && view.preview ? view.preview : '')
-    ];
-    if (view && view.id) widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)));
-    var undo = opts.draftId ? button(lang, 'undo', 'onComposeUndo', { draftId: String(opts.draftId), source: 'compose' }) : null;
-    if (undo) widgets.push(undo);
+    var widgets = [text(lang, L.t(lang, 'draftInserted'))];
+    if (preview) widgets.push(text(lang, preview));
+    widgets.push(text(lang, L.t(lang, 'draftNoUndo')));
     return card(lang, widgets);
-  }
-
-  function editedDraft(lang) {
-    return card(lang, [text(lang, i18n().t(lang, 'editedDraft'))]);
   }
 
   function homepage(next, lang, buildSha) {
@@ -256,8 +247,7 @@ var GlanceCards = (function () {
     grant: grant,
     quiet: quiet,
     composeProposal: composeProposal,
-    draftProof: draftProof,
-    editedDraft: editedDraft,
+    composeInserted: composeInserted,
     spottedUnsupported: spottedUnsupported,
     planTypeLabel: planTypeLabel,
     homepage: homepage,

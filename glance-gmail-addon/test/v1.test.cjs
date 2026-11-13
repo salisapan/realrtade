@@ -640,7 +640,10 @@ function scopesRequiredByManifest(manifest, hostSource) {
     if (gmail.currentMessageAccess === 'metadata') add('gmail.addons.current.message.metadata');
     else add('gmail.addons.current.message.readonly');
   }
-  if (gmail.composeTrigger) add('gmail.addons.current.action.compose');
+  if (gmail.composeTrigger) {
+    add('gmail.addons.current.action.compose');
+    if (gmail.composeTrigger.draftAccess === 'METADATA') add('gmail.addons.current.message.metadata');
+  }
   services.forEach((service) => {
     if (service.serviceId === 'tasks' || service.userSymbol === 'Tasks') add('tasks');
     if (service.serviceId === 'calendar' || service.userSymbol === 'Calendar') add('calendar.events');
@@ -658,16 +661,26 @@ console.log('\n--- host boundaries ---');
   const expected = scopesRequiredByManifest(manifest, host);
   check('every manifest flag has its scope, and there are no extras', JSON.stringify(scopes) === JSON.stringify(expected), { scopes: scopes, expected: expected });
   check('useLocaleFromApp requires script.locale', expected.indexOf(scopeUrl('script.locale')) !== -1 && scopes.indexOf(scopeUrl('script.locale')) !== -1);
-  check('message open reads the body, not metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
-  check('compose trigger requires the compose scope', manifest.addOns.gmail.composeTrigger && manifest.addOns.gmail.composeTrigger.draftAccess === 'METADATA' && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) !== -1);
+  check('message open still uses current.message.readonly and compose has metadata', scopes.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1 && scopes.indexOf(scopeUrl('gmail.addons.current.message.metadata')) !== -1 && manifest.addOns.gmail.composeTrigger.draftAccess === 'METADATA');
+  check('compose trigger requires the compose scope', manifest.addOns.gmail.composeTrigger && scopes.indexOf(scopeUrl('gmail.addons.current.action.compose')) !== -1);
   check('compose trigger runs onGmailCompose', manifest.addOns.gmail.composeTrigger.selectActions[0].runFunction === 'onGmailCompose');
-  check('compose scope is the add-on action, not gmail.compose or gmail.send', scopes.indexOf(scopeUrl('gmail.compose')) === -1 && scopes.indexOf(scopeUrl('gmail.send')) === -1 && scopes.indexOf(scopeUrl('gmail.modify')) === -1);
+  const absent = ['gmail.modify', 'gmail.readonly', 'gmail.metadata', 'gmail.compose', 'gmail.send'];
+  check('mail.google.com/ and full Gmail scopes are absent',
+    JSON.stringify(manifest).indexOf('mail.google.com/') === -1 &&
+    absent.every(function (id) { return scopes.indexOf(scopeUrl(id)) === -1; }),
+    scopes);
 
   const withCompose = JSON.parse(JSON.stringify(manifest));
   withCompose.addOns.gmail.composeTrigger = { draftAccess: 'NONE' };
   withCompose.oauthScopes = scopes.slice();
   const composeNeed = scopesRequiredByManifest(withCompose, host);
   check('a compose trigger would require the compose scope', composeNeed.indexOf(scopeUrl('gmail.addons.current.action.compose')) !== -1);
+  check('draft access NONE does not require the add-on metadata scope', composeNeed.indexOf(scopeUrl('gmail.addons.current.message.metadata')) === -1);
+  const metadataDraft = JSON.parse(JSON.stringify(manifest));
+  metadataDraft.addOns.gmail.composeTrigger = { draftAccess: 'METADATA' };
+  delete metadataDraft.addOns.gmail.currentMessageAccess;
+  const metadataDraftNeed = scopesRequiredByManifest(metadataDraft, host);
+  check('METADATA draft access requires the add-on metadata scope', metadataDraftNeed.indexOf(scopeUrl('gmail.addons.current.message.metadata')) !== -1 && metadataDraftNeed.indexOf(scopeUrl('gmail.addons.current.message.readonly')) !== -1);
 
   const metadataOnly = JSON.parse(JSON.stringify(manifest));
   metadataOnly.addOns.gmail.currentMessageAccess = 'metadata';
@@ -686,6 +699,7 @@ console.log('\n--- host boundaries ---');
   check('locale comes from the app', manifest.addOns.common.useLocaleFromApp === true);
   check('the script time zone is only the Asia/Jerusalem fallback', manifest.timeZone === 'Asia/Jerusalem');
   check('host never sends mail', !/gmail\.send|sendEmail|Drafts\.send|MailApp|createDraft|\.send\(/.test(host));
+  check('compose does not call GmailApp.getDraft or setPlainBody', !/GmailApp\.getDraft|setPlainBody|setUpdateDraftBodyValue/.test(host));
   check('host does not patch a task', !/Tasks\.Tasks\.patch|Tasks\.Tasks\.update/.test(host));
   check('host reads the task back through performCreate', host.indexOf('performCreate') !== -1 && host.indexOf('performUndo') !== -1);
   check('host reads an event back through performCreateEvent', host.indexOf('performCreateEvent') !== -1 && host.indexOf('performUndoEvent') !== -1);
@@ -852,6 +866,17 @@ console.log('\n--- message path parity ---');
         nav.updateCard = function (card) { nav.card = card; return nav; };
         return nav;
       },
+      ContentType: { TEXT: 'text' },
+      UpdateDraftBodyType: { IN_PLACE_INSERT: 'IN_PLACE_INSERT' },
+      newUpdateDraftBodyAction: function () {
+        const action = { contents: [], type: '' };
+        action.addUpdateContent = function (content, contentType) {
+          action.contents.push({ content: String(content || ''), contentType: contentType });
+          return action;
+        };
+        action.setUpdateType = function (type) { action.type = type; return action; };
+        return action;
+      },
       newActionResponseBuilder: function () {
         const response = { card: null };
         response.setNavigation = function (nav) { response.card = nav.card; return response; };
@@ -859,10 +884,9 @@ console.log('\n--- message path parity ---');
         return response;
       },
       newUpdateDraftActionResponseBuilder: function () {
-        const response = { body: '', card: null };
-        response.setUpdateDraftBodyValue = function (value) { response.body = String(value || ''); return response; };
-        response.setUpdateCard = function (card) { response.card = card; return response; };
-        response.build = function () { return { draft: { body: response.body }, card: response.card }; };
+        const response = { bodyAction: null };
+        response.setUpdateDraftBodyAction = function (action) { response.bodyAction = action; return response; };
+        response.build = function () { return { draftAction: response.bodyAction }; };
         return response;
       }
     }
@@ -894,7 +918,6 @@ console.log('\n--- message path parity ---');
   const openCompose = vm.runInContext('onGmailCompose', sandbox);
   const doIt = vm.runInContext('onDoIt', sandbox);
   const composeDoIt = vm.runInContext('onComposeDoIt', sandbox);
-  const composeUndo = vm.runInContext('onComposeUndo', sandbox);
   const undo = vm.runInContext('onUndo', sandbox);
   const contentTitle = vm.runInContext('Glance.intent.contentTitle', sandbox);
   const prepareText = vm.runInContext('Glance.intent.prepareText', sandbox);
@@ -1662,16 +1685,13 @@ console.log('\n--- message path parity ---');
     date: new Date('2026-10-15T08:00:00Z')
   };
   state.messages.draft1 = gmailMessage(draftMsg);
-  state.drafts = { 'draft-1': { body: '' } };
-  sandbox.GmailApp.getDraft = function (id) {
-    const row = state.drafts[id] || { body: '' };
-    return {
-      getPlainBody: function () { return row.body; },
-      setPlainBody: function (value) { row.body = String(value || ''); state.drafts[id] = row; }
-    };
+  let draftReads = 0;
+  sandbox.GmailApp.getDraft = function () {
+    draftReads += 1;
+    throw new Error('getDraft needs a mailbox scope');
   };
   const composeEvent = {
-    gmail: { messageId: 'draft1', accessToken: 'token', threadId: 'threaddraft', draftId: 'draft-1', draftBody: '' },
+    gmail: { messageId: 'draft1', accessToken: 'token', threadId: 'threaddraft', draftId: 'draft-1' },
     commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' }
   };
   const composeCard = openCompose(composeEvent)[0];
@@ -1680,15 +1700,23 @@ console.log('\n--- message path parity ---');
   const inserted = composeDoIt(Object.assign({}, composeEvent, {
     parameters: { draftId: 'draft-1', source: 'compose' }
   }));
-  check('compose Do it inserts the draft body and the read-back matches', state.drafts['draft-1'].body.indexOf('Hi') !== -1 && inserted.draft.body === state.drafts['draft-1'].body, state.drafts['draft-1']);
-  const proofButtons = buttonsOf(inserted.card);
-  check('compose proof card has undo', proofButtons.length === 1 && proofButtons[0].action === 'onComposeUndo', proofButtons);
-  state.drafts['draft-1'].body = state.drafts['draft-1'].body + ' edited';
-  const refusedDraft = composeUndo(Object.assign({}, composeEvent, { parameters: { draftId: 'draft-1', source: 'compose' } }));
-  check('compose undo refuses when the draft was edited', plain(linesOf(refusedDraft.card)[0]).indexOf("won't undo") !== -1, linesOf(refusedDraft.card));
-  state.drafts['draft-1'].body = inserted.draft.body;
-  const undoneDraft = composeUndo(Object.assign({}, composeEvent, { parameters: { draftId: 'draft-1', source: 'compose' } }));
-  check('compose undo clears the draft when the read-back still matches', state.drafts['draft-1'].body === '' && plain(linesOf(undoneDraft.card)[0]) === 'Undone.', state.drafts['draft-1']);
+  const insertedContent = inserted.draftAction && inserted.draftAction.contents && inserted.draftAction.contents[0];
+  check('compose Do it inserts at the cursor and does not read the draft',
+    draftReads === 0 &&
+    inserted.draftAction &&
+    inserted.draftAction.type === 'IN_PLACE_INSERT' &&
+    insertedContent &&
+    insertedContent.contentType === 'text' &&
+    insertedContent.content.indexOf('Hi') !== -1 &&
+    !inserted.card,
+    inserted);
+  const after = openCompose(composeEvent)[0];
+  const afterLines = linesOf(after).join('\n');
+  check('compose does not offer Undo after insert',
+    buttonsOf(after).length === 0 &&
+    afterLines.indexOf('does not undo') !== -1 &&
+    afterLines.indexOf('Handled') === -1,
+    afterLines);
   check('compose does not send', !/gmail\.send|sendEmail|Drafts\.send|MailApp|createDraft|\.send\(/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));
 }
 

@@ -11269,8 +11269,8 @@ var GlanceI18n = (function () {
       editedEvent: "The event was edited, so I won't undo it",
       grant: 'Grant permission',
       draftReady: 'Draft ready in Gmail.',
-      inDraft: 'In your reply draft.',
-      editedDraft: "The draft was edited, so I won't undo it"
+      draftInserted: 'Inserted at the cursor. Edit it in Gmail.',
+      draftNoUndo: 'Glance does not read this draft back, and does not undo it.'
     },
     he: {
       doIt: 'בצע',
@@ -11297,8 +11297,8 @@ var GlanceI18n = (function () {
       editedEvent: 'האירוע נערך, אז לא אבטל אותו',
       grant: 'תנו הרשאה',
       draftReady: 'טיוטת תשובה מוכנה ב-Gmail.',
-      inDraft: 'בטיוטת התשובה.',
-      editedDraft: 'הטיוטה נערכה, אז לא אבטל אותה'
+      draftInserted: 'הוכנס במקום הסמן. ערכו אותו ב-Gmail.',
+      draftNoUndo: 'Glance לא קורא את הטיוטה בחזרה, ולא מבטל אותה.'
     }
   };
 
@@ -12713,21 +12713,12 @@ var GlanceCards = (function () {
     return card(lang, widgets);
   }
 
-  function draftProof(view, lang, opts) {
-    opts = opts || {};
+  function composeInserted(preview, lang) {
     var L = i18n();
-    var widgets = [
-      text(lang, L.t(lang, 'inDraft')),
-      text(lang, view && view.preview ? view.preview : '')
-    ];
-    if (view && view.id) widgets.push(text(lang, L.t(lang, 'id') + ': ' + L.isolateLtr(view.id)));
-    var undo = opts.draftId ? button(lang, 'undo', 'onComposeUndo', { draftId: String(opts.draftId), source: 'compose' }) : null;
-    if (undo) widgets.push(undo);
+    var widgets = [text(lang, L.t(lang, 'draftInserted'))];
+    if (preview) widgets.push(text(lang, preview));
+    widgets.push(text(lang, L.t(lang, 'draftNoUndo')));
     return card(lang, widgets);
-  }
-
-  function editedDraft(lang) {
-    return card(lang, [text(lang, i18n().t(lang, 'editedDraft'))]);
   }
 
   function homepage(next, lang, buildSha) {
@@ -12761,8 +12752,7 @@ var GlanceCards = (function () {
     grant: grant,
     quiet: quiet,
     composeProposal: composeProposal,
-    draftProof: draftProof,
-    editedDraft: editedDraft,
+    composeInserted: composeInserted,
     spottedUnsupported: spottedUnsupported,
     planTypeLabel: planTypeLabel,
     homepage: homepage,
