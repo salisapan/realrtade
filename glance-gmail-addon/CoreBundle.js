@@ -2002,6 +2002,8 @@ const FlowGoogleCloses = (() => {
 
   const CREATE_EN = /\b(?:please\s+)?(?:prepare|draft|write|issue|draw up|put together)\b(?:\s+\w+){0,5}\s+(?:a|an|the)\s+(quote|quotation|proposal|invoice|letter|decision log)\b/i;
   const CREATE_HE = /(?:תכין|תכינו|נא\s+להכין|להכין|תכתוב|תנסח|תוציא)\s+(הצעת\s+מחיר|הצעה|חשבונית|מכתב|סיכום\s+החלטה)/;
+  // "אפשר לקבל הצעת מחיר" and "בקשה להצעת מחיר" are the same ask without תכין.
+  const QUOTE_ASK_HE = /(?:אפשר\s+לקבל|(?<!לא\s)לקבל|בקשה\s+ל)\s*הצעת\s*מחיר/;
   const SHEET_EN = /\b(?:log|record|enter)\b[^.!?\n]{0,80}?\s+(?:in|into|on)\s+a\s+new\s+(?:google\s+)?(?:spreadsheet|sheet)\b/i;
   const SHEET_HE = /(?:תרשום|רשום|לרשום)\s+בגיליון\s+חדש/;
   const SHEET_EXISTING = /\b(?:the|our|my)\s+(?:\w+\s+){0,3}(?:spreadsheet|sheet|tracker|workbook)\b|הגיליון\s+ה|בגיליון\s+ה/i;
@@ -2161,6 +2163,7 @@ const FlowGoogleCloses = (() => {
   }
 
   function artifactFromCreate(text) {
+    if (QUOTE_ASK_HE.test(text)) return 'quote';
     const he = text.match(CREATE_HE);
     if (he) {
       const word = he[1].replace(/\s+/g, ' ');
