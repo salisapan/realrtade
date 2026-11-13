@@ -136,6 +136,7 @@ function danaRoutes(readBack) {
   check('background.js has one lane hook', hooks.length === 1 && bg.indexOf('outlook-contacts.js') < 0, hooks);
   const page = fs.readFileSync(path.join(__dirname, '../src/lane-ms-page.js'), 'utf8');
   check('lane page paints contact draft', page.indexOf('flow-lane-draft') >= 0 && page.indexOf('Draft ready') >= 0);
+  check('You send is the contacts lane only', page.indexOf("res.connectorId === 'outlookContacts' && res.draft && res.posted === false") >= 0 && page.indexOf("status.textContent = 'Not posted.'") >= 0);
 
   if (failures) process.exit(1);
   console.log('outlook-contacts-corpus: all passed');
