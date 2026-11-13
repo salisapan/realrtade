@@ -37,3 +37,4 @@ jobs:
           TZ=UTC node glance-outlook-addin/test/behavior.test.cjs
           TZ=Asia/Jerusalem node glance-outlook-addin/test/addin.test.cjs
           TZ=Asia/Jerusalem node glance-outlook-addin/test/behavior.test.cjs
+          node glance-outlook-addin/test/test-manifest.test.cjs
