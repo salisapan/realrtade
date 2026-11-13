@@ -66,7 +66,7 @@ check('stray digit in title does not block price stripping', (() => {
 check('worker imports style-profile for lane writes', /style-profile\.js/.test(host));
 check('googleDocFull verify uses Drive files API', /connectorId === 'googleDocFull'/.test(host) && /drive\/v3\/files/.test(host));
 check('gmail-new-file verify regex restored', /google\(DriveSave\|Doc\|SheetAppend\|NewFile\)/.test(host));
-check('page gates full-document plan on FULL_DOCUMENT_CLOSE', /FULL_DOCUMENT_CLOSE === true/.test(gmail));
+check('page gates full-document plan on FULL_DOCUMENT_CLOSE', /glanceSwitchOn\('FULL_DOCUMENT_CLOSE'\)/.test(gmail) && /glanceLabsLocked\(\)/.test(gmail));
 check('previewOnly false would fail preview receipt path', !/previewOnly:\s*false/.test(gmail));
 check('undo learning only on successful undo', /if \(undone && undone\.ok\)/.test(gmail) && /type: 'undo'/.test(gmail));
 check('Do It emits approved learning event', /type: 'approved'/.test(gmail));

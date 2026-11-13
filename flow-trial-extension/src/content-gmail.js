@@ -2332,7 +2332,7 @@ function glanceUiCopy(kind) {
     // A new empty Google Doc, Sheet or Slides deck asked for by name ("Can you create a shared doc called
     // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
     // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
-    if (inboundMail && usingGoogle && await showFullDocumentChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
+    if (usingGoogle && await showFullDocumentChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showGoogleContactsChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showRecurringChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
@@ -3344,10 +3344,7 @@ function glanceUiCopy(kind) {
   // A full quote/proposal Doc in the person's writing style (switch FULL_DOCUMENT_CLOSE, off).
   // One Do It creates the Doc for preview; Glance never sends mail.
   async function showFullDocumentChip(message, c) {
-    try {
-      const st = await FlowStorage.get();
-      if (glanceLabsLocked() || !(st && st.glanceSwitches && st.glanceSwitches.FULL_DOCUMENT_CLOSE === true)) return false;
-    } catch (e) { return false; }
+    if (glanceLabsLocked() || !(await glanceSwitchOn('FULL_DOCUMENT_CLOSE'))) return false;
     const lang = mailLanguage({ bodyText: c.text });
     let styleSummary = null;
     try {
@@ -3356,6 +3353,7 @@ function glanceUiCopy(kind) {
       }
     } catch (e) { styleSummary = null; }
     const template = await readCompanyTemplate();
+    const started = Date.now();
     let plan = null;
     try {
       plan = await sendRuntime(Object.assign({
@@ -3366,6 +3364,7 @@ function glanceUiCopy(kind) {
         companyTemplate: template
       }, laneAccountContext()));
     } catch (e) { plan = null; }
+    try { console.info('[Glance] full-document plan ms', Date.now() - started); } catch (e) { /* no console */ }
     if (!plan || plan.action !== 'offer' || !plan.built || plan.built.blank) return false;
     const he = lang === 'he';
     const title = (plan.built && plan.built.title) || (plan.googleClose && plan.googleClose.templateName) || 'Document';
@@ -4359,26 +4358,36 @@ function glanceUiCopy(kind) {
     return (g && g.artifact) || (ctx && ctx.process && ctx.process.id) || 'unknown';
   }
 
-  let userContextSwitchOn = null;
-  async function userContextEnabled() {
-    if (userContextSwitchOn != null) return userContextSwitchOn;
+  // FlowStorage.get() only returns its own defaults, so a Labs row stored in
+  // glanceSwitches is invisible there. Read the same object the popup writes,
+  // on every event, so turning the row on is seen without reloading Gmail.
+  async function glanceSwitchOn(name) {
+    if (glanceLabsLocked()) return false;
     try {
-      const st = await FlowStorage.get();
-      userContextSwitchOn = !glanceLabsLocked() && !!(st && st.glanceSwitches && st.glanceSwitches.USER_CONTEXT_WRITER === true);
-    } catch (e) { userContextSwitchOn = false; }
-    return userContextSwitchOn;
+      const bag = await chrome.storage.local.get({ glanceSwitches: {} });
+      return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
+    } catch (e) { return false; }
+  }
+
+  async function userContextEnabled() {
+    if (glanceLabsLocked()) return false;
+    return glanceSwitchOn('USER_CONTEXT_WRITER');
   }
 
   function userContextEvent(ev) {
     if (!chromeLive()) return;
-    userContextEnabled().then((on) => {
+    userContextEnabled().then(async (on) => {
       if (!on) return;
-      const lane = laneAccountContext();
+      let accountKey = '';
+      try {
+        const lane = laneAccountContext();
+        accountKey = lane.tabAccount || await readStoredOwnEmail() || '';
+      } catch (e) { accountKey = ''; }
       try {
         chrome.runtime.sendMessage({
           type: 'flow:user-context-event',
           event: ev,
-          accountKey: lane.tabAccount || 'default'
+          accountKey: accountKey || 'default'
         });
       } catch (e) { /* worker off */ }
     });
@@ -5314,6 +5323,7 @@ function glanceUiCopy(kind) {
         if (result && result.ok) {
           if (done.replaceChildren) done.replaceChildren(el('span', 'flow-chip-label', result.written || ''));
           noteLaneTaskUndone(messageNode, messageId, record);
+          userContextEvent({ type: 'undo', partyKey: 'unknown', intentFamily: 'task', at: new Date().toISOString() });
           return;
         }
         if (result && result.partial) {
@@ -5464,6 +5474,12 @@ function glanceUiCopy(kind) {
           FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: messageId, reason: 'undo' })
             .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
         }
+        userContextEvent({
+          type: 'undo',
+          partyKey: (row.sender && (row.sender.email || row.sender)) || 'unknown',
+          intentFamily: row.processId || 'task',
+          at: new Date().toISOString()
+        });
         done.replaceChildren(el('span', 'flow-chip-label', (result && result.written) || copy.undoneLine));
         const mark = typeof FlowStorage.markGoogleTaskUndone === 'function'
           ? FlowStorage.markGoogleTaskUndone(messageId, copy.ref, row.threadId)
@@ -5797,6 +5813,15 @@ function glanceUiCopy(kind) {
       noteLaneOutcome(results);
       return;
     }
+    if (succeeded.some((r) => r && r.response && r.response.proof && r.response.proof.fetchedBack === true)) {
+      userContextEvent({
+        type: 'approved',
+        partyKey: userContextParty(ctx),
+        intentFamily: userContextFamily(ctx),
+        fetchedBack: true,
+        at: new Date().toISOString()
+      });
+    }
 
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
@@ -5876,6 +5901,7 @@ function glanceUiCopy(kind) {
           writeLaneUndoRow(ctx.legacyMessageId || ctx.messageId, laneUndoStepsOf(left), { partial: left.length < counted.length, total: counted.length }, ctx.laneIds);
           FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
           FlowStorage.calibrate('undo', ctx.intent.type);
+          userContextEvent({ type: 'undo', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() });
           // The full close is no longer true, so a later message in this
           // matter may speak again. Independent of the receipt text below.
           if (typeof FlowCloseMemory !== 'undefined') {
