@@ -1,7 +1,8 @@
 ---
 tags: [decisions]
-updated: 2026-10-28
+updated: 2026-11-13
 ---
+- 2026-11-13 · Official Messenger and Instagram messaging, code only, both switches off (`META_OFFICIAL_MESSAGING`, `GLANCE_META_OFFICIAL`). A webhook is accepted only with `X-Hub-Signature-256`. A reply is sent only after Do It and is Handled only when read back. Meta cannot unsend; the card says so. No Meta app, no webhook registration, no manifest change, no deploy. Gate: not run · Cursor agent · `docs/glance-ai/meta-official-messaging.md`, [[open-tasks]] row 87
 - 2026-10-28 · verify-ca1-r9 on PR #241: corpora assert `forms.body` absent (google-form, recurring-reminder-wiring, google-web-auth); `google-oauth-scopes-exact-corpus.cjs` pins `FlowGoogleConfig.SCOPES` ⊆ seven-scope allowlist; chat-draft fixture clock restored to 2026-10-14 (e2e patches Oct 27 in spec); restored `token-relay` + `understand.js` from merge base; D5 rows in `hebrew-weekday-explicit-date-corpus.cjs` and `intent-actions-corpus.cjs`; full corpus sweep wired in `verify_trial_install.py`. Gate: not run live.
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].

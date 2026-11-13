@@ -583,6 +583,11 @@ skipped, never called):
    (default 300) are the cost caps. `docs/ai-ladder.md` §7.
 7. `MISTRAL_API_KEY`, `LLAMA_API_KEY` (+ `LLAMA_API_URL`, `LLAMA_MODEL`),
    `DEEPSEEK_API_KEY` — only for the dormant Do It proposal (`execute`).
+8. `GLANCE_META_OFFICIAL`, `META_APP_SECRET`, `META_VERIFY_TOKEN`,
+   `META_PAGE_ACCESS_TOKEN`, `META_INSTAGRAM_PAGE_TOKEN`,
+   `GLANCE_META_READ_SECRET`, `META_GRAPH_VERSION` — official Messenger and
+   Instagram only. Empty means off. The owner steps are
+   `docs/glance-ai/meta-official-messaging.md`. Nothing here is set.
 
 No extension-side configuration, no OAuth, no new `host_permissions` (the
 function lives on `theflow-ai.com`, already covered by the extension's

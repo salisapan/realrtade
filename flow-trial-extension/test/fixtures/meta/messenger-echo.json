@@ -1,0 +1,20 @@
+{
+  "object": "page",
+  "entry": [
+    {
+      "id": "1111111111",
+      "messaging": [
+        {
+          "sender": { "id": "1111111111" },
+          "recipient": { "id": "2222222222" },
+          "timestamp": 1710000002000,
+          "message": {
+            "mid": "mid.echo",
+            "text": "אפשר את החשבונית?",
+            "is_echo": true
+          }
+        }
+      ]
+    }
+  ]
+}
