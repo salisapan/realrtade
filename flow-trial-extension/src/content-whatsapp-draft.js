@@ -47,6 +47,67 @@
     return null;
   }
 
+  function cardMount(main) {
+    let mount = main.querySelector('#glance-wa-card');
+    if (!mount) {
+      mount = document.createElement('div');
+      mount.id = 'glance-wa-card';
+      main.appendChild(mount);
+    }
+    return mount;
+  }
+
+  // One place in that week shows Do It. The click types one draft. Undo clears
+  // it only while the box still holds those words. Nothing here sends.
+  function showPlaceCard(main, box, draftText, input) {
+    if (typeof FlowChipHost === 'undefined' || !box || !draftText) return { ok: false, sends: false, reason: 'no-card' };
+    const mount = cardMount(main);
+    const old = mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    let wroteOnce = false;
+    const host = FlowChipHost.inject(mount, {
+      app: 'whatsapp',
+      doLabel: 'Do It',
+      messageId: input.key || input.threadId || 'wa',
+      uiLang: 'en',
+      intent: { label: String(input.text || '').slice(0, 180) },
+      process: {
+        id: 'chat-place-draft',
+        name: 'Reply',
+        closingLine: 'The place goes in the box. Nothing is sent.',
+        needsDateChoice: false,
+        steps: []
+      }
+    }, {
+      onDoIt: () => {
+        if (wroteOnce || typeof FlowChatCompose === 'undefined') return;
+        const write = typeof FlowChatCompose.insertDraftWithProof === 'function'
+          ? FlowChatCompose.insertDraftWithProof(box, draftText, { surface: 'whatsapp', threadId: input.threadId || input.key || null })
+          : Promise.resolve(FlowChatCompose.insertDraft(box, draftText));
+        Promise.resolve(write).then((result) => {
+          if (!result || !result.ok || wroteOnce) return;
+          wroteOnce = true;
+          const proof = result.proof || null;
+          FlowChipHost.showDraftReceipt(host, {
+            status: 'Draft ready.',
+            written: 'Draft in the chat box. Not sent.',
+            onUndo: () => {
+              const cleared = typeof FlowChatCompose.undoDraft === 'function'
+                ? FlowChatCompose.undoDraft(box, draftText, proof && proof.draftHash)
+                : FlowChatCompose.clearIfUnchanged(box, draftText);
+              if (cleared && cleared.ok) return { ok: true, written: 'Draft removed.' };
+              return { ok: false, reason: cleared && cleared.reason, written: cleared && cleared.reason === 'user-edited' ? 'You edited this. Undo left it alone.' : '' };
+            }
+          });
+        });
+      },
+      onDismiss: (h) => { try { h.remove(); } catch (e) { /* already gone */ } }
+    });
+    if (!host) return { ok: false, sends: false, reason: 'no-card' };
+    host.setAttribute('data-glance-read', String(input.text || ''));
+    return { ok: true, sends: false, card: true };
+  }
+
   function maybeDraft(main, list) {
     const last = list[list.length - 1];
     if (!last) return { ok: false, reason: 'no-inbound' };
@@ -82,10 +143,19 @@
       key: key
     };
     const box = composerBox(main);
-    return FlowChatLane.draftInto(box, input).then((r) => {
-      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input, box);
-      if (!r || r.reason !== 'no-box') drafted.add(key);
-      return { ok: true, sends: false };
+    const plan = (typeof FlowChatLane.plan === 'function') ? FlowChatLane.plan(input) : Promise.resolve(null);
+    return plan.then((planned) => {
+      if (planned && planned.judged && planned.judged.draft) {
+        const card = showPlaceCard(main, box, planned.judged.draft, input);
+        drafted.add(key);
+        return card.ok ? card : { ok: false, sends: false, reason: card.reason || 'no-card' };
+      }
+      const again = Object.assign({}, input, { evidence: planned && planned.evidence != null ? planned.evidence : input.evidence });
+      return FlowChatLane.draftInto(box, again).then((r) => {
+        if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input, box);
+        if (!r || r.reason !== 'no-box') drafted.add(key);
+        return { ok: true, sends: false };
+      });
     }).catch(() => {
       drafted.add(key);
       return { ok: false, sends: false, reason: 'error' };
@@ -107,6 +177,10 @@
     if (main.getAttribute('data-glance-chat') === 'group') return { ok: false, reason: 'group' };
     const list = rows(main);
     if (!list.length) return { ok: false, reason: 'no-messages' };
+    window.__glanceChatDomReads = (window.__glanceChatDomReads || 0) + 1;
+    document.documentElement.setAttribute('data-glance-reads', String(window.__glanceChatDomReads));
+    const openText = textOf(list[list.length - 1]);
+    main.setAttribute('data-glance-scanned', openText);
     const ids = list.map((n) => n.getAttribute('data-id'));
     if (!P.isOneToOne(ids)) return { ok: false, reason: 'not-1to1' };
     return maybeDraft(main, list);
