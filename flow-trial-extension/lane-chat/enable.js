@@ -213,11 +213,15 @@ function ageOk(code) {
   return box && box.checked === true;
 }
 
+function glanceLabsLocked() {
+  try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
+}
+
 async function paintShare(code) {
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local || !chrome.storage.local.get) return;
   let bag = {};
   try { bag = await chrome.storage.local.get({ glanceSwitches: {} }); } catch (e) { return; }
-  const on = bag && bag.glanceSwitches && bag.glanceSwitches.WHATSAPP_SHARE_INTAKE === true;
+  const on = !glanceLabsLocked() && bag && bag.glanceSwitches && bag.glanceSwitches.WHATSAPP_SHARE_INTAKE === true;
   if (!on || !list) return;
   const button = doc.createElement('button');
   button.type = 'button';

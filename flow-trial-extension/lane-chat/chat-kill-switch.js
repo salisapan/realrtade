@@ -41,9 +41,14 @@ const FlowChatKillSwitch = (() => {
     return killed;
   }
 
+  function glanceLabsLocked() {
+    try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
+  }
+
   async function blocked() {
     const bag = await storageGet({ glanceSwitches: {}, [USER_KEY]: false, [GLOBAL_KEY]: false });
-    if (!(bag.glanceSwitches && bag.glanceSwitches[SWITCH] === true)) return { blocked: true, reason: 'switch-off' };
+    // A store install keeps Labs off, including this share switch, even if storage says on.
+    if (glanceLabsLocked() || !(bag.glanceSwitches && bag.glanceSwitches[SWITCH] === true)) return { blocked: true, reason: 'switch-off' };
     if (bag[USER_KEY] === true) return { blocked: true, reason: 'user-kill' };
     const globalKill = await refreshGlobalKill();
     if (globalKill) return { blocked: true, reason: 'global-kill' };
