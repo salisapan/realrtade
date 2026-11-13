@@ -43,11 +43,11 @@ test('BOOKING_NOTICE on: a confirmed appointment is one calendar event, no guest
   const page = await open(glance, { BOOKING_NOTICE: true }, APPT);
   const chip = page.locator(MAIN + ' button.flow-chip');
   await expect(chip).toBeVisible({ timeout: 20000 });
+  // The card says Hold plus the clock; the event itself is titled from the booking.
+  await expect(page.locator(MAIN + ' .gs-intent, ' + MAIN + ' .flow-chip-process-name')).toContainText(/Hold /);
   await chip.click();
   await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   expect(events()).toHaveLength(1);
-  // The card says Hold plus the clock; the event itself is titled from the booking.
-  await expect(page.locator(MAIN + ' .gs-intent, ' + MAIN + ' .flow-chip-process-name')).toContainText(/Hold /);
   expect(events()[0].summary).toMatch(/^(Appointment|תור) · Studio Nofar$/);
   expect(events()[0].attendees || []).toEqual([]);
   await page.locator(MAIN + ' button.flow-chip-undo').click();
@@ -129,10 +129,10 @@ test('BOOKING_NOTICE on: a delivery window told in a mail is one Google Calendar
   const page = await open(glance, { BOOKING_NOTICE: true }, 'Your package will be delivered tomorrow between 14:00 and 18:00. Thanks for your order.');
   const chip = page.locator(MAIN + ' button.flow-chip');
   await expect(chip).toBeVisible({ timeout: 20000 });
+  await expect(page.locator(MAIN + ' .gs-intent, ' + MAIN + ' .flow-chip-process-name')).toContainText(/Hold /);
   await chip.click();
   await expect(page.locator(MAIN + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   expect(events()).toHaveLength(1);
-  await expect(page.locator(MAIN + ' .gs-intent, ' + MAIN + ' .flow-chip-process-name')).toContainText(/Hold /);
   expect(events()[0].summary).toMatch(/^Delivery 14:00–18:00 · Studio Nofar$/);
   expect(JSON.stringify(events()[0].end)).toContain('18:00');
   expect(events()[0].attendees || []).toEqual([]);
