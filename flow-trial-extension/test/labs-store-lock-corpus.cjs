@@ -64,7 +64,9 @@ function switchReader(file, fnName) {
     'src/content-gmail.js': 4,
     'src/content-outlook.js': 8,
     'src/chat-task-card.js': 1,
-    'popup/connect-3.js': 1
+    'popup/connect-3.js': 1,
+    'lane-chat/chat-kill-switch.js': 1,
+    'lane-chat/enable.js': 1
   };
   for (const [file, want] of Object.entries(readers)) {
     const src = read(file);

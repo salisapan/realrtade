@@ -213,20 +213,46 @@ function ageOk(code) {
   return box && box.checked === true;
 }
 
+function glanceLabsLocked() {
+  try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
+}
+
+async function paintShare(code) {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local || !chrome.storage.local.get) return;
+  let bag = {};
+  try { bag = await chrome.storage.local.get({ glanceSwitches: {} }); } catch (e) { return; }
+  const on = !glanceLabsLocked() && bag && bag.glanceSwitches && bag.glanceSwitches.WHATSAPP_SHARE_INTAKE === true;
+  if (!on || !list) return;
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.id = 'open-share-intake';
+  button.className = 'flow-chip-consent-btn';
+  button.textContent = isHe(code) ? 'שיתוף ייצוא צ׳אט (WhatsApp)' : 'Share a chat export (WhatsApp)';
+  button.addEventListener('click', () => {
+    try {
+      chrome.runtime.sendMessage({ type: 'flow:open-whatsapp-share-intake' }, () => void chrome.runtime.lastError);
+    } catch (e) { /* the page can still be opened from the worker */ }
+  });
+  list.append(button);
+}
+
 async function start() {
   const code = await preferredLang();
   showCopy(code);
   paintDisclosure(code);
   const on = await granted(metaOrigins());
-  if (!on) { showButton(code); return; }
-  try {
-    await registerAll();
-    if (list) list.replaceChildren();
-    say(nowOn(code));
-  } catch (e) {
-    showButton(code);
-    say(readerFailed(code));
+  if (!on) showButton(code);
+  else {
+    try {
+      await registerAll();
+      if (list) list.replaceChildren();
+      say(nowOn(code));
+    } catch (e) {
+      showButton(code);
+      say(readerFailed(code));
+    }
   }
+  try { await paintShare(code); } catch (e) { /* share stays hidden while the switch is off */ }
 }
 
 start();

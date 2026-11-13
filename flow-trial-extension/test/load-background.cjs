@@ -18,6 +18,8 @@ const WEB_AUTH_IMPORT = /^import \{[^}]+\} from '\.\/google-web-auth\.js';\r?\n/
 const LADDER_IMPORT = /^import \{ LADDER \} from '\.\.\/config\/ladder\.public\.js';\r?\n/m;
 const CARRY_IMPORT = /^import \{ CARRY \} from '\.\.\/config\/carry\.public\.js';\r?\n/m;
 const FLAGS_IMPORT = /^import \{ GLANCE_FLAGS_PUBLIC_JWK, GLANCE_FLAGS_URL \} from '\.\.\/config\/glance-flags\.public\.js';\r?\n/m;
+const SHARE_IMPORT = /^import \* as whatsappShareSw from '\.\/whatsapp-share-sw\.js';[^\n]*\r?\n/m;
+const SHARE_STUB = 'const whatsappShareSw = { whatsappShareIntake: async () => ({ ok: false }), whatsappShareWameOpen: async () => ({ ok: false, sends: false }), whatsappShareUndo: async () => ({ ok: false }), whatsappShareKillStatus: async () => ({ blocked: true, reason: \'switch-off\' }), whatsappShareModelConsent: async () => ({ ok: false }) };\n';
 const CONNECTORS_IMPORT = /^import \{ CONNECTORS \} from '\.\.\/config\/connectors\.public\.js';\r?\n/m;
 const LANE_HOST_IMPORT = /^import '\.\/google-lane-host\.js';\r?\n/m;
 const CLASSIC_IMPORT = /^import '((?:\.\.\/core|\.\.\/lane-chat|\.\.\/src|\.)\/[\w-]+\.js)';[^\n]*\r?\n/gm;
@@ -53,7 +55,7 @@ function backgroundScript() {
     .replace(/\bOUTLOOK_AUTH_KEY\b/g, 'ECO_SW_OUTLOOK_AUTH_KEY')
     .replace(/\bOUTLOOK_STATE_KEY\b/g, 'ECO_SW_OUTLOOK_STATE_KEY')
     .replace(/\bOUTLOOK_PENDING_KEY\b/g, 'ECO_SW_OUTLOOK_PENDING_KEY');
-  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '').replace(LANE_HOST_IMPORT, '').replace(CONNECTORS_IMPORT, '').replace(CARRY_IMPORT, '').replace(FLAGS_IMPORT, '').replace(ECOSYSTEM_SW_IMPORT, '');
+  let bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '').replace(WEB_AUTH_IMPORT, '').replace(HYBRID_IMPORTS, '').replace(LADDER_IMPORT, '').replace(LANE_HOST_IMPORT, '').replace(CONNECTORS_IMPORT, '').replace(CARRY_IMPORT, '').replace(FLAGS_IMPORT, '').replace(SHARE_IMPORT, SHARE_STUB).replace(ECOSYSTEM_SW_IMPORT, '');
   bg = bg.replace(CLASSIC_IMPORT, (line, rel) => {
     const file = path.join(root, 'src', rel);
     const src = fs.readFileSync(file, 'utf8');
