@@ -1,4 +1,4 @@
-// A Google Form from a request (switch WORKSPACE_FILE) and a repeating reminder from a repeating
+// A Google Form from a request (switches WORKSPACE_FILE and GOOGLE_FORMS) and a repeating reminder from a repeating
 // commitment (switch RECURRING_REMINDER), on the real Gmail card in the unpacked extension, against the local
 // Google lane server. Both off by default. On: the canonical Do It card, one write read back by id, a
 // receipt, and Undo that leaves anything the person edited alone. Nothing is sent and nobody is invited.
@@ -33,8 +33,15 @@ test('WORKSPACE_FILE off: a request for a form shows no card and writes nothing'
   expect(formPosts()).toHaveLength(0);
 });
 
-test('WORKSPACE_FILE on: Do It creates an empty Form, reads it back by id, and Undo trashes it', async ({ glance }) => {
-  const page = await open(glance, { WORKSPACE_FILE: true }, FORM, 'form');
+test('GOOGLE_FORMS off (WORKSPACE_FILE on): a request for a form shows no card and writes nothing', async ({ glance }) => {
+  const page = await open(glance, { WORKSPACE_FILE: true }, FORM, 'form-forms-off');
+  await page.waitForTimeout(5000);
+  await expect(page.locator('div[role="main"]')).not.toContainText('empty form');
+  expect(formPosts()).toHaveLength(0);
+});
+
+test('WORKSPACE_FILE and GOOGLE_FORMS on: Do It creates an empty Form, reads it back by id, and Undo trashes it', async ({ glance }) => {
+  const page = await open(glance, { WORKSPACE_FILE: true, GOOGLE_FORMS: true }, FORM, 'form');
   const chip = page.locator('div[role="main"] button.flow-chip');
   await expect(chip).toBeVisible({ timeout: 20000 });
   await expect(page.locator('div[role="main"]')).toContainText('Q4 launch feedback form');
@@ -51,8 +58,8 @@ test('WORKSPACE_FILE on: Do It creates an empty Form, reads it back by id, and U
   await expect.poll(() => server.calls.some((c) => c.method === 'PATCH' && c.path.indexOf('/drive/v3/files/' + id) >= 0 && c.body && c.body.trashed === true)).toBe(true);
 });
 
-test('WORKSPACE_FILE on: Undo leaves a form the person edited, and the form stays', async ({ glance }) => {
-  const page = await open(glance, { WORKSPACE_FILE: true }, FORM, 'form-edit');
+test('WORKSPACE_FILE and GOOGLE_FORMS on: Undo leaves a form the person edited, and the form stays', async ({ glance }) => {
+  const page = await open(glance, { WORKSPACE_FILE: true, GOOGLE_FORMS: true }, FORM, 'form-edit');
   await page.locator('div[role="main"] button.flow-chip').click();
   await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   server.editForm(server.last.form);

@@ -115,14 +115,14 @@ if (!fs.existsSync(uPath)) {
     const meet = JSON.parse(plain.rows.find((r) => r.meta.id === 'ok-meet').messages[2].content);
     check("a meeting's due_span carries the time, so the device can place it", /October 14/.test(meet.intentions[0].due_span) && /3pm/.test(meet.intentions[0].due_span), meet);
     check('"tomorrow" labelled two days out is flagged, not trained in (EN and HE)', ['late-tomorrow', 'he-late-tomorrow'].every((x) => plain.flags.some((f) => f.id === x && f.flag === 'device-cannot-read-the-labelled-date')), plain.flags);
-    check('an ask with no date the device can read is flagged (the device would stay silent)', plain.flags.some((f) => f.id === 'no-date-ask' && /ask-without-date/.test(f.why || '')), plain.flags);
+    check('an ask with no date is no longer flagged (owner 2026-11-11, C-4: it gets a Do It); it is trained in as a draft with no invented date', !plain.flags.some((f) => f.id === 'no-date-ask') && (() => { const r = plain.rows.find((x) => x.meta.id === 'no-date-ask'); return r && JSON.parse(r.messages[2].content).intentions[0].due === undefined; })(), plain.flags);
     check('the v3 system prompt asks for quotes', /character for character/.test(plain.rows[0].messages[0].content));
   }
   const rep = run(['--repair-dates']);
   if (!rep.err) {
     const fixed = rep.rows.filter((r) => r.meta.repaired);
     check('--repair-dates keeps the off-by-one rows with the device\'s date', fixed.length === 2 && fixed.every((r) => r.meta.repaired.to === '2026-10-08' && JSON.parse(r.messages[2].content).intentions[0].due === '2026-10-08'), fixed.map((r) => r.meta));
-    check('--repair-dates never repairs a row with no readable date', rep.flags.some((f) => f.id === 'no-date-ask'));
+    check('--repair-dates never repairs a row with no readable date (and never invents one for it)', (() => { const r = rep.rows.find((x) => x.meta.id === 'no-date-ask'); return !rep.flags.some((f) => f.id === 'no-date-ask') && r && !r.meta.repaired && JSON.parse(r.messages[2].content).intentions[0].due === undefined; })());
   }
 }
 fs.rmSync(tmp, { recursive: true, force: true });

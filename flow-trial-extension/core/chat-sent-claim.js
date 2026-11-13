@@ -9,20 +9,23 @@ const FlowChatSentClaim = (() => {
   const SENT_JUST = new RegExp('^(?:just\\s+|already\\s+)' + VERB_EN + '\\s+(?:you\\s+)?(?:the\\s+|my\\s+|your\\s+|our\\s+)(.+)$', 'i');
   const HERE = /^(?:here(?:'s|\s+is|\s+are)|attached\s+(?:is|are)|(?:please\s+)?find\s+attached|please\s+find)\s+(?:the\s+|my\s+|your\s+|our\s+)?(.+)$/i;
   const ATTACHED = /^(?:the\s+|my\s+|our\s+)?(.+?)\s+(?:is|are|was|were)\s+(?:now\s+)?(?:attached|sent|uploaded|ready)\b/i;
+  // Short replies that name little or nothing: "Sent!", "Done, sent", "Just emailed it", "Sent you an email", "sent the quote".
+  const BARE_EN = /^(?:done[,.!\s-]*|ok[,.!\s-]*|okay[,.!\s-]*)?(?:just\s+|already\s+)?(?:sent|emailed|e-?mailed|uploaded|shared)(?:\s+(?:it|them|that|this)(?:\s+(?:over|now))?|\s+you\s+(?:an?\s+)?(?:email|e-?mail|mail|message|link)|\s+(?:the|my|our)\s+(.+?))?\s*[.!]*$/i;
+  const BARE_HE = /^(?:בוצע[,.!\s-]*)?(?:שלחתי|שלחנו|העליתי|העלינו)(?:\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(?:זה|אותו|אותה|אותם|במייל|בוואטסאפ|בווטסאפ))?\s*[.!]*$/;
   const SENT_HE = /(?:^|\s)(?:שלחתי|שלחנו|העליתי|העלינו|צירפתי|צירפנו|הנה)\s+(?:לך\s+|לכם\s+)?(?:את\s+)?(.*)$/;
   const ATTACHED_HE = /^(.+?)\s+(?:מצורף|מצורפת|מצורפים|מצורפות|נשלח|נשלחה|נשלחו|מוכן|מוכנה|מוכנים)(?:[\s.,!]|$)/;
   // Later, never, not yet, a condition, somebody else, or a payment: not a document sent.
   const NO_EN = /\b(?:will|won'?t|going\s+to|gonna|'ll|haven'?t|hasn'?t|not\s+yet|didn'?t|did\s+not|never|can'?t|cannot|if\s+i|once\s+i|when\s+i|after\s+i|tomorrow|tonight|later|soon|he\s+(?:sent|emailed|uploaded)|she\s+(?:sent|emailed|uploaded)|they\s+(?:sent|emailed|uploaded)|payment|transfer(?:red)?|money|paid|wire[d]?)\b/i;
   const NO_HE = /(?:אשלח|אעלה|אצרף|נשלח\s+(?:מחר|בהמשך)|עוד\s+לא|לא\s+(?:שלחתי|העליתי|צירפתי)|אם\s+אשלח|ברגע\s+ש|מחר|בהמשך|תשלום|כסף|העברה|העברתי|שילמתי)/;
   const QUESTION = /[?؟]/;
-  const STOP = new Set(['the', 'and', 'you', 'your', 'our', 'for', 'with', 'from', 'this', 'that', 'them', 'they', 'are', 'was', 'were', 'has', 'have', 'its', 'now', 'just', 'here', 'there', 'over', 'also', 'again', 'please', 'attached', 'sent', 'send', 'share', 'shared', 'file', 'files', 'it', 'me', 'my', 'to', 'of', 'in', 'on', 'at', 'a', 'an', 'is', 'as', 'by', 'את', 'של', 'לך', 'לכם', 'לי', 'עם', 'גם', 'הנה', 'מצורף', 'מצורפת', 'שלחתי', 'שלחנו', 'שלח', 'תשלח', 'קובץ', 'קבצים']);
+  const STOP = new Set(['the', 'and', 'you', 'your', 'our', 'for', 'with', 'from', 'this', 'that', 'them', 'they', 'are', 'was', 'were', 'has', 'have', 'its', 'now', 'just', 'here', 'there', 'over', 'also', 'again', 'please', 'attached', 'sent', 'send', 'share', 'shared', 'file', 'files', 'it', 'me', 'my', 'to', 'of', 'in', 'on', 'at', 'a', 'an', 'is', 'as', 'by', 'את', 'של', 'לך', 'לכם', 'לי', 'עם', 'גם', 'הנה', 'מצורף', 'מצורפת', 'שלחתי', 'שלחנו', 'שלח', 'תשלח', 'קובץ', 'קבצים', 'מייל', 'במייל', 'בוואטסאפ', 'בווטסאפ', 'email', 'mail', 'whatsapp', 'message']);
 
   // The content words of a phrase, lowercased: no short words, no filler, a Hebrew one-letter prefix (ה ו ל ב מ כ ש) taken off.
   function tokens(phrase) {
     const out = [];
     String(phrase || '').toLowerCase().replace(/[^a-z0-9֐-׿' -]/g, ' ').split(/[\s-]+/).forEach((w) => {
       let t = w.replace(/^'+|'+$/g, '');
-      if (/[֐-׿]/.test(t) && t.length > 3) t = t.replace(/^[הובלמכש]+(?=[֐-׿]{3,})/, '');
+      if (/[֐-׿]/.test(t) && t.length > 3) t = t.replace(/^(?:[ולבכש]?ה)(?=[֐-׿]{3,})/, '');
       if (t.length >= 3 && !STOP.has(t) && out.indexOf(t) < 0) out.push(t);
     });
     return out;
@@ -37,14 +40,14 @@ const FlowChatSentClaim = (() => {
     if (NO_EN.test(raw) || NO_HE.test(raw)) return { kind: 'none', reason: 'not-a-document-sent' };
     const he = /[֐-׿]/.test(raw);
     let obj = null;
-    let m = raw.match(SENT_I) || raw.match(SENT_JUST) || raw.match(HERE) || raw.match(ATTACHED);
-    if (m) obj = m[1];
+    let m = raw.match(BARE_EN) || raw.match(BARE_HE) || raw.match(SENT_I) || raw.match(SENT_JUST) || raw.match(HERE) || raw.match(ATTACHED);
+    if (m) obj = m[1] || '';
     else {
       m = raw.match(SENT_HE) || raw.match(ATTACHED_HE);
       if (m) obj = m[1];
     }
     if (obj == null) return { kind: 'none', reason: 'no-claim' };
-    const cut = String(obj).split(/[.!,;]| but | and (?:i|we) /i)[0];
+    const cut = String(obj).split(/[.!,;]| but | and (?:i|we) /i)[0].replace(/\s+to\s+[A-Za-z][\w'-]*(?:\s+[A-Za-z][\w'-]*)?$/i, '');
     return { kind: 'sent', words: tokens(cut), lang: he ? 'he' : 'en' };
   }
 

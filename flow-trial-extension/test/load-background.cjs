@@ -81,4 +81,6 @@ const LANE_ACCOUNT_STUB = `globalThis.FlowGoogleLaneAccount = { read: async () =
   return made.ok ? (await made.json()).id : '';
 } };`;
 
-module.exports = { backgroundScript, LANE_ACCOUNT_STUB };
+const GOOGLE_CONFIG_SRC = fs.readFileSync(path.join(__dirname, '..', 'core', 'google-config.js'), 'utf8');
+
+module.exports = { backgroundScript, LANE_ACCOUNT_STUB, GOOGLE_CONFIG_SRC };

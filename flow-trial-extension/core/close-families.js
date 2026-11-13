@@ -207,6 +207,9 @@ const FlowCloseFamilies = (() => {
     const t = String(raw || '');
     if (/\bdon'?t\s+forget\b/i.test(t)) return true;
     if (/\bno\s+ne+d\s+to\s+reply\b/i.test(t)) return true;
+    // "אל תשכח להגיד לנו כשזה מוכן" is a notify-when-done tail on a send ask,
+    // not a negation of the work in the same sentence.
+    if (/אל\s+תשכח(?:י|ו)?\s+ל(?:הגיד|הודיע|עדכן)\s+ל(?:נו|י|כם|ך)(?:\s|$|[,،.!?])/.test(t)) return true;
     return false;
   }
   // "don't save" / "no need to save" is the file gate's own quiet.
@@ -223,6 +226,14 @@ const FlowCloseFamilies = (() => {
     // An English hedge, maybe, if you're free, and אולי win before a live ask.
     // "אם אפשר, תשלח" is still the ask. אם אפשר is not this hedge.
     const t = String(sentence || '');
+    // Softener then but/however/אבל, or a softener next to an explicit deadline, yields to the ask.
+    // "No rush, but please send by Friday" and "אין לחץ, אבל תשלח עד מחר" stay live.
+    if (/\b(?:no pressure|no rush|only if you have (?:the )?time|if it works out)\b[\s,.…:;—–-]*(?:but|however)\b/i.test(t)) return false;
+    if (/(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)[\s,.…:;—–-]*אבל/.test(t)) return false;
+    const softener = /\b(?:no pressure|no rush)\b/i.test(t) || /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)/.test(t);
+    const deadline = /\b(?:by|before|until|no later than)\s+(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|tomorrow|tonight|next\s+week|\d)/i.test(t)
+      || /עד\s+(?:יום\s+)?(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת|מחר)/.test(t);
+    if (softener && deadline) return false;
     if (HEDGE_EN.test(t)) return true;
     if (/(?:^|[^\u0590-\u05FF])אולי/.test(t)) return true;
     if (sentenceLiveAsk(t)) return false;

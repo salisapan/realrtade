@@ -134,3 +134,27 @@ The chat card now has one more state, drawn with the existing canonical Do It co
 
 One more state of the chat card, drawn with the existing canonical Do It component, no new design: title "Paid? Waiting on Dana: Payment 500 NIS" (Hebrew «שולם? …»), one step "Mark done: <task>" («לסמן כבוצע: …»), Do It, closed line "Task marked done." («המשימה סומנה כבוצעה.»), Handled receipt with Undo ("Google Task is open again."). Error text when the person changed the task: "You changed this task, so I left it" («שינית את המשימה, השארתי אותה»). Grok: the error text is set through `data-glance-chip-label` on the halo chip; please confirm it is visible in the card.
 
+## Y3 — the money you chased arrived
+
+- Module `flow-trial-extension/core/money-arrived.js`, switch `MONEY_ARRIVED`. Map row Y3.
+- When: a payment-received notice from the person's bank or payment app matches one open chase.
+- Line: `התשלום התקבל: <amount>` / `Payment received: <amount>`. The loop moves to closed (paid); the chase task is no longer due.
+- No action needed from the person; the card shows the close and offers Undo.
+- Undo: reopens the chase. If the person changed the loop since, the card says Undo unavailable.
+
+## E3 — your reply was really sent (added 2026-11-02)
+
+- Module `flow-trial-extension/core/reply-sent.js`, switch `REPLY_SENT_CLOSE`. Map row E3.
+- When: the person sent a reply in the thread of an ask they owed, and it answers.
+- Line: `ענית. הלולאה נסגרה.` / `You replied. Loop closed.` The loop moves to closed (kept).
+- While the reply is still a draft, or the sent reply only holds ("אחזור אליך", "let me check") or only thanks, the card stays as the open loop. No new card.
+- No action needed from the person; the card shows the close and offers Undo.
+- Undo: reopens the loop. The sent mail is never touched (sent mail: Undo unavailable). If the person changed the loop since, the card says Undo unavailable.
+## C2 — move that meeting (added 2026-11-03)
+
+- Module `flow-trial-extension/core/calendar-move.js`, switch `CALENDAR_MOVE_PROOF`. Map row C2.
+- When: a mail asks to move a named slot to another named slot, and the person's calendar has exactly one event of their own at the old slot, with no other guests.
+- Line: `הזזת ביומן: <title> ל-<date> <HH:MM>` / `Move on your calendar: <title> to <date> <HH:MM>`.
+- One step: the calendar. Choice: Do It. After the read-back: Handled with the new time.
+- Undo: puts the old time back. If the person changed the event since, the card says Undo unavailable.
+- No card when the event has guests, belongs to someone else, repeats, or two events share the old slot.

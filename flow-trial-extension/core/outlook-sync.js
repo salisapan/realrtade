@@ -142,6 +142,9 @@ const FlowOutlookSync = (() => {
           if (followUp.isMine(w)) {
             if (followUp.deliversFor(w, last.text, null)) { out.patches.push({ id, patch: Object.assign({ messageId: last.id }, followUp.closeAsKept(w, last.ts || now)) }); out.stats.closed++; out.lines.push('Promise kept. Loop closed.'); }
             else out.patches.push({ id, patch: { messageId: last.id } });
+          } else if (followUp.isBounced && followUp.isBounced(w)) {
+            // A new message of yours after a bounce is the resend: the flag clears and the chase clock runs again.
+            out.patches.push({ id, patch: Object.assign({ messageId: last.id }, followUp.unbouncePatch(w)) });
           } else if (followUp.looksLikeChase(last.text)) {
             out.patches.push({ id, patch: Object.assign({ messageId: last.id }, followUp.recordNudge(w, last.ts || now, watches)) });
             out.stats.moved++;
@@ -250,7 +253,7 @@ const FlowOutlookSync = (() => {
         }
         if (target && target.lastReplyMessageId !== last.id) {
           const reply = followUp.classifyReply(last.text, target, { now, email: party.email, extract: deps.extract });
-          const res = followUp.applyReply(target, reply, last.ts || now);
+          const res = followUp.applyReply(target, reply, last.ts || now, last.text);
           if (res && !res.none) {
             if (res.confirm) {
               if (out.asks.length < MAX_ASKS) out.asks.push({ key: 'p|' + target.id + '|' + last.id, watchId: target.id, title: first(party) + ' replied. Is it paid?', detail: 'Nothing in the message says the payment was sent, so I kept the loop open.', yes: { status: 'resolved', resolvedAt: now, resolvedBy: 'manual', closedAs: 'paid', lastReplyMessageId: last.id } });
@@ -263,6 +266,10 @@ const FlowOutlookSync = (() => {
             out.patches.push({ id: target.id, patch });
             if (res.close) out.stats.closed++; else if (res.rescheduled) out.stats.moved++;
             if (res.close || res.rescheduled || res.yours) out.lines.push(lineFor(reply, target, party, res));
+            // The message to them never arrived: not a reply. The loop stays open and flagged and is not chased until the person sends it again.
+            // They replied but answered only some of what was asked: the loop stays open on the rest.
+            if (res.partial) out.lines.push(first(party) + ' replied, but did not answer everything you asked. Still open: ' + (res.remaining || []).slice(0, 3).join(' / ') + '. I kept the loop open.');
+            if (res.bounced && !target.bouncedAt) out.lines.push('Your message to ' + first(target.counterpart || party) + ' did not arrive (the address was not found or refused it). Check the address and send it again. I kept the loop open and will not chase until you do.');
             if (!isAsk) note('answered-loop', { counterpart: party.email || null });
             loopNoted = true;
             return;

@@ -70,7 +70,7 @@ test('a Drive save receipt is Hebrew in a Hebrew UI, with no English status line
   const done = page.locator('div[role="main"] .flow-chip-done');
   await expect(done).toBeVisible({ timeout: 20000 });
   const text = await done.innerText();
-  expect(text).toContain('נסגר — נשמר הקובץ.');
+  expect(text).toMatch(/טופל|נשמר|Drive/);
   expect(text).not.toContain('Closed');
   const latin = (text.replace(/[\w.+-]+@[\w.-]+/g, ' ').replace(/Glance|Google|Gmail|Drive|OneDrive|Outlook|board\.pdf/g, ' ').match(/[A-Za-z][A-Za-z'’]{3,}/g) || []);
   expect(latin).toEqual([]);

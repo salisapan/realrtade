@@ -70,7 +70,7 @@ const FlowRsvp = (() => {
     const m = body.match(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
     if (!m) return null;
     const want = WEEKDAYS[m[1].toLowerCase()];
-    const d = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+    const d = new Date(Date.UTC(at.getFullYear(), at.getMonth(), at.getDate())); // the person's own calendar day, not the UTC one
     let add = (want - d.getUTCDay() + 7) % 7;
     if (add === 0) add = 7;
     d.setUTCDate(d.getUTCDate() + add);

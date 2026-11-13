@@ -66,15 +66,15 @@ const sandbox = {
     }
   }
 };
-// The account probe (Gmail profile) is answered here for every fetch the
+// The account probe (openid/userinfo email) is answered here for every fetch the
 // checks below install, so the counted calls are the lane's own.
 {
   let inner = sandbox.fetch;
-  const profile = /\/gmail\/v1\/users\/me\/profile/;
-  const answer = { ok: true, status: 200, text: async () => '{"emailAddress":"host@example.com"}', json: async () => ({ emailAddress: 'host@example.com' }) };
+  const userinfo = /\/oauth2\/v3\/userinfo/;
+  const answer = { ok: true, status: 200, text: async () => '{"email":"host@example.com"}', json: async () => ({ email: 'host@example.com' }) };
   Object.defineProperty(sandbox, 'fetch', {
     configurable: true,
-    get: () => (url, init) => (profile.test(String(url)) ? Promise.resolve(answer) : inner(url, init)),
+    get: () => (url, init) => (userinfo.test(String(url)) ? Promise.resolve(answer) : inner(url, init)),
     set: (fn) => { inner = fn; }
   });
 }
@@ -83,7 +83,7 @@ vm.createContext(sandbox);
 
 const cores = [
   'google-config.js', 'google-account.js', 'google-calendar.js', 'google-tasks.js', 'google-drive.js',
-  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-drafts.js', 'google-proof.js'
+  'google-docs.js', 'google-sheets.js', 'google-compose.js', 'google-drafts.js', 'google-proof.js', 'google-contacts.js'
 ];
 for (const f of cores) {
   vm.runInContext(fs.readFileSync(path.join(EXT, 'core', f), 'utf8'), sandbox, { filename: f });
@@ -105,7 +105,20 @@ check('background.js imports the lane host once', imports.length === 1, imports.
 
 const gmail = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
 check('Hold It, Task, Save file, Doc and Sheet send flow:google-write', /type: 'flow:google-write'/.test(gmail) && /googleHold:/.test(gmail) === false && /calendar: 'googleHold'/.test(gmail) && /googleTask: 'googleLaneTask'/.test(gmail) && /driveFile: 'googleDriveSave'/.test(gmail) && /driveDoc: 'googleDoc'/.test(gmail) && /driveSheet: 'googleSheetAppend'/.test(gmail));
-check('Draft reply sends flow:gmail-compose, and with no reply open creates the draft through the drafts API (no contacts lookup, no contacts scope)', /type: 'flow:gmail-compose'/.test(gmail) && !/flow:google-contacts/.test(gmail) && /googleReplyDraft/.test(gmail) && /gmailDraft: 'gmailCompose'/.test(gmail));
+check('Draft reply with compose open uses flow:gmail-compose DOM fill', /type: 'flow:gmail-compose'/.test(gmail) && /gmailDraft: 'gmailCompose'/.test(gmail));
+const saveReplyDraftSlice = gmail.slice(
+  gmail.indexOf('async function saveReplyDraft'),
+  gmail.indexOf('async function sendGmailCompose(payload)')
+);
+const sendGmailComposeSlice = gmail.slice(
+  gmail.indexOf('async function sendGmailCompose(payload)'),
+  gmail.indexOf('async function sendLaneUndo')
+);
+check('Compose closed routes through saveReplyDraft and googleReplyDraft',
+  /connectorId: 'googleReplyDraft'/.test(saveReplyDraftSlice)
+  && /if \(!composeBodyOpen\(\)\) return saveReplyDraft/.test(sendGmailComposeSlice));
+check('RD2: saveReplyDraft does not use gmailCompose connector', !/connectorId: 'gmailCompose'/.test(saveReplyDraftSlice), saveReplyDraftSlice.slice(0, 200));
+check('G8 contacts is a separate chip (flow:google-contacts-plan in the lane host, not mixed into the reply-draft path)', /flow:google-contacts-plan/.test(hostSrc) && /showGoogleContactsChip/.test(gmail) && !/gmailDraft[\s\S]{0,200}flow:google-contacts/.test(gmail));
 check('the card Undo sends flow:google-undo', /type: 'flow:google-undo'/.test(gmail));
 
 const manifest = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
@@ -307,8 +320,13 @@ async function main() {
     }, {}, resolve);
   });
   const view = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
-  check('a 401 write switches Google to reconnect and Connected is gone', denied && denied.ok === false && denied.needsReconnect === true && denied.reconnectLabel === 'Reconnect Google' && view.connected === false && view.needsReconnect === true && view.label === 'Reconnect Google' && view.label !== 'Connected', { denied, view, flag: stored.googleReconnect });
+  check('a 401 write clears the grant so Connect Google shows (not a stale Connected)', denied && denied.ok === false && view.connected === false && view.needsReconnect === false && (view.label === 'Connect Google' || view.label === 'התחבר ל-Google') && !stored.googleTasksAuth && !stored.googleWebAuth, { denied, view, flag: stored.googleReconnect, auth: stored.googleTasksAuth });
 
+  // Re-seed: a remote revoke clears storage; the next case needs a grant again.
+  stored.googleTasksAuth = { taskListId: 'glance-list' };
+  stored.googleEverConnected = { connected: true };
+  stored.googleConnectedAccount = { email: 'host@example.com' };
+  delete stored.googleReconnect;
   sandbox.chrome.i18n.getUILanguage = () => 'he';
   const hebrewDenied = await new Promise((resolve) => {
     listeners[0]({
@@ -318,7 +336,7 @@ async function main() {
     }, {}, resolve);
   });
   const hebrewView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
-  check('a 401 reconnect label follows a Hebrew UI', hebrewDenied && hebrewDenied.reconnectLabel === 'חבר מחדש את Google' && hebrewView.label === 'חבר מחדש את Google' && hebrewView.connected === false, { hebrewDenied, hebrewView });
+  check('a 401 with a Hebrew UI shows Connect Google, not a stale Connected', hebrewDenied && hebrewDenied.ok === false && hebrewView.connected === false && hebrewView.needsReconnect === false && hebrewView.label === 'התחבר ל-Google', { hebrewDenied, hebrewView });
   sandbox.chrome.i18n.getUILanguage = () => 'en';
 
   delete stored.googleTasksAuth;
@@ -326,6 +344,8 @@ async function main() {
   delete stored.googleEverConnected;
   delete stored.googleWebAuth;
   delete stored.glanceLaneUndo;
+  stored.googleConnectedAccount = { email: 'host@example.com' };
+  sandbox.fetch = async () => ({ ok: false, status: 401, text: async () => '{"error":{"code":401}}' });
   const noGrant = await new Promise((resolve) => {
     listeners[0]({
       type: 'flow:google-write',
@@ -336,8 +356,11 @@ async function main() {
   const noGrantView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host', stored.googleEverConnected);
   check('a 401 with no grant and no Connect is Connect', noGrant && noGrant.ok === false && !stored.googleReconnect && noGrant.needsReconnect !== true && noGrantView.connected === false && noGrantView.needsReconnect === false && noGrantView.label === 'Connect Google', { noGrant, noGrantView, flag: stored.googleReconnect });
 
+  stored.googleTasksAuth = { taskListId: 'glance-list' };
   stored.googleEverConnected = { connected: true };
+  stored.googleConnectedAccount = { email: 'host@example.com' };
   delete stored.googleReconnect;
+  sandbox.fetch = async () => ({ ok: false, status: 401, text: async () => '{"error":{"code":401}}' });
   const again = await new Promise((resolve) => {
     listeners[0]({
       type: 'flow:google-write',
@@ -346,9 +369,11 @@ async function main() {
     }, {}, resolve);
   });
   const againView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host', stored.googleEverConnected);
-  check('a 401 after a successful Connect is Reconnect', again && again.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && again.needsReconnect === true && againView.connected === false && againView.needsReconnect === true && againView.label === 'Reconnect Google', { again, againView, flag: stored.googleReconnect });
+  check('a 401 after a successful Connect clears to Connect Google', again && again.ok === false && againView.connected === false && againView.needsReconnect === false && againView.label === 'Connect Google' && !stored.googleEverConnected && !stored.googleTasksAuth, { again, againView, flag: stored.googleReconnect, ever: stored.googleEverConnected });
 
   stored.googleTasksAuth = { taskListId: 'glance-list' };
+  stored.googleEverConnected = { connected: true };
+  stored.googleConnectedAccount = { email: 'host@example.com' };
   delete stored.googleReconnect;
   sandbox.chrome.i18n.getUILanguage = () => 'en';
   sandbox.chrome.identity.getAuthToken = (details, cb) => {
@@ -397,7 +422,7 @@ async function main() {
   });
   const stickyView = vm.runInContext('laneGoogleStatus', sandbox)(stored.googleTasksAuth, stored.googleReconnect, 'ya29.host');
   const calendarPosts = stickyFetches.filter((c) => c.method === 'POST' && c.url.indexOf('/calendar/v3/calendars/primary/events') >= 0);
-  check('a Task 401 then a Calendar write stays reconnect and writes nothing else', taskDenied && taskDenied.ok === false && calendarOk && calendarOk.ok === false && calendarOk.reason === 'not-connected' && stored.googleReconnect && stored.googleReconnect.needed === true && stickyView.connected === false && stickyView.needsReconnect === true && stickyView.label === 'Reconnect Google' && stickyView.label !== 'Connected' && calendarPosts.length === 0, { taskDenied, calendarOk: calendarOk && { ok: calendarOk.ok, reason: calendarOk.reason }, flag: stored.googleReconnect, stickyView, posts: calendarPosts.length });
+  check('a Task 401 then a Calendar write clears the grant and writes nothing else', taskDenied && taskDenied.ok === false && calendarOk && calendarOk.ok === false && stickyView.connected === false && stickyView.label !== 'Connected' && calendarPosts.length === 0 && !stored.googleTasksAuth, { taskDenied, calendarOk: calendarOk && { ok: calendarOk.ok, reason: calendarOk.reason }, flag: stored.googleReconnect, stickyView, posts: calendarPosts.length, auth: stored.googleTasksAuth });
   check('a later success does not call noteGoogleAuthOk', hostSrc.indexOf('if (res.ok) return noteGoogleAuthOk()') < 0);
   check('a 2xx in the service worker does not clear reconnect', bg.indexOf('else if (res.ok) await clearGoogleReconnect()') < 0 && bg.indexOf('await clearGoogleReconnect()') > 0);
 
@@ -416,6 +441,35 @@ async function main() {
   delete stored.googleWebAuth;
   const cleanView = vm.runInContext('laneGoogleStatus', sandbox)(null, null, '', null, {});
   check('a clean state shows Connect', cleanView.connected === false && cleanView.needsReconnect === false && cleanView.label === 'Connect Google', cleanView);
+
+  stored.googleGrantedScopes = {
+    version: [
+      'openid',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/tasks'
+    ].join('\n'),
+    status: 'granted'
+  };
+  const probeFetches = [];
+  vm.runInContext('FlowGoogleLaneAccount.forget()', sandbox);
+  Object.defineProperty(sandbox, 'fetch', {
+    configurable: true,
+    value: async (url, init) => {
+      probeFetches.push({ url: String(url), init: init || {} });
+      if (/oauth2\/v3\/userinfo/.test(String(url))) {
+        const profile = { email: 'host@example.com' };
+        return { ok: true, status: 200, text: async () => JSON.stringify(profile), json: async () => profile };
+      }
+      return { ok: false, status: 404, text: async () => '' };
+    }
+  });
+  const probed = await vm.runInContext('FlowGoogleLaneAccount.accountOf("ya29.nocompose-probe")', sandbox);
+  check('accountOfToken uses userinfo and matches the tab without gmail.compose on the grant',
+    probed === 'host@example.com'
+    && probeFetches.some((c) => /oauth2\/v3\/userinfo/.test(c.url))
+    && !probeFetches.some((c) => /gmail\.googleapis\.com/.test(c.url)),
+    probeFetches.map((c) => c.url));
 
   if (failures) {
     console.log('\n' + failures + ' failed');

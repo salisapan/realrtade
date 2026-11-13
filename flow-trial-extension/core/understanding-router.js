@@ -16,6 +16,8 @@ const FlowUnderstandingRouter = (() => {
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
   }
   const U = sibling(typeof FlowUnderstanding !== 'undefined' ? FlowUnderstanding : null, './understanding.js', 'FlowUnderstanding');
+  const multi = () => sibling(typeof FlowModelMulti !== 'undefined' ? FlowModelMulti : null, './model-multi.js', 'FlowModelMulti'); // aiMultiV1
+  const kindCheck = () => sibling(typeof FlowKindCheck !== 'undefined' ? FlowKindCheck : null, './kind-check.js', 'FlowKindCheck'); // aiKindCheckV1
   const ER = sibling(typeof FlowExecRouter !== 'undefined' ? FlowExecRouter : null, './exec-router.js', 'FlowExecRouter');
 
   const SWITCH = 'aiPrimary';
@@ -73,6 +75,7 @@ const FlowUnderstandingRouter = (() => {
     const ms = typeof deps.timeoutMs === 'number' ? deps.timeoutMs : TIMEOUT_MS;
     const vopts = { today: input.today };
     const pctx = { attachmentCount: input.attachmentCount || 0 };
+    const KC = flags.aiKindCheckV1 === true ? kindCheck() : null;
 
     // Tier 0: the device rules keep the last word on quiets, and the clear half never reaches a model.
     if (input.direction && input.direction !== 'inbound') { trace.push('tier0:not-inbound'); return out(t0.step || 'SILENT', 0, { reason: 'not-inbound' }); }
@@ -90,9 +93,26 @@ const FlowUnderstandingRouter = (() => {
     if (!t0.possible) { trace.push('tier0:nothing'); return out('SILENT', 0, { reason: 'no-possible-intention' }); }
     if (!U) return out('SILENT', 0, { reason: 'no-validator' });
 
-    const decide = (v, tier) => {
+    const propose = (u) => (KC ? KC.proposal(U, u, pctx) : U.proposal(u, pctx));
+    // A Tier 2 answer quotes the masked text: its quoted words go back to the person's own words before the floor, the plan and the
+    // card see them ("…the signed lease [DATE_1]?" -> "…the signed lease by Friday?"). The dates were already read unmasked.
+    const unmasked = (p, unmask) => {
+      if (!unmask || !p || p.step === 'SILENT') return p;
+      const back = (x) => { if (typeof x !== 'string') return x; try { const y = unmask(x); return typeof y === 'string' && y ? y : x; } catch (e) { return x; } };
+      return Object.assign({}, p, { askSpan: back(p.askSpan), evidence: back(p.evidence) });
+    };
+    const MM = flags.aiMultiV1 === true ? multi() : null;
+    const decide = (v, tier, unmask) => {
       if (!v.ok) return out('SILENT', tier, { reason: 'invalid:' + v.reason, drops: v.drops });
-      const p = U.proposal(v.understanding, pctx);
+      if (MM) {
+        // aiMultiV1 (off): every intention on its own, each through the floor; the first that passes leads, the rest ride along.
+        const all = MM.proposals(propose, v.understanding, pctx).map((p) => unmasked(p, unmask));
+        const passed = [], held = [];
+        for (const p of all) { const f = floor(p, input, deps); if (f.pass) passed.push(Object.assign({}, p, { step: f.step })); else held.push(f.reason); }
+        if (!passed.length) return out('SILENT', tier, { reason: all.length ? held[0] : 'model:' + (propose(v.understanding).reason || 'no-actionable-intention'), understanding: v.understanding, drops: v.drops });
+        return out(passed[0].step, tier, { proposal: passed[0], proposals: passed, held, understanding: v.understanding, drops: v.drops });
+      }
+      const p = unmasked(propose(v.understanding), unmask);
       if (p.step === 'SILENT') return out('SILENT', tier, { reason: 'model:' + p.reason, understanding: v.understanding, drops: v.drops });
       const f = floor(p, input, deps);
       if (!f.pass) return out('SILENT', tier, { reason: f.reason, proposal: p, understanding: v.understanding, drops: v.drops });
@@ -120,7 +140,7 @@ const FlowUnderstandingRouter = (() => {
     const a = await ask(deps.tier2, m.text, ms);
     const v = a.ok ? U.validate(a.answer, m.text, Object.assign({ unmask: typeof m.unmask === 'function' ? m.unmask : undefined }, vopts)) : { ok: false, reason: a.reason, drops: [] };
     trace.push('tier2:' + (a.ok ? (v.ok ? 'answered' : 'invalid') : a.reason));
-    return decide(v, 2);
+    return decide(v, 2, typeof m.unmask === 'function' ? m.unmask : null);
   }
 
   return { SWITCH, RELEVANCE_SWITCH, DEFAULTS, TIMEOUT_MS, enabled, route };

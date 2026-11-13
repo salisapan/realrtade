@@ -41,6 +41,7 @@ const ADDRESSABLE = new Set(['request_reply', 'payment', 'commitment_reader', 't
 const rows = []; const seen = new Set();
 const stats = { formatSensitive: 0, typoSensitive: 0, ruleCorrected: {}, engineError: 0 };
 function label(row, body) { return E.teach(Object.assign({}, row, { body })); }
+const ATTACH_TO_INVITE = /\b(?:attach|add|include)\b[^.?!\n]{0,70}\b(?:to|onto)\s+(?:the\s+|our\s+|my\s+)?(?:\w+\s+){0,3}(?:invite|invitation)\b|(?:לצרף|תצרף|תצרפי|צרף|צרפי)[^.?!\n]{0,70}(?:לזימון|להזמנה)/i;
 function finish(row, cleanBody) {
   const key = sha([row.surface, row.direction, row.attachmentCount, row.subject, row.body, (row.cc || []).join(',')].join('\u0001'));
   if (seen.has(key)) return false; seen.add(key); row.hash = key.slice(0, 16);
@@ -48,6 +49,12 @@ function finish(row, cleanBody) {
   if (eLive.reason === 'engine-error') stats.engineError++;
   const ownText = E.preprocess(Object.assign({}, row, { body: cleanBody })).own;
   const ref = referenceLabel(eClean.label, { surface: row.surface, direction: row.direction, attachmentCount: row.attachmentCount, subject: row.subject, own: ownText, to: row.to, cc: row.cc, ownEmail: OWN[row.surface], ownNames: OWN_NAMES }, CANON_SAVE);
+  // Pre-registered 2026-10-26 (BATCH-006), applied 2026-11-08: "attach X to the invite" asks the person to send or attach a file to a
+  // meeting they are not hosting. Both blind passes labelled it a draft (batch-004 item 35, batch-006 item 35); the engine offered a
+  // calendar event for some phrasings and nothing for others. Dataset label only: runtime/product-rules.cjs (the veto) is unchanged.
+  if (row.direction === 'inbound' && !ref.rules.length && (ref.label === 'SILENT' || ref.label === 'event|calendar') && ATTACH_TO_INVITE.test(cleanBody)) {
+    ref.label = 'follow-up-ask|draft'; ref.rules.push('attach-to-invite-draft');
+  }
   row.engine35 = { label: eLive.label, reason: eLive.reason, family: eLive.family, primaryStep: eLive.primaryStep };
   row.engine35Clean = eClean.label;
   row.formatSensitive = eLive.label !== eClean.label; if (row.formatSensitive) stats.formatSensitive++;
@@ -133,6 +140,8 @@ for (const r of rows) {
   else { const b = bucket(r.templateId); r.split = b < 20 ? 'test' : (b < 32 ? 'val' : 'train'); }
 }
 const w = (name, arr) => fs.writeFileSync(path.join(OUT, name), arr.map((r) => JSON.stringify(r)).join('\n') + '\n');
+// stable content ids (model/dataset/cid.cjs): join labels by `cid`, never by the positional `id`
+const { cid: contentId } = require('../cid.cjs'); for (const r of rows) r.cid = contentId(r);
 w('all.jsonl', rows); for (const s of ['train', 'val', 'test']) w(s + '.jsonl', rows.filter((r) => r.split === s));
 const by = (fn) => { const o = {}; for (const r of rows) { const k = fn(r); o[k] = o[k] || { n: 0, show: 0 }; o[k].n++; if (r.reference.show) o[k].show++; } return o; };
 const frameCounts = {}; for (const f of frames) { const k = f.origin + ':' + f.lang; frameCounts[k] = (frameCounts[k] || 0) + 1; }

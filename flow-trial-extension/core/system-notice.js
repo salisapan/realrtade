@@ -17,7 +17,11 @@ const FlowSystemNotice = (() => {
     'amazon.com', 'amazonaws.com', 'aws.amazon.com', 'heroku.com', 'render.com', 'fly.io', 'digitalocean.com', 'atlassian.com',
     'zoom.us', 'dropbox.com', 'apple.com', 'stripe.com', 'paypal.com', 'meta.com', 'facebook.com', 'facebookmail.com',
     'slack.com', 'notion.so', 'figma.com', 'canva.com', 'mailchimp.com', 'hostinger.com', 'bluehost.com', 'monday.com',
-    'quickbooks.com', 'intuit.com', 'twilio.com', 'sendgrid.net', 'openai.com', 'anthropic.com'
+    'quickbooks.com', 'intuit.com', 'twilio.com', 'sendgrid.net', 'openai.com', 'anthropic.com',
+    // Israeli services an Israeli freelancer deals with (exact domain or a subdomain, never a lookalike): the state, the electric company, the
+    // big telecoms, the invoicing services and the two payment apps.
+    'gov.il', 'iec.co.il', 'bezeq.co.il', 'partner.co.il', 'cellcom.co.il', 'pelephone.co.il', 'hot.net.il',
+    'greeninvoice.co.il', 'morning.co', 'icount.co.il', 'paybox.co.il', 'bitpay.co.il'
   ];
 
   const MONTHS = {
@@ -69,8 +73,10 @@ const FlowSystemNotice = (() => {
     return null;
   }
 
+  const PROVIDER_NAMES = { 'gov.il': 'gov.il', 'iec.co.il': 'IEC', 'bezeq.co.il': 'Bezeq', 'hot.net.il': 'HOT', 'icount.co.il': 'iCount', 'greeninvoice.co.il': 'Green Invoice', 'morning.co': 'Morning' };
   function providerName(email, known) {
     const dom = known || domainOf(email);
+    if (PROVIDER_NAMES[dom]) return PROVIDER_NAMES[dom];
     const label = String(dom).split('.')[0] || '';
     return label ? label.charAt(0).toUpperCase() + label.slice(1) : '';
   }
@@ -107,6 +113,15 @@ const FlowSystemNotice = (() => {
     }
     const reHe = /\b(\d{1,2})\s+ב?(ינואר|פברואר|מרץ|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)(?:\s+(20\d{2}))?/g;
     while ((m = reHe.exec(t))) cands.push({ at: m.index, md: [MONTHS[m[2]], +m[1], m[3] ? +m[3] : null] });
+    // A numeric day.month in a Hebrew notice ("ב-5.11", "עד 15/11/2026"): day first, as it is written in Israel. Not in English text, where 5/11 is
+    // ambiguous, and not inside a longer number ("v5.11.2").
+    if (/[א-ת]/.test(t)) {
+      const reNum = /(?<![\d./\w])(\d{1,2})[./](\d{1,2})(?:[./](20\d{2}))?(?![\d\w]|[./]\d)/g;
+      while ((m = reNum.exec(t))) {
+        const d = +m[1]; const mo = +m[2];
+        if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) cands.push({ at: m.index, md: [mo, d, m[3] ? +m[3] : null] });
+      }
+    }
     const out = [];
     for (const c of cands) {
       let v = c.iso;
