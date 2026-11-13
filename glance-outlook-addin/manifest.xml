@@ -25,9 +25,12 @@
     </Sets>
   </Requirements>
   <FormSettings>
+    <!-- ItemRead DesktopSettings requires SourceLocation, then RequestedHeight (32–450).
+         ItemEdit DesktopSettings allows SourceLocation only. TabletSettings and PhoneSettings are optional (minOccurs 0) and are omitted. -->
     <Form xsi:type="ItemRead">
       <DesktopSettings>
         <SourceLocation DefaultValue="https://theflow-ai.com/glance-outlook-addin/src/taskpane.html" />
+        <RequestedHeight>250</RequestedHeight>
       </DesktopSettings>
     </Form>
     <Form xsi:type="ItemEdit">

@@ -92,7 +92,28 @@ function rewriteManifest(xml, base) {
   const beforeId = (/<Id>([^<]+)<\/Id>/.exec(xml) || [])[1];
   const afterId = (/<Id>([^<]+)<\/Id>/.exec(out) || [])[1];
   if (!beforeId || beforeId !== afterId) throw new Error('manifest id changed');
+  assertFormSettings(out);
   return out;
+}
+
+// The committed manifest is the source. This is the form-settings shape the copy must keep.
+// ItemRead DesktopSettings: SourceLocation, then RequestedHeight 250 (schema range 32–450).
+// ItemEdit DesktopSettings: SourceLocation only. RequestedHeight there is not valid.
+// TabletSettings and PhoneSettings: optional, omitted.
+function assertFormSettings(xml) {
+  const readAt = xml.indexOf('xsi:type="ItemRead"');
+  const editAt = xml.indexOf('xsi:type="ItemEdit"');
+  const end = xml.indexOf('</FormSettings>');
+  if (readAt < 0 || editAt < readAt || end < editAt) throw new Error('ItemRead and ItemEdit forms are required');
+  const read = xml.slice(readAt, editAt);
+  const edit = xml.slice(editAt, end);
+  if (!/<DesktopSettings>\s*<SourceLocation\b[^>]*\/>\s*<RequestedHeight>250<\/RequestedHeight>\s*<\/DesktopSettings>/.test(read)) {
+    throw new Error('ItemRead DesktopSettings must be SourceLocation then RequestedHeight 250');
+  }
+  if (/RequestedHeight/.test(edit)) throw new Error('ItemEdit DesktopSettings must not include RequestedHeight');
+  if (/<(?:TabletSettings|PhoneSettings)\b/.test(xml)) {
+    throw new Error('TabletSettings and PhoneSettings stay omitted');
+  }
 }
 
 function sameFile(a, b) {

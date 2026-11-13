@@ -46,11 +46,11 @@ The pane loads `office.js` from Microsoft. With no Mail.Read token wired, the ca
 
 ### Outlook on the web
 
-Unverified from this commit. These steps follow Microsoft's [Sideload Outlook add-ins for testing](https://learn.microsoft.com/en-us/office/dev/add-ins/outlook/sideload-outlook-add-ins-for-testing) for an add-in only manifest. They were not run on this commit.
+A sideload of the previous manifest was tried on Outlook.com and rejected: each `DesktopSettings` had only `SourceLocation`, and Outlook reported that `RequestedHeight` was missing. This manifest puts `RequestedHeight` on the read form only. A successful sideload of this file has not been run.
 
 1. Use a Microsoft 365 or Outlook.com account that can add a custom add-in. On-premises Exchange is a different path and was not tried.
-2. Open https://aka.ms/olksideload. Outlook on the web opens the Add-ins for Outlook dialog.
-3. Choose My add-ins. Under Custom Addins, choose Add a custom add-in, then Add from File, and select `dist/test-manifest.xml`. Microsoft documents Add from File for this dialog. Accept the prompts.
+2. On a consumer Outlook.com account, open https://outlook.live.com/mail/0/inclientstore and use My add-ins, then Custom, then Add from File. https://aka.ms/olksideload opens outlook.cloud.microsoft, which asks for a work or school sign-in. On a Microsoft 365 work or school account, https://aka.ms/olksideload opens the Add-ins for Outlook dialog.
+3. Choose the generated `dist/test-manifest.xml`. Accept the prompts.
 4. Open a message. Glance is on the message command surface. The pane can load from the tunnel. The card stays quiet until a Mail.Read sign-in exists.
 
 ### Outlook on iOS

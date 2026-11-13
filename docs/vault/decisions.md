@@ -9,6 +9,8 @@ updated: 2026-10-28
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-11-13 · Outlook add-in manifest: ItemRead DesktopSettings includes RequestedHeight 250 after SourceLocation. ItemEdit stays SourceLocation only, because RequestedHeight there fails the schema. TabletSettings and PhoneSettings stay omitted (optional). The previous sideload was rejected on Outlook.com. Gate: not run · Cursor agent · [[open-tasks]] row 87, `glance-outlook-addin/README.md`
+
 - 2026-11-13 · Outlook add-in test manifest: a local script writes a sideload copy whose SourceLocation, task pane, icon, and AppDomain URLs use a tester HTTPS base. The committed manifest stays on https://theflow-ai.com. Nothing is hosted or deployed. Sideload on Outlook on the web and on iOS is documented and not run. Gate: not run · Cursor agent · [[open-tasks]] row 87, `glance-outlook-addin/README.md`
 
 - 2026-11-09 · Outlook add-in phase 1 on the working branch: local bundle, mobile read command in VersionOverrides 1.1, full thread or no card, a draft is inserted only on a click and read back, the person presses Send. Not hosted. Gate: not run · Claude · [[open-tasks]] row 87, `glance-outlook-addin/README.md`
