@@ -4290,6 +4290,8 @@ function glanceUiCopy(kind) {
 
   function recordSilence(messageId, reason, detail) {
     void flushSuggest(false);
+    // One line per engine silence: the reason code and the message id only. No body text, no address.
+    console.log('[Glance] silent:', reason, messageId);
     if (!messageId || !reason || typeof FlowStorage.recordSilence !== 'function') return;
     FlowStorage.recordSilence({ messageId: messageId, reason: reason })
       .catch((e) => console.error('[Glance] failed to record a silence decision', e));
