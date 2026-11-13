@@ -10,7 +10,8 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 const FILES = ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'file-attach.js', 'fact-reply.js',
-  'quiet-metrics.js', 'resolution.js', 'commitment-title.js', 'graph-mail.js', 'incoming-judge.js', 'draft-reply.js', 'intent-decompose.js'];
+  'quiet-metrics.js', 'resolution.js', 'commitment-title.js', 'graph-mail.js', 'incoming-judge.js', 'draft-reply.js', 'intent-decompose.js', 'ai-floor.js', 'tier0-guard.js'];
+// ai-floor and tier0-guard: the clause pass needs a whole-mail veto (red team 2026-11-13); a host that passes no phishing check loads the guard.
 const NOW = new Date('2026-10-07T12:00:00+03:00').getTime();
 const sb = { module: undefined, console: { log() {}, warn() {}, error() {}, info() {}, debug() {} }, TextEncoder, atob, btoa };
 vm.createContext(sb);

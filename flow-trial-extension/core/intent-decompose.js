@@ -118,6 +118,10 @@ const FlowIntentDecompose = (() => {
   // decompose(flags, input, deps) -> { used:false } | { used:true, intentions:[parts...], primary, whole:{show, reason}, reason? }
   //   input: { text (the mail's new text, quoted history already removed by the host), whole (the judge's result on the whole mail), sender, vetoText }
   //   deps:  { judgeText(text) -> judge result (the same judge, the same host context, only the text changed); phishing(text) -> bool (optional) }
+  function guardSibling() {
+    if (typeof FlowTier0Guard !== 'undefined') return FlowTier0Guard;
+    try { return typeof require !== 'undefined' ? require('./tier0-guard.js').FlowTier0Guard : null; } catch (e) { return null; }
+  }
   function decompose(flags, input, deps) {
     if (!enabled(flags)) return { used: false };
     const i = input || {}, d = deps || {};
@@ -134,7 +138,16 @@ const FlowIntentDecompose = (() => {
     }
     if (!pass) return { used: true, intentions, primary: null, whole: { show: false, reason }, reason: 'whole-mail-quiet' };
     if (typeof d.judgeText !== 'function') return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'no-judge' };
-    if (typeof d.phishing === 'function' && d.phishing(String(i.vetoText || text))) return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'whole-mail-veto' };
+    // Red team 2026-11-13 (docs/glance-ai/red-team.md): with no phishing check from the host, a bank-change or gift-card mail whose
+    // whole reading was quiet still had each clause read alone ("Please pay invoice 552 by Friday" -> a Pay card). The whole-mail veto
+    // now always runs: the host's check when it passes one, else Glance's own guard (core/tier0-guard.js: injection and fraud shapes);
+    // with neither available, no clause pass at all.
+    const vetoText = String(i.vetoText || text);
+    const guard = guardSibling();
+    const vetoed = typeof d.phishing === 'function' ? d.phishing(vetoText)
+      : (guard && typeof guard.check === 'function' ? guard.check({ text: vetoText, subject: '' }) !== null : null);
+    if (vetoed === null) return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'no-veto-available' };
+    if (vetoed) return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'whole-mail-veto' };
     if (TAKES_BACK.test(text)) return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'takes-back' };
     const split = clauses(text);
     if (split.clauses.length < 2) return { used: true, intentions, primary: intentions[0] || null, whole: { show: !!whole.show, reason }, reason: 'one-clause' };
