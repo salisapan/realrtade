@@ -2,8 +2,16 @@
 // One Do It through the shared chat task card; a reply ask inserts a draft in the compose box.
 // Never sends. Graph read (Chat.Read) only when the DOM is not enough.
 (() => {
+  try {
+    if (document.documentElement && document.documentElement.getAttribute('data-glance-lane-teams') !== 'on') {
+      document.documentElement.setAttribute('data-glance-lane-teams', 'on');
+    }
+  } catch (e) { /* document not ready */ }
   if (window.__glanceLaneTeams) return;
-  if (typeof FlowTeamsParse === 'undefined') return;
+  if (typeof FlowTeamsParse === 'undefined') {
+    try { console.info('[Glance] whyNotShown: teams-parse-missing'); } catch (e) { /* no console */ }
+    return;
+  }
   window.__glanceLaneTeams = { observers: 0 };
   const P = FlowTeamsParse;
   const DEBOUNCE_MS = 1200;

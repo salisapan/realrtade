@@ -186,6 +186,12 @@ test('Teams hosts not granted: the lane does not register', async () => {
     expect(manifest.optional_host_permissions).toEqual(expect.arrayContaining(TEAMS_HOSTS));
     expect(manifest.host_permissions || []).not.toEqual(expect.arrayContaining(TEAMS_HOSTS));
     expect((manifest.permissions || []).join(' ')).not.toMatch(/teams\.microsoft\.com|teams\.live\.com/);
+    const leaked = JSON.parse(JSON.stringify(manifest));
+    delete leaked.optional_host_permissions;
+    expect(JSON.stringify(leaked)).not.toMatch(/teams\.(microsoft|live)\.com/);
+    const staticJs = (manifest.content_scripts || []).reduce((all, row) => all.concat(row.js || []), []);
+    expect(staticJs).not.toContain('src/content-teams.js');
+    expect(staticJs).not.toContain('src/teams-lane-boot.js');
   } finally {
     if (context) await context.close().catch(() => {});
     fs.rmSync(extDir, { recursive: true, force: true });
@@ -219,6 +225,86 @@ test('Teams hosts: grant registers, a restart keeps it, a revoke clears it', asy
     context = await launchBare(extDir, userData);
     worker = await readyWorker(context);
     await expect.poll(() => registeredIds(worker).catch(() => []), { timeout: 20000 }).not.toContain('glance-lane-teams');
+  } finally {
+    if (context) await context.close().catch(() => {});
+    fs.rmSync(extDir, { recursive: true, force: true });
+    fs.rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+test('registered Teams script injects on teams.live.com/v2, including a nested frame', async () => {
+  test.setTimeout(180000);
+  const extDir = copyExtension({ bare: true });
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-teams-v2-'));
+  let context = null;
+  try {
+    context = await launchBare(extDir, userData);
+    let worker = await readyWorker(context);
+    const extensionId = await worker.evaluate(() => chrome.runtime.id);
+    await context.close();
+    context = null;
+    grantOrigins(userData, extensionId, TEAMS_HOSTS);
+    context = await launchBare(extDir, userData);
+    const notes = [];
+    context.on('serviceworker', (sw) => sw.on('console', (msg) => notes.push(msg.text())));
+    worker = await readyWorker(context);
+    worker.on('console', (msg) => notes.push(msg.text()));
+    await expect.poll(async () => {
+      const ids = await registeredIds(worker).catch(() => []);
+      return ids.indexOf('glance-lane-teams') >= 0 ? 'glance-lane-teams' : (notes.join(' | ') || 'no-registration');
+    }, { timeout: 20000 }).toBe('glance-lane-teams');
+    const spec = await worker.evaluate(async () => {
+      const rows = await chrome.scripting.getRegisteredContentScripts({ ids: ['glance-lane-teams'] });
+      return rows && rows[0];
+    });
+    expect(spec && spec.allFrames).toBe(true);
+    expect(spec.matchOriginAsFallback).toBe(true);
+    expect(spec.persistAcrossSessions).toBe(true);
+    expect(spec.runAt).toBe('document_end');
+    expect(spec.js[0]).toBe('src/teams-lane-boot.js');
+    expect(spec.matches.slice().sort()).toEqual([
+      'https://teams.live.com/*',
+      'https://teams.microsoft.com/*'
+    ]);
+    const manifest = await worker.evaluate(() => chrome.runtime.getManifest());
+    const staticJs = (manifest.content_scripts || []).reduce((all, row) => all.concat(row.js || []), []);
+    expect(staticJs).not.toContain('src/teams-lane-boot.js');
+    const missing = await worker.evaluate(async (files) => {
+      const bad = [];
+      for (const file of files) {
+        const res = await fetch(chrome.runtime.getURL(file));
+        if (!res.ok) bad.push(file + ' ' + res.status);
+      }
+      return bad;
+    }, (spec.js || []).concat(spec.css || []));
+    expect(missing).toEqual([]);
+
+    const shell = '<!doctype html><html><body><p>shell</p>' +
+      '<iframe id="chat" src="https://teams.live.com/v2/chat"></iframe>' +
+      '<iframe id="blank" src="about:blank"></iframe></body></html>';
+    const frameHtml = '<!doctype html><html><body><p>chat frame</p></body></html>';
+    await context.route(/https:\/\/teams\.live\.com\//, async (route) => {
+      const url = route.request().url();
+      const body = url.indexOf('/v2/chat') >= 0 ? frameHtml : shell;
+      if (route.request().resourceType() === 'document') {
+        await route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: body });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
+    });
+    const logs = [];
+    const page = await context.newPage();
+    page.on('console', (msg) => logs.push(msg.text()));
+    await page.goto('https://teams.live.com/v2/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await expect.poll(() => page.locator('html').getAttribute('data-glance-lane-teams').catch(() => null), { timeout: 20000 }).toBe('on');
+    const chat = page.frame({ url: /https:\/\/teams\.live\.com\/v2\/chat/ });
+    expect(chat).toBeTruthy();
+    await expect.poll(() => chat.locator('html').getAttribute('data-glance-lane-teams').catch(() => null), { timeout: 20000 }).toBe('on');
+    const blank = page.frames().filter((frame) => frame.url() === 'about:blank' && frame.parentFrame() === page.mainFrame())[0];
+    expect(blank).toBeTruthy();
+    await expect.poll(() => blank.locator('html').getAttribute('data-glance-lane-teams').catch(() => null), { timeout: 20000 }).toBe('on');
+    await expect.poll(() => logs.some((line) => line.indexOf('[Glance] teams lane injected https://teams.live.com/v2/') >= 0), { timeout: 20000 }).toBe(true);
+    await expect.poll(() => logs.some((line) => line.indexOf('[Glance] teams lane injected https://teams.live.com/v2/chat') >= 0), { timeout: 20000 }).toBe(true);
   } finally {
     if (context) await context.close().catch(() => {});
     fs.rmSync(extDir, { recursive: true, force: true });

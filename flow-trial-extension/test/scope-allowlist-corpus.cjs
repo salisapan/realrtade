@@ -89,6 +89,8 @@ function auditShippedManifest(man, label) {
   check(tag + ': Teams web hosts are optional and not required',
     optionalHosts.indexOf('https://teams.microsoft.com/*') >= 0 && optionalHosts.indexOf('https://teams.live.com/*') >= 0 &&
     !hosts.some((h) => /teams\.(microsoft|live)\.com/i.test(h)), { optional: optionalHosts, hosts: hosts });
+  const teamsLeak = JSON.stringify(Object.assign({}, man, { optional_host_permissions: undefined }));
+  check(tag + ': no teams origin outside optional_host_permissions', !/teams\.(microsoft|live)\.com/i.test(teamsLeak));
   if (label === 'repo manifest') {
     check('mutant messenger.com optional host is rejected by v1 optional audit', (() => {
       const bad = optionalHosts.concat(['https://www.messenger.com/*']);

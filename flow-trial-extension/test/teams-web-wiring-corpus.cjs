@@ -15,7 +15,7 @@ const bg = fs.readFileSync(path.join(root, 'src/background.js'), 'utf8');
 const content = fs.readFileSync(path.join(root, 'src/content-teams.js'), 'utf8');
 const worker = fs.readFileSync(path.join(root, 'src/lane-teams-worker.js'), 'utf8');
 
-check('background registers the Teams lane', /glance-lane-teams/.test(bg) && /teams\.microsoft\.com/.test(bg) && /content-teams\.js/.test(bg));
+check('background registers the Teams lane', /glance-lane-teams/.test(bg) && /teams\.microsoft\.com/.test(bg) && /content-teams\.js/.test(bg) && /teams-lane-boot\.js/.test(bg) && /allFrames: true/.test(bg));
 check('background loads teams-web-read and lane-teams-worker', /teams-web-read\.js/.test(bg) && /lane-teams-worker\.js/.test(bg));
 check('content-teams never clicks send', !/\.click\s*\(/.test(content) && !/requestSubmit/.test(content));
 check('worker handles flow:teams-web-read', /flow:teams-web-read/.test(worker));

@@ -1931,17 +1931,21 @@
         allBox.checked = opt.length > 0 && opt.every((box) => box.checked);
       }
       allBox.addEventListener('change', async () => {
+        const teamsBox = boxes.teams;
+        const teamsWas = Boolean(teamsBox && teamsBox.checked);
         optionalBoxes().forEach((box) => { box.checked = allBox.checked; });
-        if (allBox.checked && boxes.teams && boxes.teams.checked) {
-          const ok = await askTeamsWebHosts({ box: boxes.teams, note: note, button: c });
+        if (allBox.checked && teamsBox && teamsBox.checked) {
+          const ok = await askTeamsWebHosts({ box: teamsBox, note: note, button: c });
           if (!ok) syncAll();
+        } else if (!allBox.checked && teamsWas) {
+          await releaseTeamsWebHosts({ box: teamsBox, note: note, button: c });
         }
       });
       optionalBoxes().forEach((box) => box.addEventListener('change', syncAll));
       if (boxes.teams) {
         boxes.teams.addEventListener('change', async () => {
-          if (!boxes.teams.checked) return;
-          await askTeamsWebHosts({ box: boxes.teams, note: note, button: c });
+          if (boxes.teams.checked) await askTeamsWebHosts({ box: boxes.teams, note: note, button: c });
+          else await releaseTeamsWebHosts({ box: boxes.teams, note: note, button: c });
           syncAll();
         });
       }
@@ -2015,8 +2019,8 @@
       addScope.setAttribute('data-glance-add-scope', '1');
       if (scopeBoxes.teams) {
         scopeBoxes.teams.addEventListener('change', async () => {
-          if (!scopeBoxes.teams.checked) return;
-          await askTeamsWebHosts({ box: scopeBoxes.teams, note: note, button: addScope });
+          if (scopeBoxes.teams.checked) await askTeamsWebHosts({ box: scopeBoxes.teams, note: note, button: addScope });
+          else await releaseTeamsWebHosts({ box: scopeBoxes.teams, note: note, button: addScope });
         });
       }
       addScope.addEventListener('click', async () => {
@@ -2418,6 +2422,21 @@
       if (!ok && ui && ui.box) ui.box.checked = false;
       if (!ok && ui && ui.note) { ui.note.hidden = false; ui.note.textContent = 'הדפדפן לא נתן גישה ל-Teams. Glance לא קורא את הצ׳אט.'; }
       if (!ok && ui && ui.button) ui.button.disabled = false;
+      return ok;
+    });
+  }
+
+  function releaseTeamsWebHosts(ui) {
+    const consent = globalThis.FlowTeamsHostConsent;
+    const remove = () => {
+      if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.remove) return Promise.resolve(false);
+      return chrome.permissions.remove({ origins: teamsWebHosts() }).then((ok) => Boolean(ok)).catch(() => false);
+    };
+    if (consent && typeof consent.release === 'function') return consent.release(remove, ui);
+    return remove().then((ok) => {
+      if (ui && ui.box) ui.box.checked = false;
+      if (ui && ui.note) { ui.note.hidden = false; ui.note.textContent = 'Teams כבוי. Glance לא קורא את הצ׳אט.'; }
+      if (ui && ui.button) ui.button.disabled = false;
       return ok;
     });
   }

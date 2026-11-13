@@ -36,6 +36,8 @@ REQUIRED = [
     "src/content-whatsapp.js",
     "src/content-teams.js",
     "src/teams-parse.js",
+    "src/teams-lane-boot.js",
+    "src/teams-lane-spec.js",
     "src/lane-teams-worker.js",
     "core/teams-web-read.js",
 ]

@@ -6,6 +6,8 @@ updated: 2026-11-13
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-11-13 · Teams web lane, after the live Gate on `771d48f4`: the registered script matches `teams.live.com` and `teams.microsoft.com` at the root and under `/v2/`, in every frame, and logs when it injects. Untick removes both optional hosts. They stay out of every other manifest key. No new Graph scope. Gate: not run live on this head · Cursor · [[open-tasks]] row 69
+
 - 2026-11-13 · Owner (Sali, «כן, להפעיל את Teams»): Teams web hosts `https://teams.microsoft.com/*` and `https://teams.live.com/*` are optional only. The Teams box asks for them on the click. The lane registers only after the grant, and stays quiet if they are refused or removed. No new Graph scope. Gate: not run live · Cursor · [[open-tasks]] row 69, `flow-landing/privacy.html`
 
 - 2026-10-26 · Hebrew weekday + ambiguous `5/11`: day-first only when the matched weekday is Hebrew (`יום`/`ביום`) beside the date, not any Hebrew in the mail; English and mixed US `12/4` stay December; `ביום חמישי 5/11` with no clock is 5 November; `יום שני 5/11 14:00` asks which date instead of silently picking 11 May (`core/extract.js`, `test/hebrew-weekday-explicit-date-corpus.cjs`) · Claude · PR #236
