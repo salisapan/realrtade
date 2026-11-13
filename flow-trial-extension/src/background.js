@@ -79,9 +79,9 @@ import '../core/outlook-event-call-link.js'; // classic: sets globalThis.FlowOut
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
+import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
 import '../core/teams-web-read.js'; // classic: sets globalThis.FlowTeamsWebRead (Teams web lane, Chat.Read fallback)
 import './lane-teams-worker.js'; // answers flow:teams-web-read for teams.microsoft.com
-import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
 // The worker cannot call import(). These are the helpers imported at the top of this file.
 globalThis.__glanceGoogleAuth = {
   GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
@@ -2641,10 +2641,10 @@ function googleTasksAuthedFetch(path, options) {
   return googleAuthedFetch(GOOGLE_TASKS_API, path, options);
 }
 
-// A task made from a chat names the chat (Open in WhatsApp), never "Open in Gmail". Only the three known labels count.
+// A task made from a chat names the chat (Open in WhatsApp), never "Open in Gmail". Only the known labels count.
 function chatThreadLabel(p, fallback) {
   const l = p && p.threadLabel;
-  return (l === 'Open in WhatsApp' || l === 'Open in Messenger' || l === 'Open in Instagram') ? l : fallback;
+  return (l === 'Open in WhatsApp' || l === 'Open in Messenger' || l === 'Open in Instagram' || l === 'Open in Teams') ? l : fallback;
 }
 
 const CHAT_CARD_ASSETS = ['design/step-states-v1/do-it.png', 'design/step-states-v1/do-it-dark.png', 'design/step-states-v1/living/key-idle-512.png', 'design/step-states-v1/living/key-done-512.png'];
