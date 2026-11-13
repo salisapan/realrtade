@@ -90,8 +90,8 @@ console.log('\n--- a phone signature drops only when the line is only the signat
     { gmail: shown, outlook: shownOl });
   const item17 = 'תשמור את הקובץ המצורף ב-One Drive עד יום ראשון\n\nנשלח מה-iPhone שלי';
   const one = sig(item17, 'outlook', 1);
-  check('item 17 stays OneDrive plus the Outlook draft at one file',
-    one.show === true && one.kinds && one.kinds[0] === 'onedriveFile' && one.kinds[1] === 'outlookDraft',
+  check('item 17 is the OneDrive save alone at one file, no draft step',
+    one.show === true && one.kinds && one.kinds.length === 1 && one.kinds[0] === 'onedriveFile',
     one);
 }
 

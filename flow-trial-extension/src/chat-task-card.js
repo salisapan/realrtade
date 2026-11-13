@@ -39,9 +39,15 @@ const FlowChatTaskCard = (() => {
     });
   }
 
+  // A Chrome Web Store install (Chrome adds update_url to the manifest) never turns a Labs switch on,
+  // whatever storage says. Unpacked/dev installs have no update_url and keep Labs working.
+  function glanceLabsLocked() {
+    try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
+  }
   async function switchOn(name) {
     try {
       if (!runtimeAlive() || !chrome.storage || !chrome.storage.local) return false;
+      if (glanceLabsLocked()) return false;
       const bag = await chrome.storage.local.get({ glanceSwitches: {} });
       return !!(bag.glanceSwitches && bag.glanceSwitches[name || SWITCH] === true);
     } catch (e) { return false; }
@@ -301,7 +307,7 @@ const FlowChatTaskCard = (() => {
       const st = e.process && Array.isArray(e.process.steps) ? e.process.steps[0] : null;
       const p = st && st.params;
       if (!p || !p.title || !/^\d{4}-\d{2}-\d{2}$/.test(String(p.dateIso || ''))) continue;
-      out.push({ row: e, title: String(p.title), dueIso: p.dateIso, lastNudgeAt: 0 });
+      out.push({ row: e, title: String(p.title), dueIso: p.dateIso, lastNudgeAt: 0, waiting: /^(?:Waiting on|מחכים ל)/.test(String(p.title)) });
     }
     out.forEach((t) => { t.lastNudgeAt = nudged[t.row.chatKey] || 0; });
     return out;
@@ -550,6 +556,36 @@ const FlowChatTaskCard = (() => {
       return { shown: true, reason: 'receipt' };
     }
 
+    // The person says they sent what they had promised ("Sent you the contract", «שלחתי לך את החוזה») while this chat has a task Glance wrote for that
+    // promise ("Send the contract on Thursday"): the card offers to mark it done. The words must share a content word with exactly one of the person's
+    // own open tasks from this chat (a claim that names nothing fits only the one open task); a "Waiting on ..." task is the other side's, not this.
+    if (own && typeof FlowChatSentClaim !== 'undefined') {
+      let sentOwn = null;
+      try { sentOwn = FlowChatSentClaim.recognize(i.text); } catch (e) { sentOwn = null; }
+      if (sentOwn && sentOwn.kind === 'sent') {
+        const mine = (await findOpenWaiting(chatKey)).filter((t) => !t.waiting);
+        const fittingOwn = FlowChatSentClaim.fits(sentOwn, mine, mine.length);
+        if (fittingOwn.length === 1) {
+          return offerClose(i, chatKey, mount, { row: fittingOwn[0].row, connectorId: fittingOwn[0].row.connectorId }, sentOwn.lang === 'he', sentOwn.lang === 'he' ? 'בוצע? ' : 'Done? ', 'own-sent');
+        }
+      }
+    }
+
+    // The person says they paid what they were asked for ("I paid invoice 2231", «שילמתי 500 ש"ח») while this chat has a "Pay ..." task Glance wrote for
+    // it: the card offers to mark it done. The invoice number or the amount names the task; a claim that names neither fits only the one open pay task.
+    // Glance has not seen the payment.
+    if (own && typeof FlowChatPaymentClaim !== 'undefined' && typeof FlowChatPaymentClaim.fitsOwn === 'function') {
+      let paid = null;
+      try { paid = FlowChatPaymentClaim.recognize(i.text); } catch (e) { paid = null; }
+      if (paid && paid.kind === 'claim') {
+        const mine = (await findOpenWaiting(chatKey)).filter((t) => !t.waiting);
+        const fitting = FlowChatPaymentClaim.fitsOwn(paid, mine);
+        if (fitting.length === 1) {
+          return offerClose(i, chatKey, mount, { row: fitting[0].row, connectorId: fitting[0].row.connectorId }, paid.lang === 'he', paid.lang === 'he' ? 'שולם? ' : 'Paid? ', 'own-paid');
+        }
+      }
+    }
+
     // The other side says they paid ("I transferred 500 NIS", «העברתי לך 500 ש"ח») while this chat has a "Waiting on ...: Payment" task
     // Glance wrote (Google Tasks): the card offers to mark that task done. One amount matches one task; no amount needs exactly one.
     if (!own && typeof FlowChatPaymentClaim !== 'undefined') {
@@ -571,7 +607,7 @@ const FlowChatTaskCard = (() => {
       let sent = null;
       try { sent = FlowChatSentClaim.recognize(i.text); } catch (e) { sent = null; }
       if (sent && sent.kind === 'sent') {
-        const waiting = await findOpenWaiting(chatKey);
+        const waiting = (await findOpenWaiting(chatKey)).filter((t) => t.waiting);
         const docs = waiting.filter((t) => !/^(?:Waiting on|מחכים ל-?)[^:]*:\s*(?:Payment|תשלום) /.test(t.title));
         const fitting = FlowChatSentClaim.fits(sent, docs, waiting.length);
         if (fitting.length === 1) {
@@ -669,8 +705,14 @@ const FlowChatTaskCard = (() => {
       if ((held === appt || held === inv) && held.durationMinutes) holdMinutes = held.durationMinutes;
     } else {
       try {
-        judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0 });
+        // directAskOn: plain business questions (two or more) in a one-to-one chat; this card already dropped groups, own and quoted text.
+        judged = judge.judge({ text: i.text, subject: '', sender: i.sender || {}, surface: 'chat', now: i.now, attachmentCount: 0, directAskOn: true, oneToOne: i.oneToOne === true && !i.group && !i.fromMe && !i.quoted });
       } catch (e) { judged = null; }
+      // A payment asked with an amount and a day is read by its own reader (a task "Pay 1200 NIS · Dana"); the shared judge's generic
+      // "Reply requested by Oct 27, ₪1,200" for the same words is the weaker reading and gives way to it.
+      if (!own && judged && judged.show && typeof FlowChatPaymentAsk !== 'undefined') {
+        try { const pa = FlowChatPaymentAsk.recognize(i.text, i.now); if (pa && pa.kind === 'ask') judged = null; } catch (e) { /* keep the judge's reading */ }
+      }
       // "Can we do a Teams call Thursday at 3pm?" is a call proposal the shared judge leaves to core/teams-meeting.js:
       // one day, one clock, no other tool named. It becomes the same hold, titled as a call; the Meet or Teams link is the
       // worker's, behind its own switch.
@@ -706,9 +748,14 @@ const FlowChatTaskCard = (() => {
       if ((!judged || !judged.show) && !own && typeof FlowChatPaymentAsk !== 'undefined') {
         let pay = null;
         try { pay = FlowChatPaymentAsk.recognize(i.text, i.now); } catch (e) { pay = null; }
+        // An invoice that names its number and day but no amount ("Your invoice 2231 is due on Friday"): the task is "Pay invoice 2231".
+        if (!(pay && pay.kind === 'ask') && typeof FlowChatPaymentAsk.recognizeBill === 'function') {
+          try { pay = FlowChatPaymentAsk.recognizeBill(i.text, i.now); } catch (e) { pay = null; }
+        }
         if (pay && pay.kind === 'ask') {
           const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-          const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + pay.amount + ' ' + pay.currency + (who ? ' · ' + who : '')).slice(0, 120);
+          const what = pay.ref ? (pay.lang === 'he' ? 'חשבונית ' : 'invoice ') + pay.ref : pay.amount + ' ' + pay.currency;
+          const title = ((pay.lang === 'he' ? 'לשלם ' : 'Pay ') + what + (who ? ' · ' + who : '')).slice(0, 120);
           judged = {
             show: true,
             intent: { type: 'request', label: title, entities: { dateIso: pay.dateIso, what: title } },
@@ -817,7 +864,7 @@ const FlowChatTaskCard = (() => {
     if (kind === 'calendar') {
       // A hold is titled "Meeting · Dana", not with the whole message; the chat is named in its note, never the words.
       const who = (i.sender && i.sender.name) ? String(i.sender.name).trim() : '';
-      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'delivery' ? ((he ? 'משלוח' : 'Delivery') + (deliveryWindow && deliveryWindow.endHour != null ? ' ' + pad2(deliveryWindow.hour) + ':' + pad2(deliveryWindow.minute) + '–' + pad2(deliveryWindow.endHour) + ':' + pad2(deliveryWindow.endMinute) : '')) : callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal === 'trip' ? (he ? 'נסיעה' : 'Trip') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '', durationMinutes: callProposal === 'delivery' && deliveryWindow && deliveryWindow.durationMinutes ? deliveryWindow.durationMinutes : holdMinutes || undefined }) });
+      liveStep = Object.assign({}, liveStep, { params: Object.assign({}, liveStep.params || {}, { title: ((callProposal === 'delivery' ? ((he ? (deliveryWindow && deliveryWindow.visit ? 'ביקור' : 'משלוח') : (deliveryWindow && deliveryWindow.visit ? 'Visit' : 'Delivery')) + (deliveryWindow && deliveryWindow.endHour != null ? ' ' + pad2(deliveryWindow.hour) + ':' + pad2(deliveryWindow.minute) + '–' + pad2(deliveryWindow.endHour) + ':' + pad2(deliveryWindow.endMinute) : '')) : callProposal === 'appointment' ? (he ? 'תור' : 'Appointment') : callProposal === 'invitation' ? (he ? 'הזמנה' : 'Invitation') : callProposal === 'trip' ? (he ? 'נסיעה' : 'Trip') : callProposal ? (he ? 'שיחה' : 'Call') : (he ? 'פגישה' : 'Meeting')) + (who ? ' · ' + who : '')).slice(0, 120), quote: '', durationMinutes: callProposal === 'delivery' && deliveryWindow && deliveryWindow.durationMinutes ? deliveryWindow.durationMinutes : holdMinutes || undefined }) });
     }
     if (own && !(selfNote && selfNote.kind === 'note')) {
       // The task is the promise itself, in the person's words, with whom it was made to ("לשלוח · דנה").

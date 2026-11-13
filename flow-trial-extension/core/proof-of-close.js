@@ -310,6 +310,10 @@ const FlowProofOfClose = (() => {
     return marked && marked[1] ? marked[1].trim() : '';
   }
 
+  function renameBase(name) {
+    return String(name || '').replace(/ \(\d{1,3}\)(?=\.[^.\s]{1,8}$|$)/, '').trim();
+  }
+
   function fileNameAgrees(saved, shown) {
     const rawShown = String(shown || '').trim();
     const truncated = /^[\u2026\u2025]/.test(rawShown) || /^\.{2,}/.test(rawShown) || /[\u2026\u2025]$/.test(rawShown) || /\.{2,}$/.test(rawShown);
@@ -317,6 +321,8 @@ const FlowProofOfClose = (() => {
     const right = rawShown.toLowerCase().replace(/^[\u2026\u2025.]+/, '').replace(/[\u2026\u2025.]+$/, '').trim();
     if (!left || !right) return false;
     if (left === right) return true;
+    // OneDrive renames a file that would have replaced another ("x (1).pdf"). That is still this attachment.
+    if (renameBase(left) === renameBase(right)) return true;
     // A chip cuts the name with an ellipsis. A shorter full name is a different file.
     if (!truncated) return false;
     const short = left.length <= right.length ? left : right;

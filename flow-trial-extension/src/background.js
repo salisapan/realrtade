@@ -45,13 +45,19 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
-import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
+import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleMissingScopes, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
+import '../core/connect-ecosystem.js'; // classic: sets globalThis.FlowConnectEcosystem (C1)
+import '../core/profile-hook.js'; // classic: sets globalThis.FlowProfileHook (C1 learn-signal hook)
+import '../core/graph-mail.js'; // classic: sets globalThis.FlowGraphMail (Outlook Graph sync)
+import '../core/outlook-sync.js'; // classic: sets globalThis.FlowOutlookSync (ecosystem Graph sync when OWA closed)
+import '../src/outlook.js'; // classic: sets globalThis.FlowOutlook
+import { connectEcosystemConnector, disconnectEcosystemConnector, ecosystemStatusExtras, requestMicrosoftOptionalScopes } from './connect-ecosystem-sw.js';
 import '../core/teams-meeting.js'; // classic: sets globalThis.FlowTeamsMeeting (switch TEAMS_MEETING, off)
 import '../core/day-words.js'; // classic: sets globalThis.FlowDayWords (extract.js makes the day forms people write explicit with it)
 import '../core/extract.js'; // classic: sets globalThis.FlowExtract (the repeat's clock is read with it)
@@ -92,8 +98,10 @@ import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClos
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
+import '../core/google-contacts.js';
 import './google-lane-host.js';
 import './gmail-reinject.js';
+import '../core/user-context-writer.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -281,7 +289,7 @@ const SURFACES = {
   outlook: {
     label: 'Outlook on the web',
     origins: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'],
-    extra: ['core/owa-parse.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
+    extra: ['core/owa-parse.js', 'core/outlook-thread-v1.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
       'core/outlook-calendar.js', 'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
     css: ['design/step-states-v1/scoped.css', 'src/chip.css']
   }
@@ -347,8 +355,49 @@ function recoverOutlookTab(probe) {
   // script. Only a ping the existing script answers means it is still live.
   if (probe && probe.pingOk) return 'rescan';
   if (probe && probe.hasPage && probe.refreshShown) return 'leave';
+  // A removed extension leaves DOM marks behind, but its replacement may have
+  // a fresh isolated world. Only existing declarations make reinjection unsafe.
+  if (probe && probe.hasPage && probe.readerGlobals === false) return 'inject';
   if (probe && probe.hasPage) return 'ask';
   return 'inject';
+}
+
+// The old reader may be dead, so it cannot paint its own refresh line. Put
+// recovery in the open mail, not only a badge or the panel's Settings tab.
+async function showOutlookRefreshOnPage(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: () => {
+        const visible = Array.from(document.querySelectorAll('[data-glance-refresh]'))
+          .some((node) => Boolean(node.getBoundingClientRect().height));
+        if (visible) return;
+        const mount = document.querySelector('#ReadingPaneContainerId') || document.querySelector('[role="main"]') || document.body;
+        if (!mount) return;
+        let notice = document.querySelector('[data-glance-background-refresh]');
+        if (!notice) {
+          const he = /^he/i.test(document.documentElement.lang || '') || document.documentElement.dir === 'rtl';
+          notice = document.createElement('div');
+          notice.setAttribute('data-glance-refresh', '1');
+          notice.setAttribute('data-glance-background-refresh', '1');
+          notice.setAttribute('role', 'alert');
+          notice.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;margin:8px 0;background:#f5f5f7;color:#1d1d1f;font:14px/1.5 system-ui,sans-serif;border-radius:10px;box-sizing:border-box;';
+          const text = document.createElement('span');
+          text.textContent = he ? 'כדי להפעיל את Glance כאן, רענן את Outlook.' : 'Refresh Outlook to reconnect Glance in this tab.';
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.setAttribute('data-glance-refresh-btn', '1');
+          button.textContent = he ? 'רענן' : 'Refresh';
+          button.style.cssText = 'border:0;border-radius:8px;background:#0071e3;color:white;padding:8px 16px;font:inherit;cursor:pointer;';
+          // Never reload automatically: an unsent draft must survive until the
+          // person explicitly chooses to refresh this tab.
+          button.addEventListener('click', () => location.reload());
+          notice.append(text, button);
+        }
+        mount.prepend(notice);
+      }
+    });
+  } catch (e) { /* stored flag + badge remain when page access is unavailable */ }
 }
 
 async function noteOutlookNeedsRefresh(tabId) {
@@ -366,6 +415,7 @@ async function noteOutlookNeedsRefresh(tabId) {
       }
     }
   } catch (e) { /* the popup still reads the stored flag */ }
+  await showOutlookRefreshOnPage(tabId);
   console.warn('Glance: outlook tab ' + tabId + ' needs a manual refresh');
 }
 
@@ -433,13 +483,13 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
         await clearOutlookNeedsRefresh(tab.id);
         continue;
       }
-      let seen = { globals: false, refreshShown: false };
+      let seen = { globals: false, refreshShown: false, readerGlobals: true };
       try {
         const probe = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           func: () => {
-            // DOM only. This function runs in a new isolated world, so
-            // chrome.runtime.id here is the new extension, not the page script.
+            // Inspect DOM marks and declarations separately. This isolated world
+            // can be fresh even though the document retains the old marker.
             let line = null;
             let marked = false;
             try {
@@ -448,16 +498,25 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
               marked = Boolean(root && root.getAttribute('data-glance-outlook')) ||
                 Boolean(document.querySelector('.flow-chip-host, .flow-why-not'));
             } catch (e) { line = null; marked = false; }
-            return { globals: marked || Boolean(line), refreshShown: Boolean(line) };
+            return {
+              globals: marked || Boolean(line),
+              refreshShown: Boolean(line && line.getBoundingClientRect().height),
+              // Unlike chrome.runtime.id, these are declarations in THIS world,
+              // not a claim that an old page reader is still connected.
+              readerGlobals: typeof FLOW_DOMAINS !== 'undefined' || typeof FlowStorage !== 'undefined'
+                || typeof FlowOwaParse !== 'undefined' || typeof FlowChipHost !== 'undefined'
+                || Boolean(globalThis.__glanceOutlookPage)
+            };
           }
         });
         seen = (probe && probe[0] && probe[0].result) || seen;
-      } catch (e) { seen = { globals: false, refreshShown: false }; }
+      } catch (e) { seen = { globals: false, refreshShown: false, readerGlobals: true }; }
       const action = recoverOutlookTab({
         windowType: windowType,
         pingOk: false,
-        hasPage: Boolean(seen.globals),
-        refreshShown: Boolean(seen.refreshShown)
+        hasPage: Boolean(seen.globals || seen.readerGlobals),
+        refreshShown: Boolean(seen.refreshShown),
+        readerGlobals: seen.readerGlobals
       });
       if (action === 'rescan') {
         try {
@@ -470,7 +529,7 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
         continue;
       }
       if (action === 'leave') {
-        await clearOutlookNeedsRefresh(tab.id);
+        await noteOutlookNeedsRefresh(tab.id);
         continue;
       }
       if (action === 'ask') {
@@ -480,6 +539,9 @@ async function injectSurfaceIntoOpenTabs(id, script, stamp, opts) {
       try {
         if (script.css && script.css.length) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: script.css });
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
+        const pong = await chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-ping' });
+        if (!(pong && pong.ok)) throw new Error('Outlook reader did not start');
+        await clearOutlookNeedsRefresh(tab.id);
         n++;
       } catch (e) {
         // A second inject cannot redeclare the dead script. Leave the tab.
@@ -659,16 +721,24 @@ async function clearLaneChats() {
   }
 }
 
+function metaChatLaneId(lane) {
+  return lane && (lane.id === 'glance-lane-messenger' || lane.id === 'glance-lane-instagram');
+}
+
 async function restoreLaneChats() {
   if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
   const metaOrigins = (typeof FlowMetaConsent !== 'undefined' && Array.isArray(FlowMetaConsent.ORIGINS)) ? FlowMetaConsent.ORIGINS.slice() : [];
-  let on = false;
+  const waOrigins = (LANE_CHAT.find((lane) => lane.id === 'glance-lane-whatsapp') || {}).origins || ['https://web.whatsapp.com/*'];
+  let metaGranted = false;
+  let waGranted = false;
   let known = false;
   try {
-    on = metaOrigins.length > 0 && await chrome.permissions.contains({ origins: metaOrigins });
+    metaGranted = metaOrigins.length > 0 && await chrome.permissions.contains({ origins: metaOrigins });
+    waGranted = waOrigins.length > 0 && await chrome.permissions.contains({ origins: waOrigins });
     known = true;
-  } catch (e) { on = false; known = false; }
-  if (!on) {
+  } catch (e) { metaGranted = false; waGranted = false; known = false; }
+  const metaLanesOn = await glanceSwitchOn('META_CHAT_LANES');
+  if (!metaGranted && !waGranted) {
     if (known) await clearLaneChats();
     if (chrome.tabs && chrome.tabs.query) {
       const messenger = LANE_CHAT.find((lane) => lane.id === 'glance-lane-messenger');
@@ -680,6 +750,12 @@ async function restoreLaneChats() {
     return;
   }
   for (const lane of LANE_CHAT) {
+    const isMeta = metaChatLaneId(lane);
+    const granted = isMeta ? metaGranted : waGranted;
+    if (!granted || (isMeta && !metaLanesOn)) {
+      try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered */ }
+      continue;
+    }
     try { await chrome.scripting.unregisterContentScripts({ ids: [lane.id] }); } catch (e) { /* not registered yet */ }
     try {
       await chrome.scripting.registerContentScripts([{
@@ -1476,9 +1552,14 @@ function invalidateGoogleWebAuthFlight() {
 // not open a window. The side panel and the popup have no tab. The popup
 // opened as a normal tab does have one, and it is still our page, so Connect
 // may open a window. A web page, or a sender from another extension, may not.
-function googleConnectWantsInteractive(sender) {
-  if (!sender || !sender.tab) return true;
+// forceInteractive is only for an explicit Connect Google click on a Gmail
+// card (msg.interactive === true). Silent auto-connect never sets it.
+function googleConnectWantsInteractive(sender, forceInteractive) {
   const runtimeId = chrome.runtime && chrome.runtime.id;
+  if (forceInteractive === true) {
+    return Boolean(runtimeId && sender && sender.id === runtimeId);
+  }
+  if (!sender || !sender.tab) return true;
   const url = typeof sender.url === 'string' ? sender.url : '';
   if (!runtimeId || sender.id !== runtimeId) return false;
   return url.indexOf('chrome-extension://' + runtimeId + '/') === 0;
@@ -1568,7 +1649,9 @@ function launchGoogleWebAuthFlow(details) {
   });
 }
 
-function googleManifestScopes() {
+// The Google consent is the manifest's six scopes and nothing else. No Labs switch adds a
+// scope (contacts.readonly is never requested; test/scope-allowlist-corpus.cjs pins this).
+async function googleManifestScopes() {
   const oauth2 = chrome.runtime.getManifest().oauth2;
   return googleOAuthScopesFrom(oauth2 && oauth2.scopes);
 }
@@ -1615,17 +1698,29 @@ async function runGoogleWebAuth(interactive) {
   if (!redirectUri) throw new Error('Glance could not determine this extension’s redirect address.');
   const state = randomOAuthState();
   const hint = await googleLoginHint();
+  const scopes = await googleManifestScopes();
+  // After Disconnect the window must show Google's consent screen, so a
+  // Cancel there cannot hand back the old grant.
+  const forceConsent = interactive ? await googleConsentRequired() : false;
   const url = googleImplicitAuthUrl({
     clientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri,
-    scopes: googleManifestScopes(),
+    scopes,
     state,
-    prompt: interactive ? 'select_account' : 'none',
+    prompt: interactive ? (forceConsent ? 'consent select_account' : 'select_account') : 'none',
     loginHint: hint
   });
   const resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
   if (epoch !== googleWebAuthEpoch) throw new Error('Google sign-in was closed or denied.');
   const parsed = parseGoogleImplicitRedirect(resultUrl, state);
+  // A consent with boxes left unticked is not kept: the token cannot write,
+  // and keeping it made the next Connect reuse it without a window.
+  const missing = googleMissingScopes(parsed.scope, scopes);
+  if (missing.length) {
+    const partial = new Error('Google did not grant every permission Glance needs. Connect Google again and tick every box.');
+    partial.code = 'partial-grant';
+    throw partial;
+  }
   const record = { accessToken: parsed.accessToken, source: 'web', obtainedAt: Date.now() };
   if (parsed.expiresIn) record.expiresAt = Date.now() + parsed.expiresIn * 1000;
   const keptHint = parsed.email || hint;
@@ -1745,9 +1840,10 @@ async function readGoogleGrantedScopes() {
 }
 
 async function writeGoogleGrantedScopes(status, source) {
+  const scopes = await googleManifestScopes();
   await chrome.storage.local.set({
     [GOOGLE_GRANTED_SCOPES_KEY]: {
-      version: scopeVersion(googleManifestScopes()),
+      version: scopeVersion(scopes),
       status: status,
       source: source || null,
       at: Date.now()
@@ -1818,12 +1914,27 @@ async function recordGoogleConsent(token, source) {
   try { await lane.record(token, source); } catch (e) { /* the first verified write records the account */ }
 }
 
+// A write was refused (401, revoked, missing scope, wrong account). The token
+// still in storage is the one Google refused, so an explicit Connect must ask
+// Google again instead of handing that token back without a window.
+async function googleReconnectFlagged() {
+  try {
+    const bag = await chrome.storage.local.get(GOOGLE_RECONNECT_STORAGE_KEY);
+    const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+    return Boolean(flag && flag.needed);
+  } catch (e) {
+    return false;
+  }
+}
+
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
   const granted = await readGoogleGrantedScopes();
-  if (googleScopeAction(granted, googleManifestScopes(), wantUi ? 'interactive' : 'silent') === 'upgrade') {
+  const requiredScopes = await googleManifestScopes();
+  if (googleScopeAction(granted, requiredScopes, wantUi ? 'interactive' : 'silent') === 'upgrade') {
     return upgradeGoogleScopesOnce();
   }
+  if (wantUi && await googleReconnectFlagged()) return upgradeGoogleScopesOnce();
   try {
     const token = await getGoogleAuthToken(wantUi);
     if (wantUi) await recordGoogleConsent(token, 'chrome');
@@ -1840,6 +1951,7 @@ async function getGoogleAccessToken(interactive) {
       if (wantUi) await recordGoogleConsent(web.token, 'web');
       return web;
     } catch (fallbackErr) {
+      if (wantUi && fallbackErr && fallbackErr.code === 'partial-grant') throw fallbackErr;
       if (wantUi) throw new Error(googleConnectErrorMessage(message, fallbackErr && fallbackErr.message));
       throw fallbackErr;
     }
@@ -1864,7 +1976,97 @@ async function clearCachedChromeGoogleTokens() {
   }
 }
 
+// Google's documented revoke: POST, form body token=<token>. Revoking one
+// token ends the grant for that client, so the app leaves
+// myaccount.google.com/connections. The response allows the extension
+// origin, so no extra host permission is needed.
+const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
+const GOOGLE_REVOKE_TIMEOUT_MS = 8000;
+const GOOGLE_CONSENT_REQUIRED_KEY = 'googleConsentRequired';
+const GOOGLE_REVOKE_PENDING_KEY = 'googleRevokePending';
+
+async function revokeGoogleToken(token) {
+  const t = String(token || '').trim();
+  if (!t) return { ok: false, reason: 'no-token' };
+  let timer = null;
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeout = typeof setTimeout !== 'function' ? new Promise(() => {}) : new Promise((resolve) => {
+    timer = setTimeout(() => {
+      if (ctrl) { try { ctrl.abort(); } catch (e) { /* already settled */ } }
+      resolve({ ok: false, reason: 'timeout' });
+    }, GOOGLE_REVOKE_TIMEOUT_MS);
+  });
+  const request = (async () => {
+    try {
+      const init = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'token=' + encodeURIComponent(t)
+      };
+      if (ctrl) init.signal = ctrl.signal;
+      const r = await fetch(GOOGLE_REVOKE_URL, init);
+      if (r && r.ok) return { ok: true, status: r.status };
+      let code = '';
+      try { const body = await r.json(); code = (body && (body.error || '')) || ''; } catch (e) { /* no JSON body */ }
+      return { ok: false, status: r ? r.status : 0, reason: 'http-' + (r ? r.status : 0) + (code ? ':' + String(code) : '') };
+    } catch (e) {
+      return { ok: false, reason: 'network' };
+    }
+  })();
+  try {
+    return await Promise.race([request, timeout]);
+  } finally {
+    if (timer && typeof clearTimeout === 'function') clearTimeout(timer);
+  }
+}
+
+// Every token Glance still holds for this grant, revoked at Google before
+// the local clear. Never opens a window: the Chrome token is the silent
+// getAuthToken cache, and when no usable web token is left the only extra
+// try is a prompt=none web grant (interactive:false), revoked straight away.
+async function revokeGoogleGrantBestEffort() {
+  const tokens = [];
+  const add = (t) => { const v = String(t || '').trim(); if (v && tokens.indexOf(v) === -1) tokens.push(v); };
+  let chromeToken = '';
+  try { chromeToken = await getGoogleAuthToken(false); } catch (e) { chromeToken = ''; }
+  add(chromeToken);
+  let web = null;
+  try { web = await readGoogleWebAuth(); } catch (e) { web = null; }
+  if (web && web.accessToken) add(web.accessToken);
+  let revoked = false;
+  let reason = tokens.length ? '' : 'no-token';
+  for (const t of tokens) {
+    const r = await revokeGoogleToken(t);
+    if (r.ok) revoked = true;
+    else if (!reason) reason = r.reason || 'failed';
+  }
+  if (!revoked && !chromeToken && !webTokenUsable(web) && GOOGLE_WEB_CLIENT_ID) {
+    try {
+      const minted = await runGoogleWebAuth(false);
+      const r = await revokeGoogleToken(minted && minted.accessToken);
+      if (r.ok) revoked = true;
+      else reason = r.reason || reason || 'failed';
+    } catch (e) {
+      if (!reason) reason = 'no-token';
+    }
+  }
+  return { revoked: revoked, reason: revoked ? '' : (reason || 'failed') };
+}
+
+async function googleConsentRequired() {
+  try {
+    const bag = await chrome.storage.local.get(GOOGLE_CONSENT_REQUIRED_KEY);
+    const rec = bag && bag[GOOGLE_CONSENT_REQUIRED_KEY];
+    return Boolean(rec && rec.needed);
+  } catch (e) {
+    return false;
+  }
+}
+
 async function disconnectConnector(connectorId) {
+  if (connectorId === 'microsoft' || connectorId === 'meta') {
+    return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector, disableSurface: disableSurface });
+  }
   const STORAGE_KEYS = {
     hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
     googleTasks: 'googleTasksAuth'
@@ -1878,19 +2080,39 @@ async function disconnectConnector(connectorId) {
     // Invalidate before the clear. A consent window that resolves after
     // this point sees a new epoch and must not write googleWebAuth back.
     invalidateGoogleWebAuthFlight();
+    // Revoke at Google while the tokens are still here. Clearing first left
+    // the grant live on myaccount.google.com/connections, and the next
+    // Connect came straight back without a consent screen.
+    const revoke = await revokeGoogleGrantBestEffort();
     await clearCachedChromeGoogleTokens();
-    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([
-      key,
-      GOOGLE_WEB_AUTH_STORAGE_KEY,
-      GOOGLE_RECONNECT_STORAGE_KEY,
-      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
-      GOOGLE_GRANTED_SCOPES_KEY,
-      'googleProfile',
-      'googleConnectedAccount',
-      'glanceOwnNames'
-    ]));
+    await enqueueGoogleWebAuthWrite(async () => {
+      await chrome.storage.local.remove([
+        key,
+        GOOGLE_WEB_AUTH_STORAGE_KEY,
+        GOOGLE_RECONNECT_STORAGE_KEY,
+        GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+        GOOGLE_GRANTED_SCOPES_KEY,
+        GOOGLE_REVOKE_PENDING_KEY,
+        'googleProfile',
+        'googleConnectedAccount',
+        'glanceOwnNames',
+        'googleLaneWarning'
+      ]);
+      // The next explicit Connect asks Google for consent again, and no
+      // silent caller reconnects in the meantime.
+      const patch = { [GOOGLE_CONSENT_REQUIRED_KEY]: { needed: true, at: Date.now() } };
+      if (!revoke.revoked) patch[GOOGLE_REVOKE_PENDING_KEY] = { needed: true, reason: revoke.reason, at: Date.now() };
+      await chrome.storage.local.set(patch);
+    });
+    if (!revoke.revoked) {
+      try { console.warn('[Glance] Google Disconnect: local grant cleared, Google revoke not confirmed:', revoke.reason); } catch (e) { /* no console */ }
+    }
     googleNamesFilled = false;
-    return { ok: true };
+    const hook = globalThis.FlowProfileHook;
+    if (hook && typeof hook.onDisconnect === 'function') {
+      try { hook.onDisconnect('google'); } catch (e) { /* profile store not wired */ }
+    }
+    return { ok: true, revoked: revoke.revoked, revokeReason: revoke.reason };
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
@@ -2212,22 +2434,105 @@ async function refreshGoogleSession() {
   return { ok: false, source: null, token: '' };
 }
 
-// Google ends a grant with invalid_grant, or says it was revoked. Nothing
-// else a refresh can say (no window, no session, offline) ends it.
+// Google ends a grant with invalid_grant / invalid_token, or says it was
+// revoked. Nothing else a refresh can say (no window, no session, offline)
+// ends it.
 function googleRefreshRevoked(err) {
-  return /invalid_grant|revoked/i.test(String((err && err.message) || err || ''));
+  return /invalid_grant|invalid_token|revoked/i.test(String((err && err.message) || err || ''));
+}
+
+// Remote revoke (myaccount.google.com/connections) leaves googleTasksAuth and
+// a cached Chrome token in place, so the popup still says Connected until
+// someone clicks Disconnect. Clear the same keys Disconnect clears, then the
+// panel and the card show Connect Google again. No new scopes.
+async function clearGoogleAuthForRevocation(reason) {
+  invalidateGoogleWebAuthFlight();
+  try { await clearCachedChromeGoogleTokens(); } catch (e) { /* already empty */ }
+  await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([
+    'googleTasksAuth',
+    GOOGLE_WEB_AUTH_STORAGE_KEY,
+    GOOGLE_RECONNECT_STORAGE_KEY,
+    GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+    GOOGLE_GRANTED_SCOPES_KEY,
+    'googleProfile',
+    'googleConnectedAccount',
+    'glanceOwnNames',
+    'googleLaneWarning'
+  ]));
+  googleNamesFilled = false;
+  try {
+    const hook = globalThis.FlowProfileHook;
+    if (hook && typeof hook.onDisconnect === 'function') hook.onDisconnect('google');
+  } catch (e) { /* profile store not wired */ }
+  return { cleared: true, reason: String(reason || 'revoked') };
+}
+
+function googleTokenInfoSaysRevoked(data, status) {
+  if (status === 401) return true;
+  if (!data || typeof data !== 'object') return false;
+  const err = String(data.error || data.error_description || '');
+  return /invalid_token|invalid_grant|revoked/i.test(err);
+}
+
+// Cheap check for the popup: one tokeninfo call on the token we already hold.
+// No new scopes. A dead grant clears storage so Connect Google shows; a
+// network blip leaves the stored grant alone.
+async function probeGoogleAuthStillValid() {
+  let bag = {};
+  try {
+    bag = await chrome.storage.local.get([
+      'googleTasksAuth',
+      GOOGLE_WEB_AUTH_STORAGE_KEY,
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY
+    ]);
+  } catch (e) { return { ok: true, probed: false }; }
+  if (!googleHadAccount(bag)) return { ok: true, probed: false };
+  let token = '';
+  try {
+    const cred = await getGoogleAccessToken(false);
+    token = (cred && cred.token) || '';
+  } catch (e) {
+    if (googleRefreshRevoked(e)) {
+      await clearGoogleAuthForRevocation('revoked');
+      return { ok: false, probed: true, cleared: true, reason: 'revoked' };
+    }
+    // getAuthToken can fail for offline / sign-in off without a revoke.
+    return { ok: true, probed: true, softFail: true };
+  }
+  if (!token) {
+    await clearGoogleAuthForRevocation('not signed in');
+    return { ok: false, probed: true, cleared: true, reason: 'not signed in' };
+  }
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(token));
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (googleTokenInfoSaysRevoked(data, res.status) || (res.status === 400 && googleTokenInfoSaysRevoked(data, 401))) {
+      const why = (data && (data.error || data.error_description)) || 'invalid_token';
+      await clearGoogleAuthForRevocation(why);
+      try { if (token) await removeCachedGoogleAuthToken(token); } catch (e) { /* already gone */ }
+      return { ok: false, probed: true, cleared: true, reason: String(why) };
+    }
+    if (!res.ok) return { ok: true, probed: true, softFail: true, status: res.status };
+    return { ok: true, probed: true };
+  } catch (e) {
+    if (googleRefreshRevoked(e)) {
+      await clearGoogleAuthForRevocation('revoked');
+      return { ok: false, probed: true, cleared: true, reason: 'revoked' };
+    }
+    return { ok: true, probed: true, softFail: true };
+  }
 }
 
 // One silent refresh after a 401, then the caller retries once. Web tokens
 // use prompt=none. Chrome tokens use getAuthToken({ interactive: false }).
-// Neither opens a consent window. The stored token is kept when the refresh
-// fails: a 401 can be a single bad answer. Consent is dropped only when the
-// refresh itself says the grant is gone. A null result means: retry once
-// with the token already in hand.
+// Neither opens a consent window. A single 401 before refresh is not enough
+// to drop consent; invalid_grant / invalid_token / revoked on the refresh
+// (or a 401 that survives the retry) clears the stored Google auth so the
+// popup shows Connect Google.
 async function refreshLaneCredential(cred) {
   const revoked = async () => {
-    if (cred && cred.source === 'web') await clearGoogleWebAuth();
-    await markGoogleReconnect('revoked');
+    await clearGoogleAuthForRevocation('revoked');
     return { revoked: true, token: '', source: cred && cred.source };
   };
   if (cred && cred.source === 'web') {
@@ -2260,15 +2565,24 @@ globalThis.FlowGoogleAccess = {
   },
   retry(cred) {
     return refreshLaneCredential(cred);
+  },
+  clearRevoked(reason) {
+    return clearGoogleAuthForRevocation(reason);
+  },
+  probeValid() {
+    return probeGoogleAuthStillValid();
   }
 };
 
 async function rememberGoogleAuthResult(res) {
   if (!res) return res;
-  if (res.status === 401) await markGoogleReconnect('401');
-  else if (res.status === 403) await markGoogleReconnect('missing scope');
-  // A later 2xx leaves googleReconnect set. clearGoogleReconnect runs only
-  // after Connect stores a new token.
+  if (res.status === 401) {
+    // Survived the silent refresh+retry: the grant is gone. Clear so the
+    // popup does not keep saying Connected until Disconnect is clicked.
+    await clearGoogleAuthForRevocation('401');
+  } else if (res.status === 403) {
+    await markGoogleReconnect('missing scope');
+  }
   return res;
 }
 
@@ -2420,6 +2734,10 @@ async function connectGoogleTasks(interactive, preset) {
   // script). The popup Connect click passes true. That is the one moment
   // Chrome may show the account chooser or, if browser sign-in is off, the
   // web-flow consent window. Later API calls stay silent.
+  // After Disconnect only an explicit Connect click may reconnect.
+  if (interactive === false && !preset && await googleConsentRequired()) {
+    throw new Error('Google sign-in needs you to connect again.');
+  }
   const cred = preset || await getGoogleAccessToken(interactive !== false);
   await rememberGoogleProfile(cred && cred.token);
   await clearGoogleReconnect();
@@ -2427,6 +2745,21 @@ async function connectGoogleTasks(interactive, preset) {
   await chrome.storage.local.set({
     googleTasksAuth: { taskListId },
     [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
+  });
+  // «שלב אחד לא הושלם» belongs to a Do It on the grant this Connect replaced.
+  // Left in place it kept a fresh, fully granted connection off Connected.
+  await chrome.storage.local.remove(['googleLaneWarning', GOOGLE_CONSENT_REQUIRED_KEY, GOOGLE_REVOKE_PENDING_KEY]);
+  const accountEmail = globalThis.FlowGoogleLaneAccount && typeof globalThis.FlowGoogleLaneAccount.read === 'function'
+    ? await globalThis.FlowGoogleLaneAccount.read()
+    : '';
+  const profBag = await chrome.storage.local.get({ googleProfile: null, glanceOwnNames: [] });
+  const names = Array.isArray(profBag.glanceOwnNames) ? profBag.glanceOwnNames : [];
+  const gp = profBag.googleProfile && typeof profBag.googleProfile === 'object' ? profBag.googleProfile : null;
+  await seedUserContextFromConnect({
+    email: accountEmail,
+    name: (gp && (gp.name || gp.given_name)) || names[0] || '',
+    title: gp && gp.title,
+    department: gp && gp.department
   });
   return true;
 }
@@ -2811,6 +3144,7 @@ async function followTaskReopen(ref, dueIso) {
 
 async function findThreadIdTo(recipientEmail, subject) {
   if (!recipientEmail) return null;
+  if (!(await gmailComposeApiAllowedNow())) return null;
   try {
     const q = 'to:' + recipientEmail + (subject ? ' subject:"' + String(subject).replace(/^re:\s*/i, '').replace(/"/g, '') + '"' : '');
     const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
@@ -2827,6 +3161,9 @@ async function followDraftCreate(p) {
   const to = String((p && p.to) || '').trim();
   const text = String((p && p.body) || '').trim();
   if (!to || !text) return { ok: false, reason: 'invalid', error: 'No one to write to.' };
+  if (!(await gmailComposeApiAllowedNow())) {
+    return { ok: false, reason: 'compose-closed', preview: true, closes: false, sent: false };
+  }
   const base = String(p.subject || '').trim();
   const subject = base ? (/^re:/i.test(base) ? base : 'Re: ' + base) : 'Following up';
   // A file prepared for this draft (docs/file-backed-closure-plan.md): either the one
@@ -2869,8 +3206,7 @@ function localTimeZone() {
   }
 }
 
-// glanceTimeZone wins, then the host zone. A meeting hold does not
-// silently write UTC when the person is in another zone.
+// glanceTimeZone wins, then the host zone. Gmail calendar still uses this.
 async function outlookGlanceZone(explicit) {
   const given = String(explicit || '').trim();
   if (given) return given.slice(0, 80);
@@ -2881,6 +3217,57 @@ async function outlookGlanceZone(explicit) {
     if (raw && typeof raw.timeZone === 'string' && raw.timeZone.trim()) return raw.timeZone.trim().slice(0, 80);
   } catch (e) { /* storage is optional */ }
   return localTimeZone();
+}
+
+let outlookMailboxZoneCache = null;
+
+function outlookPreferTimezone(zone) {
+  const z = String(zone || '').replace(/"/g, '').trim().slice(0, 80);
+  if (!z) return {};
+  return { Prefer: 'outlook.timezone="' + z + '"' };
+}
+
+// Graph mailboxSettings.timeZone (Windows name). Never the browser zone.
+async function outlookMailboxTimeZone(force) {
+  if (!force && outlookMailboxZoneCache && outlookMailboxZoneCache.ok) return outlookMailboxZoneCache;
+  const url = OUTLOOK_GRAPH + '/me/mailboxSettings?$select=timeZone';
+  outlookAssertNotSend(url);
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET' }); }
+  catch (e) { res = null; }
+  if (!res || res.notConnected) {
+    outlookMailboxZoneCache = { ok: false, reason: 'not-connected' };
+    return outlookMailboxZoneCache;
+  }
+  if (res.status === 401) {
+    outlookMailboxZoneCache = { ok: false, reason: 'not-connected' };
+    return outlookMailboxZoneCache;
+  }
+  if (!res.ok) {
+    outlookMailboxZoneCache = { ok: false, reason: 'mailbox-settings-unreadable', error: 'Could not read your mailbox time zone from Microsoft. Open Outlook on the web once, then try again.' };
+    return outlookMailboxZoneCache;
+  }
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  const tz = body && typeof body.timeZone === 'string' ? body.timeZone.trim() : '';
+  if (!tz) {
+    outlookMailboxZoneCache = { ok: false, reason: 'mailbox-timezone-missing', error: 'Microsoft did not return a mailbox time zone. Set your time zone in Outlook settings, then try again.' };
+    return outlookMailboxZoneCache;
+  }
+  outlookMailboxZoneCache = { ok: true, timeZone: tz.slice(0, 80) };
+  return outlookMailboxZoneCache;
+}
+
+async function outlookCalendarTimeZone(explicit) {
+  const Cal = globalThis.FlowOutlookCalendar;
+  const given = String(explicit || '').trim().slice(0, 80);
+  if (given) {
+    if (Cal && typeof Cal.graphTimeZoneOk === 'function' && Cal.graphTimeZoneOk(given)) return { ok: true, timeZone: given };
+    return { ok: false, reason: 'invalid-timezone', error: 'That time zone is not valid for a calendar hold.' };
+  }
+  const mb = await outlookMailboxTimeZone();
+  if (mb.ok) return mb;
+  return mb;
 }
 
 // No duration is ever stated in an email the way a date or time is, so
@@ -3071,9 +3458,14 @@ async function googleCalendarWrite(p) {
   if (paramsFile) {
     const found = await driveFindOneByName(paramsFile);
     if (!found || found.match !== 'one' || !found.file || !found.file.url) {
-      return { ok: false, reason: 'unclear', error: 'No single file to put on the event.' };
+      if (found && found.driveSearchUnavailable) {
+        linkedFile = null;
+      } else {
+        return { ok: false, reason: 'unclear', error: 'No single file to put on the event.' };
+      }
+    } else {
+      linkedFile = found.file;
     }
-    linkedFile = found.file;
   }
 
   const timeZone = localTimeZone();
@@ -3277,6 +3669,7 @@ function buildMimeMessage(opts) {
 // whole action because a search query came back empty.
 async function findThreadId(senderEmail, subject) {
   if (!senderEmail) return null;
+  if (!(await gmailComposeApiAllowedNow())) return null;
   try {
     const q = 'from:' + senderEmail + (subject ? ' subject:"' + subject.replace(/"/g, '') + '"' : '');
     const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q), { soft: true });
@@ -3384,12 +3777,50 @@ async function googleTokenScopes() {
 // failed page returns null rather than a short list — ranking a partial
 // page is how a second, unseen file becomes "the only match".
 // detail, when passed, receives status/reason/error of the failure.
+// Mailbox-wide Drive search needs drive.readonly, which is not in the OAuth
+// grant. Without it, stay quiet — never call files.list and surface a 403.
+async function googleGrantedScopeList() {
+  try {
+    const bag = await chrome.storage.local.get('googleGrantedScopes');
+    const rec = bag.googleGrantedScopes;
+    if (!rec) return null;
+    const v = rec.version;
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'string' && v) return v.split('\n').filter(Boolean);
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function gmailComposeApiAllowedNow() {
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  return !!(C && C.gmailDraftApiAllowed(scopes));
+}
+
+async function mailboxDriveSearchAllowedNow() {
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  return !!(C && C.mailboxDriveSearchAllowed(scopes));
+}
+
 // One 403 for a missing Drive scope drops the cached Chrome token and asks
 // once more, silently. A grant that already includes drive.readonly can be
 // reused. This retry does not open a consent window. A second 403 stops.
 async function searchDriveFiles(q, detail) {
   if (!q) {
     if (detail) { detail.status = 0; detail.reason = 'drive-search-failed'; detail.error = 'empty-query'; }
+    return null;
+  }
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  if (C && !C.mailboxDriveSearchAllowed(scopes)) {
+    if (detail) {
+      detail.status = 0;
+      detail.reason = 'drive-search-unavailable';
+      detail.error = 'mailbox-search-not-granted';
+    }
     return null;
   }
   const files = [];
@@ -3509,6 +3940,7 @@ function driveQuote(value) {
 
 async function factSources(ask) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  if (!(await mailboxDriveSearchAllowedNow())) return { ok: true, sources: [], truncated: false };
   const factLabel = driveQuote(ask && ask.factLabel);
   const sourceName = driveQuote(ask && ask.sourceName);
   const kind = ask && (ask.sourceKind === 'sheet' || ask.sourceKind === 'doc') ? ask.sourceKind : null;
@@ -3549,6 +3981,18 @@ async function factSources(ask) {
 
 async function gmailDraftWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const C = globalThis.FlowGoogleConfig;
+  const scopes = await googleGrantedScopeList();
+  if (!C || !C.gmailDraftApiAllowed(scopes)) {
+    return {
+      ok: false,
+      reason: 'compose-closed',
+      preview: true,
+      closes: false,
+      sent: false,
+      error: 'Open Reply first. Glance does not press Send.'
+    };
+  }
   if (!p.senderEmail) return { ok: false, reason: 'error', error: 'No sender address to reply to.' };
 
   const params = p.params || {};
@@ -3727,7 +4171,11 @@ async function driveFindOneByName(term) {
     if (needle.length < 2) return { match: 'unknown' };
     const escaped = needle.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const q = "trashed = false and name contains '" + escaped + "'";
-    const files = await searchDriveFiles(q);
+    const detail = {};
+    const files = await searchDriveFiles(q, detail);
+    if (!files && detail.reason === 'drive-search-unavailable') {
+      return { match: 'none', driveSearchUnavailable: true };
+    }
     if (!files) return { match: 'unknown' };
     const hits = driveNameHits(files, needle);
     if (hits.length !== 1) return { match: hits.length === 0 ? 'none' : 'many' };
@@ -3854,6 +4302,7 @@ async function deleteDriveFile(fileId) {
 
 async function gmailDraftUndo(ref) {
   if (!ref || !ref.draftId) return { ok: false };
+  if (!(await gmailComposeApiAllowedNow())) return { ok: false, reason: 'compose-closed' };
   const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts/' + encodeURIComponent(ref.draftId), {
     method: 'DELETE'
   });
@@ -3869,7 +4318,7 @@ async function gmailDraftUndo(ref) {
 // content-gmail.js can't open chrome.windows itself (that API isn't exposed
 // to content scripts), and the picker has to live in its own extension page
 // rather than be loaded into the Gmail tab — Gmail's own CSP would be the
-// one deciding whether https://apis.google.com's gapi loader is even
+// one deciding whether Google's hosted gapi loader is even
 // allowed to run there, and there is no reason to depend on that. So the
 // content script asks this worker to open the window, and this worker
 // remembers which Gmail tab asked, keyed by the requestId the content
@@ -3881,6 +4330,9 @@ async function openDrivePicker(payload, sender) {
   const requestId = payload && payload.requestId;
   const tabId = sender && sender.tab && sender.tab.id;
   if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
+  if (!(typeof FlowBuild !== 'undefined' && FlowBuild.PICKER_BUNDLED)) {
+    return { ok: false, unavailable: true };
+  }
 
   const win = await chrome.windows.create({
     url: chrome.runtime.getURL('picker/picker.html') + '?requestId=' + encodeURIComponent(requestId),
@@ -5066,6 +5518,74 @@ const OUTLOOK_AUTH_KEY = 'outlookAuth';
 const OUTLOOK_STATE_KEY = 'outlookSync';
 const OUTLOOK_KEEPALIVE_ALARM = 'glance-outlook-keepalive';
 const OUTLOOK_KEEPALIVE_MINUTES = 30;
+const OUTLOOK_OWA_URLS = ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'];
+
+let outlookEcosystemRunner = null;
+
+function outlookEcosystemRunnerDeps() {
+  const storage = {
+    get: async () => chrome.storage.local.get(null),
+    set: async (bag) => chrome.storage.local.set(bag),
+    getWatches: async () => {
+      const b = await chrome.storage.local.get('glanceWatches');
+      return (b && b.glanceWatches) || [];
+    },
+    getIdentityGraph: async () => {
+      const b = await chrome.storage.local.get('glanceIdentityGraph');
+      return (b && b.glanceIdentityGraph) || { parties: {} };
+    },
+    observeIdentity: async () => null,
+    updateWatch: async () => null,
+    upsertWatch: async (x) => x,
+    recordOutcomeLabel: async () => true
+  };
+  return {
+    storage,
+    cfg: globalThis.FlowOutlookConfig,
+    auth: globalThis.FlowOutlookAuth,
+    plan: globalThis.FlowOutlookSync && globalThis.FlowOutlookSync.plan,
+    fetch: (u, i) => fetch(u, i),
+    redirectUri: () => chrome.identity.getRedirectURL(),
+    launch: outlookLaunchInteractive,
+    launchSilent: outlookLaunchSilent,
+    permissions: chrome.permissions,
+    send: async (m) => {
+      try { return await chrome.runtime.sendMessage(m); } catch (e) { return null; }
+    },
+    random: (n) => crypto.getRandomValues(new Uint8Array(n)),
+    sha256: (b) => crypto.subtle.digest('SHA-256', b),
+    now: () => Date.now(),
+    planDeps: {
+      extract: globalThis.FlowExtract || null,
+      intent: globalThis.FlowIntent || null,
+      factReply: globalThis.FlowFactReply || null,
+      actions: globalThis.FlowActions || null
+    },
+    actions: globalThis.FlowActions || null,
+    identity: globalThis.FlowIdentity || null,
+    followUp: globalThis.FlowFollowUp || null
+  };
+}
+
+async function outlookEcosystemSync(opts) {
+  const o = opts || {};
+  let owaOpen = false;
+  try {
+    const tabs = await chrome.tabs.query({ url: OUTLOOK_OWA_URLS });
+    (tabs || []).forEach((tab) => {
+      if (tab && tab.id) {
+        owaOpen = true;
+        chrome.tabs.sendMessage(tab.id, { type: 'flow:outlook-rescan' }).catch(() => {});
+      }
+    });
+  } catch (e) { /* OWA may be closed */ }
+  if (owaOpen) return { ok: true, mode: 'rescan' };
+  const O = globalThis.FlowOutlook;
+  if (!O || typeof O.create !== 'function' || !globalThis.FlowOutlookSync) return { ok: false, error: 'not-configured', mode: 'graph' };
+  outlookEcosystemRunner = outlookEcosystemRunner || O.create(outlookEcosystemRunnerDeps());
+  const r = await outlookEcosystemRunner.sync({ force: Boolean(o.force) });
+  return Object.assign({ mode: 'graph' }, r || {});
+}
 
 // ---- the durable Outlook session (core/outlook-auth.js session) -----------------------------------------------
 // The service worker keeps the Microsoft session alive on its own: an alarm every 30 minutes (alarms survive the worker
@@ -5074,6 +5594,8 @@ const OUTLOOK_KEEPALIVE_MINUTES = 30;
 // new 24 hours starts before the old one ends. Every token lives in chrome.storage.local, so nothing depends on this worker
 // staying awake. One run at a time (outlookSessionBusy), so two surfaces never renew at once.
 function outlookLaunchInteractive(url) {
+  const hooked = glanceE2eWebAuthFlow({ url, interactive: true });
+  if (hooked && typeof hooked.then === 'function') return hooked.then((r) => r || null, () => null);
   return new Promise((resolve) => {
     try {
       chrome.identity.launchWebAuthFlow({ url, interactive: true }, (r) => {
@@ -5120,16 +5642,17 @@ async function outlookConsentScope(msg) {
     return { ok: false, reason: 'not-configured' };
   }
   const scope = String((msg && msg.scope) || '');
+  if (scope === 'Contacts.Read' || scope === 'Chat.Read') return { ok: false, reason: 'scope-refused' };
   const todoScope = scope === 'Tasks.ReadWrite';
   const calendarScope = scope === 'Calendars.ReadWrite';
-  if (!todoScope && !calendarScope) return { ok: false, reason: 'scope-refused' };
+  // Setup's OneDrive box. Files.ReadWrite is a Connect scope already; this adds nothing new.
+  const filesScope = scope === 'Files.ReadWrite' && typeof cfg.incrementalFilesScopes === 'function';
+  if (!todoScope && !calendarScope && !filesScope) return { ok: false, reason: 'scope-refused' };
   const bag = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
   const auth = bag[OUTLOOK_AUTH_KEY];
   if (!auth || !auth.token) return { ok: false, reason: 'not-connected' };
-  const scopes = cfg.incrementalConsentScopes(
-    [].concat(auth.requestedScopes || [], (auth.token && auth.token.grantedScopes) || [], cfg.SCOPES || []),
-    scope
-  );
+  const known = [].concat(auth.requestedScopes || [], (auth.token && auth.token.grantedScopes) || [], cfg.SCOPES || []);
+  const scopes = filesScope ? cfg.incrementalFilesScopes(known) : cfg.incrementalConsentScopes(known, scope);
   if (!scopes) return { ok: false, reason: 'scope-refused' };
   const r = await A.signIn({
     fetch: (u, i) => fetch(u, i),
@@ -5152,6 +5675,7 @@ async function outlookConsentScope(msg) {
   const has = names.some((s) => String(s).toLowerCase() === scope.toLowerCase());
   if (calendarScope && (!Cal || !Cal.hasWriteScope(effective))) return { ok: false, reason: 'calendar-write-not-granted' };
   if (todoScope && !has) return { ok: false, reason: 'tasks-not-granted' };
+  if (filesScope && !has) return { ok: false, reason: 'files-not-granted' };
   const policy = (msg && msg.policy) === 'always' ? 'always' : 'once';
   const policyKey = todoScope ? 'glanceTodoConsent' : 'glanceCalendarConsent';
   const stored = {
@@ -5160,7 +5684,8 @@ async function outlookConsentScope(msg) {
       requestedScopes: scopes
     })
   };
-  stored[policyKey] = { mode: policy, scope: scope, revoked: false, at: Date.now() };
+  // OneDrive has no consent-policy record: the granted scope itself is the permission.
+  if (!filesScope) stored[policyKey] = { mode: policy, scope: scope, revoked: false, at: Date.now() };
   await chrome.storage.local.set(stored);
   return { ok: true, policy: policy, scope: scope };
 }
@@ -5274,6 +5799,12 @@ async function outlookAccessToken(opts) {
 // A Graph call with the session's token; a 401 is answered once with a forced refresh (or silent renewal) and a retry.
 // A read-back GET gives up after 8s. The controller aborts the fetch. Undo then refuses and deletes nothing.
 const OUTLOOK_READ_MS = 8000;
+// One draft write step (createReply, the body PATCH, an attachment). The page bounds the whole Do It, and each step fails closed at 10s.
+function outlookWriteMs() {
+  const e2e = globalThis.__glanceE2e;
+  const n = e2e && e2e.scenario && Number(e2e.scenario.writeTimeoutMs);
+  return n > 0 ? n : 10000;
+}
 async function outlookFetch(url, init) {
   let token = await outlookAccessToken();
   if (!token) return { status: 0, ok: false, notConnected: true };
@@ -5281,20 +5812,23 @@ async function outlookFetch(url, init) {
     const method = String((init && init.method) || 'GET').toUpperCase();
     const headers = Object.assign({}, (init && init.headers) || {}, { Authorization: 'Bearer ' + t });
     const opts = Object.assign({}, init || {}, { headers: headers });
+    // A write is bounded only when its caller says how long (timeoutMs); a draft write must end, not spin.
+    const writeMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 0;
+    delete opts.timeoutMs;
     let ctl = null;
     let timer = null;
-    if (method === 'GET' && typeof AbortController === 'function') {
+    if ((method === 'GET' || writeMs) && typeof AbortController === 'function') {
       ctl = new AbortController();
-      timer = setTimeout(() => ctl.abort(), OUTLOOK_READ_MS);
+      timer = setTimeout(() => ctl.abort(), writeMs || OUTLOOK_READ_MS);
       opts.signal = ctl.signal;
     }
     try {
       return await fetch(url, opts);
     } catch (e) {
-      if (ctl && ctl.signal.aborted) return { status: 0, ok: false, reason: 'verify-timeout', timedOut: true };
+      if (ctl && ctl.signal.aborted) return { status: 0, ok: false, reason: writeMs ? 'write-timeout' : 'verify-timeout', timedOut: true };
       throw e;
     } finally {
-      if (timer) clearTimeout(timer);
+      if (timer && typeof clearTimeout === 'function') clearTimeout(timer);
     }
   };
   let res = await call(token);
@@ -5467,20 +6001,31 @@ function outlookUnverifiedLine() {
 
 const OUTLOOK_EVENT_SELECT = 'id,subject,body,start,end,location,attendees,categories,isAllDay,importance,recurrence';
 
-async function outlookStoredEventSnap(eventId) {
+async function outlookStoredEventSnap(eventId, zone) {
+  let prefer = outlookPreferTimezone(zone);
+  if (!prefer.Prefer) {
+    const mb = await outlookMailboxTimeZone();
+    prefer = mb.ok ? outlookPreferTimezone(mb.timeZone) : {};
+  }
   return outlookReadSnap(
-    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT
+    OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT,
+    prefer
   );
 }
 
 // The proof is a GET of the event just created, not the POST body.
-async function outlookEventRead(eventId) {
+async function outlookEventRead(eventId, zone) {
   const url = OUTLOOK_GRAPH + '/me/events/' + encodeURIComponent(eventId) + '?$select=' + OUTLOOK_EVENT_SELECT;
   outlookAssertNotSend(url);
+  let prefer = outlookPreferTimezone(zone);
+  if (!prefer.Prefer) {
+    const mb = await outlookMailboxTimeZone();
+    prefer = mb.ok ? outlookPreferTimezone(mb.timeZone) : {};
+  }
   let last = { snap: null, raw: null };
   for (let attempt = 0; attempt < 2; attempt++) {
     let res;
-    try { res = await outlookFetch(url, { method: 'GET' }); }
+    try { res = await outlookFetch(url, { method: 'GET', headers: prefer }); }
     catch (e) { res = null; }
     if (!res || !res.ok) continue;
     const raw = await outlookReadJson(res);
@@ -5556,9 +6101,10 @@ async function outlookDraftWrite(p) {
   outlookAssertNotSend(url);
   const immutable = p && p.outlookImmutableId === true;
   const prefer = immutable ? { Prefer: 'IdType="ImmutableId"' } : {};
-  const res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }) });
+  const res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }), timeoutMs: outlookWriteMs() });
   if (res.notConnected) return { ok: false, reason: 'not-connected' };
-  if (res.status === 401) return { ok: false, reason: 'not-connected' };
+  if (res.timedOut) return { ok: false, reason: 'timeout' };
+  if (res.status === 401) return { ok: false, reason: 'not-connected', needsSignIn: true };
   if (res.status === 403) return { ok: false, reason: 'consent', error: 'Outlook draft permission not granted yet: open Glance and reconnect Outlook once.' };
   if (!res.ok) return { ok: false, reason: 'http-' + res.status };
   const draft = await res.json();
@@ -5577,12 +6123,12 @@ async function outlookDraftWrite(p) {
   }
   if (draft.isDraft !== false) {
     try {
-      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify(patchBody) });
+      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify(patchBody), timeoutMs: outlookWriteMs() });
       if (pr && pr.ok) bodyWritten = true;
       fromSet = Boolean(pr && pr.ok && patchBody.from);
-      // One body write. A refused From does not send the body again.
-      if (!bodyWritten && comment) {
-        const bodyOnly = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
+      // One body write. A refused From does not send the body again. A timed-out PATCH is not tried a second time.
+      if (!bodyWritten && comment && !(pr && pr.timedOut)) {
+        const bodyOnly = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }), timeoutMs: outlookWriteMs() });
         bodyWritten = Boolean(bodyOnly && bodyOnly.ok);
       }
     } catch (e) { /* createReply's comment already holds the body */ }
@@ -5604,7 +6150,8 @@ async function outlookDraftWrite(p) {
         name: file.filename,
         contentType: file.mimeType,
         contentBytes: file.base64
-      })
+      }),
+      timeoutMs: outlookWriteMs()
     });
     let created = null;
     if (att && att.ok) { try { created = await att.json(); } catch (e) { created = null; } }
@@ -5675,9 +6222,78 @@ async function outlookDeleteDraft(draftId, prefer) {
 // The owner's off switches live in one storage object. A missing key is off.
 async function glanceSwitchOn(name) {
   try {
+    // A Chrome Web Store install (Chrome adds update_url) never turns a Labs switch on, whatever storage says.
+    if (chrome.runtime && typeof chrome.runtime.getManifest === 'function' && (chrome.runtime.getManifest() || {}).update_url) return false;
     const bag = await chrome.storage.local.get({ glanceSwitches: {} });
     return !!(bag.glanceSwitches && bag.glanceSwitches[name] === true);
   } catch (e) { return false; }
+}
+
+const USER_CONTEXT_STORAGE_KEY = 'glanceUserContextV0';
+
+function userContextAccountKey(msg) {
+  const raw = msg && (msg.accountKey || msg.tabAccount || (msg.event && msg.event.accountKey));
+  const k = String(raw || '').trim().toLowerCase();
+  return k || 'default';
+}
+
+async function readUserContextStore() {
+  try {
+    const bag = await chrome.storage.local.get({ [USER_CONTEXT_STORAGE_KEY]: null });
+    const root = bag[USER_CONTEXT_STORAGE_KEY];
+    if (root && root.byAccount && typeof root.byAccount === 'object') return root;
+    if (root && root.schemaVersion) {
+      return { byAccount: { default: root } };
+    }
+    return { byAccount: {} };
+  } catch (e) { return { byAccount: {} }; }
+}
+
+async function readUserContextProfile(accountKey) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W) return null;
+  const key = String(accountKey || 'default').trim().toLowerCase() || 'default';
+  const store = await readUserContextStore();
+  return W.norm((store.byAccount && store.byAccount[key]) || W.empty(key));
+}
+
+async function writeUserContextProfile(profile, accountKey) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W || !profile) return false;
+  if (!(await glanceSwitchOn(W.SWITCH))) return false;
+  const key = String(accountKey || profile.userId || 'default').trim().toLowerCase() || 'default';
+  try {
+    const store = await readUserContextStore();
+    const byAccount = Object.assign({}, store.byAccount || {});
+    const norm = W.norm(profile);
+    norm.userId = key;
+    byAccount[key] = norm;
+    await chrome.storage.local.set({ [USER_CONTEXT_STORAGE_KEY]: { byAccount: byAccount } });
+    return true;
+  } catch (e) { return false; }
+}
+
+async function seedUserContextFromConnect(connectPatch) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W || !(await glanceSwitchOn(W.SWITCH))) return;
+  const patch = connectPatch || {};
+  const accountKey = userContextAccountKey({
+    accountKey: patch.email || patch.mail || patch.accountKey,
+    tabAccount: patch.email || patch.mail
+  });
+  const next = W.fromConnect(await readUserContextProfile(accountKey), patch);
+  await writeUserContextProfile(next, accountKey);
+}
+
+async function applyUserContextEvent(msg) {
+  const W = globalThis.FlowUserContextWriter;
+  if (!W || !(await glanceSwitchOn(W.SWITCH))) return { ok: false, reason: 'switch-off' };
+  const ev = msg && msg.event;
+  if (!ev || !ev.type) return { ok: false, reason: 'missing-event' };
+  const accountKey = userContextAccountKey(msg);
+  const next = W.applyEvent(await readUserContextProfile(accountKey), Object.assign({}, ev, { accountKey: accountKey }));
+  await writeUserContextProfile(next, accountKey);
+  return { ok: true, profile: next };
 }
 
 async function outlookTeamsWanted(callText) {
@@ -5954,7 +6570,11 @@ async function outlookMeetingWrite(p) {
   }
   const title = String(params.title || 'Meeting').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Meeting';
   const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim().slice(0, 500) : '';
-  const zone = await outlookGlanceZone(params.timeZone);
+  const zoneBag = await outlookCalendarTimeZone(params.timeZone);
+  if (!zoneBag.ok) {
+    return { ok: false, reason: zoneBag.reason || 'mailbox-timezone-unavailable', error: zoneBag.error || 'Could not read your mailbox time zone.' };
+  }
+  const zone = zoneBag.timeZone;
   const lines = [];
   if (quote && quote !== title) lines.push(quote);
   if (p && p.threadUrl) lines.push(String(p.threadUrl));
@@ -5965,7 +6585,8 @@ async function outlookMeetingWrite(p) {
     title: title,
     quote: lines.length ? lines.join('\n') : title,
     durationMinutes: params.durationMinutes,
-    timeZone: zone
+    timeZone: zone,
+    mailboxTimeZone: zone
   });
   if (!built) return { ok: false, reason: 'unclear', error: 'No single time for this meeting.' };
   const body = built;
@@ -6028,13 +6649,14 @@ async function outlookMeetingWrite(p) {
     } catch (e) { removed = false; }
     return { ok: false, reason: 'series-failed', removed: removed, ref: removed ? null : { eventId: event.id } };
   }
-  const proved = await outlookEventRead(event.id);
+  const proved = await outlookEventRead(event.id, zone);
   const eventSnap = proved && proved.snap;
   const when = Cal.whenLabel(dateIso, clock.hour, clock.minute);
   const ref = {
     eventId: event.id,
     created: eventSnap,
-    contentHash: Cal.contentHash(proved && proved.raw)
+    contentHash: Cal.contentHash(proved && proved.raw),
+    timeZone: zone
   };
   const base = {
     where: 'Outlook Calendar',
@@ -6062,11 +6684,17 @@ async function outlookCalendarWrite(p) {
   if (!Cal.hasWriteScope(fileScopes)) {
     return { ok: false, reason: 'calendar-write-not-granted' };
   }
+  const zoneBag = await outlookCalendarTimeZone(params.timeZone);
+  if (!zoneBag.ok) {
+    return { ok: false, reason: zoneBag.reason || 'mailbox-timezone-unavailable', error: zoneBag.error || 'Could not read your mailbox time zone.' };
+  }
+  const zone = zoneBag.timeZone;
   const body = Cal.eventBody({
     dateIso: params.dateIso,
     hour: params.hour,
     minute: params.minute,
-    timeZone: localTimeZone(),
+    timeZone: zone,
+    mailboxTimeZone: zone,
     fileName: params.fileName || params.fileTerm,
     fileTerm: params.fileTerm,
     fileUrl: params.fileUrl,
@@ -6080,9 +6708,10 @@ async function outlookCalendarWrite(p) {
   if (invited > 0 || body.isOnlineMeeting) return { ok: false, reason: 'refused' };
   const url = OUTLOOK_GRAPH + '/me/events';
   outlookAssertNotSend(url);
+  const zoneHeader = String(body.start.timeZone || zone || '').replace(/"/g, '').slice(0, 80);
   const res = await outlookFetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: Object.assign({ 'Content-Type': 'application/json' }, outlookPreferTimezone(zoneHeader)),
     body: JSON.stringify(body)
   });
   if (res.notConnected) return { ok: false, reason: 'not-connected' };
@@ -6096,8 +6725,8 @@ async function outlookCalendarWrite(p) {
   }
   const summary = body.subject;
   const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
-  const eventSnap = await outlookStoredEventSnap(event.id);
-  const ref = { eventId: event.id, created: eventSnap };
+  const eventSnap = await outlookStoredEventSnap(event.id, zone);
+  const ref = { eventId: event.id, created: eventSnap, timeZone: zone };
   const base = {
     where: 'Outlook Calendar',
     target: 'your calendar',
@@ -6132,7 +6761,13 @@ async function outlookCalendarUndo(ref, hint) {
   outlookAssertNotSend(url);
   const calSnap = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
   if (!outlookHasSnap(calSnap)) return outlookUnconfirmed();
-  const edited = await outlookRefuseIfEdited(url, calSnap);
+  let eventZone = ref && ref.timeZone;
+  if (!eventZone) {
+    const mb = await outlookMailboxTimeZone();
+    eventZone = mb.ok ? mb.timeZone : '';
+  }
+  const prefer = outlookPreferTimezone(eventZone);
+  const edited = await outlookRefuseIfEdited(url, calSnap, prefer);
   if (edited) return edited;
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del.notConnected) return { ok: false, reason: 'not-connected' };
@@ -6629,8 +7264,8 @@ async function outlookOneFileAttachment(messageId) {
 
 // One file on the person's OneDrive. Creating or replacing it is not the
 // close: Handled waits for a GET of that item id. A file that already
-// exists is replaced only when a previous version can be restored. Never
-// Mail.Send. A mail does not search the drive.
+// exists is never replaced: the new one is saved beside it under a free name.
+// Never Mail.Send. A mail does not search the drive.
 async function outlookFileWrite(p) {
   const Files = globalThis.FlowOnedriveFile;
   const Proof = globalThis.FlowProofOfClose;
@@ -6657,29 +7292,11 @@ async function outlookFileWrite(p) {
   }
   if (!name || !bytes || !bytes.length || bytes.length > Files.MAX_BYTES) return { ok: false, reason: 'unclear' };
 
-  const lookupUrl = OUTLOOK_GRAPH + Files.rootItemPath(name);
-  outlookAssertNotSend(lookupUrl);
-  const looked = await outlookFetch(lookupUrl, { method: 'GET' });
-  if (looked && looked.notConnected) return { ok: false, reason: 'not-connected' };
-  if (looked && (looked.status === 401 || looked.status === 403)) return { ok: false, reason: 'files-not-granted' };
-  const missing = !looked || looked.status === 404;
-  const existing = !missing && looked.ok ? await outlookReadJson(looked) : null;
-  if (!missing && (!existing || !existing.id)) return { ok: false, reason: 'http-' + ((looked && looked.status) || 0) };
-
-  let created = true;
-  let previousVersionId = '';
-  let putUrl = OUTLOOK_GRAPH + Files.createContentPath(name);
-  if (!missing) {
-    const versionsUrl = OUTLOOK_GRAPH + Files.versionsPath(existing.id);
-    outlookAssertNotSend(versionsUrl);
-    const vers = await outlookFetch(versionsUrl, { method: 'GET' });
-    if (vers && (vers.status === 401 || vers.status === 403)) return { ok: false, reason: 'files-not-granted' };
-    const versionId = Files.versionIdOf(await outlookReadJson(vers));
-    if (!versionId) return { ok: false, reason: 'unclear', error: 'No previous version to restore.' };
-    created = false;
-    previousVersionId = versionId;
-    putUrl = OUTLOOK_GRAPH + Files.itemContentPath(existing.id);
-  }
+  // The write never replaces a file that is already there. A taken name gets Graph's own " (1)" suffix,
+  // so the item this write returns is always one it created, and Undo deletes exactly that item.
+  const created = true;
+  const previousVersionId = '';
+  const putUrl = OUTLOOK_GRAPH + Files.createContentPath(name) + '?@microsoft.graph.conflictBehavior=rename';
   outlookAssertNotSend(putUrl);
   const put = await outlookFetch(putUrl, {
     method: 'PUT',
@@ -6690,14 +7307,14 @@ async function outlookFileWrite(p) {
   if (put && (put.status === 401 || put.status === 403)) return { ok: false, reason: 'files-not-granted' };
   if (!put || !put.ok) return { ok: false, reason: 'http-' + ((put && put.status) || 0) };
   const writtenItem = await outlookReadJson(put);
-  const itemId = (writtenItem && writtenItem.id) || (existing && existing.id) || '';
+  const itemId = (writtenItem && writtenItem.id) || '';
+  const savedName = (writtenItem && writtenItem.name) || name;
   const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
   const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
-  const base = { where: 'OneDrive', target: name, written: 'OneDrive · ' + name, url: null };
+  const base = { where: 'OneDrive', target: savedName, written: 'OneDrive · ' + savedName, url: null };
   if (!itemId) return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
 
-  const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created };
-  if (previousVersionId) ref.previousVersionId = previousVersionId;
+  const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created, name: savedName };
   const fetched = await outlookFileFetchBack(itemId);
   if (fetched && fetched.item) ref.editSnap = outlookCreationSnap(fetched.item);
   if (!fetched.ok || !outlookHasSnap(ref.editSnap)) {
@@ -6761,8 +7378,22 @@ async function outlookFileUndo(ref) {
   outlookAssertNotSend(url);
   const del = await outlookFetch(url, { method: 'DELETE' });
   if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
-  if (del && (del.ok || del.status === 204 || del.status === 404)) return { ok: true, written: 'OneDrive file removed.' };
-  return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  if (!(del && (del.ok || del.status === 204 || del.status === 404))) return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+  // Removed means a GET of that item no longer finds it. A delete answer alone is not the proof.
+  if (!(await outlookFileGone(itemId))) {
+    return { ok: false, reason: 'still-there', written: 'OneDrive still has this file. Undo could not remove it.' };
+  }
+  return { ok: true, written: 'OneDrive file removed.' };
+}
+
+async function outlookFileGone(itemId) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || !itemId) return false;
+  const url = OUTLOOK_GRAPH + Files.itemPath(itemId);
+  outlookAssertNotSend(url);
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { return false; }
+  return Boolean(res && (res.status === 404 || res.status === 410));
 }
 
 // The attachmentSave step's writer. The page does not call it in 0.9.38.
@@ -6874,14 +7505,18 @@ async function connectorStatus() {
   const sf = await getSalesforceAuth();
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
+  // Popup open: if we still claim a Google grant, ask tokeninfo once. A
+  // remote revoke leaves storage looking Connected otherwise.
+  try { await probeGoogleAuthStillValid(); } catch (e) { /* status below still reads storage */ }
   const gt = await getGoogleTasksAuth();
-  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, 'googleLaneWarning', 'glanceLaneUndo', 'glanceHostLanguage', 'glanceUiLanguage']);
+  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, 'googleLaneWarning', 'glanceLaneUndo', 'glanceHostLanguage', 'glanceUiLanguage', GOOGLE_REVOKE_PENDING_KEY]);
   let uiLang = reconnectBag.glanceUiLanguage || reconnectBag.glanceHostLanguage || '';
   if (!uiLang) {
     try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
   }
   const grantedRec = reconnectBag[GOOGLE_GRANTED_SCOPES_KEY] || null;
-  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(googleManifestScopes()));
+  const manifestScopes = await googleManifestScopes();
+  const scopesGranted = Boolean(grantedRec && grantedRec.status === 'granted' && grantedRec.version === scopeVersion(manifestScopes));
   const googleTasks = googleConnectionState(gt, reconnectBag[GOOGLE_RECONNECT_STORAGE_KEY] || null, {
     configured: googleTasksConfigured(),
     detail: GLANCE_TASK_LIST_TITLE + ' list',
@@ -6890,10 +7525,16 @@ async function connectorStatus() {
     everConnected: reconnectBag[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || null,
     webAuth: reconnectBag[GOOGLE_WEB_AUTH_STORAGE_KEY] || null,
     laneUndo: reconnectBag.glanceLaneUndo || null,
-    scopesGranted: scopesGranted
+    scopesGranted: scopesGranted,
+    revokePending: reconnectBag[GOOGLE_REVOKE_PENDING_KEY] || null
   });
+  const ecoBag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY]);
+  const ecoSnap = await ecosystemStatusExtras(Object.assign({}, reconnectBag, ecoBag, { googleTasks: googleTasks }));
   return {
     googleTasks: googleTasks,
+    google: ecoSnap.google,
+    microsoft: ecoSnap.microsoft,
+    meta: ecoSnap.meta,
     hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID)
@@ -6973,6 +7614,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   // The person pressed רענן. Recovery never reloads a tab on its own.
+  // The page's Reconnect row. Opens Glance's setup; it connects nothing and writes nothing.
+  if (msg.type === 'flow:open-setup') {
+    const tabId = sender && sender.tab && sender.tab.id;
+    try { if (typeof tabId === 'number' && chrome.sidePanel && chrome.sidePanel.open) chrome.sidePanel.open({ tabId: tabId }).catch(() => {}); } catch (e) { /* the toolbar button opens it */ }
+    try { sendResponse({ ok: true }); } catch (e) { /* the page went away */ }
+    return true;
+  }
+
   if (msg.type === 'flow:outlook-refresh-tab') {
     const tabId = typeof msg.tabId === 'number' ? msg.tabId : (sender && sender.tab && sender.tab.id);
     if (typeof tabId === 'number' && chrome.tabs && typeof chrome.tabs.reload === 'function') {
@@ -6997,8 +7646,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => ({ ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
   }
 
+  if (msg.type === 'flow:microsoft-optional-scopes') {
+    if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
+    const bucket = msg.bucket || msg.optionalBucket;
+    return reply(sendResponse, requestMicrosoftOptionalScopes(bucket, { launchInteractive: outlookLaunchInteractive }));
+  }
+
   if (msg.type === 'flow:connect') {
-    if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
+    const ecoConnector = msg.connectorId === 'googleTasks' || msg.connectorId === 'microsoft' || msg.connectorId === 'meta';
+    if (ecoConnector) {
+      return reply(sendResponse, glanceSwitchOn('CONNECT_ECOSYSTEM').then((ecoOn) => {
+        if (ecoOn) {
+          const interactive = msg.connectorId === 'googleTasks'
+            ? googleConnectWantsInteractive(sender, msg.interactive === true)
+            : true;
+          return connectEcosystemConnector(msg.connectorId, {
+            connectGoogleTasks: (force) => connectGoogleTasks(force !== false ? interactive : false),
+            launchInteractive: outlookLaunchInteractive,
+            enableSurface: enableSurface,
+            syncOutlook: (syncOpts) => outlookEcosystemSync(syncOpts)
+          });
+        }
+        if (msg.connectorId === 'googleTasks') {
+          return connectGoogleTasks(googleConnectWantsInteractive(sender, msg.interactive === true)).then(() => ({ ok: true }));
+        }
+        return { ok: false, reason: 'connector-not-live' };
+      }));
+    }
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
@@ -7062,6 +7736,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:sharepoint-save-plan') {
     return reply(sendResponse, sharepointSavePlan(msg));
+  }
+
+  if (msg.type === 'flow:user-context-get') {
+    return reply(sendResponse, readUserContextProfile().then((p) => ({ ok: true, profile: p })));
+  }
+
+  if (msg.type === 'flow:user-context-event') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, applyUserContextEvent(msg));
   }
 
   if (msg.type === 'flow:execute-action') {
@@ -7156,6 +7839,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:outside-drive') {
     return reply(sendResponse, (async () => {
       if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+      if (!(await mailboxDriveSearchAllowedNow())) return { ok: true, files: [] };
       const since = Number(msg.sinceMs);
       const terms = (Array.isArray(msg.terms) ? msg.terms : []).map((t) => String(t).replace(/['\\]/g, '')).filter((t) => t.length >= 2).slice(0, 8);
       if (!(since > 0) || !terms.length) return { ok: false, reason: 'bad-request' };

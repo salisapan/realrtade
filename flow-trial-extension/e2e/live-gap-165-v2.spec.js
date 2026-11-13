@@ -6,6 +6,8 @@
 // server that behaves like the API, fixtures only.
 const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer } = require('./support/google-lane-server');
+const { bind: bindV1ScopeGates } = require('./support/v1-scope-gates');
+const { testIfDriveReadonly, testIfGmailCompose, driveReadonlyInManifest, gmailComposeInManifest } = bindV1ScopeGates(test);
 
 const SELF = 'ai.local.flow@gmail.com';
 const OTHER = 'sali.profile@gmail.com';
@@ -72,46 +74,51 @@ test.describe('1. a single 401 on a write', () => {
     expect(stored.googleReconnect).toBeFalsy();
   });
 
-  test('a 401 whose refresh fails for a reason other than revocation keeps the token', async ({ glance }) => {
+  test('a 401 whose refresh fails clears the grant so Connect Google shows', async ({ glance }) => {
     await glance.seedGmail({});
     server.rejectAuth('/calendar/v3/calendars/primary/events');
     const page = await glance.openGmail(opts('post401-keep', 'en'));
     await click(page);
-    await expect(main(page)).toContainText(/Not closed|not signed|Reconnect/i, { timeout: 25000 });
-    const stored = await glance.storage();
-    expect(stored.googleWebAuth && stored.googleWebAuth.accessToken).toBeTruthy();
+    await expect(main(page)).toContainText(/Connect Google|Not closed|not signed|Reconnect/i, { timeout: 25000 });
+    await expect.poll(async () => {
+      const s = await glance.storage();
+      return !(s.googleWebAuth && s.googleWebAuth.accessToken) && !s.googleTasksAuth;
+    }).toBe(true);
     const posts = server.calls.filter((c) => c.method === 'POST' && c.path === '/calendar/v3/calendars/primary/events');
     expect(posts).toHaveLength(2);
   });
 
-  test('when consent is dropped, a Chrome token does not write and the flow stops at Reconnect', async ({ glance }) => {
+  test('when consent is dropped, a Chrome token does not write and Connect Google shows', async ({ glance }) => {
     await glance.seedGmail({ googleConnectedAccount: { email: SELF, at: Date.now(), source: 'web' } });
     server.registerToken('ya29.chrome', SELF);
     await glance.evaluateWorker(() => {
+      // Mirror a remote revoke: silent Chrome mint and web refresh both fail.
       globalThis.__glanceE2e.identityToken = 'ya29.chrome';
       globalThis.__glanceE2e.webFlowError = 'Google sign-in failed (invalid_grant).';
+      globalThis.__glanceE2e.authFail = true;
     });
     server.rejectAuth('/calendar/v3/calendars/primary/events');
+    server.rejectAuth('/tasks/');
     const page = await glance.openGmail(opts('revoked-chrome', 'en'));
     await click(page);
-    await expect(main(page)).toContainText(/Reconnect|Not closed|not signed/i, { timeout: 25000 });
-    await expect(page.locator('div[role="main"] .flow-chip-done-icon')).toHaveCount(0);
+    await expect(main(page)).toContainText(/Connect Google|Reconnect|Not closed|not signed/i, { timeout: 25000 });
     expect(eventIds()).toHaveLength(0);
     expect(taskIds()).toHaveLength(0);
-    const stored = await glance.storage();
-    expect(stored.googleReconnect && stored.googleReconnect.needed).toBe(true);
+    await expect.poll(async () => {
+      const s = await glance.storage();
+      return !s.googleTasksAuth && !(s.googleWebAuth && s.googleWebAuth.accessToken);
+    }).toBe(true);
   });
 
-  test('a refresh that fails with invalid_grant drops the consent', async ({ glance }) => {
+  test('a refresh that fails with invalid_grant clears the grant', async ({ glance }) => {
     await glance.seedGmail({});
     await glance.evaluateWorker(() => { globalThis.__glanceE2e.webFlowError = 'Google sign-in failed (invalid_grant).'; });
     server.rejectAuth('/calendar/v3/calendars/primary/events');
     const page = await glance.openGmail(opts('post401-revoked', 'en'));
     await click(page);
-    await expect(main(page)).toContainText(/Reconnect|Not closed/i, { timeout: 25000 });
+    await expect(main(page)).toContainText(/Connect Google|Reconnect|Not closed/i, { timeout: 25000 });
     await expect.poll(async () => { const s = await glance.storage(); return !!(s.googleWebAuth && s.googleWebAuth.accessToken); }).toBe(false);
-    const stored = await glance.storage();
-    expect(stored.googleReconnect && stored.googleReconnect.needed).toBe(true);
+    await expect.poll(async () => { const s = await glance.storage(); return !s.googleTasksAuth; }).toBe(true);
   });
 });
 
@@ -316,7 +323,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('a recorded account but the profile cannot be read: nothing is written, Hebrew UI', async ({ glance }) => {
     await glance.seedGmail({ glanceUiLanguage: 'he', googleConnectedAccount: { email: SELF, at: Date.now(), source: 'web' } });
-    server.failGet('/gmail/v1/users/me/profile');
+    server.failGet('/oauth2/v3/userinfo');
     const page = await glance.openGmail(opts('v-unread-he', 'he'));
     await click(page);
     await refused(page, glance, 'לא הצלחתי לאמת את החשבון — יש להתחבר מחדש', 'חבר מחדש את Google');
@@ -327,7 +334,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('profile unreadable with no record at all, English UI', async ({ glance }) => {
     await glance.seedGmail({});
-    server.failGet('/gmail/v1/users/me/profile');
+    server.failGet('/oauth2/v3/userinfo');
     const page = await glance.openGmail(opts('v-unread-en', 'en'));
     await click(page);
     await refused(page, glance, "Couldn't verify the account — reconnect Google", 'Reconnect Google');
@@ -354,6 +361,7 @@ test.describe('3b. no write without a positive match of the token account', () =
 
   test('no record yet but the tab account matches the token: the write goes out and the match is recorded', async ({ glance }) => {
     await glance.seedGmail({});
+    await glance.evaluateWorker(() => chrome.storage.local.remove('googleConnectedAccount'));
     const page = await glance.openGmail(opts('v-match-adopt', 'en'));
     await click(page);
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 25000 });
@@ -361,9 +369,19 @@ test.describe('3b. no write without a positive match of the token account', () =
     await expect.poll(async () => { const s = await glance.storage(); return s.googleConnectedAccount && s.googleConnectedAccount.email; }).toBe(SELF);
   });
 
+  test('Handled banner never appears when account verification fails', async ({ glance }) => {
+    await glance.seedGmail({});
+    server.failGet('/oauth2/v3/userinfo');
+    const page = await glance.openGmail(opts('v-no-handled', 'en'));
+    await click(page);
+    await expect(main(page)).not.toContainText(/Handled/i, { timeout: 25000 });
+    await expect(page.locator('div[role="main"] .flow-chip-handled')).toHaveCount(0);
+    expect(posts()).toHaveLength(0);
+  });
+
   test('the Reconnect button asks Google for the tab account (login_hint, interactive) and writes nothing', async ({ glance }) => {
     await glance.seedGmail({});
-    server.failGet('/gmail/v1/users/me/profile');
+    server.failGet('/oauth2/v3/userinfo');
     await glance.evaluateWorker(() => { globalThis.__glanceE2e.flows = []; });
     const page = await glance.openGmail(opts('v-btn-flow', 'en'));
     await click(page);
@@ -411,12 +429,24 @@ test.describe('4. copied only: no card of any kind', () => {
     await expect(main(page)).not.toContainText(/Glance|DETECTED INTENT|report\.pdf/i);
   });
 
-  test('the same mail addressed To the account is offered the file card', async ({ glance }) => {
+  testIfDriveReadonly(
+    'the same mail addressed To the account is offered the file card',
+    async ({ glance }) => {
     await glance.seedGmail({});
     server.driveHits([{ id: 'rep-1', name: 'report.pdf', mimeType: 'application/pdf' }]);
     const page = await glance.openGmail(detailed('to-drive', 'Can you send me the report', 'en', { to: [SELF], cc: ['noa@acme.io'] }));
     await expect(chip(page)).toBeVisible({ timeout: 15000 });
-  });
+    },
+    async ({ glance }) => {
+      expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
+      await glance.seedGmail({});
+      server.driveHits([{ id: 'rep-1', name: 'report.pdf', mimeType: 'application/pdf' }]);
+      const page = await glance.openGmail(detailed('to-drive-off', 'Can you send me the report', 'en', { to: [SELF], cc: ['noa@acme.io'] }));
+      await page.waitForTimeout(3000);
+      await expect(chip(page)).toHaveCount(0);
+      expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+    }
+  );
 
   test('Gmail paints the recipients after the body: Cc only still ends with no card', async ({ glance }) => {
     await glance.seedGmail({});
@@ -427,13 +457,26 @@ test.describe('4. copied only: no card of any kind', () => {
     await expect(main(page)).not.toContainText(/DETECTED INTENT/);
   });
 
-  test('Gmail paints the recipients after the body: addressed To the account keeps its card', async ({ glance }) => {
+  testIfDriveReadonly(
+    'Gmail paints the recipients after the body: addressed To the account keeps its card',
+    async ({ glance }) => {
     await glance.seedGmail({});
     const page = await glance.openGmail(detailed('to-late', 'Can you send me the report', 'en', { lateMs: 1500, to: [SELF], cc: ['noa@acme.io'] }));
     await page.waitForTimeout(4000);
     await expect(main(page).locator('.glance-late-hdr table')).toHaveCount(1);
     await expect(chip(page)).toHaveCount(1);
-  });
+    },
+    async ({ glance }) => {
+      expect(require('./support/v1-scope-gates').driveReadonlyInManifest).toBe(false);
+      await glance.seedGmail({});
+      server.driveHits([{ id: 'rep-1', name: 'report.pdf', mimeType: 'application/pdf' }]);
+      const page = await glance.openGmail(detailed('to-late-off', 'Can you send me the report', 'en', { lateMs: 1500, to: [SELF], cc: ['noa@acme.io'] }));
+      await page.waitForTimeout(5000);
+      await expect(main(page).locator('.glance-late-hdr table')).toHaveCount(1);
+      await expect(chip(page)).toHaveCount(0);
+      expect(server.calls.some((c) => /\/drive\/v3\/files/.test(c.path))).toBe(false);
+    }
+  );
 
   test('details open with a collapsed To line and Cc only: the labelled table wins and no card is shown', async ({ glance }) => {
     await glance.seedGmail({});
@@ -492,22 +535,45 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     return { page: page, chip: c };
   }
 
-  test('the thread id only on h2.hP (hex): the draft is made in that thread', async ({ glance }) => {
+  testIfGmailCompose(
+    'the thread id only on h2.hP (hex): the draft is made in that thread',
+    async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'hdr-hex', { threadIdOnHeader: true });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
     await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(1);
     expect(drafts()[Object.keys(drafts())[0]].message.threadId).toBe(HEX);
-  });
+    },
+    async ({ glance }) => {
+      expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
+      const { page, chip: c } = await saveChain(glance, 'hdr-hex-off', { threadIdOnHeader: true });
+      await c.click();
+      await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+      expect(Object.keys(drafts())).toHaveLength(0);
+      expect(server.calls.some((c2) => c2.method === 'POST' && c2.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
+    }
+  );
 
-  test('only the decimal data-thread-perm-id: it is converted to the hex thread id', async ({ glance }) => {
+  testIfGmailCompose(
+    'only the decimal data-thread-perm-id: it is converted to the hex thread id',
+    async ({ glance }) => {
     const dec = '1234567890123456789';
     const { page, chip: c } = await saveChain(glance, 'hdr-dec', { threadIdOnHeader: true, threadPermId: dec });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
     await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(1);
     expect(drafts()[Object.keys(drafts())[0]].message.threadId).toBe(BigInt(dec).toString(16));
-  });
+    },
+    async ({ glance }) => {
+      expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
+      const dec = '1234567890123456789';
+      const { page, chip: c } = await saveChain(glance, 'hdr-dec-off', { threadIdOnHeader: true, threadPermId: dec });
+      await c.click();
+      await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+      expect(Object.keys(drafts())).toHaveLength(0);
+      expect(server.calls.some((c2) => c2.method === 'POST' && c2.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
+    }
+  );
 
   test('no thread id anywhere and no reply open: the draft step is not offered up front, and nothing says it was made', async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'hdr-none', { noThreadId: true });
@@ -518,7 +584,9 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     await expect(page.locator('div[role="main"]')).not.toContainText(/could not prepare a reply draft/i);
   });
 
-  test('Undo of the Drive save also deletes the reply draft by its id', async ({ glance }) => {
+  testIfGmailCompose(
+    'Undo of the Drive save also deletes the reply draft by its id',
+    async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'undo-draft', { threadIdOnHeader: true });
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
@@ -529,9 +597,24 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     await expect.poll(() => Object.keys(drafts()).length, { timeout: 15000 }).toBe(0);
     expect(server.calls.some((c2) => c2.method === 'DELETE' && c2.path.indexOf('/drafts/' + draftId) >= 0)).toBe(true);
     await expect.poll(() => server.file(fileId).trashed, { timeout: 15000 }).toBe(true);
-  });
+    },
+    async ({ glance }) => {
+      expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
+      const { page, chip: c } = await saveChain(glance, 'undo-draft-off', { threadIdOnHeader: true });
+      await c.click();
+      await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+      expect(Object.keys(drafts())).toHaveLength(0);
+      expect(server.calls.some((c2) => c2.method === 'POST' && c2.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
+      const fileId = server.last.file;
+      await page.locator('div[role="main"] button.flow-chip-undo').click();
+      await expect.poll(() => server.file(fileId).trashed, { timeout: 15000 }).toBe(true);
+      expect(server.calls.some((c2) => c2.method === 'DELETE' && c2.path.indexOf('/drafts/') >= 0)).toBe(false);
+    }
+  );
 
-  test('the draft is in the language of the mail, whatever the UI language is', async ({ glance }) => {
+  testIfGmailCompose(
+    'the draft is in the language of the mail, whatever the UI language is',
+    async ({ glance }) => {
     const { page, chip: c } = await saveChain(glance, 'draft-he', { threadIdOnHeader: true, senderName: 'דנה' }, 'en', 'מצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.');
     await c.click();
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
@@ -541,5 +624,14 @@ test.describe('5. the reply draft finds its thread from the real Gmail header', 
     expect(msg.body).toContain('הקובץ מוכן.');
     expect(msg.body).not.toContain('The file is ready');
     expect(msg.body).not.toContain('Hi ');
-  });
+    },
+    async ({ glance }) => {
+      expect(require('./support/v1-scope-gates').gmailComposeInManifest).toBe(false);
+      const { page, chip: c } = await saveChain(glance, 'draft-he-off', { threadIdOnHeader: true, senderName: 'דנה' }, 'en', 'מצורף ה-PO. נא לשמור אותו ב-Google Drive עד 20/10.');
+      await c.click();
+      await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+      expect(Object.keys(drafts())).toHaveLength(0);
+      expect(server.calls.some((c2) => c2.method === 'POST' && c2.path.indexOf('/gmail/v1/users/me/drafts') >= 0)).toBe(false);
+    }
+  );
 });

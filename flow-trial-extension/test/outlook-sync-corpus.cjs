@@ -301,7 +301,7 @@ console.log('\n--- OneDrive save reaches a card, and a drop still has a reason -
   const shown = plan([one]);
   const kinds = shown.incoming[0] && shown.incoming[0].process && shown.incoming[0].process.steps.map((s) => s.kind);
   check('one PDF on a OneDrive save is an incoming card',
-    shown.incoming.length === 1 && kinds && kinds[0] === 'onedriveFile' && kinds[1] === 'outlookDraft' &&
+    shown.incoming.length === 1 && kinds && kinds.length === 1 && kinds[0] === 'onedriveFile' &&
     shown.incoming[0].process.steps[0].label === 'OneDrive' && shown.diagnostics.length === 0,
     { incoming: shown.incoming.map((x) => x.subject), kinds, diagnostics: shown.diagnostics });
   const two = theirs('od2', SAVE, 0.1, 'Gate two files');
@@ -391,6 +391,35 @@ console.log('\n--- OneDrive save reaches a card, and a drop still has a reason -
       planned.incoming.length === 0 && why === 'outlook:attachments-unread',
       { incoming: planned.incoming.length, why: why, kinds: planned.incoming[0] && planned.incoming[0].process && planned.incoming[0].process.steps.map((s) => s.kind) });
   });
+}
+
+console.log('\n--- a bounce on Outlook (2026-11-13): the message never arrived ---\n');
+{
+  const w = loop('cb', { messageId: 'm0' });
+  const bounce = Object.assign(theirs('cb', 'המסירה לנמענים או לקבוצות אלו נכשלה: dana@acme.com. כתובת הדואר האלקטרוני שהזנת לא נמצאה.', 1, 'לא ניתן למסירה: Lease'), { from: { emailAddress: { name: 'Microsoft Outlook', address: 'postmaster@acme.com' } } });
+  const r = plan([mine('cb', ASK, 3), bounce], [w]);
+  const p = r.patches.find((x) => x.id === w.id);
+  check('Outlook: a delivery failure flags the loop and keeps it open, it is not a reply', p && p.patch.stage === 'bounced' && p.patch.bouncedAt && !p.patch.status, r.patches);
+  check('Outlook: the person is told once that the message did not arrive', r.lines.some((l) => /did not arrive/.test(l)), r.lines);
+  const flagged = Object.assign({}, w, { stage: 'bounced', bouncedAt: NOW - DAY });
+  const resend = plan([mine('cb', ASK, 3), bounce, mine('cb', ASK + ' (resending)', 0)], [flagged]);
+  const q = resend.patches.find((x) => x.id === w.id);
+  check('Outlook: the next message of yours after a bounce clears the flag', q && q.patch.stage === 'waiting' && q.patch.bouncedAt === null, resend.patches);
+}
+
+console.log('\n--- parts on Outlook (2026-11-13): a reply that answers only some of what was asked ---\n');
+{
+  const MULTI = 'Dana, could you send me the invitation for the demo? Also, which process would you like to see? And who from your side will join?';
+  const asked = mine('cp', MULTI, 3);
+  const r0 = plan([asked]);
+  const offer = r0.offers[0];
+  check('Outlook: a message that asks for three things opens a loop with its parts', offer && offer.ask.parts && offer.ask.parts.length === 3, offer && offer.ask.parts);
+  const w = loop('cp', { messageId: asked.id, parts: offer && offer.ask.parts, what: MULTI.slice(0, 80) });
+  const linkOnly = theirs('cp', 'https://contoso.zoom.us/j/123456 Best, Dana', 1, 'Re: Lease');
+  const r = plan([asked, linkOnly], [w]);
+  const p = r.patches.find((x) => x.id === w.id);
+  check('Outlook: a reply that is only the invitation link keeps the loop open on the two questions', p && p.patch.stage === 'partial' && !p.patch.status && p.patch.parts.filter((x) => x.status === 'open').length === 2, r.patches);
+  check('Outlook: the person is told what is still open', r.lines.some((l) => /did not answer everything/.test(l)), r.lines);
 }
 
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));

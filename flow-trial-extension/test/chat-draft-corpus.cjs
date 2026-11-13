@@ -80,9 +80,9 @@ check('business.facebook.com is not a static content script match', scriptBlob.i
 check('no chat host is a static content script match', !/whatsapp|messenger|instagram/.test(scriptBlob));
 const required = manifest.host_permissions || [];
 const optional = manifest.optional_host_permissions || [];
-const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct/;
-check('chat hosts are optional, never required', !required.some((h) => chatHost.test(h)) && optional.some((h) => /messenger\.com/.test(h)) && optional.some((h) => /instagram\.com\/direct/.test(h)) && optional.some((h) => /web\.whatsapp\.com/.test(h)));
-check('Business Suite inbox is an optional host', !required.some((h) => /business\.facebook\.com/.test(h)) && optional.some((h) => /business\.facebook\.com\/latest\/inbox/.test(h)));
+const chatHost = /whatsapp|messenger|facebook\.com\/messages|instagram\.com\/direct|app\.slack\.com|web\.telegram\.org|teams\.microsoft\.com/;
+check('v1 manifest keeps chat optional hosts out (Meta, WhatsApp, Slack, Telegram, Teams)', !required.some((h) => chatHost.test(h)) && !optional.some((h) => chatHost.test(h)));
+check('Business Suite inbox is not a v1 optional host', !required.some((h) => /business\.facebook\.com/.test(h)) && !optional.some((h) => /business\.facebook\.com\/latest\/inbox/.test(h)));
 function chromeHostCovers(pattern, url) {
   const u = new URL(url);
   const m = String(pattern || '').match(/^(https?):\/\/([^/]+)(\/.*)$/);
@@ -107,7 +107,7 @@ const backgroundSrc = fs.readFileSync(path.join(ROOT, 'src/background.js'), 'utf
 const enableSrc = fs.readFileSync(path.join(ROOT, 'lane-chat/enable.js'), 'utf8');
 const messengerLaneOrigins = originsAfter(backgroundSrc, "id: 'glance-lane-messenger'");
 const enableMessengerOrigins = originsAfter(enableSrc, "id: 'messenger'");
-check('facebook.com/messages/e2ee is already covered by messages/*', e2eePages.every((url) => optional.some((h) => chromeHostCovers(h, url)) && messengerLaneOrigins.some((h) => chromeHostCovers(h, url)) && enableMessengerOrigins.some((h) => chromeHostCovers(h, url))));
+check('facebook.com/messages/e2ee is already covered by messages/*', e2eePages.every((url) => messengerLaneOrigins.some((h) => chromeHostCovers(h, url)) && enableMessengerOrigins.some((h) => chromeHostCovers(h, url))));
 const backgroundLines = backgroundSrc.split('\n');
 const nativeAt = backgroundLines.findIndex((line) => line.indexOf("import './native-edit.js'") >= 0);
 check('background.js loads the chat worker on the line after native-edit.js', nativeAt >= 0 && /import '\.\/lane-chat-worker\.js'/.test(backgroundLines[nativeAt + 1] || ''));
@@ -117,7 +117,7 @@ check('WhatsApp Web is not a separate surface', !/label: 'WhatsApp Web'/.test(ba
 check('background.js hands the static Google helpers to the worker', /globalThis\.__glanceGoogleAuth/.test(backgroundSrc) && /GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY/.test(backgroundSrc) && /webTokenUsable: webTokenUsable/.test(backgroundSrc));
 check('the chat worker is a static import in this branch', !fs.existsSync(path.join(ROOT, 'src/lane-chat-worker.import.patch')) && !/importScripts/.test(backgroundSrc) && !/importScripts/.test(workerSrc));
 check('the token hook is locked to the test build', /update_url/.test(workerSrc) && /installed !== true/.test(workerSrc));
-check('the service worker re-registers Business Suite when it is already allowed', /glance-lane-messenger/.test(backgroundSrc) && /business\.facebook\.com\/latest\/inbox/.test(backgroundSrc) && /whyNotShown: messenger-not-granted/.test(backgroundSrc));
+check('Meta messenger and Instagram lanes register only when META_CHAT_LANES is on', /META_CHAT_LANES/.test(backgroundSrc) && /metaChatLaneId/.test(backgroundSrc) && /metaLanesOn/.test(backgroundSrc) && /business\.facebook\.com\/latest\/inbox/.test(backgroundSrc));
 check('the service worker pings a tab before injecting the lane', /window\.__glanceLaneChat/.test(backgroundSrc));
 const messengerSrc = fs.readFileSync(path.join(ROOT, 'src/content-messenger.js'), 'utf8');
 check('Messenger logs a quiet reason and retries an empty thread', /whyNotShown/.test(messengerSrc) && /RETRY_LIMIT/.test(messengerSrc) && /time\[datetime\]/.test(messengerSrc));
@@ -1291,7 +1291,8 @@ console.log('\n--- calendar evidence ---\n');
   check('English UI shows the English explanation', enCopy && enCopy.hidden === false && /Glance closes open loops/.test(enCopy.textContent) && /Nothing is ever sent automatically/.test(enCopy.textContent) && /tracks follow-ups/.test(enCopy.textContent) && /location of events/.test(enCopy.textContent) && enHeCopy && enHeCopy.hidden === true);
   enButtons[0].click();
   await new Promise((r) => setTimeout(r, 40));
-  check('one request covers every Meta host', en.asked.length === 1 && en.asked[0].join('\n') === META_ORIGINS.join('\n') && en.asked[0].every((origin) => optional.indexOf(origin) >= 0) && en.asked[0].every((origin) => origin.indexOf('<all_urls>') < 0));
+  check('one request covers every Meta host', en.asked.length === 1 && en.asked[0].join('\n') === META_ORIGINS.join('\n') && en.asked[0].every((origin) => origin.indexOf('<all_urls>') < 0));
+  check('v1 manifest does not declare Meta or chat optional hosts the enable page asks for', META_ORIGINS.every((origin) => optional.indexOf(origin) < 0));
   const scripts = en.registered[0] || [];
   const scriptIds = scripts.map((row) => row.id).slice().sort().join(',');
   check('the grant registers every Meta lane once', en.registered.length === 1 && scripts.length === 3 && scriptIds === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp');
@@ -1374,9 +1375,9 @@ console.log('\n--- calendar evidence ---\n');
   check('signup can call the Meta consent opener', sent && sent.type === 'flow:open-meta-chats' && opened.ok === true && opened.page === 'lane-chat/enable.html' && pop.window.FlowMetaConsent.ORIGINS.join('\n') === META_ORIGINS.join('\n'));
   pop.window.close();
 
-  function loadLanes(granted) {
+  function loadLanes(granted, switches) {
     const registered = [];
-    const stored = { surfaces: {} };
+    const stored = { surfaces: {}, glanceSwitches: switches || {} };
     const sandbox = {
       console: { log() {}, info() {}, warn() {}, error() {} },
       URLSearchParams, URL, TextEncoder, Uint8Array,
@@ -1407,11 +1408,15 @@ console.log('\n--- calendar evidence ---\n');
   }
   const waOnly = loadLanes(['https://web.whatsapp.com/*']);
   await waOnly.settle();
-  check('a WhatsApp-only grant registers no lane', waOnly.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).length === 0, waOnly.registered.map((row) => row.id));
-  const full = loadLanes(META_ORIGINS.slice());
-  await full.settle();
-  const fullIds = full.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).sort();
-  check('a full Meta grant registers three lanes', fullIds.join(',') === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp', fullIds);
+  check('a WhatsApp-only grant registers the WhatsApp lane only', waOnly.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).join(',') === 'glance-lane-whatsapp', waOnly.registered.map((row) => row.id));
+  const fullOff = loadLanes(META_ORIGINS.slice());
+  await fullOff.settle();
+  const offIds = fullOff.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).sort();
+  check('a full Meta host grant registers WhatsApp only while META_CHAT_LANES is off', offIds.join(',') === 'glance-lane-whatsapp', offIds);
+  const fullOn = loadLanes(META_ORIGINS.slice(), { META_CHAT_LANES: true });
+  await fullOn.settle();
+  const fullIds = fullOn.registered.filter((row) => String(row.id).indexOf('glance-lane-') === 0).map((row) => row.id).sort();
+  check('a full Meta grant with META_CHAT_LANES on registers three lanes', fullIds.join(',') === 'glance-lane-instagram,glance-lane-messenger,glance-lane-whatsapp', fullIds);
 
   const fixtureHtml = fs.readFileSync(path.join(ROOT, 'dev/messenger-fixture.html'), 'utf8');
   const fixtureClock = fs.readFileSync(path.join(ROOT, 'dev/fixture-clock.js'), 'utf8');

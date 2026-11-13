@@ -98,7 +98,7 @@ const FlowChipHost = (() => {
         ? FlowDisplay.holdWhenLine(clock.dateIso, clock.hour, clock.minute, lang)
         : '';
     } else if (clock && clock.dateIso && typeof FlowDisplay.cardDateLine === 'function') {
-      line = FlowDisplay.cardDateLine(clock.dateIso, lang);
+      line = clock.overdue && typeof FlowDisplay.overdueDateLine === 'function' ? FlowDisplay.overdueDateLine(clock.dateIso, lang) : FlowDisplay.cardDateLine(clock.dateIso, lang);
     }
     if (!line) return;
     const node = el('p', 'flow-chip-when', line);

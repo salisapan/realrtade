@@ -101,7 +101,8 @@ const FlowOutlookAuth = (() => {
       refreshToken: resp.refresh_token ? String(resp.refresh_token) : (previous && previous.refreshToken) || null,
       expiresAt: t + Math.max(0, (Number(resp.expires_in) || 3600) - 60) * 1000,
       rtIssuedAt: rtIssuedAt,
-      grantedScopes: grantedFromResponse(resp, previous)
+      grantedScopes: grantedFromResponse(resp, previous),
+      idToken: resp.id_token ? String(resp.id_token) : (previous && previous.idToken) || null
     };
   }
 

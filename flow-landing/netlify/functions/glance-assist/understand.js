@@ -28,6 +28,9 @@ const DEFAULT_PRO_READS = 3000;
 const DEFAULT_CALL_MICROUSD = 400;   // conservative per-read estimate (glance-ai/oss/cost/cost-tables.md is $0.0001-0.0004)
 const ID_RE = /^[A-Za-z0-9_-]{8,80}$/;
 const TIMEOUT_MS = 20000;
+// An Israeli phone number in the local form (054-1234567, 03-5551234, (03) 555-1234, 0541234567). model-router.js leaksPii() catches the
+// international and US forms only, and the device mask did not mask these either (an open red-team fix, #249). Refused here, nothing charged.
+const IL_PHONE = /(?:^|[^\d])\(?0(?:[23489]|5\d|7[2-9])\)?[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)/;
 
 function sha(prefix, value) { return crypto.createHash('sha256').update(prefix + '|' + value).digest('hex'); }
 function envNumber(env, name, fallback) { const n = Number(env && env[name]); return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback; }
@@ -96,7 +99,7 @@ function createUnderstand(ctx) {
     if (!ready()) return result(503, { code: 'unavailable' });
     const text = typeof payload.maskedText === 'string' ? payload.maskedText.trim() : '';
     if (!text || text.length > MAX_TEXT_CHARS) return result(400, { code: 'bad_request' });
-    if (router.leaksPii(text, 'outbound')) return result(422, { code: 'pii' });                   // the mask missed something: nothing is asked, nothing charged
+    if (router.leaksPii(text, 'outbound') || IL_PHONE.test(text)) return result(422, { code: 'pii' }); // the mask missed something: nothing is asked, nothing charged
     if (languages().indexOf(/[֐-׿]/.test(text) ? 'he' : 'en') < 0) return result(422, { code: 'language_off' });
     const today = typeof payload.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.today) ? payload.today : new Date(now).toISOString().slice(0, 10);
     const me = await who(payload);
@@ -136,4 +139,4 @@ function createUnderstand(ctx) {
   return { ready, read, status };
 }
 
-module.exports = { MAX_TEXT_CHARS, DEFAULT_CALL_MICROUSD, createUnderstand, mockProvider, openAiCompatibleProvider, memoryStore };
+module.exports = { MAX_TEXT_CHARS, DEFAULT_CALL_MICROUSD, IL_PHONE, createUnderstand, mockProvider, openAiCompatibleProvider, memoryStore };

@@ -49,6 +49,18 @@ const FlowFollow = (() => {
     });
   }
 
+  async function gmailComposeApiAllowedFromStorage() {
+    const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
+    if (!C || typeof C.gmailDraftApiAllowed !== 'function') return false;
+    try {
+      const bag = await chrome.storage.local.get('googleGrantedScopes');
+      const rec = bag && bag.googleGrantedScopes;
+      const raw = rec && rec.version;
+      const scopes = raw == null ? null : String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
+      return C.gmailDraftApiAllowed(scopes);
+    } catch (e) { return false; }
+  }
+
   function track(event) {
     send({ type: 'flow:track', event, params: {} });
   }
@@ -273,7 +285,7 @@ const FlowFollow = (() => {
     const name = whoOf(sender);
     const what = patch.yoursReason === 'blocked' ? 'could not open or find what you sent' : 'asked you something';
     let next = Object.assign({}, watch, patch);
-    const canDraft = Boolean(next.counterpart && next.counterpart.email);
+    const canDraft = Boolean(next.counterpart && next.counterpart.email) && (await gmailComposeApiAllowedFromStorage());
     // Is a file part of the way out, and is there exactly one right file? Otherwise: none.
     const choice = canDraft ? await resolveFile(ctx, next) : null;
     if (choice && choice.source === 'drive') {
@@ -361,7 +373,7 @@ const FlowFollow = (() => {
 
   // Everything they wrote after the message that opened the loop, judged as one:
   // an answer followed by a "thanks" is still an answer.
-  const RANK = { paid: 7, closed: 6, declined: 6, yours: 5, promised: 4, answered: 3, ack: 2, auto: 1 };
+  const RANK = { paid: 7, closed: 6, declined: 6, yours: 5, promised: 4, answered: 3, ack: 2, auto: 1, bounced: 1 };
   function judge(ctx, watch) {
     const msgs = Array.from(ctx.messages);
     let from = msgs.length - 1;
@@ -396,7 +408,7 @@ const FlowFollow = (() => {
       const why = String(best.reply.why || '');
       note('heldOpen', { text: best.text, counterpart: watch.counterpart, reason: /waiting on someone/.test(why) ? 'it is with someone else' : /not clearly/.test(why) ? 'too short to be an answer' : /interim/.test(why) ? 'still working on it' : /ack/.test(why) ? 'only a thank-you' : 'unrelated' });
     }
-    const res = FlowFollowUp.applyReply(watch, best.reply, Date.now());
+    const res = FlowFollowUp.applyReply(watch, best.reply, Date.now(), best.text);
     if (res.none) return;
     recordReply(watch, best.reply, lastId);
     // An answer that came in another app than the one the loop was opened in says so, in the loop and in the receipt.
@@ -405,10 +417,19 @@ const FlowFollow = (() => {
     const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
     if (res.close && next.tier === 'model' && best.reply.outcome !== 'declined') confirmAsk(next, 'confirmedAsk', 'ASK');
     if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : best.reply.outcome === 'declined' ? 'declined' : best.reply.delivered === 'file' ? 'file' : 'replied', via);
+    else if (res.bounced) {
+      // The mail never arrived: not a reply. The loop stays open and flagged, and is not chased until the person has sent it again.
+      if (!watch.bouncedAt) receipt('Your message to ' + whoOf(watch.counterpart) + ' did not arrive (the address was not found or refused it). Check the address and send it again. I kept the loop open and will not chase until you do.', null);
+    }
     else if (res.yours) await yours(watch, best.sender, patch, ctx);
     else if (res.claimedOnly) {
       // They wrote "attached" and nothing came through. Say so once; the loop stays open.
       if (!watch.claimedFileAt) receipt(whoOf(best.sender) + ' said the file is attached, but no file came through. I kept the loop open.', null);
+    }
+    else if (res.partial) {
+      // They wrote back but answered only some of what you asked: the loop stays open on the rest, and the reminder moves.
+      await moveTask(Object.assign({}, watch, patch), patch.chaseIso);
+      receipt(whoOf(best.sender) + ' replied, but did not answer everything you asked. Still open: ' + (res.remaining || []).slice(0, 3).join(' / ') + '. I kept the loop open and will look again on ' + dayLabel(patch.chaseIso) + '.', null);
     }
     else if (res.rescheduled) await promised(watch, best.sender, patch);
     else if (res.confirm) paidCard(next, best.sender);
@@ -999,7 +1020,12 @@ const FlowFollow = (() => {
     const person = { email: sender.email, personKey: env.personKey || null };
     const payment = FlowResolution.paymentStatus({ facts: env.facts, person, watches, paymentsSeen: await FlowStorage.getPaymentsSeen(), state: env.state, now: Date.now() });
     const issuer = await FlowStorage.getIssuer(need.object);
-    return { evidence: { threadFiles, driveFiles: found && found.ok ? found.files : null }, payment, issuer };
+    return {
+      evidence: { threadFiles, driveFiles: found && found.ok ? found.files : null },
+      payment,
+      issuer,
+      driveSearch: found
+    };
   }
 
   function planFor(env, world) {
@@ -1081,12 +1107,13 @@ const FlowFollow = (() => {
       if (saved) receipt('Draft ready in Gmail' + (attached && !withoutFile ? ' with ' + attached : '') + '. Nothing was sent. I will close this when you send the ' + env.need.label + '.' + (withoutFile ? ' I could not attach the file, so add it yourself.' : ''), null);
     };
     const move = (fn) => () => { fn().catch((e) => { console.error('[Glance] resolution step failed', e); receipt('Something did not work. Try again in a moment.', null); }); };
+    const btn = (en, heLabel) => (he ? heLabel : en);
     plan.actions.forEach((a, idx) => {
       const primary = idx === 0 ? 'primary' : 'ghost';
-      if (a === 'prepare-reply-with-file') row.appendChild(button('Prepare reply with file', primary, move(reply({}, true))));
-      else if (a === 'prepare-plain-reply') row.appendChild(button('Prepare my reply', primary, move(reply({}, false))));
-      else if (a === 'mark-paid') row.appendChild(button(plan.move === 'verify-payment' ? 'Yes, it is paid' : 'It is paid now', primary, move(async () => { const saved = await saveResolution(env, FlowResolution.markPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
-      else if (a === 'not-paid') row.appendChild(button('Not yet', 'ghost', move(async () => { const saved = await saveResolution(env, FlowResolution.markNotPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
+      if (a === 'prepare-reply-with-file') row.appendChild(button(btn('Prepare reply with file', 'הכיני תשובה עם הקובץ'), primary, move(reply({}, true))));
+      else if (a === 'prepare-plain-reply') row.appendChild(button(btn('Prepare my reply', 'הכיני תשובה'), primary, move(reply({}, false))));
+      else if (a === 'mark-paid') row.appendChild(button(btn(plan.move === 'verify-payment' ? 'Yes, it is paid' : 'It is paid now', plan.move === 'verify-payment' ? 'כן, שולם' : 'שולם עכשיו'), primary, move(async () => { const saved = await saveResolution(env, FlowResolution.markPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
+      else if (a === 'not-paid') row.appendChild(button(btn('Not yet', 'עדיין לא'), 'ghost', move(async () => { const saved = await saveResolution(env, FlowResolution.markNotPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
       else if (a === 'request-issuer') row.appendChild(button('Ask ' + (plan.issuer.name || plan.issuer.email) + ' to issue it', primary, move(async () => {
         const dateText = null;
         const body = FlowResolution.issuerRequestDraft(env.need, env.facts, plan.issuer, { dateText });
@@ -1119,7 +1146,7 @@ const FlowFollow = (() => {
       }
       else if (a === 'create-from-template' && ctx.openCreateCard) row.appendChild(button('Fill in the details', primary, () => { dismiss(); ctx.openCreateCard({ ask: { id: env.need.object, creatable: true, lang: env.need.lang, label: env.need.label, synonym: env.need.synonym, line: plan.line }, decision: plan.template, sender: env.sender, subject: env.subject, bodyText: env.text, threadId: env.threadId }); }));
     });
-    row.appendChild(button('Not now', 'ghost', dismiss));
+    row.appendChild(button(he ? 'לא עכשיו' : 'Not now', 'ghost', dismiss));
   }
 
   // An ask for a financial artifact in a thread with no loop, or a new message in a thread that carries a resolution.
@@ -1149,10 +1176,12 @@ const FlowFollow = (() => {
     }
     const key = threadId + '|' + lastId;
     if (examinedResolution.has(key)) return true;
-    examinedResolution.add(key);
     const env = { need, facts, state, watch, sender, threadId, lastId, subject: ctx.subject, threadUrl: ctx.threadUrl(lastId), text, what: String(text).replace(/\s+/g, ' ').trim().slice(0, 160), personKey: (watch && watch.personKey) || null };
     const world = await resolutionWorld(ctx, sender, env);
+    if (world.driveSearch && world.driveSearch.reason === 'drive-search-unavailable') return false;
+    examinedResolution.add(key);
     const plan = planFor(env, world);
+    if (plan && (plan.move === 'choose-file' || plan.why === 'several-fit')) return true;
     if (watch) {
       // Say it again only when the move changed, and keep the stored line true. A held loop stays quiet.
       if (state.move === plan.move) return true;
@@ -1319,6 +1348,8 @@ const FlowFollow = (() => {
             return;
           }
           // A new message of mine in a thread I am waiting on: a chase, or just talk.
+          // A new message of mine after a bounce is the resend: the flag clears and the chase clock runs again.
+          if (FlowFollowUp.isBounced(watch)) { await FlowStorage.updateWatch(threadId, Object.assign({ messageId: lastId }, FlowFollowUp.unbouncePatch(watch))); return; }
           if (FlowFollowUp.looksLikeChase(ctx.ownMessageText(last))) await chased(watch, lastId);
           else await FlowStorage.updateWatch(threadId, { messageId: lastId });
         }

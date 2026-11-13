@@ -13,7 +13,7 @@ function check(name, cond, extra) {
 
 const ALLOW = new Set([
   'glance', 'outlook', 'gmail', 'microsoft', 'pro', 'onedrive', 'teams', 'google', 'drive', 'todo',
-  'meta', 'slack', 'telegram'
+  'meta', 'slack', 'telegram', 'planner'
 ]);
 const BRAND_PHRASES = ['glance pro', 'telegram web', 'google', 'meta', 'slack'];
 
