@@ -629,7 +629,8 @@ function glanceUiCopy(kind) {
       hasThreadAttachment: Boolean(ctx.hasThreadAttachment),
       executionMemory: ctx.executionMemory || null,
       attachFile: ctx.attachFile || null,
-      text: text
+      text: text,
+      subject: ctx.subject || ''
     }) : null;
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent: intent };
     return { show: true, intent: intent, process: process };
@@ -2379,8 +2380,9 @@ function glanceUiCopy(kind) {
           ? FlowIncomingJudge.namedQuietOf(text, {}) : null);
       // A contacts lookup is named on the page: contacts are not in v1, and a skip with no reason is not allowed.
       if (reason === 'contacts-unavailable') paintGmailWhy(message, 'contacts-unavailable', FlowDisplay.whyNotShownLine('contacts-unavailable', glanceUiHebrew() ? 'he' : 'en'));
-      logScanSkip(messageId, reason || 'no-chip-candidate');
-      recordSilence(messageId, reason, {
+      const silenceReason = engineSilenceReason(intent, reason);
+      logScanSkip(messageId, silenceReason);
+      recordSilence(messageId, silenceReason, {
         family: intent.closeFamily || intent.quiet,
         clocks: (String(text).match(/\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b/gi) || []).join(' ').slice(0, 80),
         debug: debug
@@ -2600,6 +2602,7 @@ function glanceUiCopy(kind) {
     if (!process) {
       logScanSkip(messageId, 'no-process');
       void flushSuggest(false);
+      recordSilence(messageId, 'no-process');
       return;
     }
     // A reply draft is saved in the thread by its id. With no thread id and
@@ -4141,7 +4144,10 @@ function glanceUiCopy(kind) {
         const zone = await glanceUserTimeZone();
         if (zone) params.timeZone = zone;
       }
-      params.title = renderedTitleFor(ctx, params.title);
+      // The card label for a hold ("שריין ג׳ 10:00") stays on the card
+      // and in Activity. The event itself keeps the planned title (the
+      // meeting subject, or the sentence when the subject is empty).
+      params.title = artifactTitleFor(ctx, params.title);
       // The worker adds a Meet link only when this text proposes a video call and
       // the MEET_LINK switch is on (off by default). Text stays local.
       if (ctx && ctx.bodyText) params.callText = String(ctx.bodyText).slice(0, 1500);
@@ -4286,6 +4292,20 @@ function glanceUiCopy(kind) {
 
   function logScanSkip(messageId, reason) {
     console.log('[Glance] scan skip:', String(reason || 'unknown'), messageId || '');
+  }
+
+  // A named quiet keeps its code. A typeless miss whose only day is already
+  // gone is the past-date silence. Anything else is no-chip-candidate. The
+  // reason is a short code; it never includes the body.
+  function engineSilenceReason(intent, reason) {
+    if (reason) return reason;
+    const date = intent && intent.facts && intent.facts.date;
+    const iso = date && typeof date.iso === 'string' ? date.iso : '';
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+    if ((date && date.dropped) || (iso && iso < today)) return 'past-date';
+    return 'no-chip-candidate';
   }
 
   function recordSilence(messageId, reason, detail) {

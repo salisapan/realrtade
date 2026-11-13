@@ -54,13 +54,32 @@ const FlowActions = (() => {
     return null;
   }
 
+  // The event title for a calendar hold is the meeting subject, with reply
+  // prefixes and bracket tags like [G-Calendar] stripped. The card label
+  // ("Hold Tue 10:00" / "שריין ג׳ 10:00") is a separate string. An empty
+  // subject falls back to the sentence being closed.
+  function holdSubjectTitle(subject) {
+    let s = String(subject || '')
+      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    let prev = '';
+    while (s && s !== prev) {
+      prev = s;
+      s = s.replace(/^(?:(?:re|fw|fwd|השב|תגובה|הועבר)\s*:\s*)+/ig, '').trim();
+      s = s.replace(/^\[[^[\]]+\]\s*/g, '').trim();
+    }
+    return s;
+  }
+
   function calendarAction(intent, e, ctx) {
-    // A calendar hold's title is the sentence being closed. The schedule
-    // processes keep the short "Meeting Sep 18" label — that path is a
-    // meeting, and the sentence can be the whole invite.
+    // A calendar hold's title is the meeting subject when one is present.
+    // The schedule processes keep the short "Meeting Sep 18" label — that
+    // path is a meeting, and the sentence can be the whole invite.
     const mutate = e.calendarOp === 'delete' || e.calendarOp === 'update';
     const hold = intent.personalClose === 'calendar-hold' || mutate;
-    const title = (hold ? (e.what || intent.label) : (intent.label || e.what)) || (hold ? 'Hold' : 'Meeting');
+    const subjectTitle = hold ? holdSubjectTitle(ctx && ctx.subject) : '';
+    const title = (hold ? (subjectTitle || e.what || intent.label) : (intent.label || e.what)) || (hold ? 'Hold' : 'Meeting');
     const hint = e.calendarOp === 'delete' ? 'Remove from Calendar: '
       : e.calendarOp === 'update' ? 'Move on Calendar: '
       : 'Add to Calendar: ';

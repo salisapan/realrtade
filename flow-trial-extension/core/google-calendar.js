@@ -130,12 +130,14 @@ const FlowGoogleCalendar = (() => {
     if (link && name) {
       lines.push('File: ' + name);
       lines.push(link);
-    } else if (quote) {
-      lines.push(quote);
+    }
+    const unique = [];
+    for (let k = 0; k < lines.length; k++) {
+      if (unique.indexOf(lines[k]) === -1) unique.push(lines[k]);
     }
     return {
       summary: name || title,
-      description: lines.join('\n'),
+      description: unique.join('\n'),
       start: { dateTime: startIso, timeZone: zone },
       end: { dateTime: endIso, timeZone: zone },
       attendees: []
