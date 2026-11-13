@@ -55,7 +55,10 @@ function glanceUiCopy(kind) {
   } catch (e) { /* the lines below are the same table when the shared one is absent */ }
   const he = glanceUiHebrew();
   if (kind === 'reconnect') return he ? 'חבר מחדש את Google' : 'Reconnect Google';
+  if (kind === 'connectGoogle') return he ? 'התחבר ל-Google' : 'Connect Google';
   if (kind === 'connect') return he ? 'התחבר ל-Google בחלון Glance קודם.' : 'Connect Google in the Glance popup first.';
+  if (kind === 'connecting') return he ? 'מתחבר…' : 'Connecting…';
+  if (kind === 'connectFailed') return he ? 'החיבור נכשל.' : 'Connection failed.';
   if (kind === 'edited') return he ? 'שינית את זה. Undo השאיר אותו כמו שהוא.' : 'You edited this. Undo left it alone.';
   if (kind === 'still') return he ? 'עדיין שם — משימת Google לא הוסרה.' : 'Still there — the Google Task was not removed.';
   if (kind === 'calendar') return he ? 'אין מועד אחד לאירוע הזה.' : 'No single time for this event.';
@@ -2483,11 +2486,13 @@ function glanceUiCopy(kind) {
     // screen, never before and never from a settings page. Covers both "not
     // onboarded yet" and "onboarded, but to a stale non-Google connectorId"
     // (see the comment above this function's earlier connectorId check) —
-    // either way, the account isn't actually ready to write to Google, and
-    // ensureGoogleAutoConnect() is the one path that can fix that silently.
+    // either way, the account isn't actually ready to write to Google.
+    // Silent auto-connect is tried once. If it fails, the card still paints
+    // with a single Connect Google action (interactive, on click only) so a
+    // new store user sees the suggestion instead of a silent drop.
+    let needsGoogleConnect = false;
     if (!usingGoogle && !(await ensureGoogleAutoConnect())) {
-      logScanSkip(messageId, 'google-connect');
-      return;
+      needsGoogleConnect = true;
     }
 
     let attachFile = null;
@@ -2622,7 +2627,8 @@ function glanceUiCopy(kind) {
       // removed it anyway.
       bodyText: text,
       executionMemory: executionMemory,
-      app: 'gmail'
+      app: 'gmail',
+      needsGoogleConnect: needsGoogleConnect
     });
     watchCopiedOnly(message, messageId, text, ownEmail, audience);
     // Re-injecting after Gmail rebuilds the node is now expected behaviour,
@@ -3682,7 +3688,46 @@ function glanceUiCopy(kind) {
     return true;
   }
 
+  // Interactive Connect Google from a card click. Never used by the silent
+  // auto-connect path. On success the card continues into its normal Do It;
+  // nothing runs until the owner clicks.
+  async function connectGoogleFromCard() {
+    const res = await sendRuntime({ type: 'flow:connect', connectorId: 'googleTasks', interactive: true });
+    if (!(res && res.ok)) return res || { ok: false, reason: 'failed' };
+    await FlowStorage.set({ onboarded: true, connectorId: 'googleTasks' });
+    state = await FlowStorage.get();
+    chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: 'googleTasks', via: 'card' } });
+    return { ok: true };
+  }
+
+  async function onConnectGoogleOrDoIt(host, chip, ctx, liveSteps) {
+    if (ctx && ctx.needsGoogleConnect) {
+      setChipState(chip, 'flow-chip-pending', glanceShow(glanceUiCopy('connecting')));
+      let res = null;
+      try { res = await connectGoogleFromCard(); } catch (e) { res = { ok: false, reason: 'failed' }; }
+      if (!(res && res.ok)) {
+        setChipState(chip, 'flow-chip-error', glanceShow(glanceUiCopy('connectFailed')));
+        const label = glanceShow(glanceUiCopy('connectGoogle'));
+        const dark = chip && chip.querySelector && chip.querySelector('.doit-dark');
+        if (dark) {
+          dark.textContent = label;
+          dark.setAttribute('aria-label', label);
+          chip.setAttribute('aria-label', label);
+          chip.disabled = false;
+          chip.removeAttribute('data-glance-chip-state');
+        } else if (chip && chip.replaceChildren) {
+          chip.className = 'flow-chip';
+          chip.replaceChildren(el('span', 'shell'), el('span', 'ring'), el('span', 'shine'), el('span', 'flow-chip-do-label', label));
+        }
+        return;
+      }
+      ctx.needsGoogleConnect = false;
+    }
+    return onDoIt(host, chip, ctx, liveSteps);
+  }
+
   function injectChip(messageNode, ctx) {
+
     void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
     if (!ctx) return;
@@ -3799,8 +3844,8 @@ function glanceUiCopy(kind) {
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', glanceChrome().doIt));
-    chip.addEventListener('click', () => onDoIt(host, chip, ctx, liveSteps));
+    chip.appendChild(el('span', 'flow-chip-do-label', ctx.needsGoogleConnect ? glanceShow(glanceUiCopy('connectGoogle')) : glanceChrome().doIt));
+    chip.addEventListener('click', () => onConnectGoogleOrDoIt(host, chip, ctx, liveSteps));
     mainRow.appendChild(chip);
 
     host.appendChild(mainRow);
@@ -3813,6 +3858,7 @@ function glanceUiCopy(kind) {
         lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
         uiLang: lang,
         surface: 'gmail',
+        doItLabel: ctx.needsGoogleConnect ? glanceShow(glanceUiCopy('connectGoogle')) : null,
         dateChoices: ctx.process.dateChoices || null,
         onDateChoice: (iso) => {
           if (typeof FlowActions !== 'undefined' && FlowActions.chooseDate) FlowActions.chooseDate(ctx.process, iso);
@@ -3823,7 +3869,7 @@ function glanceUiCopy(kind) {
         onDoIt: (button) => {
           if (button && button.disabled) return;
           if (ctx.process.needsDateChoice) return;
-          onDoIt(host, button, ctx, liveSteps);
+          onConnectGoogleOrDoIt(host, button, ctx, liveSteps);
         },
         onDismiss: () => onDismiss(host, ctx),
         onChange: (next) => {
@@ -3831,7 +3877,7 @@ function glanceUiCopy(kind) {
           liveSteps.length = 0;
           picked.forEach((step) => liveSteps.push(step));
         },
-        onRetry: () => onDoIt(host, host.querySelector('button.flow-chip') || host.querySelector('.do-halo'), ctx, liveSteps)
+        onRetry: () => onConnectGoogleOrDoIt(host, host.querySelector('button.flow-chip') || host.querySelector('.do-halo'), ctx, liveSteps)
       });
       const draft = ctx.process.steps.find((step) => step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId);
       if (draft) host.appendChild(buildAttachChooser(draft, ctx));
@@ -3850,7 +3896,7 @@ function glanceUiCopy(kind) {
           liveSteps.length = 0;
           picked.forEach((step) => liveSteps.push(step));
         },
-        onRetry: () => onDoIt(host, chip, ctx, liveSteps)
+        onRetry: () => onConnectGoogleOrDoIt(host, chip, ctx, liveSteps)
       });
       host.__glanceSteps = view;
       const draft = ctx.process.steps.find((step) => step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId);
