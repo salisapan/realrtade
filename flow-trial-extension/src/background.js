@@ -694,7 +694,7 @@ const LANE_CHAT = [
 const LANE_TEAMS = {
   id: 'glance-lane-teams',
   origins: ['https://teams.microsoft.com/*', 'https://teams.live.com/*'],
-  js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/teams-parse.js', 'src/content-teams.js']
+  js: ['core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/teams-parse.js', 'src/content-teams.js', 'core/meeting-confirm.js', 'core/chat-self-note.js', 'src/chat-task-card.js']
 };
 
 const TEAMS_HOSTS = LANE_TEAMS.origins.slice();
@@ -793,29 +793,30 @@ async function restoreLaneChats() {
   }
 }
 
-async function restoreLaneTeams() {
-  if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
-  let on = false;
-  try { on = await chrome.permissions.contains({ origins: TEAMS_HOSTS }); } catch (e) { on = false; }
-  const id = LANE_TEAMS.id;
-  try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* not registered */ }
-  if (!on) return;
+function teamsPermissionTouches(perm) {
+  const origins = (perm && perm.origins) || [];
+  if (!origins.length) return true;
+  return origins.some((origin) => TEAMS_HOSTS.indexOf(origin) >= 0);
+}
+
+async function teamsScriptRow() {
+  if (!chrome.scripting || !chrome.scripting.getRegisteredContentScripts) return null;
   try {
-    await chrome.scripting.registerContentScripts([{
-      id: id,
-      matches: LANE_TEAMS.origins,
-      js: laneChatScripts(LANE_TEAMS),
-      css: LANE_CHAT_CSS,
-      runAt: 'document_idle',
-      persistAcrossSessions: true
-    }]);
-  } catch (e) {
-    console.info('[Glance] whyNotShown: teams-lane-not-registered');
-    return;
-  }
-  if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return;
+    const rows = await chrome.scripting.getRegisteredContentScripts({ ids: [LANE_TEAMS.id] });
+    return (rows || []).filter((row) => row && row.id === LANE_TEAMS.id)[0] || null;
+  } catch (e) { return null; }
+}
+
+function teamsRegistrationCurrent(row) {
+  const js = (row && row.js) || [];
+  return js.indexOf('src/content-teams.js') >= 0 && js.indexOf('src/chat-task-card.js') >= 0;
+}
+
+async function injectTeamsOpenTabs() {
+  if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting || !chrome.scripting.executeScript) return;
   let tabs = [];
   try { tabs = await chrome.tabs.query({ url: LANE_TEAMS.origins }); } catch (e) { tabs = []; }
+  const files = laneChatScripts(LANE_TEAMS);
   for (const tab of tabs || []) {
     if (!tab || typeof tab.id !== 'number') continue;
     let alive = false;
@@ -828,24 +829,82 @@ async function restoreLaneTeams() {
     } catch (e) { alive = false; }
     if (alive) continue;
     try {
-      await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: LANE_CHAT_CSS });
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: laneChatScripts(LANE_TEAMS) });
+      if (chrome.scripting.insertCSS) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: LANE_CHAT_CSS });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: files });
     } catch (e) { console.info('[Glance] whyNotShown: teams-lane-not-injected'); }
   }
+}
+
+let teamsLaneJob = null;
+function queueRestoreLaneTeams() {
+  const run = Promise.resolve(teamsLaneJob).then(() => restoreLaneTeams());
+  teamsLaneJob = run.then(() => { if (teamsLaneJob === run) teamsLaneJob = null; }, () => { if (teamsLaneJob === run) teamsLaneJob = null; });
+  return run;
+}
+
+async function restoreLaneTeams() {
+  if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
+  let on = false;
+  try { on = await chrome.permissions.contains({ origins: TEAMS_HOSTS }); }
+  catch (e) { return; }
+  const id = LANE_TEAMS.id;
+  if (!on) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* not registered */ }
+    return;
+  }
+  let row = await teamsScriptRow();
+  if (row && !teamsRegistrationCurrent(row)) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* replaced below */ }
+    row = null;
+  }
+  if (!row) {
+    const spec = {
+      id: id,
+      matches: LANE_TEAMS.origins.slice(),
+      js: laneChatScripts(LANE_TEAMS),
+      css: LANE_CHAT_CSS.slice(),
+      runAt: 'document_idle',
+      persistAcrossSessions: true
+    };
+    let registered = false;
+    let lastError = '';
+    for (let attempt = 0; attempt < 3 && !registered; attempt++) {
+      try {
+        await chrome.scripting.registerContentScripts([spec]);
+        registered = true;
+      } catch (e) {
+        lastError = e && e.message ? String(e.message) : '';
+        const again = await teamsScriptRow();
+        registered = Boolean(again && teamsRegistrationCurrent(again));
+        if (!registered && attempt < 2) await new Promise((resolve) => setTimeout(resolve, 40 * (attempt + 1)));
+      }
+    }
+    if (!registered) {
+      console.info('[Glance] whyNotShown: teams-lane-not-registered' + (lastError ? ' ' + lastError : ''));
+      return;
+    }
+  }
+  await injectTeamsOpenTabs();
 }
 
 dropLegacyWhatsApp();
 restoreSurfaces();
 restoreLaneChats();
-restoreLaneTeams();
-chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); restoreLaneTeams(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); restoreLaneTeams(); });
+queueRestoreLaneTeams();
+chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); queueRestoreLaneTeams(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); queueRestoreLaneTeams(); });
 try {
   if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
-    chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); restoreLaneTeams(); });
+    chrome.permissions.onAdded.addListener((perm) => {
+      restoreLaneChats();
+      if (teamsPermissionTouches(perm)) queueRestoreLaneTeams();
+    });
   }
   if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
-    chrome.permissions.onRemoved.addListener(() => { restoreLaneChats(); restoreLaneTeams(); });
+    chrome.permissions.onRemoved.addListener((perm) => {
+      restoreLaneChats();
+      if (teamsPermissionTouches(perm)) queueRestoreLaneTeams();
+    });
   }
 } catch (e) { /* the next wake reads the grant again */ }
 

@@ -1909,7 +1909,7 @@
           calendar: 'שם קובץ אחד על היומן. ביטול מסיר את האירוע. לא מזמין אף אחד.',
           onedrive: 'שומר קובץ אחד ב-OneDrive > Glance, קורא אותו, וביטול מוחק אותו. מייל לא מחפש בקבצים.',
           contacts: 'קורא אנשי קשר.',
-          teams: 'Glance קורא את הצ׳אט האישי הפתוח ב-Teams ומניח תשובה רק בתיבת הכתיבה. הוא לא שולח, וביטול מוחק כל כתיבה שהוא עשה.',
+          teams: (globalThis.FlowTeamsHostConsent && FlowTeamsHostConsent.PRIVACY_HE) || 'Glance קורא את הצ׳אט האישי הפתוח ב-Teams ומניח תשובה רק בתיבת הכתיבה. הוא לא שולח, וביטול מוחק כל כתיבה שהוא עשה.',
           sharepoint: 'יוצר קובץ ריק, או שומר את הקובץ המצורף, בתיקיית Glance של אתר SharePoint אחד ששמו נכתב במייל. קורא בחזרה, וביטול מוחק אם לא ערכת. לא משתף.'
         };
         const detail = uiLang() === 'he' ? (heDetail[svc.id] || '') : svc.detail;
@@ -1930,28 +1930,35 @@
         const opt = optionalBoxes();
         allBox.checked = opt.length > 0 && opt.every((box) => box.checked);
       }
-      allBox.addEventListener('change', () => {
+      allBox.addEventListener('change', async () => {
         optionalBoxes().forEach((box) => { box.checked = allBox.checked; });
+        if (allBox.checked && boxes.teams && boxes.teams.checked) {
+          const ok = await askTeamsWebHosts({ box: boxes.teams, note: note, button: c });
+          if (!ok) syncAll();
+        }
       });
       optionalBoxes().forEach((box) => box.addEventListener('change', syncAll));
+      if (boxes.teams) {
+        boxes.teams.addEventListener('change', async () => {
+          if (!boxes.teams.checked) return;
+          await askTeamsWebHosts({ box: boxes.teams, note: note, button: c });
+          syncAll();
+        });
+      }
       const connectBtnLabel = (link === 'missing') ? 'התחבר' : 'התחבר מחדש';
       const c = el('button', 'ghost sm', connectBtnLabel);
       c.type = 'button';
       c.setAttribute('data-glance-connect-go', '1');
       c.addEventListener('click', async () => {
+        if (boxes.teams && boxes.teams.checked) {
+          const hostOk = await askTeamsWebHosts({ box: boxes.teams, note: note, button: c });
+          if (!hostOk) return;
+        }
         c.disabled = true;
-        let ids = services.filter((svc) => {
+        const ids = services.filter((svc) => {
           const box = boxes[svc.id];
           return box && (box.checked || box.disabled);
         }).map((svc) => svc.id);
-        let teamsQuiet = false;
-        if (ids.indexOf('teams') >= 0) {
-          const hostOk = await requestTeamsWebHosts();
-          if (!hostOk) {
-            teamsQuiet = true;
-            ids = ids.filter((id) => id !== 'teams');
-          }
-        }
         const scopes = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.scopesFor === 'function')
           ? FlowOutlookConfig.scopesFor(ids) : null;
         const r = scopes ? await o.connect({ scopes: scopes }) : await o.connect();
@@ -1962,10 +1969,6 @@
             : (OUTLOOK_ERRORS[r.error] || 'Could not turn it on (' + r.error + ').');
           note.textContent = sentence;
           return;
-        }
-        if (teamsQuiet) {
-          note.hidden = false;
-          note.textContent = 'הדפדפן לא נתן גישה ל-Teams. Glance לא קורא שם.';
         }
         await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
       });
@@ -2010,18 +2013,21 @@
       const addScope = el('button', 'ghost sm', 'הוסף הרשאה');
       addScope.type = 'button';
       addScope.setAttribute('data-glance-add-scope', '1');
+      if (scopeBoxes.teams) {
+        scopeBoxes.teams.addEventListener('change', async () => {
+          if (!scopeBoxes.teams.checked) return;
+          await askTeamsWebHosts({ box: scopeBoxes.teams, note: note, button: addScope });
+        });
+      }
       addScope.addEventListener('click', async () => {
-        addScope.disabled = true;
         const teamsBox = scopeBoxes.teams;
         const teamsOn = !!(teamsBox && teamsBox.checked && !teamsBox.disabled);
-        let teamsHostOk = true;
-        if (teamsOn) teamsHostOk = await requestTeamsWebHosts();
-        if (teamsOn && !teamsHostOk) {
-          note.hidden = false;
-          note.textContent = 'הדפדפן לא נתן גישה ל-Teams. Glance לא קורא שם.';
+        if (teamsOn) {
+          const teamsHostOk = await askTeamsWebHosts({ box: teamsBox, note: note, button: addScope });
+          if (!teamsHostOk) return;
         }
+        addScope.disabled = true;
         const add = scopeServices.filter((svc) => {
-          if (svc.id === 'teams' && !teamsHostOk) return false;
           const box = scopeBoxes[svc.id];
           if (!box || !box.checked || box.disabled) return false;
           return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
@@ -2030,7 +2036,6 @@
         const ticked = scopeServices.some((svc) => { const b = scopeBoxes[svc.id]; return b && b.checked && !b.disabled; });
         if (ticked && !add.length) {
           addScope.disabled = false;
-          if (teamsOn && !teamsHostOk) return;
           // Ticked, and every scope of it is already on the token: nothing to ask, and the person is told so.
           note.hidden = false;
           note.textContent = 'ההרשאות שסימנת כבר ניתנו.';
@@ -2400,11 +2405,21 @@
     return (listed && listed.length) ? listed.slice() : ['https://teams.microsoft.com/*', 'https://teams.live.com/*'];
   }
 
-  // The browser prompt has to start on this click. A later await is not a user gesture.
-  async function requestTeamsWebHosts() {
-    if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) return false;
-    try { return Boolean(await chrome.permissions.request({ origins: teamsWebHosts() })); }
-    catch (e) { return false; }
+  // The browser prompt has to start on this tick or on התחבר. A later await is not a user gesture.
+  function requestTeamsWebHosts() {
+    if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) return Promise.resolve(false);
+    return chrome.permissions.request({ origins: teamsWebHosts() }).then((ok) => Boolean(ok)).catch(() => false);
+  }
+
+  function askTeamsWebHosts(ui) {
+    const consent = globalThis.FlowTeamsHostConsent;
+    if (consent && typeof consent.ask === 'function') return consent.ask(() => requestTeamsWebHosts(), ui);
+    return requestTeamsWebHosts().then((ok) => {
+      if (!ok && ui && ui.box) ui.box.checked = false;
+      if (!ok && ui && ui.note) { ui.note.hidden = false; ui.note.textContent = 'הדפדפן לא נתן גישה ל-Teams. Glance לא קורא את הצ׳אט.'; }
+      if (!ok && ui && ui.button) ui.button.disabled = false;
+      return ok;
+    });
   }
 
   async function labsOptionalScopeAfterFlip(switchId) {

@@ -154,6 +154,24 @@ function grantOrigins(userData, id, origins) {
   fs.writeFileSync(prefsPath, JSON.stringify(prefs));
 }
 
+function revokeOrigins(userData, id, origins) {
+  const prefsPath = path.join(userData, 'Default', 'Preferences');
+  const prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf8'));
+  const row = prefs.extensions && prefs.extensions.settings && prefs.extensions.settings[id];
+  if (!row) throw new Error('extension preferences were not written');
+  function drop(block) {
+    if (!block) return;
+    block.explicit_host = ((block.explicit_host) || []).filter((origin) => origins.indexOf(origin) < 0);
+  }
+  drop(row.granted_permissions);
+  drop(row.active_permissions);
+  fs.writeFileSync(prefsPath, JSON.stringify(prefs));
+}
+
+async function registeredIds(worker) {
+  return worker.evaluate(async () => (await chrome.scripting.getRegisteredContentScripts()).map((row) => row.id));
+}
+
 test('Teams hosts not granted: the lane does not register', async () => {
   test.setTimeout(90000);
   const extDir = copyExtension({ bare: true });
@@ -175,8 +193,8 @@ test('Teams hosts not granted: the lane does not register', async () => {
   }
 });
 
-test('Teams hosts granted: the lane registers', async () => {
-  test.setTimeout(120000);
+test('Teams hosts: grant registers, a restart keeps it, a revoke clears it', async () => {
+  test.setTimeout(180000);
   const extDir = copyExtension({ bare: true });
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-teams-on-'));
   let context = null;
@@ -189,7 +207,18 @@ test('Teams hosts granted: the lane registers', async () => {
     grantOrigins(userData, extensionId, TEAMS_HOSTS);
     context = await launchBare(extDir, userData);
     worker = await readyWorker(context);
-    await expect.poll(async () => worker.evaluate(async () => (await chrome.scripting.getRegisteredContentScripts()).map((row) => row.id)).catch(() => []), { timeout: 20000 }).toContain('glance-lane-teams');
+    await expect.poll(() => registeredIds(worker).catch(() => []), { timeout: 20000 }).toContain('glance-lane-teams');
+    await context.close();
+    context = null;
+    context = await launchBare(extDir, userData);
+    worker = await readyWorker(context);
+    await expect.poll(() => registeredIds(worker).catch(() => []), { timeout: 20000 }).toContain('glance-lane-teams');
+    await context.close();
+    context = null;
+    revokeOrigins(userData, extensionId, TEAMS_HOSTS);
+    context = await launchBare(extDir, userData);
+    worker = await readyWorker(context);
+    await expect.poll(() => registeredIds(worker).catch(() => []), { timeout: 20000 }).not.toContain('glance-lane-teams');
   } finally {
     if (context) await context.close().catch(() => {});
     fs.rmSync(extDir, { recursive: true, force: true });
