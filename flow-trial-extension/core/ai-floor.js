@@ -53,7 +53,7 @@ const FlowAiFloor = (() => {
   ].join('|'), 'i');
   const INJECT_HE = /(?:התעלמ|תתעלמ|התעלם|שכח|תשכח|עקוף)\S*\s+(?:מ)?(?:כל\s+)?(?:ה)?(?:הוראות|כללים|כללי|הנחיות)|הוראת\s+מערכת|הודעת\s+מערכת|(?:^|\n)\s*מערכת\s*:|הוראות\s+חדשות\s*:|כ(?:בינה\s+מלאכותית|עוזר\s+(?:ה)?(?:דיגיטלי|וירטואלי|AI)|מודל\s+(?:ה)?שפה)|אתה\s+(?:עכשיו\s+)?(?:עוזר|בינה\s+מלאכותית|מודל)|אל\s+(?:תספר|תספרי|תגיד|תגידי|תודיע)\s+(?:ל)?(?:סאלי|משתמש)|בלי\s+(?:לשאול|לספר|לעדכן)\s+(?:את\s+)?(?:סאלי|המשתמש)|באופן\s+אוטומטי\s+(?:לאשר|לשלם|להעביר|לשלוח)/;
   const FRAUD_EN = /\b(?:new|updated|changed|different|alternate|alternative)\s+(?:bank|banking|payment|wire|remittance)\s+(?:details|account|info(?:rmation)?|instructions)\b|\b(?:new|updated|different)\s+(?:bank\s+)?account\s+(?:below|number|details)\b|\bwire\s+[^.\n]{0,30}\b(?:to|into)\s+(?:the|this|our|a)\s+new\s+account\b|\bto\s+the\s+new\s+(?:bank\s+)?account\b|\bbank\s+details\s+(?:have\s+)?changed\b|\b(?:update|change)\s+(?:our|the|your)\s+(?:bank|payment|banking)\s+details\b|\bgift\s*-?\s*cards?\b|\b(?:itunes|google\s+play|amazon|steam|apple)\s+(?:gift\s+)?cards?\b|\b(?:crypto(?:currency)?|bitcoin|btc|ethereum|eth|usdt|tether)\b|\bwallet\s+address\b|\b(?:urgent(?:ly)?|immediately|asap|right\s+away)\b[^.\n]{0,40}\b(?:wire|transfer)\b|\b(?:wire|transfer)\b[^.\n]{0,40}\b(?:urgent(?:ly)?|immediately|right\s+now|right\s+away|now)\b|\bforward\s+(?:all|every)\s+(?:the\s+)?(?:invoices?|emails?|messages?|files?|documents?)\b|\baccount\s+\d{2}-\d{3}/i;
-  const FRAUD_HE = /חשבון\s+(?:ה)?בנק\s+(?:ה)?(?:חדש|שלנו\s+השתנה)|(?:ל)?חשבון\s+(?:ה)?חדש|פרטי\s+(?:ה)?(?:בנק|חשבון)\s+(?:ה)?(?:חדשים|השתנו|עודכנו)|שינוי\s+(?:ב)?פרטי\s+(?:ה)?(?:בנק|חשבון)|כרטיס(?:י)?\s+(?:ה)?מתנה|גיפט\s*-?\s*קארד|ביטקוין|קריפטו|מטבע(?:ות)?\s+דיגיטלי|ארנק\s+(?:דיגיטלי|קריפטו)|(?:דחוף|מיד|מייד|עכשיו)[^.\n]{0,30}(?:להעביר|העבר|תעביר|העבירו)\s+[$₪€£\d]|(?:להעביר|העבר|תעביר|העבירו)\s+[$₪€£]?[\d,.]+\s*(?:₪|ש"ח|ש״ח|\$|€)?[^.\n]{0,30}(?:מיד|מייד|עכשיו|דחוף)|העבר\s+את\s+כל\s+(?:ה)?(?:חשבוניות|מיילים|קבצים|מסמכים)|לחשבון\s+\d{2}-\d{3}/;
+  const FRAUD_HE = /חשבון\s+(?:ה)?בנק\s+(?:ה)?(?:חדש|שלנו\s+השתנה)|(?:ל)?חשבון\s+(?:ה)?חדש|פרטי\s+(?:ה)?(?:בנק|חשבון)(?:\s+(?:שלנו|שלי|שלו|שלה|שלהם))?\s+(?:ה)?(?:חדשים|השתנו|עודכנו)|שינוי\s+(?:ב)?פרטי\s+(?:ה)?(?:בנק|חשבון)|כרטיס(?:י)?\s+(?:ה)?מתנה|גיפט\s*-?\s*קארד|ביטקוין|קריפטו|מטבע(?:ות)?\s+דיגיטלי|ארנק\s+(?:דיגיטלי|קריפטו)|(?:דחוף|מיד|מייד|עכשיו)[^.\n]{0,30}(?:להעביר|העבר|תעביר|העבירו)\s+[$₪€£\d]|(?:להעביר|העבר|תעביר|העבירו)\s+[$₪€£]?[\d,.]+\s*(?:₪|ש"ח|ש״ח|\$|€)?[^.\n]{0,30}(?:מיד|מייד|עכשיו|דחוף)|העבר\s+את\s+כל\s+(?:ה)?(?:חשבוניות|מיילים|קבצים|מסמכים)|לחשבון\s+\d{2}-\d{3}/;
   const HE_CUR = String.raw`ש["״׳']{1,2}ח|שקלים|שקל(?![\u0590-\u05FF])`;
   const CUR = String.raw`(?:[$€£₪]\s?\d|\d[\d,.]*\s?(?:₪|${HE_CUR}|(?:usd|eur|ils|nis|gbp|dollars?|euros?|shekels?)\b))`;
   const MONEY_EN = new RegExp(String.raw`\b(?:wire|wiring|wired|remit(?:tance)?|pay(?:ing|ment|ments|able)?|paid|payout|settle\s+(?:the\s+)?(?:outstanding\s+)?(?:balance|invoice|bill|debt)|clear\s+(?:the\s+)?(?:outstanding\s+)?balance|bank\s+(?:account|transfer|details)|account\s+(?:number|no\.?)|iban|swift|bic|routing\s+number|sort\s+code|venmo|zelle|paypal|western\s+union|moneygram|refund|reimburse(?:ment)?|deposit\s+(?:the\s+)?(?:money|funds|check)|invoice\s+of)\b|\btransfer(?:ring|red|s)?\b[^.\n]{0,25}${CUR}|${CUR}[^.\n]{0,25}\btransfer\b|\btransfer(?:ring|red)?\s+(?:the\s+)?(?:money|funds|payment|deposit|amount|balance|fee)\b|\bsend\s+(?:me\s+|us\s+|them\s+)?${CUR}|\b(?:gift\s*cards?|crypto|bitcoin)\b`, 'i');
@@ -73,8 +73,26 @@ const FlowAiFloor = (() => {
     return null;
   }
   function offerAcceptance(t) { return OFFER_EN.test(t) || OFFER_HE.test(t); }
+  // Red team 2026-10-30 (docs/glance-ai/red-team.md): an injection written to slip past the patterns above. A zero-width or soft hyphen inside
+  // a word ("Ig​nore"), full-width letters ("Ｉｇｎｏｒｅ"), a Cyrillic or Greek letter that looks Latin ("Ignоre"), spaced-out letters
+  // ("I g n o r e"), or the same order in other words ("forget everything above", «תתעלם מכל מה שנאמר לך קודם»). The text is folded first,
+  // then read by the same patterns plus the paraphrases.
+  const LOOKALIKE = { 'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x', 'і': 'i', 'ј': 'j', 'ѕ': 's', 'ԁ': 'd', 'ӏ': 'l', 'һ': 'h', 'к': 'k', 'м': 'm', 'н': 'h', 'т': 't', 'в': 'b',
+    'А': 'A', 'Е': 'E', 'О': 'O', 'Р': 'P', 'С': 'C', 'Т': 'T', 'Х': 'X', 'І': 'I', 'К': 'K', 'М': 'M', 'Н': 'H', 'В': 'B',
+    'ο': 'o', 'α': 'a', 'ε': 'e', 'ι': 'i', 'κ': 'k', 'ν': 'v', 'ρ': 'p', 'τ': 't', 'υ': 'u', 'Ο': 'O', 'Α': 'A', 'Ε': 'E', 'Ι': 'I', 'Κ': 'K', 'Ν': 'N', 'Ρ': 'P', 'Τ': 'T' };
+  function fold(x) {
+    let t = String(x == null ? '' : x);
+    try { t = t.normalize('NFKC'); } catch (e) { /* keep as is */ }
+    t = t.replace(/[­᠎​-‏⁠-⁤﻿‪-‮⁦-⁩]/g, '');
+    t = t.replace(/[Ͱ-ϿЀ-ӿ]/g, (ch) => LOOKALIKE[ch] || ch);
+    t = t.replace(/(?:\b[A-Za-z][  ]){3,}[A-Za-z]\b/g, (m) => m.replace(/[  ]/g, ''));
+    return t;
+  }
+  const INJECT_PARA_EN = /\b(?:forget|disregard|ignore|drop)\s+(?:about\s+)?(?:everything|all(?:\s+of)?(?:\s+(?:that|this|the\s+above))?|anything)\s+(?:(?:written\s+|said\s+|stated\s+)?(?:above|before|prior|previously|earlier)|you\s+(?:were|have\s+been)\s+(?:told|given|instructed))\b|\b(?:disregard|ignore|forget)\s+what\s+you\s+(?:were|have\s+been)\s+(?:told|instructed|asked|given)\b/i;
+  const INJECT_PARA_HE = /(?:התעלם|תתעלם|התעלמי|תתעלמי|התעלמו|תתעלמו|שכח|תשכח|שכחי|תשכחי)\s+(?:מ|מכל|ממה|מכל\s+מה|את\s+כל\s+מה)\s*(?:מה\s+)?ש(?:נאמר|נכתב|אמרו|קיבלת|ביקשו|הוגדר|כתוב)/;
   function textVeto(full, own) {
-    if (INJECT_EN.test(full) || INJECT_HE.test(full)) return 'injection';
+    const ff = fold(full);
+    if (INJECT_EN.test(full) || INJECT_HE.test(full) || INJECT_EN.test(ff) || INJECT_HE.test(ff) || INJECT_PARA_EN.test(ff) || INJECT_PARA_HE.test(ff)) return 'injection';
     if (FRAUD_EN.test(own) || FRAUD_HE.test(own)) return 'payment-fraud';
     return null;
   }
@@ -123,7 +141,10 @@ const FlowAiFloor = (() => {
   // floorFor(mail) -> the { gate, veto } pair Router v2 takes as deps, bound to this mail.
   function floorFor(mail) { return { gate: (p) => gate(p, mail), veto: (p) => veto(p, mail) }; }
 
-  return { gate, veto, floorFor, hasDeadline, unsupportedKind, offerAcceptance, moneyMovement };
+  // The injection read alone, for close paths that are not a model proposal (core/bill-paid.js): folded text, the same patterns.
+  function injected(text) { const t = clean(text), ff = fold(t); return INJECT_EN.test(t) || INJECT_HE.test(t) || INJECT_EN.test(ff) || INJECT_HE.test(ff) || INJECT_PARA_EN.test(ff) || INJECT_PARA_HE.test(ff); }
+
+  return { gate, veto, floorFor, hasDeadline, unsupportedKind, offerAcceptance, moneyMovement, fold, injected };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowAiFloor };

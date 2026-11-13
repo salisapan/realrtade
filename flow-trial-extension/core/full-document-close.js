@@ -46,6 +46,18 @@ const FlowFullDocumentClose = (() => {
     return m ? m[0].trim() : null;
   }
 
+  // Red team 2026-11-13 (docs/glance-ai/red-team.md): the price in the person's quote came from any amount in the mail, so the client's
+  // budget ("our budget is $50,000"), last year's price ("you charged us $3,000") or a deposit already paid became the price of the new
+  // quote. An amount in a sentence that says it is a budget, a cap, a past price, a deposit or a penalty is not this quote's price: the
+  // placeholder stays and the person fills it.
+  const NOT_THIS_PRICE = /\b(?:budget|up to|at most|maximum|max\.?|cap|no more than|last (?:year|time|quote)|previous(?:ly)?|before|earlier|used to|charged (?:us|me)|we paid|i paid|already paid|deposit|advance|down ?payment|penalty|fine|refund)\b|(?:תקציב|לכל היותר|עד\s+(?:ל)?[\d₪$€]|מקסימום|בשנה שעברה|בפעם הקודמת|קודם|בעבר|גבית|גביתם|שילמנו|שילמתי|מקדמה|קנס|החזר)/i;
+  function priceAmount(text) {
+    const amount = extractAmount(text);
+    if (!amount) return null;
+    const core = String(amount).replace(/[.,;:!?]+$/, '');
+    const sentence = String(text || '').split(/(?<=[.!?])\s+|\n+/).find((x) => x.indexOf(core) >= 0) || String(text || '');
+    return NOT_THIS_PRICE.test(sentence) ? null : amount;
+  }
   function recognize(text) {
     const t = String(text || '').trim();
     if (!t) return { kind: 'empty' };
@@ -159,7 +171,7 @@ const FlowFullDocumentClose = (() => {
     const C = Closes();
     if (!C || typeof C.consider !== 'function') return { action: 'silence', reason: 'not-configured' };
 
-    const amount = input.amount || extractAmount(text);
+    const amount = input.amount || priceAmount(text);
     const consider = C.consider({
       text: text,
       template: input.template || input.companyTemplate || null,
