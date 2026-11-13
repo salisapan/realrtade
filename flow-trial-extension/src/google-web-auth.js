@@ -298,8 +298,17 @@ export function googleConnectionState(auth, reconnect, extras) {
   const connectLabel = english ? 'Connect Google' : GOOGLE_CONNECT_LABEL;
   const warningLabel = english ? 'A step did not finish' : 'שלב אחד לא הושלם';
   const connected = had && !needs && !warn;
+  // Disconnect cleared Glance, but Google did not confirm the revoke. Say so
+  // instead of implying the access is gone.
+  const pending = Boolean(extra.revokePending && extra.revokePending.needed) && !connected;
+  const revokeNote = pending
+    ? (english
+      ? 'Disconnected in Glance. Google did not confirm removing access. You can remove Glance at myaccount.google.com/connections.'
+      : 'נותק ב-Glance. Google לא אישר את הסרת הגישה. אפשר להסיר את Glance ב-myaccount.google.com/connections.')
+    : '';
   return {
     connected: connected,
+    revokeNote: revokeNote,
     needsReconnect: needs,
     warning: warn,
     reconnectLabel: needs ? reconnectLabel : GOOGLE_RECONNECT_LABEL,

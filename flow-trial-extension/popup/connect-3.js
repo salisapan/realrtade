@@ -253,8 +253,11 @@ const ConnectEcosystemUI = (function () {
           '<span class="label">' + c.busy + '</span></button>';
       } else {
         const errHtml = err ? ('<p class="c3-err" role="alert">' + err.replace(/</g, '&lt;') + '</p>') : '';
+        const gt = eco.id === 'google' && status.googleTasks ? status.googleTasks : null;
+        const revokeNote = gt && gt.revokeNote ? String(gt.revokeNote) : '';
+        const noteHtml = revokeNote ? ('<p class="c3-err" dir="auto" data-glance-revoke-note="google">' + revokeNote.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</p>') : '';
         body = '<button type="button" class="c3-doit" data-connect-eco="' + eco.id + '"' + (anyBusy ? ' disabled' : '') + '>' +
-          '<span class="marks">' + marksHtml(eco.marks) + '</span><span class="label">' + c.cta + '</span></button>' + errHtml;
+          '<span class="marks">' + marksHtml(eco.marks) + '</span><span class="label">' + c.cta + '</span></button>' + errHtml + noteHtml;
       }
       const sub = busy ? c.hint : toolsLine(ecoToolsList(eco.id, lang));
       const stateName = done ? (partial ? 'partial' : 'done') : (busy ? 'busy' : 'idle');

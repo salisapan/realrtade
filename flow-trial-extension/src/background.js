@@ -1661,12 +1661,15 @@ async function runGoogleWebAuth(interactive) {
   const state = randomOAuthState();
   const hint = await googleLoginHint();
   const scopes = await googleManifestScopes();
+  // After Disconnect the window must show Google's consent screen, so a
+  // Cancel there cannot hand back the old grant.
+  const forceConsent = interactive ? await googleConsentRequired() : false;
   const url = googleImplicitAuthUrl({
     clientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri,
     scopes,
     state,
-    prompt: interactive ? 'select_account' : 'none',
+    prompt: interactive ? (forceConsent ? 'consent select_account' : 'select_account') : 'none',
     loginHint: hint
   });
   const resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
@@ -1935,6 +1938,93 @@ async function clearCachedChromeGoogleTokens() {
   }
 }
 
+// Google's documented revoke: POST, form body token=<token>. Revoking one
+// token ends the grant for that client, so the app leaves
+// myaccount.google.com/connections. The response allows the extension
+// origin, so no extra host permission is needed.
+const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
+const GOOGLE_REVOKE_TIMEOUT_MS = 8000;
+const GOOGLE_CONSENT_REQUIRED_KEY = 'googleConsentRequired';
+const GOOGLE_REVOKE_PENDING_KEY = 'googleRevokePending';
+
+async function revokeGoogleToken(token) {
+  const t = String(token || '').trim();
+  if (!t) return { ok: false, reason: 'no-token' };
+  let timer = null;
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeout = typeof setTimeout !== 'function' ? new Promise(() => {}) : new Promise((resolve) => {
+    timer = setTimeout(() => {
+      if (ctrl) { try { ctrl.abort(); } catch (e) { /* already settled */ } }
+      resolve({ ok: false, reason: 'timeout' });
+    }, GOOGLE_REVOKE_TIMEOUT_MS);
+  });
+  const request = (async () => {
+    try {
+      const init = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'token=' + encodeURIComponent(t)
+      };
+      if (ctrl) init.signal = ctrl.signal;
+      const r = await fetch(GOOGLE_REVOKE_URL, init);
+      if (r && r.ok) return { ok: true, status: r.status };
+      let code = '';
+      try { const body = await r.json(); code = (body && (body.error || '')) || ''; } catch (e) { /* no JSON body */ }
+      return { ok: false, status: r ? r.status : 0, reason: 'http-' + (r ? r.status : 0) + (code ? ':' + String(code) : '') };
+    } catch (e) {
+      return { ok: false, reason: 'network' };
+    }
+  })();
+  try {
+    return await Promise.race([request, timeout]);
+  } finally {
+    if (timer && typeof clearTimeout === 'function') clearTimeout(timer);
+  }
+}
+
+// Every token Glance still holds for this grant, revoked at Google before
+// the local clear. Never opens a window: the Chrome token is the silent
+// getAuthToken cache, and when no usable web token is left the only extra
+// try is a prompt=none web grant (interactive:false), revoked straight away.
+async function revokeGoogleGrantBestEffort() {
+  const tokens = [];
+  const add = (t) => { const v = String(t || '').trim(); if (v && tokens.indexOf(v) === -1) tokens.push(v); };
+  let chromeToken = '';
+  try { chromeToken = await getGoogleAuthToken(false); } catch (e) { chromeToken = ''; }
+  add(chromeToken);
+  let web = null;
+  try { web = await readGoogleWebAuth(); } catch (e) { web = null; }
+  if (web && web.accessToken) add(web.accessToken);
+  let revoked = false;
+  let reason = tokens.length ? '' : 'no-token';
+  for (const t of tokens) {
+    const r = await revokeGoogleToken(t);
+    if (r.ok) revoked = true;
+    else if (!reason) reason = r.reason || 'failed';
+  }
+  if (!revoked && !chromeToken && !webTokenUsable(web) && GOOGLE_WEB_CLIENT_ID) {
+    try {
+      const minted = await runGoogleWebAuth(false);
+      const r = await revokeGoogleToken(minted && minted.accessToken);
+      if (r.ok) revoked = true;
+      else reason = r.reason || reason || 'failed';
+    } catch (e) {
+      if (!reason) reason = 'no-token';
+    }
+  }
+  return { revoked: revoked, reason: revoked ? '' : (reason || 'failed') };
+}
+
+async function googleConsentRequired() {
+  try {
+    const bag = await chrome.storage.local.get(GOOGLE_CONSENT_REQUIRED_KEY);
+    const rec = bag && bag[GOOGLE_CONSENT_REQUIRED_KEY];
+    return Boolean(rec && rec.needed);
+  } catch (e) {
+    return false;
+  }
+}
+
 async function disconnectConnector(connectorId) {
   if (connectorId === 'microsoft' || connectorId === 'meta') {
     return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector, disableSurface: disableSurface });
@@ -1952,24 +2042,39 @@ async function disconnectConnector(connectorId) {
     // Invalidate before the clear. A consent window that resolves after
     // this point sees a new epoch and must not write googleWebAuth back.
     invalidateGoogleWebAuthFlight();
+    // Revoke at Google while the tokens are still here. Clearing first left
+    // the grant live on myaccount.google.com/connections, and the next
+    // Connect came straight back without a consent screen.
+    const revoke = await revokeGoogleGrantBestEffort();
     await clearCachedChromeGoogleTokens();
-    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([
-      key,
-      GOOGLE_WEB_AUTH_STORAGE_KEY,
-      GOOGLE_RECONNECT_STORAGE_KEY,
-      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
-      GOOGLE_GRANTED_SCOPES_KEY,
-      'googleProfile',
-      'googleConnectedAccount',
-      'glanceOwnNames',
-      'googleLaneWarning'
-    ]));
+    await enqueueGoogleWebAuthWrite(async () => {
+      await chrome.storage.local.remove([
+        key,
+        GOOGLE_WEB_AUTH_STORAGE_KEY,
+        GOOGLE_RECONNECT_STORAGE_KEY,
+        GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+        GOOGLE_GRANTED_SCOPES_KEY,
+        GOOGLE_REVOKE_PENDING_KEY,
+        'googleProfile',
+        'googleConnectedAccount',
+        'glanceOwnNames',
+        'googleLaneWarning'
+      ]);
+      // The next explicit Connect asks Google for consent again, and no
+      // silent caller reconnects in the meantime.
+      const patch = { [GOOGLE_CONSENT_REQUIRED_KEY]: { needed: true, at: Date.now() } };
+      if (!revoke.revoked) patch[GOOGLE_REVOKE_PENDING_KEY] = { needed: true, reason: revoke.reason, at: Date.now() };
+      await chrome.storage.local.set(patch);
+    });
+    if (!revoke.revoked) {
+      try { console.warn('[Glance] Google Disconnect: local grant cleared, Google revoke not confirmed:', revoke.reason); } catch (e) { /* no console */ }
+    }
     googleNamesFilled = false;
     const hook = globalThis.FlowProfileHook;
     if (hook && typeof hook.onDisconnect === 'function') {
       try { hook.onDisconnect('google'); } catch (e) { /* profile store not wired */ }
     }
-    return { ok: true };
+    return { ok: true, revoked: revoke.revoked, revokeReason: revoke.reason };
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
@@ -2591,6 +2696,10 @@ async function connectGoogleTasks(interactive, preset) {
   // script). The popup Connect click passes true. That is the one moment
   // Chrome may show the account chooser or, if browser sign-in is off, the
   // web-flow consent window. Later API calls stay silent.
+  // After Disconnect only an explicit Connect click may reconnect.
+  if (interactive === false && !preset && await googleConsentRequired()) {
+    throw new Error('Google sign-in needs you to connect again.');
+  }
   const cred = preset || await getGoogleAccessToken(interactive !== false);
   await rememberGoogleProfile(cred && cred.token);
   await clearGoogleReconnect();
@@ -2601,7 +2710,7 @@ async function connectGoogleTasks(interactive, preset) {
   });
   // «שלב אחד לא הושלם» belongs to a Do It on the grant this Connect replaced.
   // Left in place it kept a fresh, fully granted connection off Connected.
-  await chrome.storage.local.remove('googleLaneWarning');
+  await chrome.storage.local.remove(['googleLaneWarning', GOOGLE_CONSENT_REQUIRED_KEY, GOOGLE_REVOKE_PENDING_KEY]);
   const accountEmail = globalThis.FlowGoogleLaneAccount && typeof globalThis.FlowGoogleLaneAccount.read === 'function'
     ? await globalThis.FlowGoogleLaneAccount.read()
     : '';
@@ -5681,7 +5790,7 @@ async function outlookFetch(url, init) {
       if (ctl && ctl.signal.aborted) return { status: 0, ok: false, reason: writeMs ? 'write-timeout' : 'verify-timeout', timedOut: true };
       throw e;
     } finally {
-      if (timer) clearTimeout(timer);
+      if (timer && typeof clearTimeout === 'function') clearTimeout(timer);
     }
   };
   let res = await call(token);
@@ -7362,7 +7471,7 @@ async function connectorStatus() {
   // remote revoke leaves storage looking Connected otherwise.
   try { await probeGoogleAuthStillValid(); } catch (e) { /* status below still reads storage */ }
   const gt = await getGoogleTasksAuth();
-  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, 'googleLaneWarning', 'glanceLaneUndo', 'glanceHostLanguage', 'glanceUiLanguage']);
+  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, 'googleLaneWarning', 'glanceLaneUndo', 'glanceHostLanguage', 'glanceUiLanguage', GOOGLE_REVOKE_PENDING_KEY]);
   let uiLang = reconnectBag.glanceUiLanguage || reconnectBag.glanceHostLanguage || '';
   if (!uiLang) {
     try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
@@ -7378,7 +7487,8 @@ async function connectorStatus() {
     everConnected: reconnectBag[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || null,
     webAuth: reconnectBag[GOOGLE_WEB_AUTH_STORAGE_KEY] || null,
     laneUndo: reconnectBag.glanceLaneUndo || null,
-    scopesGranted: scopesGranted
+    scopesGranted: scopesGranted,
+    revokePending: reconnectBag[GOOGLE_REVOKE_PENDING_KEY] || null
   });
   const ecoBag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY]);
   const ecoSnap = await ecosystemStatusExtras(Object.assign({}, reconnectBag, ecoBag, { googleTasks: googleTasks }));
