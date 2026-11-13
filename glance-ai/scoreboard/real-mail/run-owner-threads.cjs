@@ -23,9 +23,9 @@ for (const r of rows) {
   let got = 'open';
   if (r.reply !== null) {
     const auto = F.isAutoReply(r.reply, r.from);
-    const rep = auto ? { outcome: 'auto' } : F.classifyReply(r.reply, w, { now: NOW, email: r.from });
+    const rep = F.classifyReply(r.reply, w, { now: NOW, email: r.from });
     const ap = F.applyReply(w, rep, NOW);
-    got = ap.none ? (auto ? 'hold(auto)' : 'none') : ap.close ? 'close(' + rep.outcome + ')' : 'open(' + rep.outcome + ')';
+    got = ap.bounced ? 'flag(bounced)' : ap.none ? (auto || rep.outcome === 'auto' ? 'hold(auto)' : 'none') : ap.close ? 'close(' + rep.outcome + ')' : 'open(' + rep.outcome + ')';
   }
   const ok = (r.expect === 'close' && /^close/.test(got)) || (r.expect === 'hold' && /^hold/.test(got)) || (r.expect === 'open' && got === 'open') || (r.expect === 'flag' && /flag/.test(got)) || (r.expect === 'close-part' && /^(close|open\(ack|open\(promised)/.test(got));
   if (ok) right++;

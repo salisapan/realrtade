@@ -22,7 +22,7 @@
 //   { id, threadId, messageId, subject, counterpart:{email,name}, kind,
 //     what, amount:{value,currency,raw}|null, deadlineIso, chaseIso,
 //     createdAt, status:'waiting'|'resolved'|'stopped', resolvedAt, taskRef,
-//     stage:'waiting'|'nudged'|'promised'|'yours', nudges, nudgedAt, promisedIso,
+//     stage:'waiting'|'nudged'|'promised'|'yours'|'bounced', nudges, nudgedAt, promisedIso,
 //     lastReplyAt, closedAs:'replied'|'paid'|'declined'|'manual'|null }
 //
 // A watch is an OPEN LOOP: something you are owed, kept open until reality
@@ -549,6 +549,19 @@ const FlowFollowUp = (() => {
   // would close a follow-up the person is still waiting on.
   const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|מענה אוטומטי|בחופשה עד|בחופשה|אעדר|(?:לא|אינני|איני) נמצא(?:ת)? במשרד|המסירה לנמענים|לא ניתן למסירה)/i;
 
+  // A delivery failure: the mail the person sent never reached the other side. It is not a reply FROM them and it says nothing about the ask,
+  // so it never closes a loop and never counts as an answer, and chasing the same address again would bounce the same way
+  // (found on the owner's real threads, 2026-11-12: a Hebrew "המסירה לנמענים ... נכשלה" only held the loop).
+  const BOUNCE = /\b(?:undeliverable|delivery (?:status notification|failure|has failed)|mail delivery (?:failed|subsystem)|message (?:could not be delivered|not delivered)|address (?:not found|rejected)|recipient address rejected|user unknown|no such user|mailbox (?:unavailable|not found|full))\b|(?:לא ניתן למסירה|המסירה לנמענים[^.]{0,60}נכשלה|כתובת הדואר האלקטרוני[^.]{0,40}לא נמצאה|ההודעה לא נמסרה)/i;
+  function isBounce(text, senderEmail) {
+    if (/^(?:mailer-daemon|postmaster)@/i.test(String(senderEmail || ''))) return true;
+    return BOUNCE.test(String(text || '').slice(0, 800));
+  }
+  function unbouncePatch(w) {
+    return { stage: (w && (w.nudges || 0) > 0) ? 'nudged' : 'waiting', bouncedAt: null };
+  }
+  function isBounced(w) { return Boolean(w) && w.status === 'waiting' && w.stage === 'bounced'; }
+
   function isAutoReply(text, senderEmail) {
     if (AUTO_REPLY.test(String(text || '').slice(0, 600))) return true;
     return /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(senderEmail || ''));
@@ -681,6 +694,7 @@ const FlowFollowUp = (() => {
     const c = ctx || {};
     const kind = watch && watch.kind === KINDS.PAYMENT ? KINDS.PAYMENT : KINDS.REPLY;
     const raw = String(text || '').trim();
+    if (isBounce(raw, c.email)) return { outcome: 'bounced', promisedIso: null, basis: 'rule' };
     if (isAutoReply(raw, c.email)) return { outcome: 'auto', promisedIso: null, basis: 'rule' };
 
     const body = stripGreeting(raw);
@@ -818,6 +832,8 @@ const FlowFollowUp = (() => {
   function applyReply(watch, reply, now) {
     const t = typeof now === 'number' ? now : Date.now();
     if (!watch || watch.status !== 'waiting' || isMine(watch) || isClock(watch) || !reply || reply.outcome === 'auto') return { none: true };
+    // The mail never arrived. Not a reply: the loop stays open, is flagged, and is not chased until the person has sent it again.
+    if (reply.outcome === 'bounced') return { patch: { stage: 'bounced', bouncedAt: t }, bounced: true };
     const seen = { lastReplyAt: t };
     switch (reply.outcome) {
       case 'closed':
@@ -1038,7 +1054,7 @@ const FlowFollowUp = (() => {
   function nextMove(watches, w, now, opts) {
     if (!opts || opts.enabled !== true) return null;
     const t = typeof now === 'number' ? now : Date.now();
-    if (!isActive(w) || isMine(w) || isClock(w) || isYours(w) || hasItems(w)) return null;
+    if (!isActive(w) || isMine(w) || isClock(w) || isYours(w) || isBounced(w) || hasItems(w)) return null;
     if (stageOf(w) === 'promised' && (!w.promisedIso || w.promisedIso >= isoDay(today(t)))) return null; // they gave a day: wait for it
     if ((w.nudges || 0) < MAX_NUDGE_LEVEL) return null;         // the three nudges come first
     if (!w.chaseIso || w.chaseIso > isoDay(today(t))) return null; // not due today
@@ -1320,7 +1336,7 @@ const FlowFollowUp = (() => {
 
   return {
     KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, fromProposal, deliversPromise, deliversFor, closeAsKept, closeFromTask, taskRefsToCheck, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
-    repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
+    repliedSince, isAutoReply, isBounce, isBounced, unbouncePatch, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
     nextNudgeLevel, missedAskIn, missedPromiseIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay,
     applyReplyItems, decideItem, itemCounts, hasItems,
     nextMove, moveDonePatch, moveDismissPatch, releasePatch

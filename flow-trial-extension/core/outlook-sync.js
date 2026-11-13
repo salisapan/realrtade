@@ -142,6 +142,9 @@ const FlowOutlookSync = (() => {
           if (followUp.isMine(w)) {
             if (followUp.deliversFor(w, last.text, null)) { out.patches.push({ id, patch: Object.assign({ messageId: last.id }, followUp.closeAsKept(w, last.ts || now)) }); out.stats.closed++; out.lines.push('Promise kept. Loop closed.'); }
             else out.patches.push({ id, patch: { messageId: last.id } });
+          } else if (followUp.isBounced && followUp.isBounced(w)) {
+            // A new message of yours after a bounce is the resend: the flag clears and the chase clock runs again.
+            out.patches.push({ id, patch: Object.assign({ messageId: last.id }, followUp.unbouncePatch(w)) });
           } else if (followUp.looksLikeChase(last.text)) {
             out.patches.push({ id, patch: Object.assign({ messageId: last.id }, followUp.recordNudge(w, last.ts || now, watches)) });
             out.stats.moved++;
@@ -263,6 +266,8 @@ const FlowOutlookSync = (() => {
             out.patches.push({ id: target.id, patch });
             if (res.close) out.stats.closed++; else if (res.rescheduled) out.stats.moved++;
             if (res.close || res.rescheduled || res.yours) out.lines.push(lineFor(reply, target, party, res));
+            // The message to them never arrived: not a reply. The loop stays open and flagged and is not chased until the person sends it again.
+            if (res.bounced && !target.bouncedAt) out.lines.push('Your message to ' + first(target.counterpart || party) + ' did not arrive (the address was not found or refused it). Check the address and send it again. I kept the loop open and will not chase until you do.');
             if (!isAsk) note('answered-loop', { counterpart: party.email || null });
             loopNoted = true;
             return;

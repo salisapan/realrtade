@@ -373,7 +373,7 @@ const FlowFollow = (() => {
 
   // Everything they wrote after the message that opened the loop, judged as one:
   // an answer followed by a "thanks" is still an answer.
-  const RANK = { paid: 7, closed: 6, declined: 6, yours: 5, promised: 4, answered: 3, ack: 2, auto: 1 };
+  const RANK = { paid: 7, closed: 6, declined: 6, yours: 5, promised: 4, answered: 3, ack: 2, auto: 1, bounced: 1 };
   function judge(ctx, watch) {
     const msgs = Array.from(ctx.messages);
     let from = msgs.length - 1;
@@ -417,6 +417,10 @@ const FlowFollow = (() => {
     const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
     if (res.close && next.tier === 'model' && best.reply.outcome !== 'declined') confirmAsk(next, 'confirmedAsk', 'ASK');
     if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : best.reply.outcome === 'declined' ? 'declined' : best.reply.delivered === 'file' ? 'file' : 'replied', via);
+    else if (res.bounced) {
+      // The mail never arrived: not a reply. The loop stays open and flagged, and is not chased until the person has sent it again.
+      if (!watch.bouncedAt) receipt('Your message to ' + whoOf(watch.counterpart) + ' did not arrive (the address was not found or refused it). Check the address and send it again. I kept the loop open and will not chase until you do.', null);
+    }
     else if (res.yours) await yours(watch, best.sender, patch, ctx);
     else if (res.claimedOnly) {
       // They wrote "attached" and nothing came through. Say so once; the loop stays open.
@@ -1339,6 +1343,8 @@ const FlowFollow = (() => {
             return;
           }
           // A new message of mine in a thread I am waiting on: a chase, or just talk.
+          // A new message of mine after a bounce is the resend: the flag clears and the chase clock runs again.
+          if (FlowFollowUp.isBounced(watch)) { await FlowStorage.updateWatch(threadId, Object.assign({ messageId: lastId }, FlowFollowUp.unbouncePatch(watch))); return; }
           if (FlowFollowUp.looksLikeChase(ctx.ownMessageText(last))) await chased(watch, lastId);
           else await FlowStorage.updateWatch(threadId, { messageId: lastId });
         }

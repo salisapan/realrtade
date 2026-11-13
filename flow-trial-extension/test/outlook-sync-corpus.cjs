@@ -393,6 +393,20 @@ console.log('\n--- OneDrive save reaches a card, and a drop still has a reason -
   });
 }
 
+console.log('\n--- a bounce on Outlook (2026-11-13): the message never arrived ---\n');
+{
+  const w = loop('cb', { messageId: 'm0' });
+  const bounce = Object.assign(theirs('cb', 'המסירה לנמענים או לקבוצות אלו נכשלה: dana@acme.com. כתובת הדואר האלקטרוני שהזנת לא נמצאה.', 1, 'לא ניתן למסירה: Lease'), { from: { emailAddress: { name: 'Microsoft Outlook', address: 'postmaster@acme.com' } } });
+  const r = plan([mine('cb', ASK, 3), bounce], [w]);
+  const p = r.patches.find((x) => x.id === w.id);
+  check('Outlook: a delivery failure flags the loop and keeps it open, it is not a reply', p && p.patch.stage === 'bounced' && p.patch.bouncedAt && !p.patch.status, r.patches);
+  check('Outlook: the person is told once that the message did not arrive', r.lines.some((l) => /did not arrive/.test(l)), r.lines);
+  const flagged = Object.assign({}, w, { stage: 'bounced', bouncedAt: NOW - DAY });
+  const resend = plan([mine('cb', ASK, 3), bounce, mine('cb', ASK + ' (resending)', 0)], [flagged]);
+  const q = resend.patches.find((x) => x.id === w.id);
+  check('Outlook: the next message of yours after a bounce clears the flag', q && q.patch.stage === 'waiting' && q.patch.bouncedAt === null, resend.patches);
+}
+
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
 console.log('TOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);
