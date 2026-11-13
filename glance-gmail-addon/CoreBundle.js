@@ -6298,16 +6298,10 @@ const FlowIntent = (() => {
         const labelNow = String(intent.label || '').trim();
         if (!/^(?:Decision|החלטה): \S/.test(labelNow) && !usableSelfTitle(labelNow)) return stayQuiet('hedge', { noRescue: true });
         if (intent.confidence === 'low') intent.confidence = 'high';
-        // "Remind me to renew the domain on Friday" is that task, due Friday.
-        // The day is already on facts. The task step reads entities.dateIso.
-        if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && intent.entities && !intent.entities.dateIso) {
-          intent.entities.dateIso = facts.date.iso;
-        }
-        // Any note to self with a day still ahead is due that day: the card already shows it ("עד 22 בנוב׳"), so the task
-        // step must carry it too, or Do It writes a task with no due date.
-        if (!isPast && facts && facts.date && facts.date.iso && !facts.date.dropped && intent.entities && !intent.entities.dateIso && !intent.entities.overdueIso) {
-          intent.entities.dateIso = facts.date.iso;
-        }
+        // The task is due the day in the sentence it is about, not the first
+        // day in a mail that also books a meeting ("meet on the 17th, and
+        // remind me to send the quote by the 22nd").
+        applyTaskClauseDate(intent, text, ctx.now, facts, isPast);
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
       // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
@@ -8207,7 +8201,77 @@ const FlowIntent = (() => {
     if (/^ל[\u0590-\u05FF]/.test(clause)) return clipTitle(clause);
     return '';
   }
+  function sentencesOfTask(text) {
+    return String(text || '').split(/\r?\n+|(?<=[.!?؟])\s+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function dateFactsOf(text, now) {
+    if (!text || typeof FlowExtract === 'undefined' || typeof FlowExtract.extract !== 'function') return null;
+    const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : null;
+    const src = D && typeof D.normalize === 'function' ? D.normalize(String(text), now) : String(text);
+    try {
+      const got = FlowExtract.extract(src, { now: now });
+      return got && got.date ? got : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function taskClauseFor(text, label, entities) {
+    const sentences = sentencesOfTask(text);
+    const remind = sentences.find((s) => /(?:^|[^\u0590-\u05FF])תזכיר(?:י|ו)?\s+לי(?![\u0590-\u05FF])|\bremind me to\b/i.test(s));
+    if (remind) return remind;
+    const needles = [label, entities && entities.requestWhat]
+      .map((v) => String(v || '').replace(/\s+/g, ' ').trim())
+      .filter((v) => v.length >= 4);
+    for (let i = 0; i < needles.length; i++) {
+      const n = needles[i];
+      const hit = sentences.find((s) => s.indexOf(n) !== -1 || n.indexOf(s) !== -1);
+      if (hit) return hit;
+    }
+    return sentences.length === 1 ? sentences[0] : '';
+  }
+  function applyTaskClauseDate(intent, text, now, facts, isPast) {
+    if (!intent || !intent.entities) return;
+    const clause = taskClauseFor(text, intent.label, intent.entities);
+    const clauseFacts = dateFactsOf(clause, now);
+    const clauseDate = clauseFacts && clauseFacts.date;
+    if (clauseDate && clauseDate.iso && !clauseDate.dropped && !isPastDate(clauseDate.iso, now)) {
+      intent.entities.dateIso = clauseDate.iso;
+      intent.entities.when = humanWhen(clauseDate, clauseFacts.time || null);
+      if (!(clauseFacts.time && Number.isInteger(clauseFacts.time.hour))) {
+        delete intent.entities.hour;
+        delete intent.entities.minute;
+      } else {
+        intent.entities.hour = clauseFacts.time.hour;
+        intent.entities.minute = clauseFacts.time.minute || 0;
+      }
+      return;
+    }
+    // "Remind me to renew the domain on Friday" is that task, due Friday.
+    // The day is already on facts. The task step reads entities.dateIso.
+    if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && !intent.entities.dateIso) {
+      intent.entities.dateIso = facts.date.iso;
+    }
+    // Any note to self with a day still ahead is due that day: the card already shows it ("עד 22 בנוב׳"), so the task
+    // step must carry it too, or Do It writes a task with no due date.
+    if (!isPast && facts && facts.date && facts.date.iso && !facts.date.dropped && !intent.entities.dateIso && !intent.entities.overdueIso) {
+      intent.entities.dateIso = facts.date.iso;
+    }
+    // A day that only lives in another sentence (the meeting) is not this task's due day.
+    const kept = intent.entities.dateIso;
+    if (kept && clause && !dateFactsOf(clause, now)) {
+      const slash = heSlashDate(kept);
+      const owns = (slash && clause.indexOf(slash) !== -1) || clause.indexOf(kept) !== -1;
+      if (!owns) {
+        intent.entities.dateIso = null;
+        intent.entities.when = null;
+        delete intent.entities.hour;
+        delete intent.entities.minute;
+      }
+    }
+  }
+
   function selfAskTitle(text, subject, ctx) {
+
     const raw = String(text || '');
     const invite = attachToInvitePlan(raw);
     if (invite) return invite.label;
@@ -8312,13 +8376,32 @@ const FlowActions = (() => {
     return null;
   }
 
+  // The event title for a calendar hold is the meeting subject, with reply
+  // prefixes and bracket tags like [G-Calendar] stripped. The card label
+  // ("Hold Tue 10:00" / "שריין ג׳ 10:00") is a separate string. An empty
+  // subject falls back to the sentence being closed.
+  function holdSubjectTitle(subject) {
+    let s = String(subject || '')
+      .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    let prev = '';
+    while (s && s !== prev) {
+      prev = s;
+      s = s.replace(/^(?:(?:re|fw|fwd|השב|תגובה|הועבר)\s*:\s*)+/ig, '').trim();
+      s = s.replace(/^\[[^[\]]+\]\s*/g, '').trim();
+    }
+    return s;
+  }
+
   function calendarAction(intent, e, ctx) {
-    // A calendar hold's title is the sentence being closed. The schedule
-    // processes keep the short "Meeting Sep 18" label — that path is a
-    // meeting, and the sentence can be the whole invite.
+    // A calendar hold's title is the meeting subject when one is present.
+    // The schedule processes keep the short "Meeting Sep 18" label — that
+    // path is a meeting, and the sentence can be the whole invite.
     const mutate = e.calendarOp === 'delete' || e.calendarOp === 'update';
     const hold = intent.personalClose === 'calendar-hold' || mutate;
-    const title = (hold ? (e.what || intent.label) : (intent.label || e.what)) || (hold ? 'Hold' : 'Meeting');
+    const subjectTitle = hold ? holdSubjectTitle(ctx && ctx.subject) : '';
+    const title = (hold ? (subjectTitle || e.what || intent.label) : (intent.label || e.what)) || (hold ? 'Hold' : 'Meeting');
     const hint = e.calendarOp === 'delete' ? 'Remove from Calendar: '
       : e.calendarOp === 'update' ? 'Move on Calendar: '
       : 'Add to Calendar: ';
@@ -8348,7 +8431,13 @@ const FlowActions = (() => {
         // writer must not fall back to an all-day event if that time is
         // missing by the time Do It runs.
         requireTime: hold || mutate,
-        threadUrl: ctx.threadUrl
+        threadUrl: ctx.threadUrl,
+        // Raw mail subject. Writers strip reply prefixes and [tags] when
+        // they add the "Subject:" line to the event description.
+        subject: ctx && ctx.subject ? String(ctx.subject).slice(0, 300) : '',
+        // A calendar hold uses the meeting subject (or the sentence) as the
+        // event title. Other calendar steps keep the short classifier label.
+        useMeetingSubject: hold
       }
     };
     const span = mutate ? null : statedDurationMinutes([e.what, ctx && ctx.text], e.hour, e.minute);
@@ -9258,7 +9347,7 @@ const FlowActions = (() => {
     return lines;
   }
 
-  return { planFor, chooseDate, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
+  return { planFor, chooseDate, holdSubjectTitle, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines, inboundMeetingAnnouncement };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };
@@ -10668,7 +10757,8 @@ const FlowIncomingJudge = (() => {
       threadUrl: i.threadUrl || null,
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
       executionMemory: i.executionMemory || null,
-      text: vetoText
+      text: vetoText,
+      subject: i.subject || ''
     };
     // The show decision uses the unrewritten plan. A later Meeting or task
     // rewrite must not open a surface this plan leaves quiet.
@@ -11796,6 +11886,7 @@ var GlanceIntent = (function () {
         hour: holdClock.hour,
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
+        useMeetingSubject: holdParams.useMeetingSubject === true,
         lang: mailLang(sourceText || ''),
         reason: 'hold',
         planId: 'hold'
@@ -11878,10 +11969,13 @@ var GlanceIntent = (function () {
     return raw;
   }
 
-  // Card chrome follows the Gmail locale. The title written on the event
-  // and the reminder comes from the mail. A Hebrew meeting keeps its noun,
-  // the date as written, and the clock. An English meeting keeps the
-  // classifier's short label.
+  // Card chrome follows the Gmail locale. A Hebrew meeting card keeps its
+  // noun, the date as written, and the clock. The title written on the
+  // event is the meeting subject, with reply prefixes and [tags] stripped
+  // (the same rule as the extension). An empty subject falls back to the
+  // sentence already in decision.title from the engine. An English meeting
+  // keeps the classifier's short label on the card and the engine title
+  // on the event.
   var MEETING_NOUNS_HE = [
     'שיחת טלפון', 'פגישת עבודה', 'שיחת זום', 'שיחת וידאו', 'עמידה יומית',
     'פגישה', 'שיחה', 'ראיון', 'סנכרון', 'תיאום', 'ייעוץ', 'הדגמה', 'מפגש', 'ועידה'
@@ -11971,6 +12065,10 @@ var GlanceIntent = (function () {
 
   function contentTitle(text, decision) {
     if (!decision || (decision.kind !== 'schedule' && decision.kind !== 'hold')) return decision;
+    // Preserve the engine title for the calendar event before the card
+    // chrome overwrites decision.title. For a hold that title is already
+    // the cleaned subject, or the sentence when the subject is empty.
+    if (decision.kind === 'hold' && !decision.eventTitle) decision.eventTitle = decision.title;
     if (!mailIsHebrew(text)) return decision;
     var datePart = writtenDate(text, decision.dateIso || decision.due || '');
     var timePart = '';
