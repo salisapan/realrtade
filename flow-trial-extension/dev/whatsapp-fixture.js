@@ -15,7 +15,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.connect) {
   const port = chrome.runtime.connect({ name: 'glance-fixture-scan' });
   port.onMessage.addListener((msg) => {
     if (!msg || msg.type !== 'flow:fixture-scan') return;
+    if (msg.url && location.href !== msg.url && location.href.indexOf(msg.url) !== 0 && msg.url.indexOf(location.href) !== 0) return;
     const row = window.__glanceChatSurfaces && window.__glanceChatSurfaces.whatsapp;
     port.postMessage(row && typeof row.scan === 'function' ? row.scan({ gesture: true }) : { ok: false, reason: 'no-scan' });
   });
+  port.postMessage({ type: 'flow:fixture-hello', url: location.href });
 }

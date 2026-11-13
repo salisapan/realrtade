@@ -115,11 +115,18 @@ const FlowChatOnDemand = (() => {
     return { ok: true, scan: first };
   }
 
-  function scanFixturePage(tabId) {
+  function scanFixturePage(tab) {
+    const tabId = tab && tab.id;
+    const tabUrl = String((tab && tab.url) || '');
     const rows = [];
     fixturePorts.forEach((port) => rows.push(port));
-    let port = rows.find((p) => p.sender && p.sender.tab && p.sender.tab.id === tabId);
-    if (!port) port = rows.find((p) => /whatsapp-fixture\.html/.test(String((p.sender && p.sender.url) || '')));
+    const urlOf = (p) => String(p.__fixtureUrl || (p.sender && p.sender.url) || '');
+    const sameUrl = (p) => {
+      const url = urlOf(p);
+      return Boolean(tabUrl) && Boolean(url) && (url === tabUrl || url.indexOf(tabUrl) === 0 || tabUrl.indexOf(url) === 0);
+    };
+    let port = rows.find((p) => p.sender && p.sender.tab && p.sender.tab.id === tabId && (!tabUrl || sameUrl(p) || !urlOf(p)));
+    if (!port) port = rows.find(sameUrl);
     if (!port && rows.length === 1) port = rows[0];
     if (!port) return Promise.resolve({ ok: false, reason: 'no-scan', ports: rows.length });
     return new Promise((resolve) => {
@@ -130,12 +137,13 @@ const FlowChatOnDemand = (() => {
       function onMsg(msg) {
         clearTimeout(timer);
         try { port.onMessage.removeListener(onMsg); } catch (e) { /* port already gone */ }
-        if (!msg || msg.ok === false) resolve({ ok: false, reason: (msg && msg.reason) || 'no-scan', scan: msg });
+        if (!msg || msg.type === 'flow:fixture-hello') return;
+        if (msg.ok === false) resolve({ ok: false, reason: msg.reason || 'no-scan', scan: msg });
         else resolve({ ok: true, scan: msg });
       }
       try {
         port.onMessage.addListener(onMsg);
-        port.postMessage({ type: 'flow:fixture-scan' });
+        port.postMessage({ type: 'flow:fixture-scan', url: tabUrl });
       } catch (e) {
         clearTimeout(timer);
         resolve({ ok: false, reason: 'inject-failed' });
@@ -170,7 +178,7 @@ const FlowChatOnDemand = (() => {
       // this build does not declare, and tabs.sendMessage never reaches an
       // extension page. The page keeps a port open; the gesture asks that port
       // to run the stub scan. web.whatsapp.com stays on the gate below.
-      return scanFixturePage(tab.id);
+      return scanFixturePage(tab);
     }
     if (surfaceKey === 'whatsapp') {
       const decision = await whatsappGate(api);
@@ -234,6 +242,9 @@ const FlowChatOnDemand = (() => {
       api.runtime.onConnect.addListener((port) => {
         if (!port || port.name !== 'glance-fixture-scan') return;
         fixturePorts.add(port);
+        port.onMessage.addListener((msg) => {
+          if (msg && msg.type === 'flow:fixture-hello' && msg.url) port.__fixtureUrl = String(msg.url);
+        });
         port.onDisconnect.addListener(() => fixturePorts.delete(port));
       });
     }
