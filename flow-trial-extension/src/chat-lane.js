@@ -64,42 +64,54 @@ const FlowChatLane = (() => {
     return { connected, facts, events: [] };
   }
 
-  // box is the open chat's input. input.evidence skips the worker (tests).
-  // A missing box, a veto, or two answers leaves the page untouched.
-  async function draftInto(box, input) {
+  // Evidence and the judge, with nothing written. input.evidence skips the worker.
+  // A missing draft is silence. The caller decides whether to type.
+  async function plan(input) {
     const i = input || {};
-    if (typeof FlowChatDraft === 'undefined' || typeof FlowChatCompose === 'undefined') {
-      return { ok: false, sends: false, reason: 'missing' };
-    }
+    if (typeof FlowChatDraft === 'undefined') return { ok: false, sends: false, reason: 'missing', evidence: null };
     const detected = FlowChatDraft.detect(i.text, i);
     let evidence = Object.prototype.hasOwnProperty.call(i, 'evidence') ? i.evidence : null;
     if (evidence == null && detected && detected.fetch) {
       if (detected.kind === 'fact') {
         const reply = await ask('flow:fact-sources', detected.fact || {}, i);
-        if (reply && reply.reason === 'invalidated') return { ok: false, sends: false, reason: 'invalidated' };
+        if (reply && reply.reason === 'invalidated') return { ok: false, sends: false, reason: 'invalidated', evidence: null };
         evidence = bagFromFact(detected, reply);
       } else {
         const reply = await ask('flow:chat-evidence', detected.fetch, i);
-        if (reply && reply.reason === 'invalidated') return { ok: false, sends: false, reason: 'invalidated' };
+        if (reply && reply.reason === 'invalidated') return { ok: false, sends: false, reason: 'invalidated', evidence: null };
         evidence = (reply && reply.evidence) || { connected: { calendar: false }, events: null };
       }
     }
     const judged = FlowChatDraft.judge(Object.assign({}, i, { evidence: evidence || {}, detected: detected }));
     if (!judged || judged.sends !== false || !judged.show || !judged.draft) {
       const reason = (judged && judged.reason) || 'silence';
-      try { console.info('[Glance] whyNotShown: ' + reason); } catch (e) { /* the console can be missing */ }
-      return { ok: false, sends: false, reason: reason, judged: judged };
+      return { ok: false, sends: false, reason: reason, judged: judged, evidence: evidence };
     }
+    return { ok: true, sends: false, reason: 'found', judged: judged, evidence: evidence };
+  }
+
+  // box is the open chat's input. input.evidence skips the worker (tests).
+  // A missing box, a veto, or two answers leaves the page untouched.
+  async function draftInto(box, input) {
+    if (typeof FlowChatCompose === 'undefined') return { ok: false, sends: false, reason: 'missing' };
+    const planned = await plan(input);
+    if (!planned.ok || !planned.judged || !planned.judged.draft) {
+      if (planned.reason && planned.reason !== 'missing') {
+        try { console.info('[Glance] whyNotShown: ' + planned.reason); } catch (e) { /* the console can be missing */ }
+      }
+      return planned;
+    }
+    const i = input || {};
     const meta = { surface: i.channel || i.surface, threadId: i.threadId || i.key || null };
     const wrote = typeof FlowChatCompose.insertDraftWithProof === 'function'
-      ? await FlowChatCompose.insertDraftWithProof(box, judged.draft, meta)
-      : FlowChatCompose.insertDraft(box, judged.draft);
+      ? await FlowChatCompose.insertDraftWithProof(box, planned.judged.draft, meta)
+      : FlowChatCompose.insertDraft(box, planned.judged.draft);
     wrote.sends = false;
-    wrote.judged = judged;
+    wrote.judged = planned.judged;
     return wrote;
   }
 
-  return { draftInto };
+  return { draftInto, plan };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowChatLane };

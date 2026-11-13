@@ -1,11 +1,4 @@
-// WhatsApp Web draft lane. A second reader beside src/content-whatsapp.js, which
-// stays read-only and is owned by another open pull request. This file does not
-// call FlowFollow, so a loop is not opened twice.
-//
-// What it does: when the newest message in the open one-to-one chat asks for one
-// place or one fact the core judge can find, it places that answer in the box.
-// What it never does: press Enter, click Send, react, mark as read, open a chat,
-// or touch a group. The person sends the draft. A draft is not a closed loop.
+// WhatsApp Web draft lane (gesture-only). Injected on demand; never auto-reads.
 (() => {
   if (typeof FlowWhatsAppParse === 'undefined' || typeof FlowChatLane === 'undefined') return;
   if (window.__glanceWhatsAppDraftLane) return;
@@ -30,11 +23,11 @@
   }
 
   function textOf(node) {
-    const pieces = Array.from(node.querySelectorAll('span.selectable-text, span[data-testid="selectable-text"]')).map((s) => ({
-      text: s.innerText || s.textContent || '',
-      quoted: Boolean(s.closest('[data-quoted="1"], [aria-label^="Quoted"], [data-testid="quoted-message"], [data-testid="quoted-msg"]'))
+    const pieces = Array.from(node.querySelectorAll('span.selectable-text, span[data-testid="selectable-text"], img[alt]')).map((s) => ({
+      text: s.getAttribute && s.getAttribute('alt') ? s.getAttribute('alt') : (s.innerText || s.textContent || ''),
+      quoted: Boolean(s.closest && s.closest('[data-quoted="1"], [aria-label^="Quoted"], [data-testid="quoted-message"], [data-testid="quoted-msg"]'))
     }));
-    return P.joinText(pieces);
+    return P.joinText(pieces.filter((p) => p.text));
   }
 
   function quoted(node) {
@@ -54,25 +47,85 @@
     return null;
   }
 
+  function cardMount(main) {
+    let mount = main.querySelector('#glance-wa-card');
+    if (!mount) {
+      mount = document.createElement('div');
+      mount.id = 'glance-wa-card';
+      main.appendChild(mount);
+    }
+    return mount;
+  }
+
+  // One place in that week shows Do It. The click types one draft. Undo clears
+  // it only while the box still holds those words. Nothing here sends.
+  function showPlaceCard(main, box, draftText, input) {
+    if (typeof FlowChipHost === 'undefined' || !box || !draftText) return { ok: false, sends: false, reason: 'no-card' };
+    const mount = cardMount(main);
+    const old = mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    let wroteOnce = false;
+    const host = FlowChipHost.inject(mount, {
+      app: 'whatsapp',
+      doLabel: 'Do It',
+      messageId: input.key || input.threadId || 'wa',
+      uiLang: 'en',
+      intent: { label: String(input.text || '').slice(0, 180) },
+      process: {
+        id: 'chat-place-draft',
+        name: 'Reply',
+        closingLine: 'The place goes in the box. Nothing is sent.',
+        needsDateChoice: false,
+        steps: []
+      }
+    }, {
+      onDoIt: () => {
+        if (wroteOnce || typeof FlowChatCompose === 'undefined') return;
+        const write = typeof FlowChatCompose.insertDraftWithProof === 'function'
+          ? FlowChatCompose.insertDraftWithProof(box, draftText, { surface: 'whatsapp', threadId: input.threadId || input.key || null })
+          : Promise.resolve(FlowChatCompose.insertDraft(box, draftText));
+        Promise.resolve(write).then((result) => {
+          if (!result || !result.ok || wroteOnce) return;
+          wroteOnce = true;
+          const proof = result.proof || null;
+          FlowChipHost.showDraftReceipt(host, {
+            status: 'Draft ready.',
+            written: 'Draft in the chat box. Not sent.',
+            onUndo: () => {
+              const cleared = typeof FlowChatCompose.undoDraft === 'function'
+                ? FlowChatCompose.undoDraft(box, draftText, proof && proof.draftHash)
+                : FlowChatCompose.clearIfUnchanged(box, draftText);
+              if (cleared && cleared.ok) return { ok: true, written: 'Draft removed.' };
+              return { ok: false, reason: cleared && cleared.reason, written: cleared && cleared.reason === 'user-edited' ? 'You edited this. Undo left it alone.' : '' };
+            }
+          });
+        });
+      },
+      onDismiss: (h) => { try { h.remove(); } catch (e) { /* already gone */ } }
+    });
+    if (!host) return { ok: false, sends: false, reason: 'no-card' };
+    host.setAttribute('data-glance-read', String(input.text || ''));
+    return { ok: true, sends: false, card: true };
+  }
+
   function maybeDraft(main, list) {
     const last = list[list.length - 1];
-    if (!last) return;
+    if (!last) return { ok: false, reason: 'no-inbound' };
     const parsed = P.parseDataId(last.getAttribute('data-id') || '');
     if (parsed && parsed.fromMe) {
-      // The person's own newest message: a dated promise in it is offered as a task (CHAT_PROMISE_CARD, off).
       const mine = textOf(last);
       const mineKey = (last.getAttribute('data-id') || '') + '\n' + mine;
       if (typeof FlowChatTaskCard !== 'undefined') {
         FlowChatTaskCard.sync(mineKey);
         if (mine && !quoted(last)) FlowChatTaskCard.offer({ text: mine, channel: 'whatsapp', oneToOne: true, group: false, fromMe: true, own: true, quoted: false, sender: { name: P.partyFromChat(title(main), list.map((n) => n.getAttribute('data-id'))).name }, key: mineKey, now: Date.now() }).catch(() => {});
       }
-      return;
+      return { ok: true, sends: false, reason: 'own-message' };
     }
-    if (!parsed) { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return; }
+    if (!parsed) { if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(null); return { ok: false, reason: 'unparsed' }; }
     const text = textOf(last);
     const key = (last.getAttribute('data-id') || '') + '\n' + text;
     if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.sync(key);
-    if (!text || drafted.has(key) || inflight.has(key)) return;
+    if (!text || drafted.has(key) || inflight.has(key)) return { ok: false, reason: 'already-drafted' };
     inflight.add(key);
     const ids = list.map((n) => n.getAttribute('data-id'));
     const party = P.partyFromChat(title(main), ids);
@@ -83,15 +136,30 @@
       group: false,
       quoted: quoted(last),
       channel: 'whatsapp',
+      surface: 'whatsapp',
+      threadId: P.threadIdFor(title(main), ids),
       now: Date.now(),
       sender: { name: party.name, phone: party.phone },
       key: key
     };
     const box = composerBox(main);
-    FlowChatLane.draftInto(box, input).then((r) => {
-      if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input, box);
-      if (!r || r.reason !== 'no-box') drafted.add(key);
-    }).catch(() => { drafted.add(key); }).finally(() => { inflight.delete(key); });
+    const plan = (typeof FlowChatLane.plan === 'function') ? FlowChatLane.plan(input) : Promise.resolve(null);
+    return plan.then((planned) => {
+      if (planned && planned.judged && planned.judged.draft) {
+        const card = showPlaceCard(main, box, planned.judged.draft, input);
+        drafted.add(key);
+        return card.ok ? card : { ok: false, sends: false, reason: card.reason || 'no-card' };
+      }
+      const again = Object.assign({}, input, { evidence: planned && planned.evidence != null ? planned.evidence : input.evidence });
+      return FlowChatLane.draftInto(box, again).then((r) => {
+        if (typeof FlowChatTaskCard !== 'undefined') FlowChatTaskCard.afterDraft(r, input, box);
+        if (!r || r.reason !== 'no-box') drafted.add(key);
+        return { ok: true, sends: false };
+      });
+    }).catch(() => {
+      drafted.add(key);
+      return { ok: false, sends: false, reason: 'error' };
+    }).finally(() => { inflight.delete(key); });
   }
 
   function scan(opts) {
@@ -109,10 +177,13 @@
     if (main.getAttribute('data-glance-chat') === 'group') return { ok: false, reason: 'group' };
     const list = rows(main);
     if (!list.length) return { ok: false, reason: 'no-messages' };
+    window.__glanceChatDomReads = (window.__glanceChatDomReads || 0) + 1;
+    document.documentElement.setAttribute('data-glance-reads', String(window.__glanceChatDomReads));
+    const openText = textOf(list[list.length - 1]);
+    main.setAttribute('data-glance-scanned', openText);
     const ids = list.map((n) => n.getAttribute('data-id'));
     if (!P.isOneToOne(ids)) return { ok: false, reason: 'not-1to1' };
-    maybeDraft(main, list);
-    return { ok: true, sends: false };
+    return maybeDraft(main, list);
   }
 
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
