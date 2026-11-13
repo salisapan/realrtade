@@ -35,14 +35,23 @@ The homepage shows the next pending action when a prefetch cache returns one. Se
 
 ## Scopes
 
-- `https://www.googleapis.com/auth/gmail.addons.current.message.readonly`
-- `https://www.googleapis.com/auth/gmail.addons.execute`
-- `https://www.googleapis.com/auth/tasks`
-- `https://www.googleapis.com/auth/calendar.events`
-- `https://www.googleapis.com/auth/script.external_request` (only if a script property URL is set)
-- `https://www.googleapis.com/auth/script.locale` (the card language follows the Gmail locale)
+Workspace add-on host (`appsscript.json`). Each declared scope is non-restricted, and each one has a reason:
 
-No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`. No full `calendar` scope. If the Apps Script editor adds `https://www.googleapis.com/auth/calendar` when the Calendar service is enabled, delete that line and keep `calendar.events`.
+| Scope | Why this host needs it |
+| --- | --- |
+| `gmail.addons.execute` | Run the card (homepage and the message-open trigger). |
+| `gmail.addons.current.message.readonly` | Read the open message only, through `GmailApp.setCurrentMessageAccessToken`. Not the mailbox, and not the other messages in the thread. |
+| `tasks` | Do it writes one Google Task, reads it back, and Undo removes it. |
+| `calendar.events` | Do it writes one calendar hold or event, reads it back, and Undo removes it. Not the full `calendar` scope. |
+| `userinfo.email` | `Session.getActiveUser().getEmail()` names the reader, so a mail to someone else stays quiet. |
+| `script.external_request` | `UrlFetchApp` for the optional `GLANCE_PREFETCH_URL` homepage call. Unset, nothing is fetched. |
+| `script.locale` | `useLocaleFromApp`: the card follows the Gmail language. |
+
+The v1 ceiling also allows `calendar.events`, `tasks`, `drive.file`, `openid`, `userinfo.profile`, and `email`. `drive.file`, `openid`, and `userinfo.profile` are not declared, because this host does not use them yet. `gmail.addons.current.action.compose` is allowed only if a compose trigger is added. This manifest has none.
+
+`v1.test.cjs` fails if the manifest declares a restricted scope (`gmail.modify`, `gmail.compose`, `gmail.readonly`, `drive.readonly`, `forms.body`, `contacts.readonly`) or any scope outside that ceiling. There is no inbox label or star marker: that path needed a restricted Gmail scope, and it is not in this host. The card reads the whole plain body of the open message, quoted history included, up to 20000 characters. It does not fetch the other messages in the thread.
+
+If the Apps Script editor adds `https://www.googleapis.com/auth/calendar` when the Calendar service is enabled, delete that line and keep `calendar.events`.
 
 ## Tests
 
@@ -50,6 +59,7 @@ No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`. No full `
 node glance-gmail-addon/scripts/build-bundle.js
 node glance-gmail-addon/scripts/check-core-bundle.cjs
 node glance-gmail-addon/test/v1.test.cjs
+node glance-gmail-addon/test/behavior.test.cjs
 node glance-gmail-addon/test/build-stamp.test.cjs
 ```
 
@@ -111,13 +121,22 @@ The unverified-app screen says Google has not verified the app. The test user ch
 
 Open a message. Open the side panel and choose Glance. The card is either one Do it, or nothing to close. Leave the panel open: the next message runs the same card. Do it on `Please remember to send the contract by Friday.` Confirm the task in Google Tasks matches the id, title, and due on the card, then Undo and confirm it is gone. Edit a task in Google Tasks and Undo again: the card must refuse, and the edited task must still be there. On a mail whose subject is `פגישה ביום חמישי 22/10`, the card offers the scheduled event and its reminder, not "Nothing to close." Do it creates the all-day event and the task, and both ids on the card match what Google stored. Edit the event and Undo: the card refuses, and both the event and the task remain. On `Could we meet Thursday at 3pm?` the card says Calendar hold. Do it creates one 30-minute event and no task.
 
-### Gmail on iOS and Android
+### Gmail on iPhone
 
-Same Google account. Open a message and tap the Glance icon under the message. The card does not open by itself. There is no separate mobile build. The same Do it, proof, and Undo are the whole UI.
+There is no separate iPhone build. The test deployment above is the card inside the Gmail app. This commit was not installed on a phone. Nothing in the repo deploys the script.
+
+1. Finish the test deployment on a computer, signed in as one of the consent-screen test users (the steps above). Install it from **Deploy → Test deployments**.
+2. On the iPhone, sign into the Gmail app with that same account. If the icon is missing, force-quit Gmail and open it again.
+3. Open a message. The card does not open by itself. Tap the Glance icon under the message.
+4. `Please remember to send the contract by Friday.` shows one Do it. A hello with nothing to do shows **Nothing to close.** `Could we meet Thursday at 3pm?` shows Calendar hold. `פגישה ביום חמישי 22/10` shows the event and its reminder.
+5. Tap Do it. The card shows the id that was read back. Confirm that id in Google Tasks or Calendar. Tap Undo and confirm it is gone. Edit the item and tap Undo again: the card refuses, and the edit stays.
+6. Confirm nothing was sent. The card has no Send button.
+
+Google documents the test deployment for the web. Whether an unpublished test deployment shows in the iPhone app is checked on the device in step 3. Android uses the same install and the same icon.
 
 ## What not to do
 
 - Do not publish, and do not create a Marketplace listing.
 - Do not add a send call (`GmailApp.sendEmail`, `MailApp`, `Drafts.send`).
-- Do not add `gmail.compose`, `gmail.modify`, `gmail.readonly`, or the full `calendar` scope. The only calendar scope is `calendar.events`.
+- Do not add a restricted scope: `gmail.modify`, `gmail.compose`, `gmail.readonly`, `drive.readonly`, `forms.body`, `contacts.readonly`, or the full `calendar` scope. The only calendar scope is `calendar.events`.
 - Do not put a client secret in the repo. The card uses the person's Apps Script grant.

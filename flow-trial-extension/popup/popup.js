@@ -130,9 +130,15 @@
   let scrollAtRender = 0;
   function beginRender() {
     if (renderDepth === 0) {
-      rememberScroll();
       const scroller = panelScroller();
-      scrollAtRender = scroller ? scroller.scrollTop : 0;
+      const live = scroller ? scroller.scrollTop : 0;
+      scrollAtRender = live;
+      // A tab click holds the lock across this paint, so rememberScroll
+      // would no-op, and the scroll event for a move during that lock is
+      // still queued. The live spot is the one to put back. A paint that
+      // already reset the scroller leaves 0, and the saved spot stays.
+      if (live > 0) tabScroll[activeTabId()] = live;
+      else rememberScroll();
       scrollLock = true;
     }
     renderDepth += 1;
@@ -1137,6 +1143,12 @@
         scrollLock = true;
         if (tab.dataset.tab === 'log') await renderLog();
         if (tab.dataset.tab === 'open') await renderOpen();
+        const scroller = panelScroller();
+        const live = scroller ? scroller.scrollTop : 0;
+        // The paint's own restore drops the lock, so a scroll during the
+        // await is the person. Reading it here keeps that spot. A reset
+        // leaves 0, and this tab's saved spot still applies.
+        if (live > 0) tabScroll[tab.dataset.tab] = live;
         scrollLock = false;
         restoreScroll();
       });
