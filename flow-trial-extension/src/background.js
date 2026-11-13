@@ -80,6 +80,9 @@ import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import './native-edit.js'; // classic: sets globalThis.FlowNativeEdit
 import './lane-chat-worker.js'; // answers flow:chat-evidence from the calendars already connected
 import '../lane-chat/meta-consent.js'; // one Meta consent; signup sends flow:open-meta-chats
+import '../core/teams-web-read.js'; // classic: sets globalThis.FlowTeamsWebRead (Teams web lane, Chat.Read fallback)
+import './lane-teams-worker.js'; // answers flow:teams-web-read for teams.microsoft.com
+import './teams-lane-spec.js'; // classic: sets globalThis.FlowTeamsLaneSpec (Teams match patterns)
 // The worker cannot call import(). These are the helpers imported at the top of this file.
 globalThis.__glanceGoogleAuth = {
   GOOGLE_WEB_AUTH_STORAGE_KEY: GOOGLE_WEB_AUTH_STORAGE_KEY,
@@ -689,6 +692,16 @@ const LANE_CHAT = [
   }
 ];
 
+const LANE_TEAMS = {
+  id: 'glance-lane-teams',
+  origins: (globalThis.FlowTeamsLaneSpec && FlowTeamsLaneSpec.HOSTS.slice()) || ['https://teams.microsoft.com/*', 'https://teams.live.com/*'],
+  matches: (globalThis.FlowTeamsLaneSpec && FlowTeamsLaneSpec.MATCHES.slice()) || ['https://teams.microsoft.com/*', 'https://teams.live.com/*'],
+  boot: 'src/teams-lane-boot.js',
+  js: ['src/teams-lane-boot.js', 'core/fact-reply.js', 'core/close-chains.js', 'src/chat-draft.js', 'src/chat-compose.js', 'src/chat-lane.js', 'src/lane-draft-store.js', 'src/group-word.js', 'src/teams-parse.js', 'src/content-teams.js', 'core/meeting-confirm.js', 'core/chat-self-note.js', 'src/chat-task-card.js']
+};
+
+const TEAMS_HOSTS = LANE_TEAMS.origins.slice();
+
 // The chat task card needs the one shared judge, the step kit and the canonical card, which the lean chat lists do
 // not carry. Each chat registration loads the same base the Outlook surface does (minus the Gmail-only pieces and the
 // Gmail follow-up scripts), the lane's own files, then the card, so the card file always loads after chat-lane.js.
@@ -696,12 +709,14 @@ const CHAT_CARD_SKIP = ['src/follow.js', 'src/chip-peek.js'];
 function laneChatScripts(lane) {
   const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0 && CHAT_CARD_SKIP.indexOf(f) < 0);
   const out = [];
-  for (const f of base.concat(lane.js, ['core/day-words.js', 'core/meeting-confirm.js', 'core/teams-meeting.js', 'core/chat-reminder.js', 'core/chat-deadline-ask.js', 'core/chat-callback-ask.js', 'core/chat-payment-ask.js', 'core/chat-appointment-notice.js', 'core/chat-pickup-notice.js', 'core/chat-travel-notice.js', 'core/chat-delivery-window.js', 'core/chat-payment-claim.js', 'core/chat-sent-claim.js', 'core/chat-chase.js', 'core/chat-invitation-notice.js', 'core/chat-self-note.js', 'src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
+  const lead = lane && lane.boot ? [lane.boot] : [];
+  for (const f of lead.concat(base, lane.js, ['core/day-words.js', 'core/meeting-confirm.js', 'core/teams-meeting.js', 'core/chat-reminder.js', 'core/chat-deadline-ask.js', 'core/chat-callback-ask.js', 'core/chat-payment-ask.js', 'core/chat-appointment-notice.js', 'core/chat-pickup-notice.js', 'core/chat-travel-notice.js', 'core/chat-delivery-window.js', 'core/chat-payment-claim.js', 'core/chat-sent-claim.js', 'core/chat-chase.js', 'core/chat-invitation-notice.js', 'core/chat-self-note.js', 'src/chip-host.js', 'src/chat-task-card.js'])) if (out.indexOf(f) < 0) out.push(f);
   return out;
 }
 const LANE_CHAT_CSS = ['design/step-states-v1/scoped.css', 'src/chip.css'];
 globalThis.__glanceLaneChatScripts = laneChatScripts;
 globalThis.__glanceLaneChatDefs = LANE_CHAT;
+globalThis.__glanceLaneTeamsDef = LANE_TEAMS;
 
 async function clearLaneChats() {
   if (!chrome.scripting || !chrome.scripting.unregisterContentScripts) return;
@@ -782,17 +797,145 @@ async function restoreLaneChats() {
   }
 }
 
+function teamsPermissionTouches(perm) {
+  const origins = (perm && perm.origins) || [];
+  if (!origins.length) return true;
+  return origins.some((origin) => TEAMS_HOSTS.indexOf(origin) >= 0);
+}
+
+async function teamsScriptRow() {
+  if (!chrome.scripting || !chrome.scripting.getRegisteredContentScripts) return null;
+  try {
+    const rows = await chrome.scripting.getRegisteredContentScripts({ ids: [LANE_TEAMS.id] });
+    return (rows || []).filter((row) => row && row.id === LANE_TEAMS.id)[0] || null;
+  } catch (e) { return null; }
+}
+
+function teamsScriptSpec() {
+  return {
+    id: LANE_TEAMS.id,
+    matches: (LANE_TEAMS.matches || LANE_TEAMS.origins).slice(),
+    js: laneChatScripts(LANE_TEAMS),
+    css: LANE_CHAT_CSS.slice(),
+    // document_end, not document_idle: Teams is a SPA and its load event can stay open.
+    runAt: 'document_end',
+    allFrames: true,
+    matchOriginAsFallback: true,
+    persistAcrossSessions: true
+  };
+}
+
+function teamsRegistrationCurrent(row) {
+  if (!row) return false;
+  const spec = teamsScriptSpec();
+  const js = row.js || [];
+  if (js[0] !== LANE_TEAMS.boot) return false;
+  if (js.indexOf('src/content-teams.js') < 0 || js.indexOf('src/chat-task-card.js') < 0) return false;
+  if (JSON.stringify(js) !== JSON.stringify(spec.js)) return false;
+  if (row.allFrames !== true || row.matchOriginAsFallback !== true || row.persistAcrossSessions !== true) return false;
+  if (row.runAt !== 'document_end') return false;
+  const got = (row.matches || []).slice().sort();
+  const want = spec.matches.slice().sort();
+  return JSON.stringify(got) === JSON.stringify(want);
+}
+
+async function injectTeamsOpenTabs() {
+  if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting || !chrome.scripting.executeScript) return;
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: (LANE_TEAMS.matches || LANE_TEAMS.origins).slice() }); } catch (e) { tabs = []; }
+  const files = laneChatScripts(LANE_TEAMS);
+  for (const tab of tabs || []) {
+    if (!tab || typeof tab.id !== 'number') continue;
+    let missing = [];
+    try {
+      const reply = await chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        func: () => Boolean(window.__glanceLaneTeamsBoot)
+      });
+      missing = (reply || []).filter((row) => row && row.result !== true && typeof row.frameId === 'number').map((row) => row.frameId);
+    } catch (e) { missing = []; }
+    if (!missing.length) continue;
+    try {
+      if (chrome.scripting.insertCSS) await chrome.scripting.insertCSS({ target: { tabId: tab.id, frameIds: missing }, files: LANE_CHAT_CSS });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id, frameIds: missing }, files: files });
+    } catch (e) {
+      const detail = e && e.message ? String(e.message) : '';
+      console.info('[Glance] whyNotShown: teams-lane-not-injected' + (detail ? ' ' + detail : ''));
+    }
+  }
+}
+
+let teamsLaneJob = null;
+function queueRestoreLaneTeams() {
+  const run = Promise.resolve(teamsLaneJob).then(() => restoreLaneTeams());
+  teamsLaneJob = run.then(() => { if (teamsLaneJob === run) teamsLaneJob = null; }, (err) => {
+    const detail = err && err.message ? String(err.message) : '';
+    console.info('[Glance] whyNotShown: teams-lane-not-registered ' + detail);
+    if (teamsLaneJob === run) teamsLaneJob = null;
+  });
+  return run;
+}
+
+async function restoreLaneTeams() {
+  if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
+  let on = false;
+  try { on = await chrome.permissions.contains({ origins: TEAMS_HOSTS }); }
+  catch (e) {
+    console.info('[Glance] whyNotShown: teams-permission-unknown');
+    return;
+  }
+  const id = LANE_TEAMS.id;
+  if (!on) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* not registered */ }
+    return;
+  }
+  let row = await teamsScriptRow();
+  if (row && !teamsRegistrationCurrent(row)) {
+    try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* replaced below */ }
+    row = null;
+  }
+  if (!row) {
+    const spec = teamsScriptSpec();
+    let registered = false;
+    let lastError = '';
+    for (let attempt = 0; attempt < 3 && !registered; attempt++) {
+      try {
+        await chrome.scripting.registerContentScripts([spec]);
+        registered = true;
+      } catch (e) {
+        lastError = e && e.message ? String(e.message) : '';
+        const again = await teamsScriptRow();
+        registered = Boolean(again && teamsRegistrationCurrent(again));
+        if (!registered && attempt < 2) await new Promise((resolve) => setTimeout(resolve, 40 * (attempt + 1)));
+      }
+    }
+    if (!registered) {
+      console.info('[Glance] whyNotShown: teams-lane-not-registered' + (lastError ? ' ' + lastError : ''));
+      return;
+    }
+    console.info('[Glance] teams lane registered ' + spec.matches.join(' '));
+  }
+  await injectTeamsOpenTabs();
+}
+
 dropLegacyWhatsApp();
 restoreSurfaces();
 restoreLaneChats();
-chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+queueRestoreLaneTeams();
+chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); queueRestoreLaneTeams(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); queueRestoreLaneTeams(); });
 try {
   if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
-    chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); });
+    chrome.permissions.onAdded.addListener((perm) => {
+      restoreLaneChats();
+      if (teamsPermissionTouches(perm)) queueRestoreLaneTeams();
+    });
   }
   if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
-    chrome.permissions.onRemoved.addListener(() => { restoreLaneChats(); });
+    chrome.permissions.onRemoved.addListener((perm) => {
+      restoreLaneChats();
+      if (teamsPermissionTouches(perm)) queueRestoreLaneTeams();
+    });
   }
 } catch (e) { /* the next wake reads the grant again */ }
 
@@ -2608,10 +2751,10 @@ function googleTasksAuthedFetch(path, options) {
   return googleAuthedFetch(GOOGLE_TASKS_API, path, options);
 }
 
-// A task made from a chat names the chat (Open in WhatsApp), never "Open in Gmail". Only the three known labels count.
+// A task made from a chat names the chat (Open in WhatsApp), never "Open in Gmail". Only the known labels count.
 function chatThreadLabel(p, fallback) {
   const l = p && p.threadLabel;
-  return (l === 'Open in WhatsApp' || l === 'Open in Messenger' || l === 'Open in Instagram') ? l : fallback;
+  return (l === 'Open in WhatsApp' || l === 'Open in Messenger' || l === 'Open in Instagram' || l === 'Open in Teams') ? l : fallback;
 }
 
 const CHAT_CARD_ASSETS = ['design/step-states-v1/do-it.png', 'design/step-states-v1/do-it-dark.png', 'design/step-states-v1/living/key-idle-512.png', 'design/step-states-v1/living/key-done-512.png'];

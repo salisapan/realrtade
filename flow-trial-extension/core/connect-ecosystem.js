@@ -19,7 +19,7 @@ const FlowConnectEcosystem = (() => {
     contacts: ['Contacts.Read']
   };
 
-  const TEAMS_OPTIONAL_HOST_ORIGINS = ['https://teams.microsoft.com/*'];
+  const TEAMS_OPTIONAL_HOST_ORIGINS = ['https://teams.microsoft.com/*', 'https://teams.live.com/*'];
 
   const MS_CONSUMER_TENANT_ID = '9188040d-6c67-4c5b-b112-36a304b66dad';
 

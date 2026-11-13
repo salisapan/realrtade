@@ -214,7 +214,9 @@
     "http://localhost/*",
     "https://outlook.live.com/*",
     "https://outlook.office.com/*",
-    "https://outlook.office365.com/*"
+    "https://outlook.office365.com/*",
+    "https://teams.microsoft.com/*",
+    "https://teams.live.com/*"
   ],
   "options_ui": {
     "page": "lane-chat/enable.html",

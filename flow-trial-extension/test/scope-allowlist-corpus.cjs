@@ -35,8 +35,7 @@ const FORBIDDEN_V1_OPTIONAL_HOSTS = [
   /instagram\.com\/direct/i,
   /web\.whatsapp\.com/i,
   /app\.slack\.com/i,
-  /web\.telegram\.org/i,
-  /teams\.microsoft\.com/i
+  /web\.telegram\.org/i
 ];
 const ALLOWED_V1_OPTIONAL_HOSTS = [
   'https://graph.microsoft.com/*',
@@ -45,7 +44,9 @@ const ALLOWED_V1_OPTIONAL_HOSTS = [
   'http://localhost/*',
   'https://outlook.live.com/*',
   'https://outlook.office.com/*',
-  'https://outlook.office365.com/*'
+  'https://outlook.office365.com/*',
+  'https://teams.microsoft.com/*',
+  'https://teams.live.com/*'
 ];
 const RESTRICTED = [
   /\/auth\/gmail(\.|$)/, /mail\.google\.com/, /\/auth\/drive$/, /\/auth\/drive\.(readonly|metadata|metadata\.readonly|appdata|photos\.readonly|scripts|activity|activity\.readonly)$/,
@@ -85,6 +86,11 @@ function auditShippedManifest(man, label) {
   check(tag + ': v1 optional_host_permissions matches the allowed set exactly', JSON.stringify(optionalHosts.slice().sort()) === JSON.stringify(ALLOWED_V1_OPTIONAL_HOSTS.slice().sort()), { got: optionalHosts, want: ALLOWED_V1_OPTIONAL_HOSTS });
   check(tag + ': no forbidden v1 optional chat/Meta host', !optionalHosts.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))), optionalHosts);
   check(tag + ': no forbidden v1 chat/Meta host in host_permissions', !hosts.some((h) => FORBIDDEN_V1_OPTIONAL_HOSTS.some((re) => re.test(h))), hosts);
+  check(tag + ': Teams web hosts are optional and not required',
+    optionalHosts.indexOf('https://teams.microsoft.com/*') >= 0 && optionalHosts.indexOf('https://teams.live.com/*') >= 0 &&
+    !hosts.some((h) => /teams\.(microsoft|live)\.com/i.test(h)), { optional: optionalHosts, hosts: hosts });
+  const teamsLeak = JSON.stringify(Object.assign({}, man, { optional_host_permissions: undefined }));
+  check(tag + ': no teams origin outside optional_host_permissions', !/teams\.(microsoft|live)\.com/i.test(teamsLeak));
   if (label === 'repo manifest') {
     check('mutant messenger.com optional host is rejected by v1 optional audit', (() => {
       const bad = optionalHosts.concat(['https://www.messenger.com/*']);

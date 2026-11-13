@@ -1,6 +1,6 @@
 ---
 tags: [decisions]
-updated: 2026-10-28
+updated: 2026-11-13
 ---
 - 2026-11-13 · #222 live web Gate, second install: a reply compose event has no message id. The message card offers הכן תשובה, which opens a reply draft with createDraftReply under gmail.addons.current.action.compose and never sends. The compose window matches the draft subject to that reply, remembered for six hours, and Do it inserts it at the cursor. Gate: not installed yet. · Cursor agent · `glance-gmail-addon/Code.js`, `flow-landing/privacy.html`, [[open-tasks]]
 - 2026-11-13 · #222 live web Gate: the compose card reads the replied-to message from `gmail.messageId` and the current-message token, then Do it inserts at the cursor. A compose event with no message id says why. No mailbox scope. Gate: the previous install failed at compose; this head is not installed yet. · Cursor agent · `glance-gmail-addon/Code.js`, [[open-tasks]]
@@ -8,6 +8,12 @@ updated: 2026-10-28
 - 2026-10-28 · verify-ca1-r9 on PR #241: corpora assert `forms.body` absent (google-form, recurring-reminder-wiring, google-web-auth); `google-oauth-scopes-exact-corpus.cjs` pins `FlowGoogleConfig.SCOPES` ⊆ seven-scope allowlist; chat-draft fixture clock restored to 2026-10-14 (e2e patches Oct 27 in spec); restored `token-relay` + `understand.js` from merge base; D5 rows in `hebrew-weekday-explicit-date-corpus.cjs` and `intent-actions-corpus.cjs`; full corpus sweep wired in `verify_trial_install.py`. Gate: not run live.
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
+
+- 2026-11-13 · Teams web lane, after the live Gate on `d552e0e4`: a teams.live.com v2 self-chat ("(You)") and a one-to-one are identified from the header, the hash, or a conversation id in the DOM. The bubble already on screen is offered, including a self-chat. A miss logs the missing signals and not the message. Hosts stay optional. Gate: not run live on this head · Cursor · [[open-tasks]] row 69
+
+- 2026-11-13 · Teams web lane, after the live Gate on `771d48f4`: the registered script matches `teams.live.com` and `teams.microsoft.com` at the root and under `/v2/`, in every frame, and logs when it injects. Untick removes both optional hosts. They stay out of every other manifest key. No new Graph scope. Gate: not run live on this head · Cursor · [[open-tasks]] row 69
+
+- 2026-11-13 · Owner (Sali, «כן, להפעיל את Teams»): Teams web hosts `https://teams.microsoft.com/*` and `https://teams.live.com/*` are optional only. The Teams box asks for them on the click. The lane registers only after the grant, and stays quiet if they are refused or removed. No new Graph scope. Gate: not run live · Cursor · [[open-tasks]] row 69, `flow-landing/privacy.html`
 
 - 2026-10-26 · Hebrew weekday + ambiguous `5/11`: day-first only when the matched weekday is Hebrew (`יום`/`ביום`) beside the date, not any Hebrew in the mail; English and mixed US `12/4` stay December; `ביום חמישי 5/11` with no clock is 5 November; `יום שני 5/11 14:00` asks which date instead of silently picking 11 May (`core/extract.js`, `test/hebrew-weekday-explicit-date-corpus.cjs`) · Claude · PR #236
 - 2026-10-26 · Breadth Y3: a chased payment closes only on a payment-received notice from an allowlisted bank or payment app with the same amount (the payer's "I paid" stays a claim), read back by id; Undo reopens (`core/money-arrived.js`, switch `MONEY_ARRIVED` off, not wired). Gate: not run · Claude routine · [[open-tasks]] row 65

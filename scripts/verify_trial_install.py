@@ -29,11 +29,17 @@ REQUIRED = [
     "icons/icon16.png",
     "icons/icon48.png",
     "icons/icon128.png",
-    # Registered at runtime from background.js (SURFACES or LANE_CHAT), so not in the manifest.
+    # Registered at runtime from background.js (SURFACES, LANE_CHAT, or LANE_TEAMS), so not in the manifest.
     "src/content-outlook.js",
     "core/owa-parse.js",
     "src/chip-host.js",
     "src/content-whatsapp.js",
+    "src/content-teams.js",
+    "src/teams-parse.js",
+    "src/teams-lane-boot.js",
+    "src/teams-lane-spec.js",
+    "src/lane-teams-worker.js",
+    "core/teams-web-read.js",
 ]
 
 

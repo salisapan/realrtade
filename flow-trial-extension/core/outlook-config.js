@@ -48,7 +48,7 @@ const FlowOutlookConfig = {
     // is off until the owner turns it on.
     { id: 'sharepoint', label: 'SharePoint', detail: 'Create one empty Word or Excel file in the Glance folder of the SharePoint site a mail names, read it back, and Undo deletes it unless you edited it. Nothing is shared.', scopes: ['Sites.ReadWrite.All'], required: false },
     { id: 'contacts', label: 'Contacts', detail: 'Read contacts.', scopes: ['Contacts.Read'], required: false },
-    { id: 'teams', label: 'Teams', detail: 'Read chats you are in.', scopes: ['Chat.Read'], required: false }
+    { id: 'teams', label: 'Teams', detail: 'Glance reads the open one-to-one chat in Teams and only places a reply in the compose box. It never sends, and Undo removes any write it made.', scopes: ['Chat.Read'], required: false }
   ],
   // How far back one check looks, and how many messages per folder (newest first). A bounded window, not "the mailbox".
   LOOKBACK_DAYS: 14,
