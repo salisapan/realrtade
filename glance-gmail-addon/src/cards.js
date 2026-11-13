@@ -197,15 +197,23 @@ var GlanceCards = (function () {
     ]);
   }
 
-  function composeDoItButton(draftId, lang) {
-    return button(lang, 'doIt', 'onComposeDoIt', { draftId: String(draftId || ''), source: 'compose' });
+  function composeDoItButton(messageId, lang) {
+    return button(lang, 'doIt', 'onComposeDoIt', { messageId: String(messageId || ''), source: 'compose' });
   }
 
-  function composeProposal(preview, draftId, lang) {
+  function composeProposal(preview, messageId, lang) {
     var widgets = [text(lang, i18n().t(lang, 'draftReady'))];
     if (preview) widgets.push(text(lang, preview));
-    widgets.push(composeDoItButton(draftId, lang));
+    widgets.push(composeDoItButton(messageId, lang));
     return card(lang, widgets);
+  }
+
+  function composeNeedsReply(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'composeNeedsReply'))]);
+  }
+
+  function composeNoReply(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'composeNoReply'))]);
   }
 
   function composeInserted(preview, lang) {
@@ -248,6 +256,8 @@ var GlanceCards = (function () {
     quiet: quiet,
     composeProposal: composeProposal,
     composeInserted: composeInserted,
+    composeNeedsReply: composeNeedsReply,
+    composeNoReply: composeNoReply,
     spottedUnsupported: spottedUnsupported,
     planTypeLabel: planTypeLabel,
     homepage: homepage,

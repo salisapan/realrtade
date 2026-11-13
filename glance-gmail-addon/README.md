@@ -45,7 +45,7 @@ The homepage shows the next pending action when a prefetch cache returns one. Se
 - `https://www.googleapis.com/auth/script.locale` (the card language follows the Gmail locale)
 - `https://www.googleapis.com/auth/userinfo.email` (the reader's address)
 
-The card never sends. It does not ask for `gmail.modify`, `gmail.readonly`, `gmail.metadata`, `gmail.compose`, `gmail.send`, or any other full mailbox scope. No full `calendar` scope. If the Apps Script editor adds `https://www.googleapis.com/auth/calendar` when the Calendar service is enabled, delete that line and keep `calendar.events`. Compose Do it inserts the reply at the cursor through `UpdateDraftBodyAction`. It does not call `GmailApp.getDraft`. It does not read the draft back, and it does not undo that insert, because both would need a mailbox scope.
+The card never sends. It does not ask for `gmail.modify`, `gmail.readonly`, `gmail.metadata`, `gmail.compose`, `gmail.send`, or any other full mailbox scope. No full `calendar` scope. If the Apps Script editor adds `https://www.googleapis.com/auth/calendar` when the Calendar service is enabled, delete that line and keep `calendar.events`. Compose reads the replied-to message from `gmail.messageId` with the current-message token, then Do it inserts the reply at the cursor through `UpdateDraftBodyAction`. It does not call `GmailApp.getDraft` or `GmailApp.getThreadById`. A compose event with no message id says so. It does not read the draft back, and it does not undo that insert, because both would need a mailbox scope.
 
 ## Tests
 

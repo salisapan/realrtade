@@ -1,7 +1,10 @@
 // Glance card host for Gmail on the web and in the Gmail apps on iOS and Android.
 // Card Service only. Do it writes one task, one calendar hold, or a scheduled
 // event plus its reminder, then reads each write back.
-// A compose trigger inserts the reply at the cursor in the open draft.
+// A compose trigger reads the message being replied to (gmail.messageId plus
+// the current-message token) and inserts the reply at the cursor.
+// Google's Gmail event object has no draft id. A thread id alone is not read:
+// the token covers the open message, not the mailbox.
 // That insert is not read back. Reading or replacing the draft through the
 // Gmail message API needs a mailbox scope this card does not ask for.
 // Undo of that draft is not offered, because restoring it would overwrite an edit we cannot see.
@@ -29,21 +32,29 @@ function onHomepage(e) {
   }
 }
 
+function composeReplyId_(e) {
+  var gmail = e && e.gmail;
+  if (gmail && gmail.messageId) return String(gmail.messageId);
+  var params = e && e.parameters;
+  if (params && params.messageId) return String(params.messageId);
+  return '';
+}
+
 function onGmailCompose(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
   try {
-    if (!e || !e.gmail || !e.gmail.draftId) return [render_(Glance.cards.quiet(lang))];
-    var draftId = String(e.gmail.draftId);
-    var existing = readComposeInsert_(draftId);
+    var messageId = composeReplyId_(e);
+    if (!messageId) return [render_(Glance.cards.composeNeedsReply(lang))];
+    var existing = readComposeInsert_(messageId);
     if (existing && existing.preview) {
       return [render_(Glance.cards.composeInserted(existing.preview, lang))];
     }
     var opened = readOpen_(e, emptyRead_(e));
     if (!opened) throw readFail_('open', emptyRead_(e));
     var draftText = draftTextForOpen_(opened);
-    if (!draftText) return [render_(Glance.cards.quiet(lang))];
+    if (!draftText) return [render_(Glance.cards.composeNoReply(lang))];
     var preview = Glance.intent.sanitizeTitle(draftText).slice(0, 240);
-    return [render_(Glance.cards.composeProposal(preview, draftId, lang))];
+    return [render_(Glance.cards.composeProposal(preview, messageId, lang))];
   } catch (err) {
     errorLog_(err);
     return [render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose'))];
@@ -52,14 +63,16 @@ function onGmailCompose(e) {
 
 function onComposeDoIt(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
-  var draftId = e && e.parameters && e.parameters.draftId ? String(e.parameters.draftId) : (e && e.gmail && e.gmail.draftId ? String(e.gmail.draftId) : '');
-  if (!draftId) return update_(render_(Glance.cards.readError(lang, 'no-draft')));
+  var messageId = composeReplyId_(e);
+  if (!messageId) return update_(render_(Glance.cards.composeNeedsReply(lang)));
+  if (!e.gmail) e.gmail = {};
+  if (!e.gmail.messageId) e.gmail.messageId = messageId;
   try {
     var opened = readOpen_(e, emptyRead_(e));
     if (!opened) throw readFail_('open', emptyRead_(e));
     var draftText = draftTextForOpen_(opened);
-    if (!draftText) return update_(render_(Glance.cards.quiet(lang)));
-    saveComposeInsert_(draftId, { preview: Glance.intent.sanitizeTitle(draftText).slice(0, 240) });
+    if (!draftText) return update_(render_(Glance.cards.composeNoReply(lang)));
+    saveComposeInsert_(messageId, { preview: Glance.intent.sanitizeTitle(draftText).slice(0, 240) });
     return draftInsertResponse_(draftText);
   } catch (err) {
     errorLog_(err);

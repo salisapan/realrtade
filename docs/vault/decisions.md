@@ -2,6 +2,7 @@
 tags: [decisions]
 updated: 2026-10-28
 ---
+- 2026-11-13 · #222 live web Gate: the compose card reads the replied-to message from `gmail.messageId` and the current-message token, then Do it inserts at the cursor. A compose event with no message id says why. No mailbox scope. Gate: the previous install failed at compose; this head is not installed yet. · Cursor agent · `glance-gmail-addon/Code.js`, [[open-tasks]]
 - 2026-11-13 · #222 live Apps Script install: compose `draftAccess: METADATA` declares `gmail.addons.current.message.metadata`. Compose Do it inserts the reply at the cursor through `UpdateDraftBodyAction` and does not read or undo that draft, because both need a mailbox scope. Nothing sends. Gate: not run live. Not deployed. · Cursor agent · `glance-gmail-addon/appsscript.json`, `flow-landing/privacy.html`, [[open-tasks]]
 - 2026-10-28 · verify-ca1-r9 on PR #241: corpora assert `forms.body` absent (google-form, recurring-reminder-wiring, google-web-auth); `google-oauth-scopes-exact-corpus.cjs` pins `FlowGoogleConfig.SCOPES` ⊆ seven-scope allowlist; chat-draft fixture clock restored to 2026-10-14 (e2e patches Oct 27 in spec); restored `token-relay` + `understand.js` from merge base; D5 rows in `hebrew-weekday-explicit-date-corpus.cjs` and `intent-actions-corpus.cjs`; full corpus sweep wired in `verify_trial_install.py`. Gate: not run live.
 

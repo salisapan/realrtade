@@ -30,7 +30,9 @@ var GlanceI18n = (function () {
       grant: 'Grant permission',
       draftReady: 'Draft ready in Gmail.',
       draftInserted: 'Inserted at the cursor. Edit it in Gmail.',
-      draftNoUndo: 'Glance does not read this draft back, and does not undo it.'
+      draftNoUndo: 'Glance does not read this draft back, and does not undo it.',
+      composeNeedsReply: 'Open Glance from a reply. This compose has no message to read.',
+      composeNoReply: 'This message has no reply to insert.'
     },
     he: {
       doIt: 'בצע',
@@ -58,7 +60,9 @@ var GlanceI18n = (function () {
       grant: 'תנו הרשאה',
       draftReady: 'טיוטת תשובה מוכנה ב-Gmail.',
       draftInserted: 'הוכנס במקום הסמן. ערכו אותו ב-Gmail.',
-      draftNoUndo: 'Glance לא קורא את הטיוטה בחזרה, ולא מבטל אותה.'
+      draftNoUndo: 'Glance לא קורא את הטיוטה בחזרה, ולא מבטל אותה.',
+      composeNeedsReply: 'פתחו את Glance מתשובה. לכתיבה הזו אין הודעה לקרוא.',
+      composeNoReply: 'בהודעה הזו אין תשובה להכניס.'
     }
   };
 

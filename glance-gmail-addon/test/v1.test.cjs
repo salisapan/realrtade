@@ -1674,31 +1674,57 @@ console.log('\n--- message path parity ---');
     { errors: missingCalendar.errors, lines: missingLines, row: missingRow });
 
   reset();
+  const replyId = '16a2c177reply';
   const draftMsg = {
-    id: 'draft1',
-    threadId: 'threaddraft',
-    subject: 'Report',
+    id: replyId,
+    threadId: 'thread16a2',
+    subject: 'פגישה עם דנה',
     plain: 'Please send me the report by Friday.',
     html: quietHtml,
     from: 'Dana Levi <dana@meridian.com>',
     to: 'owner@ai.local.flow@gmail.com',
     date: new Date('2026-10-15T08:00:00Z')
   };
-  state.messages.draft1 = gmailMessage(draftMsg);
+  state.messages[replyId] = gmailMessage(draftMsg);
   let draftReads = 0;
+  let threadReads = 0;
   sandbox.GmailApp.getDraft = function () {
     draftReads += 1;
     throw new Error('getDraft needs a mailbox scope');
   };
+  sandbox.GmailApp.getThreadById = function () {
+    threadReads += 1;
+    throw new Error('getThreadById needs a mailbox scope');
+  };
   const composeEvent = {
-    gmail: { messageId: 'draft1', accessToken: 'token', threadId: 'threaddraft', draftId: 'draft-1' },
-    commonEventObject: { userLocale: 'en', timeZone: 'Etc/UTC' }
+    gmail: {
+      messageId: replyId,
+      threadId: 'thread16a2',
+      accessToken: 'token',
+      toRecipients: ['dana@meridian.com'],
+      ccRecipients: [],
+      bccRecipients: [],
+      subject: 'Re: פגישה עם דנה'
+    },
+    draftMetadata: {
+      toRecipients: ['dana@meridian.com'],
+      ccRecipients: [],
+      bccRecipients: [],
+      subject: 'Re: פגישה עם דנה'
+    },
+    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
   };
   const composeCard = openCompose(composeEvent)[0];
   const composeButtons = buttonsOf(composeCard);
-  check('compose offers one Do it for a reply-track mail', composeButtons.length === 1 && composeButtons[0].action === 'onComposeDoIt', { buttons: composeButtons, lines: linesOf(composeCard) });
+  check('a reply compose event offers בצע and does not say nothing to close',
+    composeButtons.length === 1 &&
+    composeButtons[0].action === 'onComposeDoIt' &&
+    composeButtons[0].text.indexOf('בצע') !== -1 &&
+    linesOf(composeCard).join('\n').indexOf('אין מה לסגור') === -1 &&
+    threadReads === 0,
+    { buttons: composeButtons, lines: linesOf(composeCard) });
   const inserted = composeDoIt(Object.assign({}, composeEvent, {
-    parameters: { draftId: 'draft-1', source: 'compose' }
+    parameters: { messageId: replyId, source: 'compose' }
   }));
   const insertedContent = inserted.draftAction && inserted.draftAction.contents && inserted.draftAction.contents[0];
   check('compose Do it inserts at the cursor and does not read the draft',
@@ -1714,9 +1740,27 @@ console.log('\n--- message path parity ---');
   const afterLines = linesOf(after).join('\n');
   check('compose does not offer Undo after insert',
     buttonsOf(after).length === 0 &&
-    afterLines.indexOf('does not undo') !== -1 &&
+    afterLines.indexOf('לא מבטל') !== -1 &&
     afterLines.indexOf('Handled') === -1,
     afterLines);
+  const bareCompose = openCompose({
+    gmail: {
+      threadId: 'thread-no-message',
+      toRecipients: ['dana@meridian.com'],
+      ccRecipients: [],
+      bccRecipients: [],
+      subject: 'Re: פגישה עם דנה'
+    },
+    draftMetadata: { toRecipients: ['dana@meridian.com'], subject: 'Re: פגישה עם דנה' },
+    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
+  })[0];
+  const bareLines = linesOf(bareCompose).join('\n');
+  check('a compose event with no message id says why',
+    buttonsOf(bareCompose).length === 0 &&
+    bareLines.indexOf('אין הודעה לקרוא') !== -1 &&
+    bareLines.indexOf('אין מה לסגור') === -1 &&
+    threadReads === 0,
+    bareLines);
   check('compose does not send', !/gmail\.send|sendEmail|Drafts\.send|MailApp|createDraft|\.send\(/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));
 }
 
