@@ -5,11 +5,16 @@ Glance closes open loops. Gmail is where it starts today.
 Source: `git log origin/claude/install-uiux-pro-max-skill-a4agox --since=2026-10-20` limited to `flow-trial-extension/core`, `flow-trial-extension/src`, `flow-trial-extension/manifest.json` and `glance-gmail-addon/`. Regenerate: `scripts/what-changed.sh 2026-10-20 > docs/glance-ai/shipped-in-code.md`.
 
 - Extension version in `manifest.json` on the branch: 0.9.56
-- Commits on the working branch that are not on `main`: 204. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
-- Lines changed in core, src and the add-on since `main`: 82 files changed, 9755 insertions(+), 632 deletions(-)
+- Commits on the working branch that are not on `main`: 212. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
+- Lines changed in core, src and the add-on since `main`: 87 files changed, 11927 insertions(+), 805 deletions(-)
 
 | Commit | When | What it changed in code | Files in core, src or the add-on |
 |---|---|---|---|
+| 731539af | 2026-11-14 | Decompose v1: merge several intentions into one card (core only, off) | core/README.md core/incoming-judge.js core/intent-decompose.js glance-gmail-addon/CoreBundle.js  |
+| f47eb242 | 2026-11-13 | Gate 176379c0: calendar hold event uses the meeting subject; description is not doubled (#290) | core/actions.js core/google-calendar.js core/incoming-judge.js core/intent.js  |
+| 62d49e3b | 2026-11-13 | iOS-1 Gmail add-on: compose trigger + fix failing tests (#222) | glance-gmail-addon/Code.js glance-gmail-addon/CoreBundle.js glance-gmail-addon/README.md glance-gmail-addon/appsscript.json  |
+| 07c6bc42 | 2026-11-13 | Gate f2e6f3ee: Hebrew self-mail meeting is a calendar hold; Tasks Do It keeps the due day (#289) | core/actions.js core/intent.js src/content-gmail.js src/google-lane-host.js  |
+| f2e6f3ee | 2026-11-13 | Google: detect revoked access; no false טופל חלקית after Drive save (#279) | src/background.js src/content-gmail.js src/google-lane-host.js src/google-web-auth.js  |
 | d7bc5a0c | 2026-11-13 | Follow loop: an ask with several parts stays open until its parts are answered | core/README.md core/follow-up.js core/outlook-sync.js src/follow.js  |
 | 2502747e | 2026-11-13 | Follow loop: a delivery failure is its own outcome (bounced) | core/README.md core/follow-up.js core/outlook-sync.js src/follow.js  |
 | b8ef96bf | 2026-11-13 | Direct-ask reader in one-to-one chats (WhatsApp, Messenger, Instagram, Teams) | core/README.md core/incoming-judge.js src/chat-task-card.js glance-gmail-addon/CoreBundle.js  |
