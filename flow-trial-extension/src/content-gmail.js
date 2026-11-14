@@ -71,6 +71,7 @@ function glanceUiCopy(kind) {
   if (kind === 'undo') return he ? 'בטל' : 'Undo';
   if (kind === 'undoAll') return he ? 'בטל הכל' : 'Undo all';
   if (kind === 'undoing') return he ? 'מבטל…' : 'Undoing…';
+  if (kind === 'undoneDocTrash') return he ? 'בוטל · המסמך הועבר לאשפה' : 'Undone · the document was moved to the trash';
   if (kind === 'tryAgain') return he ? 'נסה שוב' : 'Try again';
   if (kind === 'panelHead') return he ? 'מה עדיין פתוח' : 'Still open';
   return '';
@@ -2790,7 +2791,7 @@ function glanceUiCopy(kind) {
     } else if (kind === 'gmailDraft') {
       svg.appendChild(svgEl('rect', { x: 2, y: 3.5, width: 12, height: 9, rx: 1.5 }));
       svg.appendChild(svgEl('polyline', { points: '2.5,4 8,9 13.5,4' }));
-    } else if (kind === 'driveDoc' || kind === 'driveSheet' || kind === 'driveFile') {
+    } else if (kind === 'driveDoc' || kind === 'driveDocFull' || kind === 'driveSheet' || kind === 'driveFile') {
       svg.appendChild(svgEl('path', { d: 'M4 1.5 H9 L12.5 5 V14.5 H4 Z' }));
       svg.appendChild(svgEl('polyline', { points: '9,1.5 9,5 12.5,5' }));
     } else { // googleTask
@@ -3438,7 +3439,7 @@ function glanceUiCopy(kind) {
       closedLine: he ? 'המסמך מוכן לעיון — לא נשלח.' : 'Document ready to preview — not sent.',
       steps: [{
         id: 'full-doc',
-        kind: 'driveDoc',
+        kind: 'driveDocFull',
         label: 'Doc',
         hint: he ? 'יוצר מסמך מלא ב-Drive לעיון' : 'Create the full document in Drive for preview',
         dependsOn: null,
@@ -4147,16 +4148,16 @@ function glanceUiCopy(kind) {
     const base = { connectorId: action.kind, threadUrl: ctx.threadUrl };
     const priorUrl = prior && prior.url;
 
-    if (action.kind === 'driveDoc' || action.kind === 'driveSheet') {
+    if (action.kind === 'driveDoc' || action.kind === 'driveDocFull' || action.kind === 'driveSheet') {
       const built = ctx.googleBuilt;
       if (!built || built.blank) return null;
-      return Object.assign(base, {
-        params: {
-          title: built.title,
-          html: action.kind === 'driveDoc' ? built.html : null,
-          csv: action.kind === 'driveSheet' ? built.csv : null
-        }
-      });
+      const params = {
+        title: built.title,
+        html: (action.kind === 'driveDoc' || action.kind === 'driveDocFull') ? built.html : null,
+        csv: action.kind === 'driveSheet' ? built.csv : null
+      };
+      if (action.kind === 'driveDocFull' || (ctx && ctx.previewOnly)) params.fullDocument = true;
+      return Object.assign(base, { params: params });
     }
 
     // A repeating reminder (switch RECURRING_REMINDER, off): the title, the one rule and the first start travel.
@@ -4396,6 +4397,7 @@ function glanceUiCopy(kind) {
     driveFile: 'googleDriveSave',
     attachmentSave: 'googleDriveSave',
     driveDoc: 'googleDoc',
+    driveDocFull: 'googleDocFull',
     driveSheet: 'googleSheetAppend',
     driveNewFile: 'googleNewFile',
     calendarCallLink: 'googleEventCallLink',
@@ -4407,7 +4409,7 @@ function glanceUiCopy(kind) {
 
   function laneConnectorId(kind) {
     if (LANE_BY_KIND[kind]) return LANE_BY_KIND[kind];
-    if (kind === 'googleHold' || kind === 'googleLaneTask' || kind === 'googleDriveSave' || kind === 'googleDoc' || kind === 'googleSheetAppend' || kind === 'gmailCompose') return kind;
+    if (kind === 'googleHold' || kind === 'googleLaneTask' || kind === 'googleDriveSave' || kind === 'googleDoc' || kind === 'googleDocFull' || kind === 'googleSheetAppend' || kind === 'gmailCompose') return kind;
     return '';
   }
 
@@ -5135,7 +5137,7 @@ function glanceUiCopy(kind) {
         }
       }
       if (action && action.kind === 'calendar') logCalendarHold(calendarHoldOutcome(result.response));
-      if (action && action.kind === 'driveDoc' && ctx && ctx.previewOnly) logFullDocument(fullDocumentOutcome(result.response));
+      if (action && (action.kind === 'driveDocFull' || (action.kind === 'driveDoc' && ctx && ctx.previewOnly))) logFullDocument(fullDocumentOutcome(result.response));
       results.push(result);
       if (onStepDone) onStepDone(result, results.length, actions.length);
     }
@@ -5296,7 +5298,7 @@ function glanceUiCopy(kind) {
   function fullDocumentFailure(results, ctx) {
     if (!ctx || !ctx.previewOnly) return null;
     for (const r of results || []) {
-      if (!r || !r.action || r.action.kind !== 'driveDoc') continue;
+      if (!r || !r.action || (r.action.kind !== 'driveDoc' && r.action.kind !== 'driveDocFull')) continue;
       if (r.response && r.response.skipped) continue;
       const o = fullDocumentOutcome(r.response);
       if (o.result === 'failed') return { result: r, outcome: o };
@@ -5817,10 +5819,24 @@ function glanceUiCopy(kind) {
     undo.addEventListener('click', () => {
       undo.disabled = true;
       undo.textContent = he ? 'מבטל…' : 'Undoing…';
-      sendLaneUndo('googleDoc', response.ref).then((undone) => {
-        undo.textContent = undone && undone.ok ? (he ? 'בוטל' : 'Undone') : (undone && undone.error) || (he ? 'לא בוטל' : 'Undo failed');
+      sendLaneUndo('googleDocFull', response.ref).then((undone) => {
+        const word = (undone && undone.ok) ? (undone.reason || 'trashed') : ((undone && undone.reason) || 'failed');
+        try { console.log('[Glance] full-document undo ' + word); } catch (e) {}
         if (undone && undone.ok) {
+          const line = glanceUiCopy('undoneDocTrash') || (he ? 'בוטל · המסמך הועבר לאשפה' : 'Undone · the document was moved to the trash');
+          const written = done.querySelector('.flow-chip-written');
+          if (written) written.textContent = line;
+          undo.textContent = line;
           userContextEvent({ type: 'undo', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() });
+          return;
+        }
+        undo.disabled = false;
+        if (undone && undone.reason === 'user-edited') {
+          undo.textContent = he ? 'ערכת את המסמך. ביטול השאיר אותו.' : (glanceUiCopy('edited') || undone.error);
+        } else if (undone && undone.reason === 'unconfirmed') {
+          undo.textContent = he ? 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא.' : 'Could not confirm the document was unchanged, so it was left alone.';
+        } else {
+          undo.textContent = (he ? 'לא בוטל' : 'Undo failed');
         }
       });
     });
@@ -6054,7 +6070,7 @@ function glanceUiCopy(kind) {
       return;
     }
     if (!succeeded.length) {
-      const docPreview = results.find((r) => r.response && r.response.ok === true && r.response.preview === true && r.action && r.action.kind === 'driveDoc');
+      const docPreview = results.find((r) => r.response && r.response.ok === true && r.response.preview === true && r.action && (r.action.kind === 'driveDocFull' || r.action.kind === 'driveDoc'));
       if (docPreview) {
         showDocPreviewReceipt(host, chip, docPreview, ctx);
         return;
@@ -6494,7 +6510,7 @@ function glanceUiCopy(kind) {
         const next = (result.response && result.response.ok) ? (proved ? 'verified' : 'verifying') : 'failed';
         const hold = next !== 'failed' ? null
           : (result.action.kind === 'calendar' ? calendarHoldOutcome(result.response)
-            : (result.action.kind === 'driveDoc' && ctx && ctx.previewOnly ? fullDocumentOutcome(result.response) : null));
+            : ((result.action.kind === 'driveDocFull' || (result.action.kind === 'driveDoc' && ctx && ctx.previewOnly)) ? fullDocumentOutcome(result.response) : null));
         const why = next === 'failed' ? (hold && hold.result === 'failed' ? glanceShow(hold.line) : reasonMessage(result.response, ctx)) : null;
         host.__glanceSteps.setRow(result.action.id, next, why, hold && hold.result === 'failed' ? { blocker: true } : null);
       }
@@ -6513,7 +6529,7 @@ function glanceUiCopy(kind) {
           const o = calendarHoldOutcome({ ok: false, reason: 'unavailable' });
           logCalendarHold({ result: 'failed', reason: 'exception' });
           paintHoldError(host, chip, o, null);
-        } else if (ctx && ctx.previewOnly && liveSteps.some((s) => s && s.kind === 'driveDoc')) {
+        } else if (ctx && ctx.previewOnly && liveSteps.some((s) => s && (s.kind === 'driveDocFull' || s.kind === 'driveDoc'))) {
           const o = fullDocumentOutcome({ ok: false, reason: 'unavailable' });
           logFullDocument({ result: 'failed', reason: 'exception' });
           paintHoldError(host, chip, o, null);

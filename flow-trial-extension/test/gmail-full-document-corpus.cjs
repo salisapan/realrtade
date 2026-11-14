@@ -50,7 +50,7 @@ check('switch off → off', F.plan({ flags: {}, text: 'Please prepare a quote fo
 check('clear ask offers preview doc', plan('Please prepare a quote for Dana Cole at $3,900 titled "Floor 14".').action === 'offer');
 check('no price in mail still offers with placeholder', (() => {
   const p = plan('Please prepare a quote for Dana Cole titled "Floor 14".');
-  return p.action === 'offer' && p.built && p.built.html && p.built.html.indexOf(F.PRICE_PLACEHOLDER) !== -1;
+  return p.action === 'offer' && p.built && p.built.html && p.built.html.indexOf(F.placeholdersFor('en').amount) !== -1;
 })());
 check('Hebrew no-price ask without quoted title still offers with placeholder', (() => {
   const p = F.plan({
@@ -67,6 +67,10 @@ check('stray digit in title does not block price stripping', (() => {
   return invented.filled && !invented.filled.amount;
 })());
 
+check('worker keeps plan html on the write and logs write and undo',
+  /out\.html = html/.test(host) && /\[Glance\] full-document write /.test(host) && /\[Glance\] full-document undo /.test(host));
+check('receipt undo of a created Doc uses the trash copy',
+  /undoneDocTrash/.test(gmail) && /המסמך הועבר לאשפה/.test(gmail));
 check('worker imports style-profile for lane writes', /style-profile\.js/.test(host));
 check('googleDocFull verify uses Drive files API', /connectorId === 'googleDocFull'/.test(host) && /drive\/v3\/files/.test(host));
 check('gmail-new-file verify regex restored', /google\(DriveSave\|Doc\|SheetAppend\|NewFile\)/.test(host));

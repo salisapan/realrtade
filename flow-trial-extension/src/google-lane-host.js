@@ -34,6 +34,44 @@ const RECONNECT_KEY = 'googleReconnect';
 const RECONNECT_LABEL = 'חבר מחדש את Google';
 let laneSource = 'chrome';
 
+function isFullDocumentLane(connectorId, bag) {
+  if (connectorId === 'googleDocFull') return true;
+  return !!(bag && (bag.fullDocument === true || (bag.params && bag.params.fullDocument === true)));
+}
+
+function emitFullDocumentLog(line) {
+  try { console.log(line); } catch (e) {}
+  try {
+    const e2e = globalThis.__glanceE2e;
+    if (e2e) (e2e.fullDocumentLogs || (e2e.fullDocumentLogs = [])).push(line);
+  } catch (e) {}
+}
+
+function logFullDocumentWrite(connectorId, input, result) {
+  if (!isFullDocumentLane(connectorId, input)) return;
+  const o = result || {};
+  let word;
+  let reason;
+  if (o.ok === true) {
+    word = 'created';
+    reason = o.proof && o.proof.fetchedBack === true ? 'verified' : 'unproved';
+  } else {
+    word = 'failed';
+    reason = o.reason || 'failed';
+    if (reason === 'drive-not-granted' || reason === 'missing-scope') reason = 'drive-scope-missing';
+  }
+  emitFullDocumentLog('[Glance] full-document write ' + word + ' ' + reason);
+  if (o.googleReason) {
+    emitFullDocumentLog('[Glance] full-document google ' + o.googleReason);
+  }
+}
+
+function logFullDocumentUndo(connectorId, ref, result) {
+  if (!isFullDocumentLane(connectorId, ref)) return;
+  const word = (result && result.ok === true) ? (result.reason || 'trashed') : ((result && result.reason) || 'failed');
+  emitFullDocumentLog('[Glance] full-document undo ' + word);
+}
+
 // The token of the account the person consented to in Glance, and only that.
 // The stored Connect token and Chrome's own token are both read, each one's
 // account comes from the openid/userinfo email claim, and the account recorded at Connect
@@ -668,17 +706,25 @@ async function guardedWrite(connectorId, input, ctx) {
   activeTab = c.tab || '';
   const picked = await laneCredential(c.tab);
   if (!picked.ok && picked.consentRevoked) {
-    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => ({
-      ok: false,
-      reason: 'not-connected',
-      needsReconnect: true,
-      reconnectLabel: reconnectWords(),
-      error: statusLanguage() === 'he' ? 'חבר מחדש את Google כדי להמשיך.' : 'Reconnect Google to continue.',
-      written: '',
-      proof: null
-    }));
+    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => {
+      const out = {
+        ok: false,
+        reason: 'not-connected',
+        needsReconnect: true,
+        reconnectLabel: reconnectWords(),
+        error: statusLanguage() === 'he' ? 'חבר מחדש את Google כדי להמשיך.' : 'Reconnect Google to continue.',
+        written: '',
+        proof: null
+      };
+      logFullDocumentWrite(connectorId, input, out);
+      return out;
+    });
   }
-  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked, null, c.lang);
+  if (!picked.ok && picked.reason !== 'no-token') {
+    const out = wrongAccountResult(picked, null, c.lang);
+    logFullDocumentWrite(connectorId, input, out);
+    return out;
+  }
   // A Doc needs drive.file. A grant known to lack it is not sent to Google:
   // the card asks Reconnect, and Reconnect asks Google's consent for it.
   if (connectorId === 'googleDoc' || connectorId === 'googleDocFull') {
@@ -686,7 +732,7 @@ async function guardedWrite(connectorId, input, ctx) {
     const scopes = await storedGrantedScopes();
     if (Config && typeof Config.hasScope === 'function' && Config.hasScope(scopes, Config.SCOPE_DRIVE_FILE) === false) {
       await noteGoogleAuthFailure('missing scope');
-      return {
+      const out = {
         ok: false,
         reason: 'drive-not-granted',
         missingScope: 'drive.file',
@@ -695,10 +741,13 @@ async function guardedWrite(connectorId, input, ctx) {
         written: '',
         proof: null
       };
+      logFullDocumentWrite(connectorId, input, out);
+      return out;
     }
   }
   const result = await writeWithListRecovery(connectorId, input, picked.ok ? picked : null);
   if (result && picked.ok && result.ok !== undefined) result.account = picked.email;
+  logFullDocumentWrite(connectorId, input, result);
   return result;
 }
 
@@ -707,17 +756,27 @@ async function guardedUndo(connectorId, ref, ctx) {
   activeTab = c.tab || '';
   const picked = await laneCredential(c.tab);
   if (!picked.ok && picked.consentRevoked) {
-    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => ({
-      ok: false,
-      reason: 'not-connected',
-      needsReconnect: true,
-      reconnectLabel: reconnectWords(),
-      proof: null
-    }));
+    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => {
+      const out = {
+        ok: false,
+        reason: 'not-connected',
+        needsReconnect: true,
+        reconnectLabel: reconnectWords(),
+        proof: null
+      };
+      logFullDocumentUndo(connectorId, ref, out);
+      return out;
+    });
   }
-  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked, null, c.lang);
+  if (!picked.ok && picked.reason !== 'no-token') {
+    const out = wrongAccountResult(picked, null, c.lang);
+    logFullDocumentUndo(connectorId, ref, out);
+    return out;
+  }
   const prepared = await prepareUndo(connectorId, ref);
-  return Lane.undo(connectorId, prepared);
+  const result = await Lane.undo(connectorId, prepared);
+  logFullDocumentUndo(connectorId, prepared || ref, result);
+  return result;
 }
 
 function csvRow(csv) {
@@ -817,15 +876,19 @@ async function prepareWrite(connectorId, input, cred) {
   }
   if (connectorId === 'googleDriveSave') return i;
   if (connectorId === 'googleDoc' || connectorId === 'googleDocFull') {
-    const text = params.text || i.text || plainText(params.html || i.html || '');
+    const html = params.html || i.html || '';
+    const text = params.text || i.text || (html ? plainText(html) : '');
     const documentId = i.documentId || params.documentId || '';
-    return {
+    const out = {
       title: params.title || i.title || 'Note',
       name: params.title || i.title || 'Note',
       text: text,
       documentId: documentId,
       origin: documentId ? (i.origin || params.origin || 'picked') : 'created'
     };
+    if (html) out.html = html;
+    if (i.fullDocument === true || params.fullDocument === true || connectorId === 'googleDocFull') out.fullDocument = true;
+    return out;
   }
   if (connectorId === 'googleSheetAppend') {
     const spreadsheetId = i.spreadsheetId || params.spreadsheetId || '';

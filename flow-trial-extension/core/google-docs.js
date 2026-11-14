@@ -41,8 +41,25 @@ const FlowGoogleDocs = (() => {
     return s;
   }
 
+  function htmlToPlain(html) {
+    return String(html || '')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|h1|h2|h3|li|div|tr|table|ul|ol)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+  }
+
   function textOf(input) {
-    const text = String((input && input.text) || '').replace(/\u0000/g, '');
+    const raw = String((input && input.text) || '').replace(/\u0000/g, '');
+    const fromHtml = raw.trim() ? raw : htmlToPlain(input && input.html);
+    const text = String(fromHtml || '').replace(/\u0000/g, '');
     if (!text.trim() || text.length > 8000) return '';
     return text;
   }
@@ -65,13 +82,31 @@ const FlowGoogleDocs = (() => {
   }
 
   // UTF-8 HTML so Hebrew (and any other script) renders in the Doc. dir=rtl
-  // when the text has Hebrew; otherwise ltr.
-  function asHtml(text) {
-    const rtl = hasHebrew(text);
+  // when the text has Hebrew; otherwise ltr. Block elements so Google Docs
+  // import keeps paragraphs instead of collapsing them into one line.
+  function wrapDocHtml(inner, textHint) {
+    const src = String(inner || '').trim();
+    const rtl = hasHebrew(src) || hasHebrew(textHint);
     const dir = rtl ? 'rtl' : 'ltr';
     const lang = rtl ? 'he' : 'en';
-    const body = escapeHtml(text).replace(/\r\n|\r|\n/g, '<br>\n');
-    return '<!DOCTYPE html><html dir="' + dir + '" lang="' + lang + '"><head><meta charset="UTF-8"></head><body dir="' + dir + '">' + body + '</body></html>';
+    if (/<html[\s>]/i.test(src)) {
+      let out = src;
+      if (!/<meta[^>]+charset/i.test(out)) {
+        out = out.replace(/<head([^>]*)>/i, '<head$1><meta charset="UTF-8">');
+        if (!/<head[\s>]/i.test(out)) out = out.replace(/<html([^>]*)>/i, '<html$1><head><meta charset="UTF-8"></head>');
+      }
+      if (!/\sdir=/i.test(out)) out = out.replace(/<html([^>]*)>/i, '<html dir="' + dir + '" lang="' + lang + '"$1>');
+      if (!/<body[^>]*\sdir=/i.test(out)) out = out.replace(/<body([^>]*)>/i, '<body dir="' + dir + '"$1>');
+      return out;
+    }
+    return '<!DOCTYPE html><html dir="' + dir + '" lang="' + lang + '"><head><meta charset="UTF-8"></head><body dir="' + dir + '">' + src + '</body></html>';
+  }
+
+  function asHtml(text) {
+    const blocks = String(text || '').split(/\r\n|\r|\n/).map(function (line) {
+      return '<p>' + escapeHtml(line) + '</p>';
+    });
+    return wrapDocHtml(blocks.join('') || '<p></p>', text);
   }
 
   function utf8Bytes(s) {
@@ -306,7 +341,7 @@ const FlowGoogleDocs = (() => {
     }
     const name = safeName(i.name || i.title || 'Note');
     if (!name) return { ok: false, reason: 'unclear' };
-    return createAndRead(name, text, http, clock);
+    return createAndRead(name, text, i.html, http, clock, i.fullDocument ? { fullDocument: true } : null);
   }
 
   // The Glance folder is one this lane made, so drive.file can see it.
@@ -334,11 +369,11 @@ const FlowGoogleDocs = (() => {
     return { ok: true, id: '' };
   }
 
-  async function createAndRead(name, text, http, clock) {
+  async function createAndRead(name, text, htmlIn, http, clock, extraRef) {
     const C = cfg();
     const folder = await glanceFolder(http);
     if (folder && folder.ok === false) return folder;
-    const html = asHtml(text);
+    const html = htmlIn ? wrapDocHtml(htmlIn, text) : asHtml(text);
     const packed = multipart(
       Object.assign({ name: name, mimeType: DOC_MIME }, folder && folder.id ? { parents: [folder.id] } : {}),
       'text/html; charset=UTF-8',
@@ -389,12 +424,14 @@ const FlowGoogleDocs = (() => {
     const link = docLink(got.json, file.id);
     base.url = link;
     const proof = C && C.proofOf(SYSTEM, file.id, link, C.clockIso(clock));
-    const ref = {
+    const ref = Object.assign({
       documentId: file.id,
       externalId: file.id,
       created: true,
+      name: (got.json && got.json.name) || name,
+      contentText: normalizeText(exportedText),
       snapshot: fileSnapshot(got.json)
-    };
+    }, extraRef || {});
     if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: ref, proof: null }, base);
     return Object.assign({ ok: true, ref: ref, proof: proof }, base);
   }
@@ -405,11 +442,20 @@ const FlowGoogleDocs = (() => {
     if (ref.created === true) {
       const got = await call(http, { method: 'GET', url: fileUrl(id) });
       if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
-      if (got.status === 404) return { ok: true, written: 'Doc removed.' };
+      if (got.status === 404) return { ok: true, reason: 'trashed', written: 'Doc removed.' };
       if (!got.ok || got.status === 0) return unconfirmedResult();
-      const verdict = unchanged(ref.snapshot, got.json);
-      if (verdict === 'edited') return editedResult();
-      if (verdict !== 'match') return unconfirmedResult();
+      if (got.json && got.json.trashed === true) return { ok: true, reason: 'trashed', written: 'Doc removed.' };
+      if (ref.name && got.json && got.json.name && String(got.json.name) !== String(ref.name)) return editedResult();
+      const want = normalizeText(ref.contentText || '');
+      if (want) {
+        const exported = await call(http, {
+          method: 'GET',
+          url: FILES + '/' + encodeURIComponent(id) + '/export?mimeType=' + encodeURIComponent('text/plain')
+        });
+        if (exported.status === 401 || exported.status === 403) return { ok: false, reason: 'not-connected' };
+        if (!exported.ok || exported.status === 0) return unconfirmedResult();
+        if (normalizeText(exported.text || '') !== want) return editedResult();
+      }
       const del = await call(http, {
         method: 'PATCH',
         url: FILES + '/' + encodeURIComponent(id),
@@ -417,7 +463,7 @@ const FlowGoogleDocs = (() => {
         body: JSON.stringify({ trashed: true })
       });
       if (del.status === 401 || del.status === 403) return { ok: false, reason: 'not-connected' };
-      if (del.ok || del.status === 204 || del.status === 404) return { ok: true, written: 'Doc removed.' };
+      if (del.ok || del.status === 204 || del.status === 404) return { ok: true, reason: 'trashed', written: 'Doc removed.' };
       return { ok: false, reason: 'http-' + del.status };
     }
     const inserted = ref.inserted ? String(ref.inserted) : '';
@@ -478,6 +524,8 @@ const FlowGoogleDocs = (() => {
     write: write,
     undo: undo,
     asHtml: asHtml,
+    wrapDocHtml: wrapDocHtml,
+    htmlToPlain: htmlToPlain,
     FOLDER_NAME: FOLDER_NAME
   };
 })();

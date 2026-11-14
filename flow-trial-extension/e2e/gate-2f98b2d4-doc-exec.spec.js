@@ -15,8 +15,8 @@ const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer, GOOGLE_403_SCOPE, GOOGLE_403_DRIVE_DISABLED } = require('./support/google-lane-server');
 
 const SELF = 'ai.local.flow@gmail.com';
-const SUBJECT = '[G-Quote] בקשה להצעת מחיר לאתר חדש 13/11';
-const BODY = 'היי, אפשר לקבל הצעת מחיר מסודרת לבניית אתר תדמית של 5 עמודים? תודה, רוני';
+const SUBJECT = '[G-Quote] בקשה להצעת מחיר לאתר חדש 14/11';
+const BODY = 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק. 5 עמודים, טופס יצירת קשר ובלוג. תודה';
 const DOC_MIME = 'application/vnd.google-apps.document';
 const DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
 const ALL_SCOPES = [
@@ -52,9 +52,11 @@ async function openQuote(glance, seed) {
   });
   const lines = [];
   page.on('console', (m) => { const t = m.text(); if (t.indexOf('[Glance] full-document') === 0) lines.push(t); });
+  await glance.evaluateWorker(() => { if (globalThis.__glanceE2e) globalThis.__glanceE2e.fullDocumentLogs = []; });
+  const workerLines = () => glance.evaluateWorker(() => (globalThis.__glanceE2e && globalThis.__glanceE2e.fullDocumentLogs) || []);
   const host = page.locator('[data-legacy-message-id="' + id + '"] .flow-chip-host');
   await expect(host).toContainText('טיוטת הצעת מחיר', { timeout: 20000 });
-  return { page, host, lines };
+  return { page, host, lines, workerLines };
 }
 
 const creates = () => server.calls.filter((c) => c.method === 'POST' && (c.path === '/drive/v3/files' || c.path.indexOf('/upload/drive/v3/files') === 0));
@@ -86,7 +88,7 @@ async function armWebConsent(glance, grantedScopes) {
 }
 
 test('granted: Do It creates one Google Doc with the quote, verified, and Undo trashes it', async ({ glance }) => {
-  const { page, host, lines } = await openQuote(glance);
+  const { page, host, lines, workerLines } = await openQuote(glance);
   await host.locator('button.flow-chip').click();
   await expect(page.locator('div[role="main"] .flow-chip-done')).toBeVisible({ timeout: 20000 });
   expect(docCreates()).toHaveLength(1);
@@ -94,8 +96,20 @@ test('granted: Do It creates one Google Doc with the quote, verified, and Undo t
   expect(created.path.indexOf('/upload/drive/v3/files')).toBe(0);
   expect(created.search).toContain('uploadType=multipart');
   expect(created.media).toContain('charset="UTF-8"');
-  expect(created.media).toContain('dir="rtl"');
+  expect(created.media).toContain('<html dir="rtl" lang="he">');
+  expect(created.media).toContain('<p>');
+  expect(created.media).toContain('<h1>');
   expect(created.media).toContain('הצעת מחיר');
+  expect(created.media).toContain('5 עמודים');
+  expect(created.media).toContain('טופס יצירת קשר');
+  expect(created.media).toContain('בלוג');
+  expect(created.media).toContain('לקוח:');
+  expect(created.media).toContain('[לא צוין לקוח]');
+  expect(created.media).not.toContain('Party:');
+  expect(created.media).not.toContain('Amount:');
+  expect(created.media).not.toContain('Title:');
+  expect(created.media).not.toContain('[לקוח / party]');
+  expect(created.media).not.toContain('[מחיר / price]');
   const id = server.last.doc;
   expect(server.calls.some((c) => /docs\.googleapis|\/v1\/documents\//.test(c.path))).toBe(false);
   expect(server.calls.filter((c) => c.method === 'GET' && c.path === '/drive/v3/files/' + id + '/export' && /mimeType=text%2Fplain/.test(c.search))).toHaveLength(1);
@@ -106,16 +120,20 @@ test('granted: Do It creates one Google Doc with the quote, verified, and Undo t
   await expect(open).toHaveText('פתח ב-Docs');
   await expect(open).toHaveAttribute('href', 'https://docs.google.com/document/d/' + id + '/edit');
   await expect.poll(() => lines).toContain('[Glance] full-document write created verified');
+  await expect.poll(workerLines).toContain('[Glance] full-document write created verified');
   await expect(host.locator('.flow-chip-hold-error')).toHaveCount(0);
   expect(server.calls.some((c) => /\/gmail\/v1\/users\/me\/messages\/send|\/drafts\/send/.test(c.path))).toBe(false);
   await page.locator('div[role="main"] button.flow-chip-undo').click();
   await expect.poll(() => trashes(id).length).toBe(1);
   expect(server.file(id).trashed).toBe(true);
+  await expect(page.locator('div[role="main"] .flow-chip-done')).toContainText('בוטל · המסמך הועבר לאשפה');
+  await expect.poll(workerLines).toContain('[Glance] full-document undo trashed');
+  await expect.poll(() => lines).toContain('[Glance] full-document undo trashed');
 });
 
 test('Drive API off in the Cloud project: a Hebrew line names it, no Reconnect loop, no leftover file', async ({ glance }) => {
   server.forbid('drive/v3', '', GOOGLE_403_DRIVE_DISABLED);
-  const { host, lines } = await openQuote(glance);
+  const { host, lines, workerLines } = await openQuote(glance);
   await host.locator('button.flow-chip').click();
   const alert = host.locator('.flow-chip-hold-error');
   await expect(alert).toBeVisible({ timeout: 20000 });
@@ -131,6 +149,8 @@ test('Drive API off in the Cloud project: a Hebrew line names it, no Reconnect l
   expect(server.calls.some((c) => /docs\.googleapis|\/v1\/documents\//.test(c.path))).toBe(false);
   await expect.poll(() => lines).toContain('[Glance] full-document write failed drive-api-disabled');
   await expect.poll(() => lines).toContain('[Glance] full-document google SERVICE_DISABLED');
+  await expect.poll(workerLines).toContain('[Glance] full-document write failed drive-api-disabled');
+  await expect.poll(workerLines).toContain('[Glance] full-document google SERVICE_DISABLED');
   const bag = await glance.storage();
   expect(bag.googleReconnect || null).toBe(null);
   expect(bag.googleLastDenial && bag.googleLastDenial.kind).toBe('api-disabled');
@@ -139,7 +159,7 @@ test('Drive API off in the Cloud project: a Hebrew line names it, no Reconnect l
 
 test('missing drive.file: the line names the Drive permission, Reconnect asks Google consent for drive.file, then one Doc', async ({ glance }) => {
   server.forbid('/drive/v3/files', 'POST', GOOGLE_403_SCOPE);
-  const { page, host, lines } = await openQuote(glance);
+  const { page, host, lines, workerLines } = await openQuote(glance);
   await host.locator('button.flow-chip').click();
   const alert = host.locator('.flow-chip-hold-error');
   await expect(alert).toBeVisible({ timeout: 20000 });
@@ -150,6 +170,7 @@ test('missing drive.file: the line names the Drive permission, Reconnect asks Go
   const reconnect = host.locator('.flow-chip-reconnect');
   await expect(reconnect).toHaveText('חבר מחדש את Google');
   await expect.poll(() => lines).toContain('[Glance] full-document write failed drive-scope-missing');
+  await expect.poll(workerLines).toContain('[Glance] full-document write failed drive-scope-missing');
   expect(docCreates()).toHaveLength(0);
   expect(creates().filter((c) => c.denied === 403).length).toBeGreaterThan(0);
   expect(Object.keys(server.files()).filter((id) => server.file(id).mimeType === DOC_MIME)).toEqual([]);
@@ -183,10 +204,11 @@ test('missing drive.file: the line names the Drive permission, Reconnect asks Go
   expect(docCreates()).toHaveLength(1);
   expect(creates().filter((c) => c.denied === 403).length).toBeGreaterThan(0);
   await expect.poll(() => lines).toContain('[Glance] full-document write created verified');
+  await expect.poll(workerLines).toContain('[Glance] full-document write created verified');
 });
 
 test('a grant known to lack drive.file never calls Drive, and a consent that still leaves Drive unticked is not a connection', async ({ glance }) => {
-  const { host, lines } = await openQuote(glance);
+  const { host, lines, workerLines } = await openQuote(glance);
   const partial = ALL_SCOPES.filter((s) => s !== DRIVE_FILE);
   await glance.evaluateWorker((granted) => chrome.storage.local.set({
     googleGrantedScopes: { version: granted.concat(['https://www.googleapis.com/auth/drive.file']).sort().join('\n'), granted: granted, missing: ['https://www.googleapis.com/auth/drive.file'], status: 'asked', source: 'web', at: Date.now() }
@@ -196,6 +218,7 @@ test('a grant known to lack drive.file never calls Drive, and a consent that sti
   await expect(alert).toBeVisible({ timeout: 20000 });
   await expect(alert).toHaveAttribute('data-glance-hold-reason', 'drive-scope-missing');
   await expect.poll(() => lines).toContain('[Glance] full-document write failed drive-scope-missing');
+  await expect.poll(workerLines).toContain('[Glance] full-document write failed drive-scope-missing');
   expect(creates()).toHaveLength(0);
 
   await armWebConsent(glance, partial);

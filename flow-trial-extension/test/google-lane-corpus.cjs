@@ -278,9 +278,31 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
     packed.indexOf('"parents":["folder-glance"]') >= 0 &&
     packed.indexOf('charset=UTF-8') >= 0 &&
     packed.indexOf(docText) >= 0 &&
-    packed.indexOf('dir="ltr"') >= 0);
+    packed.indexOf('dir="ltr"') >= 0 &&
+    packed.indexOf('<p>') >= 0);
   const heHtml = Docs.asHtml(heText);
-  check('Hebrew HTML is UTF-8 and dir=rtl', heHtml.indexOf('charset="UTF-8"') >= 0 && heHtml.indexOf('dir="rtl"') >= 0 && heHtml.indexOf('lang="he"') >= 0 && heHtml.indexOf(heText) >= 0);
+  check('Hebrew HTML is UTF-8 and dir=rtl', heHtml.indexOf('charset="UTF-8"') >= 0 && heHtml.indexOf('dir="rtl"') >= 0 && heHtml.indexOf('lang="he"') >= 0 && heHtml.indexOf(heText) >= 0 && heHtml.indexOf('<p>') >= 0);
+  const quoteHtml = '<h1>הצעת מחיר — אתר חדש</h1><p>שלום,</p><p><strong>לקוח:</strong> [לא צוין לקוח]</p><ul><li>5 עמודים</li><li>בלוג</li></ul><p>בברכה,</p>';
+  const fromHtml = scripted([
+    { status: 200, ok: true, json: { files: [] } },
+    { status: 200, ok: true, json: { id: 'folder-glance', name: 'Glance' } },
+    { status: 200, ok: true, json: Object.assign({}, FILE_SNAP, { id: 'doc-html' }) },
+    { status: 200, ok: true, json: Object.assign({}, FILE_SNAP, { id: 'doc-html' }) },
+    { status: 200, ok: true, json: null, text: Docs.htmlToPlain(quoteHtml) }
+  ]);
+  const htmlDoc = await Docs.write({ scopes: Cfg.SCOPES, name: 'Receipt', html: quoteHtml, fullDocument: true }, fromHtml.http, CLOCK);
+  const htmlPacked = Buffer.from(fromHtml.calls[2].body).toString('utf8');
+  check('a write with html keeps block elements, RTL and Hebrew labels',
+    htmlDoc.ok === true && htmlDoc.ref.fullDocument === true &&
+    htmlPacked.indexOf('<html dir="rtl" lang="he">') >= 0 &&
+    htmlPacked.indexOf('<meta charset="UTF-8">') >= 0 &&
+    htmlPacked.indexOf('<h1>') >= 0 &&
+    htmlPacked.indexOf('<ul>') >= 0 &&
+    htmlPacked.indexOf('5 עמודים') >= 0 &&
+    htmlPacked.indexOf('לקוח:') >= 0 &&
+    htmlPacked.indexOf('Party:') < 0 &&
+    htmlPacked.indexOf('Amount:') < 0 &&
+    htmlPacked.indexOf('Title:') < 0, htmlDoc);
   check('doc calls stay off gmail, off the Docs API, and off a documents scope', noGmail(created.calls) && created.calls.every((c) => c.url.indexOf('docs.googleapis.com') < 0 && c.url.indexOf('/auth/documents') < 0));
   const driveOff = scripted([
     { status: 403, ok: false, json: { error: { code: 403, message: 'Google Drive API has not been used in project 93977330357 before or it is disabled.', status: 'PERMISSION_DENIED', details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com', metadata: { service: 'drive.googleapis.com' } }] } } }
@@ -289,25 +311,40 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   check('a Drive SERVICE_DISABLED is named and leaves no file', driveOffRes.ok === false && driveOffRes.reason === 'drive-api-disabled' && driveOffRes.googleReason === 'SERVICE_DISABLED' && driveOffRes.service === 'drive.googleapis.com' && driveOff.calls.length === 1 && driveOff.calls[0].method === 'GET', driveOffRes);
 
   const docTrash = scripted([
-    { status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP) },
+    { status: 200, ok: true, json: Object.assign({ id: 'doc1', name: 'Receipt', trashed: false }, SNAP) },
+    { status: 200, ok: true, json: null, text: docText },
     { status: 200, ok: true, json: { trashed: true } }
   ]);
   const docUndo = await Docs.undo(doc.ref, docTrash.http);
-  check('undo of a created doc reads the file snapshot, then trashes it', docUndo.ok === true && docTrash.calls[0].method === 'GET' && docTrash.calls[0].url.indexOf('headRevisionId') >= 0 && docTrash.calls[1].method === 'PATCH', docUndo);
-  const docEdited = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP, { headRevisionId: 'rev-edited', version: '2' }) }]);
+  check('undo of a created doc exports the written text, then trashes it', docUndo.ok === true && docUndo.reason === 'trashed' && docTrash.calls[0].method === 'GET' && docTrash.calls[1].method === 'GET' && docTrash.calls[1].url.indexOf('/export') >= 0 && docTrash.calls[2].method === 'PATCH', docUndo);
+  const docEdited = scripted([
+    { status: 200, ok: true, json: Object.assign({ id: 'doc1', name: 'Receipt', trashed: false }, SNAP, { headRevisionId: 'rev-edited', version: '2' }) },
+    { status: 200, ok: true, json: null, text: docText + ' Edited.' }
+  ]);
   const docRefused = await Docs.undo(doc.ref, docEdited.http);
-  check('undo of a created doc refuses an edited file and does not trash it', docRefused.ok === false && docRefused.reason === 'user-edited' && docRefused.error === 'You edited this. Undo left it alone.' && docEdited.calls.length === 1 && docEdited.calls[0].method === 'GET', docRefused);
+  check('undo of a created doc refuses an edited file and does not trash it', docRefused.ok === false && docRefused.reason === 'user-edited' && docRefused.error === 'You edited this. Undo left it alone.' && docEdited.calls.length === 2 && docEdited.calls[0].method === 'GET' && docEdited.calls[1].url.indexOf('/export') >= 0 && !docEdited.calls.some((c) => c.method === 'PATCH'), docRefused);
   const docDown = scripted([{ status: 500, ok: false, json: null }]);
   const docUnread = await Docs.undo(doc.ref, docDown.http);
   check('doc undo refuses when the read fails and does not trash', docUnread.ok === false && docUnread.reason === 'unconfirmed' && docUnread.error === "Couldn't confirm it's unchanged. Undo left it alone." && docDown.calls.length === 1, docUnread);
-  const docNoSnap = await Docs.undo(Object.assign({}, doc.ref, { snapshot: null }), scripted([{ status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP) }]).http);
-  check('doc undo without a snapshot does not trash', docNoSnap.ok === false && docNoSnap.reason === 'unconfirmed', docNoSnap);
-  const docTimeOnly = scripted([{ status: 200, ok: true, json: { id: 'doc1', trashed: false, headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } }]);
-  const docTimeRefused = await Docs.undo(Object.assign({}, doc.ref, { snapshot: { headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } }), docTimeOnly.http);
-  check('doc undo refuses a modifiedTime match when version is missing and does not trash', docTimeRefused.ok === false && docTimeRefused.reason === 'unconfirmed' && docTimeRefused.error === "Couldn't confirm it's unchanged. Undo left it alone." && docTimeOnly.calls.length === 1, docTimeRefused);
-  const docVersion = scripted([{ status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP, { version: '4' }) }]);
-  const docVersionRefused = await Docs.undo(doc.ref, docVersion.http);
-  check('doc undo refuses a version mismatch and does not trash', docVersionRefused.ok === false && docVersionRefused.reason === 'user-edited' && docVersionRefused.error === 'You edited this. Undo left it alone.' && docVersion.calls.length === 1, docVersionRefused);
+  const docNoSnap = scripted([
+    { status: 200, ok: true, json: Object.assign({ id: 'doc1', name: 'Receipt', trashed: false }, SNAP) },
+    { status: 200, ok: true, json: null, text: docText },
+    { status: 200, ok: true, json: { trashed: true } }
+  ]);
+  const docNoSnapUndo = await Docs.undo(Object.assign({}, doc.ref, { snapshot: null }), docNoSnap.http);
+  check('doc undo without a snapshot still trashes when the exported text matches', docNoSnapUndo.ok === true && docNoSnapUndo.reason === 'trashed' && docNoSnap.calls[2].method === 'PATCH', docNoSnapUndo);
+  const docOpened = scripted([
+    { status: 200, ok: true, json: Object.assign({ id: 'doc1', name: 'Receipt', trashed: false }, SNAP, { version: '4', headRevisionId: 'rev-open', modifiedTime: '2026-11-14T16:22:00.000Z' }) },
+    { status: 200, ok: true, json: null, text: docText },
+    { status: 200, ok: true, json: { trashed: true } }
+  ]);
+  const docOpenedUndo = await Docs.undo(doc.ref, docOpened.http);
+  check('doc undo still trashes after a conversion or open that only bumps metadata', docOpenedUndo.ok === true && docOpenedUndo.reason === 'trashed' && docOpened.calls[1].url.indexOf('/export') >= 0 && docOpened.calls[2].method === 'PATCH', docOpenedUndo);
+  const docRenamed = scripted([
+    { status: 200, ok: true, json: Object.assign({ id: 'doc1', name: 'Renamed', trashed: false }, SNAP) }
+  ]);
+  const docRenamedUndo = await Docs.undo(doc.ref, docRenamed.http);
+  check('doc undo refuses a renamed file and does not trash', docRenamedUndo.ok === false && docRenamedUndo.reason === 'user-edited' && docRenamed.calls.length === 1 && !docRenamed.calls.some((c) => c.method === 'PATCH'), docRenamedUndo);
   const added = 'Added line';
   const editMark = Docs.rangeName('doc9', added, CLOCK);
   const edited = scripted([

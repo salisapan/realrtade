@@ -54,7 +54,29 @@ const noAmt = F.plan({
   lang: 'en',
   companyTemplate: quoteTemplate()
 });
-check('built html shows placeholder when mail had no amount', noAmt.action === 'offer' && noAmt.built && noAmt.built.html && noAmt.built.html.indexOf(F.PRICE_PLACEHOLDER) !== -1 && !/\$[\d,]+/.test(noAmt.built.html), noAmt);
+check('built html shows placeholder when mail had no amount', noAmt.action === 'offer' && noAmt.built && noAmt.built.html && noAmt.built.html.indexOf(F.placeholdersFor('en').amount) !== -1 && !/\$[\d,]+/.test(noAmt.built.html), noAmt);
+check('English built html uses English labels and several paragraphs, not Party/Amount/Title',
+  noAmt.built.html.indexOf('<p>') >= 0 && noAmt.built.html.indexOf('<h1>') >= 0 &&
+  noAmt.built.html.indexOf('Client:') >= 0 && noAmt.built.html.indexOf('Price:') >= 0 &&
+  noAmt.built.html.indexOf('Party:') < 0 && noAmt.built.html.indexOf('Amount:') < 0 &&
+  noAmt.built.html.indexOf('Title:') < 0 && noAmt.built.html.indexOf('Floor 14') >= 0, noAmt.built.html);
+
+const gateMail = 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק. 5 עמודים, טופס יצירת קשר ובלוג. תודה';
+const gate = F.plan({
+  flags: flagsOn,
+  text: '[G-Quote] בקשה להצעת מחיר לאתר חדש 14/11\n' + gateMail,
+  lang: 'he'
+});
+const gateHtml = (gate.built && gate.built.html) || '';
+check('Hebrew Gate mail fills items and a title from the mail',
+  gate.action === 'offer' && /5 עמודים/.test(gateHtml) && /טופס יצירת קשר/.test(gateHtml) && /בלוג/.test(gateHtml) && /אתר חדש/.test(gateHtml),
+  { action: gate.action, html: gateHtml, filled: gate.googleClose && gate.googleClose.filled });
+check('Hebrew Gate html is RTL-ready paragraphs with Hebrew labels and placeholders, no English labels',
+  gateHtml.indexOf('<h1>') >= 0 && gateHtml.split('<p>').length >= 4 &&
+  gateHtml.indexOf('לקוח:') >= 0 && gateHtml.indexOf('מחיר:') >= 0 &&
+  gateHtml.indexOf(F.PARTY_PLACEHOLDER) >= 0 && gateHtml.indexOf(F.PRICE_PLACEHOLDER) >= 0 &&
+  gateHtml.indexOf('Party:') < 0 && gateHtml.indexOf('Amount:') < 0 && gateHtml.indexOf('Title:') < 0 &&
+  gateHtml.indexOf('[לקוח / party]') < 0 && gateHtml.indexOf('[מחיר / price]') < 0, gateHtml);
 const invented = F.stripInventedAmounts({ filled: { party: 'Dana', amount: '$1,000' } }, 'Please prepare a quote for Floor 14.');
 check('invented $1,000 stripped when not verbatim in mail', invented.filled && !invented.filled.amount);
 
