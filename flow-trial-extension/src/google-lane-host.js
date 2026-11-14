@@ -379,7 +379,7 @@ function readBody(res) {
     if (text) {
       try { json = JSON.parse(text); } catch (e) { json = null; }
     }
-    return { status: res.status, ok: res.ok, json: json };
+    return { status: res.status, ok: res.ok, json: json, text: text || '' };
   });
 }
 

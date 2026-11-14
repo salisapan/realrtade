@@ -255,21 +255,39 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
 
   console.log('\n--- a Doc is created and edited, then undo removes it ---\n');
   const docText = 'Please find the receipt.';
-  const createdMark = Docs.rangeName('doc1', docText, CLOCK);
+  const heText = 'הצעת מחיר לאתר חדש';
+  const FILE_SNAP = { id: 'doc1', name: 'Receipt', mimeType: 'application/vnd.google-apps.document', trashed: false, webViewLink: 'https://docs.google.com/document/d/doc1/edit', headRevisionId: 'rev-1', version: '1', modifiedTime: SNAP.modifiedTime };
   const created = scripted([
-    { status: 200, ok: true, json: { id: 'doc1', name: 'Receipt', mimeType: 'application/vnd.google-apps.document', trashed: false } },
-    { status: 200, ok: true, json: { id: 'doc1', trashed: false } },
-    { status: 200, ok: true, json: {} },
-    { status: 200, ok: true, json: markedDoc(createdMark, [docText], docText) },
-    { status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP) }
+    { status: 200, ok: true, json: { files: [] } },
+    { status: 200, ok: true, json: { id: 'folder-glance', name: 'Glance' } },
+    { status: 200, ok: true, json: FILE_SNAP },
+    { status: 200, ok: true, json: FILE_SNAP },
+    { status: 200, ok: true, json: null, text: docText }
   ]);
   const doc = await Docs.write({ scopes: Cfg.SCOPES, name: 'Receipt', text: docText }, created.http, CLOCK);
-  check('doc create is proved from the named range', proved(doc) && doc.proof.system === 'google/docs' && doc.ref.created === true && doc.ref.rangeName === createdMark && doc.ref.snapshot.headRevisionId === 'rev-1' && created.calls.length === 5 && created.calls[3].method === 'GET' && created.calls[4].method === 'GET', doc);
-  const createdBatch = JSON.parse(created.calls[2].body);
-  check('the insert is stored in a named range',
-    createdBatch.requests[0].insertText.text === docText &&
-    createdBatch.requests[1].createNamedRange.name === createdMark);
-  check('doc calls stay off gmail and off a documents scope', noGmail(created.calls) && created.calls.every((c) => c.url.indexOf('/auth/documents') < 0));
+  check('doc create is proved from the Drive read-back and export', proved(doc) && doc.proof.system === 'google/docs' && doc.ref.created === true && !doc.ref.rangeName && doc.ref.snapshot.headRevisionId === 'rev-1' && doc.url === FILE_SNAP.webViewLink && created.calls.length === 5 && created.calls[3].method === 'GET' && created.calls[4].method === 'GET', doc);
+  check('the Doc is created by one Drive multipart upload into the Glance folder',
+    created.calls[0].method === 'GET' && created.calls[0].url.indexOf('/drive/v3/files?') >= 0 &&
+    created.calls[1].method === 'POST' && /"mimeType":"application\/vnd.google-apps.folder"/.test(String(created.calls[1].body)) &&
+    created.calls[2].method === 'POST' && created.calls[2].url.indexOf('/upload/drive/v3/files?uploadType=multipart') >= 0 &&
+    created.calls[2].body instanceof Uint8Array &&
+    created.calls[4].url.indexOf('/export?mimeType=text%2Fplain') >= 0);
+  const packed = Buffer.from(created.calls[2].body).toString('utf8');
+  check('the upload is HTML with a UTF-8 charset and the quote text',
+    packed.indexOf('"mimeType":"application/vnd.google-apps.document"') >= 0 &&
+    packed.indexOf('"parents":["folder-glance"]') >= 0 &&
+    packed.indexOf('charset=UTF-8') >= 0 &&
+    packed.indexOf(docText) >= 0 &&
+    packed.indexOf('dir="ltr"') >= 0);
+  const heHtml = Docs.asHtml(heText);
+  check('Hebrew HTML is UTF-8 and dir=rtl', heHtml.indexOf('charset="UTF-8"') >= 0 && heHtml.indexOf('dir="rtl"') >= 0 && heHtml.indexOf('lang="he"') >= 0 && heHtml.indexOf(heText) >= 0);
+  check('doc calls stay off gmail, off the Docs API, and off a documents scope', noGmail(created.calls) && created.calls.every((c) => c.url.indexOf('docs.googleapis.com') < 0 && c.url.indexOf('/auth/documents') < 0));
+  const driveOff = scripted([
+    { status: 403, ok: false, json: { error: { code: 403, message: 'Google Drive API has not been used in project 93977330357 before or it is disabled.', status: 'PERMISSION_DENIED', details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com', metadata: { service: 'drive.googleapis.com' } }] } } }
+  ]);
+  const driveOffRes = await Docs.write({ scopes: Cfg.SCOPES, name: 'Receipt', text: docText }, driveOff.http, CLOCK);
+  check('a Drive SERVICE_DISABLED is named and leaves no file', driveOffRes.ok === false && driveOffRes.reason === 'drive-api-disabled' && driveOffRes.googleReason === 'SERVICE_DISABLED' && driveOffRes.service === 'drive.googleapis.com' && driveOff.calls.length === 1 && driveOff.calls[0].method === 'GET', driveOffRes);
+
   const docTrash = scripted([
     { status: 200, ok: true, json: Object.assign({ id: 'doc1', trashed: false }, SNAP) },
     { status: 200, ok: true, json: { trashed: true } }

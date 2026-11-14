@@ -4,14 +4,15 @@
 // came straight back without a consent screen and the next «בצע» failed the
 // same way. The Gate profile's own record shows drive.file was granted each
 // time: the 403 was not a missing scope, but every 403 was flagged as one.
-// Here: the granted path writes one Doc and Undo trashes it; an API that is
+// Here: the granted path writes one Doc through a Drive multipart upload
+// (no Docs API) and Undo trashes it; an API that is
 // off in the Cloud project names itself and does not offer Reconnect; a
 // real missing drive.file names the Drive permission, offers Reconnect, and
 // Reconnect asks Google with prompt=consent, include_granted_scopes and
 // drive.file; a consent that still lacks drive.file is not a connection.
 // Unpacked extension against the local Google lane server. Nothing is sent.
 const { test, expect } = require('./support/harness');
-const { startGoogleLaneServer, GOOGLE_403_SCOPE, GOOGLE_403_DOCS_DISABLED } = require('./support/google-lane-server');
+const { startGoogleLaneServer, GOOGLE_403_SCOPE, GOOGLE_403_DRIVE_DISABLED } = require('./support/google-lane-server');
 
 const SELF = 'ai.local.flow@gmail.com';
 const SUBJECT = '[G-Quote] בקשה להצעת מחיר לאתר חדש 13/11';
@@ -59,7 +60,6 @@ async function openQuote(glance, seed) {
 const creates = () => server.calls.filter((c) => c.method === 'POST' && (c.path === '/drive/v3/files' || c.path.indexOf('/upload/drive/v3/files') === 0));
 // A create Google refused (403) is recorded with `denied`; it made no file.
 const docCreates = () => creates().filter((c) => c.body && c.body.mimeType === DOC_MIME && !c.denied);
-const deniedDocCreates = () => creates().filter((c) => c.body && c.body.mimeType === DOC_MIME && c.denied === 403);
 const trashes = (id) => server.calls.filter((c) => c.method === 'PATCH' && c.path === '/drive/v3/files/' + id && c.body && c.body.trashed === true);
 
 // Reconnect's Google window: getAuthToken (Chrome sign-in) is off on the Gate
@@ -90,10 +90,21 @@ test('granted: Do It creates one Google Doc with the quote, verified, and Undo t
   await host.locator('button.flow-chip').click();
   await expect(page.locator('div[role="main"] .flow-chip-done')).toBeVisible({ timeout: 20000 });
   expect(docCreates()).toHaveLength(1);
+  const created = docCreates()[0];
+  expect(created.path.indexOf('/upload/drive/v3/files')).toBe(0);
+  expect(created.search).toContain('uploadType=multipart');
+  expect(created.media).toContain('charset="UTF-8"');
+  expect(created.media).toContain('dir="rtl"');
+  expect(created.media).toContain('הצעת מחיר');
   const id = server.last.doc;
-  expect(server.calls.filter((c) => c.method === 'POST' && c.path === '/v1/documents/' + id + ':batchUpdate')).toHaveLength(1);
-  const text = server.doc(id).body.content[0].paragraph.elements[0].textRun.content;
-  expect(text.length).toBeGreaterThan(20);
+  expect(server.calls.some((c) => /docs\.googleapis|\/v1\/documents\//.test(c.path))).toBe(false);
+  expect(server.calls.filter((c) => c.method === 'GET' && c.path === '/drive/v3/files/' + id + '/export' && /mimeType=text%2Fplain/.test(c.search))).toHaveLength(1);
+  const plain = server.doc(id).body.content[0].paragraph.elements[0].textRun.content;
+  expect(plain.length).toBeGreaterThan(20);
+  expect(plain).toContain('הצעת מחיר');
+  const open = page.locator('div[role="main"] a.flow-chip-written');
+  await expect(open).toHaveText('פתח ב-Docs');
+  await expect(open).toHaveAttribute('href', 'https://docs.google.com/document/d/' + id + '/edit');
   await expect.poll(() => lines).toContain('[Glance] full-document write created verified');
   await expect(host.locator('.flow-chip-hold-error')).toHaveCount(0);
   expect(server.calls.some((c) => /\/gmail\/v1\/users\/me\/messages\/send|\/drafts\/send/.test(c.path))).toBe(false);
@@ -102,29 +113,28 @@ test('granted: Do It creates one Google Doc with the quote, verified, and Undo t
   expect(server.file(id).trashed).toBe(true);
 });
 
-test('Docs API off in the Cloud project: a Hebrew line names it, no Reconnect loop, no empty Doc left', async ({ glance }) => {
-  server.forbid(':batchUpdate', 'POST', GOOGLE_403_DOCS_DISABLED);
+test('Drive API off in the Cloud project: a Hebrew line names it, no Reconnect loop, no leftover file', async ({ glance }) => {
+  server.forbid('drive/v3', '', GOOGLE_403_DRIVE_DISABLED);
   const { host, lines } = await openQuote(glance);
   await host.locator('button.flow-chip').click();
   const alert = host.locator('.flow-chip-hold-error');
   await expect(alert).toBeVisible({ timeout: 20000 });
   await expect(alert).toHaveAttribute('role', 'alert');
-  await expect(alert).toHaveAttribute('data-glance-hold-reason', 'docs-api-disabled');
+  await expect(alert).toHaveAttribute('data-glance-hold-reason', 'drive-api-disabled');
   await expect(alert).toContainText('לא נוצר מסמך ב-Google');
-  await expect(alert).toContainText('שירות המסמכים של Google לא מופעל');
-  await expect(alert).toContainText('לא נשאר מסמך ריק ב-Drive');
+  await expect(alert).toContainText('שירות Drive של Google לא מופעל');
   await expect(host.locator('.flow-chip-reconnect')).toHaveCount(0);
   await expect(host.locator('.approve-title')).toHaveText('עדיין פתוח · לא נוצר דבר');
   await expect(host).not.toContainText('unconfirmed');
-  expect(docCreates()).toHaveLength(1);
-  const id = server.last.doc;
-  expect(trashes(id)).toHaveLength(1);
-  await expect.poll(() => lines).toContain('[Glance] full-document write failed docs-api-disabled');
+  expect(docCreates()).toHaveLength(0);
+  expect(Object.keys(server.files()).filter((id) => server.file(id).mimeType === DOC_MIME)).toEqual([]);
+  expect(server.calls.some((c) => /docs\.googleapis|\/v1\/documents\//.test(c.path))).toBe(false);
+  await expect.poll(() => lines).toContain('[Glance] full-document write failed drive-api-disabled');
   await expect.poll(() => lines).toContain('[Glance] full-document google SERVICE_DISABLED');
   const bag = await glance.storage();
   expect(bag.googleReconnect || null).toBe(null);
   expect(bag.googleLastDenial && bag.googleLastDenial.kind).toBe('api-disabled');
-  expect(bag.googleLastDenial && bag.googleLastDenial.service).toBe('docs.googleapis.com');
+  expect(bag.googleLastDenial && bag.googleLastDenial.service).toBe('drive.googleapis.com');
 });
 
 test('missing drive.file: the line names the Drive permission, Reconnect asks Google consent for drive.file, then one Doc', async ({ glance }) => {
@@ -141,8 +151,9 @@ test('missing drive.file: the line names the Drive permission, Reconnect asks Go
   await expect(reconnect).toHaveText('חבר מחדש את Google');
   await expect.poll(() => lines).toContain('[Glance] full-document write failed drive-scope-missing');
   expect(docCreates()).toHaveLength(0);
-  expect(deniedDocCreates()).toHaveLength(1);
-  expect(server.calls.some((c) => c.path.indexOf(':batchUpdate') >= 0)).toBe(false);
+  expect(creates().filter((c) => c.denied === 403).length).toBeGreaterThan(0);
+  expect(Object.keys(server.files()).filter((id) => server.file(id).mimeType === DOC_MIME)).toEqual([]);
+  expect(server.calls.some((c) => /docs\.googleapis|\/v1\/documents\//.test(c.path))).toBe(false);
   const flagged = await glance.storage();
   expect(flagged.googleReconnect && flagged.googleReconnect.reason).toBe('missing scope');
 
@@ -170,7 +181,7 @@ test('missing drive.file: the line names the Drive permission, Reconnect asks Go
   await host.locator('button.flow-chip').click();
   await expect(page.locator('div[role="main"] .flow-chip-done')).toBeVisible({ timeout: 20000 });
   expect(docCreates()).toHaveLength(1);
-  expect(deniedDocCreates()).toHaveLength(1);
+  expect(creates().filter((c) => c.denied === 403).length).toBeGreaterThan(0);
   await expect.poll(() => lines).toContain('[Glance] full-document write created verified');
 });
 

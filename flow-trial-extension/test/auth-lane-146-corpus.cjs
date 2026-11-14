@@ -80,21 +80,51 @@ async function laneFetch(url, init) {
     return jsonResponse(204, null);
   }
   if (u.indexOf('/upload/drive/v3/files') >= 0 && method === 'POST') {
+    const raw = init && init.body;
+    let meta = {};
+    let media = '';
+    if (raw && typeof raw !== 'string') {
+      const text = Buffer.from(raw).toString('utf8');
+      const start = text.indexOf('{');
+      if (start >= 0) {
+        let depth = 0, end = -1;
+        for (let i = start; i < text.length; i++) {
+          if (text[i] === '{') depth++;
+          else if (text[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+        }
+        if (end > start) { try { meta = JSON.parse(text.slice(start, end + 1)); } catch (e) { meta = {}; } }
+      }
+      const parts = text.split('\r\n\r\n');
+      if (parts.length >= 3) media = parts.slice(2).join('\r\n\r\n').replace(/\r\n--glance_lane_drive--$/, '');
+    }
+    if (meta.mimeType === 'application/vnd.google-apps.document') {
+      const file = { id: 'doc-1', name: meta.name || 'Note', mimeType: 'application/vnd.google-apps.document', trashed: false, version: '3', modifiedTime: '2026-10-15T12:00:00.000Z', headRevisionId: 'rev-1', webViewLink: 'https://docs.google.com/document/d/doc-1/edit' };
+      const plain = String(media).replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+      laneState.doc = { file: file, text: plain, rangeName: '', namedRangeId: 'nr-1' };
+      return jsonResponse(200, file);
+    }
     laneState.file = { id: 'file-1', name: 'note.txt', mimeType: 'text/plain', trashed: false, version: '3', modifiedTime: '2026-10-15T12:00:00.000Z', headRevisionId: 'rev-1', contentHash: 'abc' };
     return jsonResponse(200, laneState.file);
   }
   if (u.indexOf('www.googleapis.com/drive') >= 0 && u.indexOf('/files') >= 0 && method === 'POST') {
     const mime = body && body.mimeType;
-    const id = mime === 'application/vnd.google-apps.document' ? 'doc-1' : 'file-1';
+    const id = mime === 'application/vnd.google-apps.folder' ? 'folder-1' : (mime === 'application/vnd.google-apps.document' ? 'doc-1' : 'file-1');
     const file = { id: id, name: (body && body.name) || 'Note', mimeType: mime || '', trashed: false, version: '3', modifiedTime: '2026-10-15T12:00:00.000Z', headRevisionId: 'rev-1' };
-    if (id === 'doc-1') laneState.doc = { file: file, text: '', rangeName: '', namedRangeId: 'nr-1' };
-    else laneState.file = file;
+    if (mime === 'application/vnd.google-apps.document') laneState.doc = { file: file, text: '', rangeName: '', namedRangeId: 'nr-1' };
+    else if (mime !== 'application/vnd.google-apps.folder') laneState.file = file;
     return jsonResponse(200, file);
+  }
+  if (u.indexOf('www.googleapis.com/drive') >= 0 && method === 'GET' && /\/files\/[^/?]+\/export/.test(u)) {
+    const text = (laneState.doc && laneState.doc.text) || '';
+    return { ok: true, status: 200, text: async () => text };
+  }
+  if (u.indexOf('www.googleapis.com/drive') >= 0 && method === 'GET' && /\/drive\/v3\/files\?/.test(u)) {
+    return jsonResponse(200, { files: [] });
   }
   if (u.indexOf('www.googleapis.com/drive') >= 0 && method === 'GET') {
     const id = (u.match(/\/files\/([^/?]+)/) || [])[1];
     const file = [laneState.doc && laneState.doc.file, laneState.file].find((item) => item && item.id === id);
-    return jsonResponse(200, file || { id: id || 'doc-1', name: 'Note', mimeType: 'application/vnd.google-apps.document', trashed: false, version: '3', modifiedTime: '2026-10-15T12:00:00.000Z', headRevisionId: 'rev-1' });
+    return jsonResponse(200, file || { id: id || 'doc-1', name: 'Note', mimeType: 'application/vnd.google-apps.document', trashed: false, version: '3', modifiedTime: '2026-10-15T12:00:00.000Z', headRevisionId: 'rev-1', webViewLink: 'https://docs.google.com/document/d/' + (id || 'doc-1') + '/edit' });
   }
   if (u.indexOf('www.googleapis.com/drive') >= 0 && method === 'PATCH') return jsonResponse(200, { trashed: true });
   if (u.indexOf(':batchUpdate') >= 0 && method === 'POST') {

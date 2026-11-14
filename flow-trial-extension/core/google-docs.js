@@ -1,10 +1,14 @@
 // One Google Doc, created or edited only when Glance made the file or the
-// person picked it. Drive files.create uses drive.file. The Docs API edits
-// that id. There is no documents OAuth scope. Undo trashes a file this
-// lane created. An edit is wrapped in a named range. Undo reads that range
-// back, locks the delete to that revision, and removes the text and the
-// named range. A changed revision is read again before any second delete.
-// A missing or edited range is refused. Handled waits for a read-back.
+// person picked it. A new Doc is a Drive multipart upload of HTML
+// (uploadType=multipart, mimeType application/vnd.google-apps.document)
+// into the Glance folder, using drive.file only. There is no documents
+// OAuth scope and no docs.googleapis.com call on that create. The write
+// is verified with Drive files.get and an export to text/plain. Undo
+// trashes a file this lane created. An edit of a picked Doc is still
+// wrapped in a named range via the Docs API. Undo reads that range back,
+// locks the delete to that revision, and removes the text and the named
+// range. A changed revision is read again before any second delete. A
+// missing or edited range is refused. Handled waits for a read-back.
 // Portable: no chrome.*, no DOM, no network.
 const FlowGoogleDocs = (() => {
   const SYSTEM = 'google/docs';
@@ -12,6 +16,10 @@ const FlowGoogleDocs = (() => {
   const DOC_MIME = 'application/vnd.google-apps.document';
   const FILES = 'https://www.googleapis.com/drive/v3/files';
   const DOCS = 'https://docs.googleapis.com/v1/documents/';
+  const FILE_FIELDS = 'id,name,mimeType,trashed,webViewLink,headRevisionId,version,modifiedTime';
+  const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=' + encodeURIComponent(FILE_FIELDS);
+  const FOLDER_NAME = 'Glance';
+  const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
   function cfg() {
     return typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
@@ -45,7 +53,59 @@ const FlowGoogleDocs = (() => {
   }
 
   function fileUrl(id) {
-    return FILES + '/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,headRevisionId,version,modifiedTime');
+    return FILES + '/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent(FILE_FIELDS);
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function hasHebrew(s) {
+    return /[\u0590-\u05FF]/.test(String(s || ''));
+  }
+
+  // UTF-8 HTML so Hebrew (and any other script) renders in the Doc. dir=rtl
+  // when the text has Hebrew; otherwise ltr.
+  function asHtml(text) {
+    const rtl = hasHebrew(text);
+    const dir = rtl ? 'rtl' : 'ltr';
+    const lang = rtl ? 'he' : 'en';
+    const body = escapeHtml(text).replace(/\r\n|\r|\n/g, '<br>\n');
+    return '<!DOCTYPE html><html dir="' + dir + '" lang="' + lang + '"><head><meta charset="UTF-8"></head><body dir="' + dir + '">' + body + '</body></html>';
+  }
+
+  function utf8Bytes(s) {
+    return new TextEncoder().encode(String(s || ''));
+  }
+
+  function multipart(meta, mediaType, bytes) {
+    const boundary = 'glance_lane_drive';
+    const head = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(meta) + '\r\n--' + boundary + '\r\nContent-Type: ' + mediaType + '\r\n\r\n';
+    const tail = '\r\n--' + boundary + '--';
+    const h = utf8Bytes(head);
+    const t = utf8Bytes(tail);
+    const body = new Uint8Array(h.length + bytes.length + t.length);
+    body.set(h, 0);
+    body.set(bytes, h.length);
+    body.set(t, h.length + bytes.length);
+    return { contentType: 'multipart/related; boundary=' + boundary, body: body };
+  }
+
+  function normalizeText(s) {
+    return String(s || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function exportContains(exported, text) {
+    const got = normalizeText(exported);
+    const want = normalizeText(text);
+    return !!(want && got && got.indexOf(want) >= 0);
+  }
+
+  function docLink(json, id) {
+    const link = json && typeof json.webViewLink === 'string' ? json.webViewLink.trim() : '';
+    if (link && /^https:\/\/docs\.google\.com\//.test(link)) return link;
+    return 'https://docs.google.com/document/d/' + encodeURIComponent(id) + '/edit';
   }
 
   function fileSnapshot(json) {
@@ -145,7 +205,7 @@ const FlowGoogleDocs = (() => {
     try {
       const res = await http(req);
       const status = res && typeof res.status === 'number' ? res.status : 0;
-      return { status: status, ok: !!(res && (res.ok === true || (status >= 200 && status < 300))), json: res && res.json ? res.json : null, denial: res && res.denial ? res.denial : null, url: req && req.url };
+      return { status: status, ok: !!(res && (res.ok === true || (status >= 200 && status < 300))), json: res && res.json ? res.json : null, text: res && res.text != null ? String(res.text) : '', denial: res && res.denial ? res.denial : null, url: req && req.url };
     } catch (e) {
       return { status: 0, ok: false, json: null };
     }
@@ -246,28 +306,97 @@ const FlowGoogleDocs = (() => {
     }
     const name = safeName(i.name || i.title || 'Note');
     if (!name) return { ok: false, reason: 'unclear' };
+    return createAndRead(name, text, http, clock);
+  }
+
+  // The Glance folder is one this lane made, so drive.file can see it.
+  // A 401/403 is returned as the write's reason (Reconnect or an API that
+  // is off). Any other list or create miss falls back to My Drive.
+  async function glanceFolder(http) {
+    const q = "mimeType='" + FOLDER_MIME + "' and name='" + FOLDER_NAME + "' and trashed=false";
+    const listed = await call(http, {
+      method: 'GET',
+      url: FILES + '?q=' + encodeURIComponent(q) + '&pageSize=1&fields=' + encodeURIComponent('files(id,name)')
+    });
+    const listedDenied = authFail(listed);
+    if (listedDenied) return listedDenied;
+    const hit = listed.ok && listed.json && Array.isArray(listed.json.files) ? listed.json.files[0] : null;
+    if (hit && hit.id) return { ok: true, id: String(hit.id) };
+    const made = await call(http, {
+      method: 'POST',
+      url: FILES + '?fields=' + encodeURIComponent('id,name'),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME })
+    });
+    const madeDenied = authFail(made);
+    if (madeDenied) return madeDenied;
+    if (made.ok && made.json && made.json.id) return { ok: true, id: String(made.json.id) };
+    return { ok: true, id: '' };
+  }
+
+  async function createAndRead(name, text, http, clock) {
+    const C = cfg();
+    const folder = await glanceFolder(http);
+    if (folder && folder.ok === false) return folder;
+    const html = asHtml(text);
+    const packed = multipart(
+      Object.assign({ name: name, mimeType: DOC_MIME }, folder && folder.id ? { parents: [folder.id] } : {}),
+      'text/html; charset=UTF-8',
+      utf8Bytes(html)
+    );
     const posted = await call(http, {
       method: 'POST',
-      url: FILES + '?fields=' + encodeURIComponent('id,name,mimeType,trashed'),
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name, mimeType: DOC_MIME })
+      url: UPLOAD,
+      headers: { 'Content-Type': packed.contentType },
+      body: packed.body
     });
     const denied = authFail(posted);
     if (denied) return denied;
-    if (!posted.ok) return { ok: false, reason: 'http-' + posted.status };
-    const file = posted.json || {};
     const base = { where: 'Google Docs', target: name, written: 'Doc · ' + name, url: null };
+    if (!posted.ok) return Object.assign({ ok: false, reason: 'http-' + posted.status, ref: null, proof: null }, base);
+    const file = posted.json || {};
     if (!file.id) return Object.assign({ ok: false, reason: 'proof_pending', ref: null, proof: null }, base);
+
+    async function failClean(reason, extra) {
+      const cleanedUp = await trashCreated(http, file.id);
+      return Object.assign({ ok: false, reason: reason, ref: { documentId: file.id, externalId: file.id, created: true }, proof: null, cleanedUp: cleanedUp }, extra || {}, base);
+    }
+
     const got = await call(http, { method: 'GET', url: fileUrl(file.id) });
-    if (!got.ok || !got.json || got.json.id !== file.id || got.json.trashed === true) {
-      return Object.assign({ ok: false, reason: 'verify_failed', ref: { documentId: file.id, externalId: file.id, created: true }, proof: null }, base);
+    const gotDenied = authFail(got);
+    if (gotDenied) {
+      gotDenied.cleanedUp = await trashCreated(http, file.id);
+      return gotDenied;
     }
-    const inserted = await insertAndRead(file.id, text, http, clock, true, name);
-    if (inserted && inserted.ref && inserted.ref.created === true) {
-      const meta = await call(http, { method: 'GET', url: fileUrl(file.id) });
-      if (meta.ok && meta.json) inserted.ref.snapshot = fileSnapshot(meta.json);
+    if (!got.ok || !got.json || got.json.id !== file.id || got.json.trashed === true || got.json.mimeType !== DOC_MIME) {
+      return failClean('verify_failed');
     }
-    return inserted;
+
+    const exported = await call(http, {
+      method: 'GET',
+      url: FILES + '/' + encodeURIComponent(file.id) + '/export?mimeType=' + encodeURIComponent('text/plain')
+    });
+    const expDenied = authFail(exported);
+    if (expDenied) {
+      expDenied.cleanedUp = await trashCreated(http, file.id);
+      return expDenied;
+    }
+    const exportedText = exported.text || '';
+    if (!exported.ok || !exportContains(exportedText, text)) {
+      return failClean('verify_failed');
+    }
+
+    const link = docLink(got.json, file.id);
+    base.url = link;
+    const proof = C && C.proofOf(SYSTEM, file.id, link, C.clockIso(clock));
+    const ref = {
+      documentId: file.id,
+      externalId: file.id,
+      created: true,
+      snapshot: fileSnapshot(got.json)
+    };
+    if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: ref, proof: null }, base);
+    return Object.assign({ ok: true, ref: ref, proof: proof }, base);
   }
 
   async function undo(ref, http) {
@@ -347,7 +476,9 @@ const FlowGoogleDocs = (() => {
     namedSpan: namedSpan,
     textInRange: textInRange,
     write: write,
-    undo: undo
+    undo: undo,
+    asHtml: asHtml,
+    FOLDER_NAME: FOLDER_NAME
   };
 })();
 
