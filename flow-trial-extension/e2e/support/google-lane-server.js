@@ -814,7 +814,9 @@ function startGoogleLaneServer() {
           if (!doc) return;
           const name = Object.keys(doc.namedRanges || {})[0] || '';
           state.docs[id] = docBody(text, name);
-          if (state.files[id]) state.files[id].docText = String(text || '');
+          const next = String(text || '');
+          if (state.files[id]) state.files[id].docText = next;
+          state.docText[id] = next;
           bumpFile(state.files[id]);
         },
         editSheetRow: (id, row) => {
