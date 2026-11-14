@@ -5657,6 +5657,8 @@ function outlookEcosystemRunnerDeps() {
   };
   return {
     storage,
+    // A Labs switch by name, with the store lock honoured (glanceSwitchOn above): src/outlook.js reads DECOMPOSE through it.
+    switchOn: (name) => glanceSwitchOn(name),
     cfg: globalThis.FlowOutlookConfig,
     auth: globalThis.FlowOutlookAuth,
     plan: globalThis.FlowOutlookSync && globalThis.FlowOutlookSync.plan,

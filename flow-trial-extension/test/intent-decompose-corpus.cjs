@@ -117,5 +117,31 @@ check('a bank change with a payment stays quiet, clause by clause too', r.intent
 r = run('Hi Sali, Maybe we could meet Monday at 10:00? Also, perhaps send the deck sometime. Thanks');
 check('a hedged mail stays quiet', r.intentions.length === 0, r);
 
+console.log('\n--- one card for a mail that asks for more than one thing (FlowIncomingJudge.judge with decomposeOn) ---\n');
+function judgeMulti(text, extra) {
+  const input = Object.assign({ text, subject: 'Next steps', sender: { name: 'Dana Levi', email: 'dana@acme.io' }, now: new Date(NOW), threadUrl: 'https://mail.google.com/x', hasThreadAttachment: false, attachmentCount: 0,
+    surface: 'gmail', to: [OWN], cc: [], ownAddresses: [OWN], ownNames: ['Sali', 'Sali Sapan', 'סאלי'], userName: 'Sali', direction: 'inbound', inbound: true, namesWaitDone: true }, extra || {});
+  return J.judge(input, DEPS);
+}
+const kindsOf = (r) => (r.show ? r.process.steps.map((st) => st.kind).join('+') : 'SILENT(' + r.reason + ')');
+const MULTI_EN = "Hi Sali, Could you send me the Q3 numbers by Wednesday? Also, let's meet on Monday, October 12 at 10:00 to go over the budget. Thanks, Dana";
+let rm = judgeMulti(MULTI_EN);
+check('off by default: the mail is judged as one piece, exactly as before', !rm.decomposed && kindsOf(rm) === kindsOf(judgeMulti(MULTI_EN, { decomposeOn: false })), kindsOf(rm));
+rm = judgeMulti(MULTI_EN, { decomposeOn: true });
+check('on: a reply ask and a meeting in one mail become ONE card with both intentions\' steps', rm.show && rm.decomposed === 2 && /calendar/.test(kindsOf(rm)) && /gmailDraft/.test(kindsOf(rm)), kindsOf(rm));
+check('the card is named from the catalog (Schedule & Confirm), so every surface already has it in both languages', rm.process.id === 'schedule-confirm' && rm.process.name === 'Schedule & Confirm' && /drafted, and tracked/i.test(rm.process.closedLine), [rm.process.id, rm.process.closedLine]);
+check('step ids are unique and each dependency points at a step of the same card', new Set(rm.process.steps.map((st) => st.id)).size === rm.process.steps.length && rm.process.steps.every((st) => !st.dependsOn || rm.process.steps.some((o) => o.id === st.dependsOn)), rm.process.steps.map((st) => [st.id, st.dependsOn]));
+check('every merged step is one the judge itself planned (nothing invented) and the plan is within the product\'s step cap', rm.process.steps.length <= D.MAX_STEPS && rm.process.steps.every((st) => st.kind && st.params), rm.process.steps.length);
+check('the meeting step keeps its own day and clock, the reply step its own day', rm.process.steps.some((st) => st.kind === 'calendar' && st.params.dateIso === '2026-10-12' && st.params.hour === 10) && rm.process.steps.some((st) => st.kind === 'gmailDraft'), rm.process.steps.map((st) => [st.kind, st.params && st.params.dateIso, st.params && st.params.hour]));
+check('the card carries both quotes as evidence and says it is a decomposed card', rm.intent.decomposed === true && rm.intent.intentions === 2 && rm.intent.evidence.length === 2, rm.intent);
+check('a mail with one intention is unchanged with the switch on', kindsOf(judgeMulti('Hi Sali, Could you send me the Q3 numbers by Wednesday? Thanks, Dana', { decomposeOn: true })) === kindsOf(judgeMulti('Hi Sali, Could you send me the Q3 numbers by Wednesday? Thanks, Dana')));
+const MULTI_HE = 'היי סאלי, אפשר לשלוח לי את הדוח עד יום חמישי? בנוסף, נא לקבוע פגישה ביום ראשון ה-11.10 בשעה 14:00. תודה, דנה';
+rm = judgeMulti(MULTI_HE, { decomposeOn: true });
+check('HE: the same, one card with the report reply and the meeting', rm.show && rm.decomposed === 2 && /calendar/.test(kindsOf(rm)) && /Draft/.test(kindsOf(rm)), kindsOf(rm));
+rm = judgeMulti(MULTI_EN, { decomposeOn: true, surface: 'outlook', to: ['glance.salisapan@outlook.com'], ownAddresses: ['glance.salisapan@outlook.com'] });
+check('Outlook: the same card with Outlook\'s own draft step, no Gmail step', rm.show && rm.decomposed === 2 && /outlookDraft/.test(kindsOf(rm)) && !/gmailDraft/.test(kindsOf(rm)), kindsOf(rm));
+check('the whole-mail quiets stand with the switch on (FYI, hedge, bank change, take-back)', ['Hi Sali, FYI the office is closed on Friday. Can you send me the Q3 numbers by Wednesday? Thanks', 'Hi Sali, Maybe we could meet Monday at 10:00? Also, perhaps send the deck sometime. Thanks', 'Hi Sali, Our bank details have changed. Please pay the ₪4,000 invoice to the new account by Friday. Thanks', "Hi Sali, Could you send the invoice by Friday? Please don't."].every((t) => !judgeMulti(t, { decomposeOn: true }).decomposed), 1);
+check('a mail addressed to someone else (the reader only on Cc, no greeting by name) never gets a merged card; a Cc reader greeted by name keeps the engine\'s own C-12 stance', !judgeMulti(MULTI_EN.replace('Hi Sali, ', ''), { decomposeOn: true, to: ['other@acme.io'], cc: [OWN] }).decomposed);
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

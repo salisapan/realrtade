@@ -669,6 +669,9 @@ const FlowOutlook = (() => {
         knownNames = bag && bag.glanceOwnNames;
       } catch (e) { knownNames = null; }
       const intentApi = planDeps.intent;
+      // The Labs switch DECOMPOSE (off by default): a mail that asks for several things becomes one card with every ask's steps.
+      // The host's own switch reader (src/background.js glanceSwitchOn, which honours the Chrome Web Store lock); no reader means off.
+      try { planDeps.decomposeOn = typeof deps.switchOn === 'function' ? Boolean(await deps.switchOn('DECOMPOSE')) : false; } catch (e) { planDeps.decomposeOn = false; }
       planDeps.userName = accountName;
       planDeps.ownNames = (intentApi && typeof intentApi.readerNamesFrom === 'function')
         ? intentApi.readerNamesFrom({ displayName: accountName, profile: auth.profile, knownNames: knownNames })

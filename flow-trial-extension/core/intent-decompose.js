@@ -107,7 +107,9 @@ const FlowIntentDecompose = (() => {
       doneWhen: anchor && DONE_WHEN[anchor] ? DONE_WHEN[anchor] : null,
       evidence: clause ? clause.text : null,
       needsClick: true,
-      closes: false
+      closes: false,
+      // The judge's own result for this intention ({ intent, process }): the one thing merge() builds a card from. Never invented here.
+      card: res && res.show && res.process && (res.process.steps || []).length ? { intent: res.intent, process: res.process } : null
     };
   }
 
@@ -169,7 +171,55 @@ const FlowIntentDecompose = (() => {
     return { used: true, intentions: out, primary: out[0] || null, whole: { show: !!whole.show, reason } };
   }
 
-  return { decompose, clauses, partsOf, cleanWhat, enabled, SWITCH, DEFAULTS, MAX_INTENTIONS, DONE_WHEN, CLAUSE_PASS_REASONS, FAMILY_CLAUSE_RULES, TAKES_BACK };
+  // ---- merge: one card for a mail that asks for more than one thing --------------------------------------------------------------------------
+  // The hosts show one card per mail, and a card already carries a list of steps the person can tick. So several intentions become ONE card whose
+  // steps are every intention's own steps (from the judge, never invented), in the mail's order, each step id and dependency prefixed by its intention
+  // so they stay apart. The process name and its two lines come from the product's own catalog (core/actions.js), so every surface already has them
+  // in both languages: a meeting plus a reply is "Schedule & Confirm", a meeting alone "Schedule It", a reply "Reply & Track". Nothing new to translate.
+  // At most MAX_STEPS steps (core/actions.js MAX_ACTIONS); an intention that would not fit whole is left out, never cut in half.
+  // Only intentions the judge itself offered (`card`) are merged: a file ask handed to the file chain has no real steps here and stays on its own path.
+  const MAX_STEPS = 5;
+  function catalogFor(kinds) {
+    let A = null;
+    try { A = typeof FlowActions !== 'undefined' ? FlowActions : (typeof require !== 'undefined' ? require('./actions.js').FlowActions : null); } catch (e) { A = null; }
+    const cat = A && A.PROCESS_CATALOG;
+    if (!cat) return null;
+    const has = (re) => kinds.some((k) => re.test(k));
+    const id = has(/calendar/i) ? (has(/draft/i) ? 'schedule-confirm' : 'schedule') : (has(/draft/i) ? 'reply-track' : null);
+    return id && cat[id] ? Object.assign({ id }, cat[id]) : null;
+  }
+  function merge(intentions) {
+    const cards = (Array.isArray(intentions) ? intentions : []).filter((x) => x && x.card && x.card.process);
+    if (cards.length < 2) return null;
+    const steps = [];
+    const used = [];
+    cards.forEach((x, n) => {
+      const mine = (x.card.process.steps || []).map((st) => Object.assign({}, st, {
+        id: 'i' + (n + 1) + '-' + (st.id || st.kind),
+        dependsOn: st.dependsOn ? 'i' + (n + 1) + '-' + st.dependsOn : null
+      }));
+      if (steps.length + mine.length > MAX_STEPS) return;
+      mine.forEach((st) => steps.push(st));
+      used.push(x);
+    });
+    if (used.length < 2) return null;
+    const cat = catalogFor(steps.map((st) => st.kind));
+    const first = used[0].card.process;
+    const process = {
+      id: cat ? cat.id : first.id,
+      name: cat ? cat.name : first.name,
+      closingLine: cat ? cat.closingLine : first.closingLine,
+      closedLine: cat ? cat.closedLine : first.closedLine,
+      needsDateChoice: false,
+      dateChoices: null,
+      steps,
+      decomposed: used.length
+    };
+    const intent = Object.assign({}, used[0].card.intent, { decomposed: true, intentions: used.length, evidence: used.map((x) => x.evidence).filter(Boolean) });
+    return { intent, process, used: used.length };
+  }
+
+  return { decompose, clauses, partsOf, cleanWhat, merge, MAX_STEPS, enabled, SWITCH, DEFAULTS, MAX_INTENTIONS, DONE_WHEN, CLAUSE_PASS_REASONS, FAMILY_CLAUSE_RULES, TAKES_BACK };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntentDecompose };

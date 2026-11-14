@@ -10581,7 +10581,37 @@ const FlowIncomingJudge = (() => {
     return c;
   }
 
+  // ---- several intentions in one mail (core/intent-decompose.js, owner 2026-11-12) ----------------------------------------------------------
+  // Off unless the host passes decomposeOn (the Labs switch DECOMPOSE, off by default). The whole-mail decision above always runs first; this only
+  // runs when the mail shows or the judge found nothing, and it returns ONE card whose steps are each intention's own (intent-decompose merge).
+  // Every quiet of the whole mail, phishing and the take-back clauses stand (see the module). A mail with one intention comes back unchanged.
   function judge(input, deps) {
+    const i = input || {};
+    const whole = judgeOnce(i, deps);
+    if (i.decomposeOn !== true) return whole;
+    const Dc = sibling(typeof FlowIntentDecompose !== 'undefined' ? FlowIntentDecompose : null, './intent-decompose.js', 'FlowIntentDecompose');
+    const d = deps || {};
+    const intentApi = pick(d, 'intent', typeof FlowIntent !== 'undefined' ? FlowIntent : null);
+    if (!Dc || typeof Dc.decompose !== 'function' || typeof Dc.merge !== 'function') return whole;
+    const Fj = typeof FlowJudgment !== 'undefined' ? FlowJudgment : null;
+    const CF = sibling(typeof FlowCloseFamilies !== 'undefined' ? FlowCloseFamilies : null, './close-families.js', 'FlowCloseFamilies');
+    let newText = String(i.text || '');
+    try { if (Fj && typeof Fj.newContent === 'function') newText = Fj.newContent(newText); } catch (e) { /* keep the whole text */ }
+    let r = null;
+    try {
+      r = Dc.decompose({ aiDecomposeV1: true }, { text: newText, whole, sender: i.sender || null, vetoText: (i.subject ? String(i.subject) + '\n' : '') + String(i.text || '') }, {
+        judgeText: (t) => judgeOnce(Object.assign({}, i, { text: t, decomposeOn: false }), deps),
+        phishing: (t) => (intentApi && typeof intentApi.phishingOrNegative === 'function' ? intentApi.phishingOrNegative(t) : false),
+        familyHit: (t) => (CF && typeof CF.assess === 'function' ? CF.assess(t, null, { now: i.now, senderEmail: (i.sender && i.sender.email) || null }) : null)
+      });
+    } catch (e) { return whole; }
+    if (!r || !r.used || !Array.isArray(r.intentions) || r.intentions.length < 2) return whole;
+    const merged = Dc.merge(r.intentions);
+    if (!merged) return whole;
+    return { show: true, intent: merged.intent, process: merged.process, decomposed: merged.used };
+  }
+
+  function judgeOnce(input, deps) {
     const i = input || {};
     const d = deps || {};
     const intentApi = pick(d, 'intent', typeof FlowIntent !== 'undefined' ? FlowIntent : null);
