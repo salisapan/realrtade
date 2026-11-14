@@ -5415,8 +5415,8 @@ const FlowIntent = (() => {
   // "wire … to the new bank account below" is the same quiet: a payment
   // aimed at an account the sender just introduced. A dated invoice with
   // no new account is still the ask.
-  const BANK_CHANGE = /\b(?:changed banks|new account|new bank account|update (?:our |the )?(?:bank|account) details|(?:bank )?account below)\b|פרטי חשבון חדשים|החלפנו בנק/i;
-  const PAY_MOVE = /\b(?:pay|wire|transfer)\b|(?:תשלום|העברה)|(?:^|[^\u0590-\u05FF])(?:שלם|תשלם|להעביר)(?![\u0590-\u05FF])/i;
+  const BANK_CHANGE = /\b(?:changed banks|new account|new bank account|update (?:our |the )?(?:bank|account) details|(?:bank )?account below|(?:bank|account) details (?:have |has )?(?:changed|been (?:changed|updated)))\b|פרטי חשבון חדשים|החלפנו בנק|פרטי\s+(?:ה)?(?:חשבון|בנק)(?:\s+\S+){0,3}\s+(?:השתנו|עודכנו|התחלפו)|חשבון\s+(?:בנק\s+)?חדש|(?:^|[^\u0590-\u05FF])לחשבון\s+החדש/i;
+  const PAY_MOVE = /\b(?:pay|wire|transfer)\b|(?:תשלום|העברה)|(?:^|[^\u0590-\u05FF])(?:שלם|שלמו|תשלם|להעביר|העבר|העבירו|תעביר|תעבירו)(?![\u0590-\u05FF])/i;
   function bankChangePayment(text) {
     const raw = String(text || '');
     return BANK_CHANGE.test(raw) && PAY_MOVE.test(raw);
@@ -10641,6 +10641,12 @@ const FlowIncomingJudge = (() => {
     // A reminder or a deadline asked without a question ("Don't forget to bring the signed form on Monday", "I need the signed
     // contract by Wednesday") and a request to call back on a day become a task due that day (core/chat-reminder.js,
     // chat-deadline-ask.js, chat-callback-ask.js). Only for a mail addressed to the person (their address on To, not Cc-only).
+    // Phishing, a credential harvest and a payment to a new bank account stay quiet BEFORE the task and payment readers: those two build a task
+    // "Pay X to the new account" from the same words the veto below refuses (found by the capability probe, 2026-11-14).
+    if ((i.taskAskOn === true || i.paymentAskOn === true) && i.senderIsUser !== true && i.inbound !== false && typeof intentApi.phishingOrNegative === 'function'
+      && intentApi.phishingOrNegative((i.subject ? String(i.subject) + '\n' : '') + prepareForJudge(i.text))) {
+      return { show: false, reason: 'quiet:family', intent: null };
+    }
     // Off unless the host passes taskAskOn (glanceSwitches.TASK_ASK).
     if (i.taskAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
       const ask = taskAsk(i, prepareForJudge(i.text));

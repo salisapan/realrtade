@@ -651,8 +651,8 @@ const FlowIntent = (() => {
   // "wire … to the new bank account below" is the same quiet: a payment
   // aimed at an account the sender just introduced. A dated invoice with
   // no new account is still the ask.
-  const BANK_CHANGE = /\b(?:changed banks|new account|new bank account|update (?:our |the )?(?:bank|account) details|(?:bank )?account below)\b|פרטי חשבון חדשים|החלפנו בנק/i;
-  const PAY_MOVE = /\b(?:pay|wire|transfer)\b|(?:תשלום|העברה)|(?:^|[^\u0590-\u05FF])(?:שלם|תשלם|להעביר)(?![\u0590-\u05FF])/i;
+  const BANK_CHANGE = /\b(?:changed banks|new account|new bank account|update (?:our |the )?(?:bank|account) details|(?:bank )?account below|(?:bank|account) details (?:have |has )?(?:changed|been (?:changed|updated)))\b|פרטי חשבון חדשים|החלפנו בנק|פרטי\s+(?:ה)?(?:חשבון|בנק)(?:\s+\S+){0,3}\s+(?:השתנו|עודכנו|התחלפו)|חשבון\s+(?:בנק\s+)?חדש|(?:^|[^\u0590-\u05FF])לחשבון\s+החדש/i;
+  const PAY_MOVE = /\b(?:pay|wire|transfer)\b|(?:תשלום|העברה)|(?:^|[^\u0590-\u05FF])(?:שלם|שלמו|תשלם|להעביר|העבר|העבירו|תעביר|תעבירו)(?![\u0590-\u05FF])/i;
   function bankChangePayment(text) {
     const raw = String(text || '');
     return BANK_CHANGE.test(raw) && PAY_MOVE.test(raw);
