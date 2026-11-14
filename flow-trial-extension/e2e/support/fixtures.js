@@ -22,6 +22,13 @@ function gmailLiveSelf(o) {
   const langAttr = o.lang ? (' lang="' + esc(o.lang) + '"') : '';
   const account = accountButton(o, own, name);
   const titleEmail = o.titleEmail || own;
+  const files = Array.isArray(o.attachments) ? o.attachments : [];
+  const chips = files.map((f) => {
+    const fileName = (f && (f.name || f.filename)) || 'file.pdf';
+    const mime = (f && f.mimeType) || 'application/pdf';
+    const url = (f && f.url) || ('https://mail.google.com/mail/u/0/?view=att&disp=safe&name=' + encodeURIComponent(fileName));
+    return '<span download_url="' + esc(mime + ':' + fileName + ':' + url) + '">' + esc(fileName) + '</span>';
+  }).join('');
   return '<!doctype html><html' + langAttr + '><head><title>Inbox - ' + esc(titleEmail) + ' - Gmail</title></head><body>' +
     account +
     '<div role="main">' +
@@ -30,6 +37,7 @@ function gmailLiveSelf(o) {
     '<h3 class="iw"><span class="gD" email="' + esc(own) + '" name="' + esc(name) + '" data-hovercard-id="' + esc(own) + '">' + esc(name) + '</span></h3>' +
     '<span class="hb">' + (o.toSelfText === 'אליי' ? '' : 'to ') + '<span class="g2">' + esc(o.toSelfText || 'me') + '</span></span>' +
     '<div class="a3s">' + esc(body) + '</div>' +
+    chips +
     '</div></div></body></html>';
 }
 

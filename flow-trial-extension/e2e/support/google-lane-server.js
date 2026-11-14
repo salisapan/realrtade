@@ -51,12 +51,33 @@ function hashBytes(buf) {
 }
 
 function parseDriveUpload(buf) {
-  const text = Buffer.from(buf || []).toString('binary');
+  const raw = Buffer.from(buf || []);
+  const text = raw.toString('binary');
   const jsonStart = text.indexOf('{');
-  const jsonEnd = text.indexOf('}');
   let meta = {};
-  if (jsonStart >= 0 && jsonEnd > jsonStart) {
-    try { meta = JSON.parse(text.slice(jsonStart, jsonEnd + 1)); } catch (e) { meta = {}; }
+  if (jsonStart >= 0) {
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    let end = -1;
+    for (let i = jsonStart; i < text.length; i++) {
+      const c = text[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (c === '\\') esc = true;
+        else if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') inStr = true;
+      else if (c === '{') depth += 1;
+      else if (c === '}') {
+        depth -= 1;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+    if (end > jsonStart) {
+      try { meta = JSON.parse(raw.slice(jsonStart, end + 1).toString('utf8')); } catch (e) { meta = {}; }
+    }
   }
   const marker = '\r\n\r\n';
   const first = text.indexOf(marker);
@@ -391,6 +412,29 @@ function startGoogleLaneServer() {
       }
       if (method === 'GET' && path === '/drive/v3/files') {
         const q = url.searchParams.get('q') || '';
+        if (q.indexOf('glanceDoc') >= 0 || q.indexOf('appProperties') >= 0) {
+          const thread = /key='glanceThread' and value='([^']*)'/.exec(q);
+          const kind = /key='glanceType' and value='([^']*)'/.exec(q);
+          const hits = Object.keys(state.files).map((k) => state.files[k]).filter((f) => {
+            if (!f || f.trashed || f.mimeType !== 'application/vnd.google-apps.document') return false;
+            const props = f.appProperties || {};
+            if (props.glanceDoc !== '1') return false;
+            if (thread && props.glanceThread !== thread[1]) return false;
+            if (kind && props.glanceType !== kind[1]) return false;
+            return true;
+          });
+          send(res, 200, { files: hits.map((f) => ({
+            id: f.id,
+            name: f.name,
+            mimeType: f.mimeType,
+            trashed: false,
+            webViewLink: f.webViewLink || '',
+            description: f.description || '',
+            appProperties: f.appProperties || {},
+            createdTime: f.createdTime || ''
+          })) });
+          return;
+        }
         if (q.indexOf('application/vnd.google-apps.folder') >= 0) {
           const named = /name\s*=\s*'([^']*)'/.exec(q);
           const hits = Object.keys(state.files).map((k) => state.files[k]).filter((f) => f.mimeType === 'application/vnd.google-apps.folder' && !f.trashed && (!named || f.name === named[1]));
@@ -472,6 +516,9 @@ function startGoogleLaneServer() {
           const kind = String(mime).split('.').pop();
           file.webViewLink = 'https://docs.google.com/' + (kind === 'document' ? 'document' : kind) + '/d/' + id + '/edit';
         }
+        if (packed.meta && packed.meta.appProperties) file.appProperties = packed.meta.appProperties;
+        if (packed.meta && packed.meta.description) file.description = packed.meta.description;
+        if (!file.createdTime) file.createdTime = '2026-11-14T09:00:00.000Z';
         if (isDoc) {
           const plain = htmlPlainText(packed.bytes);
           state.docs[id] = docBody(plain, '');
@@ -482,6 +529,28 @@ function startGoogleLaneServer() {
         }
         state.files[id] = file;
         state.last.file = id;
+        const echoed = driveFields(file, url.searchParams.get('fields'));
+        send(res, echoed.status, echoed.body);
+        return;
+      }
+      if (method === 'PATCH' && path.indexOf('/upload/drive/v3/files/') === 0) {
+        const packed = parseDriveUpload(raw);
+        const id = path.slice('/upload/drive/v3/files/'.length).split('/')[0];
+        const file = state.files[id];
+        if (!file) { send(res, 404, { error: 'missing' }); return; }
+        if (packed.meta && packed.meta.name) file.name = packed.meta.name;
+        if (packed.meta && packed.meta.appProperties) file.appProperties = Object.assign({}, file.appProperties || {}, packed.meta.appProperties);
+        if (packed.meta && packed.meta.description) file.description = packed.meta.description;
+        bumpFile(file);
+        if (file.mimeType === 'application/vnd.google-apps.document' && packed.bytes && packed.bytes.length) {
+          const plain = htmlPlainText(packed.bytes);
+          state.docs[id] = docBody(plain, '');
+          state.docText[id] = plain;
+        }
+        if (packed.meta && Object.keys(packed.meta).length) {
+          state.calls[state.calls.length - 1].body = packed.meta;
+          state.calls[state.calls.length - 1].media = Buffer.from(packed.bytes || []).toString('utf8');
+        }
         const echoed = driveFields(file, url.searchParams.get('fields'));
         send(res, echoed.status, echoed.body);
         return;

@@ -150,7 +150,7 @@ const FlowStepKit = (() => {
       (c.icon ? '<span class="ss-chip-glyph" aria-hidden="true">' + glyph(c.icon) + '</span>' : '') +
       '<span class="chip-txt">' + (c.q || '') + '</span>' +
       dateChoicesHTML(waiting || c.selectedIso ? c.dateChoices : null, c.selectedIso) +
-      '<span class="chip-act"><button type="button" class="chip-x" aria-label="' + esc(L.dismiss || 'Dismiss') + '">×</button>' + doItHTML(L.doIt, waiting) + '</span></div>';
+      '<span class="chip-act"><button type="button" class="chip-x" aria-label="' + esc(L.dismiss || 'Dismiss') + '">×</button>' + (cfg.noDoIt ? '' : doItHTML(L.doIt, waiting)) + '</span></div>';
   }
 
   function addHTML(L) {
