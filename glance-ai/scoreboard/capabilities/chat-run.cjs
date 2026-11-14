@@ -46,6 +46,14 @@ const ROWS = [
   ['chat.questions', 'he', 'היי, מה המחיר לעשרה משתמשים? כמה זמן לוקח ההטמעה אצלכם?', 'draft'], ['chat.questions', 'en', 'Hi, what is the price for ten users? Which plan includes onboarding support?', 'draft'],
   ['chat.neg.one-question', 'en', 'Hi, how long does onboarding take with you guys?', 'none'],
   ['chat.reminder', 'en', 'Remind me to call the bank tomorrow', 'task'],
+  // second pass: other wording of the same kinds
+  ['chat.deadline', 'he', 'תשלח לי את החוזה החתום עד מחר בערב', 'task'], ['chat.deadline', 'en', 'Can you get me the final numbers by Monday?', 'task'],
+  ['chat.callback', 'he', 'תתקשר אליי ביום שלישי, זה דחוף', 'task'], ['chat.payment', 'he', 'תשלם לי 320 שקל עד יום חמישי', 'pay'],
+  ['chat.appointment', 'en', 'See you Tuesday at 09:30 at the clinic, your appointment is booked', 'calendar'],
+  // by design, not rows: «המשלוח יגיע ...» without «שלך» is not read as the person's own delivery (core/chat-delivery-window.js), and «נתראה ביום חמישי ב-18:00» is a goodbye, not a proposal.
+  ['chat.neg.ack', 'en', 'sounds good, talk soon', 'none'], ['chat.neg.past', 'he', 'שילמתי את החשבונית אתמול', 'none'],
+  ['chat.neg.negation', 'he', 'אין צורך לשלוח לי את החוזה', 'none'], ['chat.neg.hedge', 'en', 'maybe we could meet sometime next week, no rush', 'none'],
+  ['chat.neg.other-tool', 'he', 'נעשה שיחה בזום ביום שלישי ב-15:00?', 'none'],
   // negatives
   ['chat.neg.ack', 'en', 'ok thanks', 'none'], ['chat.neg.ack', 'he', 'תודה רבה, סבבה', 'none'],
   ['chat.neg.hedge', 'he', 'אולי נדבר מתישהו בשבוע הבא', 'none'], ['chat.neg.past', 'en', 'I paid the invoice yesterday', 'none'],
@@ -53,7 +61,7 @@ const ROWS = [
   ['chat.neg.bank', 'en', 'Our bank details changed, please pay the 4,000 invoice to the new account by Friday', 'none'],
   ['chat.neg.other-tool', 'en', 'Can we do a Zoom call Tuesday at 3pm?', 'none']
 ];
-const SAME = { video_link: ['calendar'], draft: ['task'] };
+const SAME = { video_link: ['calendar'], draft: ['task'], task: ['draft'] };
 const ok = (w, g2) => (w === 'none' ? g2 === 'none' : g2 !== 'none' && (g2 === w || (SAME[w] || []).indexOf(g2) >= 0));
 const out = {}, detail = [];
 for (const [kind, lang, text, want, over] of ROWS) {

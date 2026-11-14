@@ -5336,6 +5336,8 @@ const FlowIntent = (() => {
   const VETO_HE_LATIN_RE = new RegExp(VETO_HE_LATIN, 'i');
   const VETO_HE_CANCEL_RE = new RegExp('(?:^|[^\\u0590-\\u05FF])(?:' + VETO_HE_CANCEL + ')(?![\\u0590-\\u05FF])');
   const VETO_PAST_EN = new RegExp('\\b(?:the |our |a |this )?' + VETO_EVENT + '\\s+was\\s+(?:on|yesterday)\\b', 'i');
+  // «The meeting last Tuesday at 16:00 was great, thanks for coming.»: a meeting named with «last <day or week>», or one called great, good or productive, is behind us.
+  const VETO_PAST_EN2 = new RegExp('\\b(?:the |our |a |this )?' + VETO_EVENT + '\\s+last\\s+(?:week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b|\\b(?:the |our |a |this )?' + VETO_EVENT + '(?:[^\\n.!?]){0,40}\\b(?:was|were)\\s+(?:really\\s+)?(?:great|good|productive|helpful|useful|nice|fun)\\b', 'i');
   const VETO_PAST_HE = new RegExp('(?:' + VETO_HE_EVENT + '|' + VETO_HE_LATIN + ')(?:[^\\n.!?]){0,40}(?:הייתה|היה|היו)|(?:הייתה|היה|היו)(?:[^\\n.!?]){0,40}(?:' + VETO_HE_EVENT + '|' + VETO_HE_LATIN + ')', 'i');
   function vetoClauses(raw) {
     return String(raw || '').split(/\n+|(?<=[.!?;])\s+|,\s+|\s+\bbut\b\s+|\s+אבל\s+/i);
@@ -5360,7 +5362,7 @@ const FlowIntent = (() => {
   }
   function clausePast(clause) {
     if (/\bwas on my list\b/i.test(clause)) return false;
-    return VETO_PAST_EN.test(clause) || VETO_PAST_HE.test(clause);
+    return VETO_PAST_EN.test(clause) || VETO_PAST_EN2.test(clause) || VETO_PAST_HE.test(clause);
   }
   function clauseLive(clause) {
     if (clausePast(clause) || clauseCancelled(clause)) return false;
@@ -10656,14 +10658,14 @@ const FlowIncomingJudge = (() => {
     }
     // Off unless the host passes taskAskOn (glanceSwitches.TASK_ASK).
     if (i.taskAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
-      const ask = taskAsk(i, prepareForJudge(i.text));
+      const ask = taskAsk(i, stripOwnVocative(prepareForJudge(i.text), i.ownNames));
       if (ask) return { show: true, intent: ask.intent, process: forSurface(ask.process, i.surface || 'gmail') };
     }
 
     // A payment asked of the person with an amount and a day ("Please transfer 500 NIS by Sunday") becomes a task "Pay 500 NIS"
     // due that day (core/chat-payment-ask.js). Glance never pays. Off unless the host passes paymentAskOn (glanceSwitches.PAYMENT_ASK).
     if (i.paymentAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
-      const pay = paymentAsk(i, prepareForJudge(i.text));
+      const pay = paymentAsk(i, stripOwnVocative(prepareForJudge(i.text), i.ownNames));
       if (pay) return { show: true, intent: pay.intent, process: forSurface(pay.process, i.surface || 'gmail') };
     }
 
@@ -11128,6 +11130,18 @@ const FlowIncomingJudge = (() => {
     };
   }
 
+  // «Sali, I need the budget by Thursday.»: a mail that opens on the reader's own given name and a comma is addressed to the reader, and the task and payment
+  // readers want the clause itself (capability frozen set, 2026-11-14: «Hi, I need ...» read, «Sali, I need ...» did not). Another person's name ("Dana,") is not
+  // stripped, so a mail for someone else stays quiet.
+  function stripOwnVocative(body, ownNames) {
+    const names = (ownNames || []).filter(Boolean).map((n) => String(n).trim().toLowerCase());
+    if (!names.length) return body;
+    const m = String(body || '').match(/^\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})\s*[,،:]\s+/);
+    if (!m) return body;
+    const w = m[1].toLowerCase();
+    const alias = { sali: 'סאלי', 'סאלי': 'sali' };
+    return (names.indexOf(w) >= 0 || (alias[w] && names.indexOf(alias[w]) >= 0)) ? String(body).slice(m[0].length) : body;
+  }
   function taskAsk(i, body) {
     if (!addressedOnTo(i)) return null;
     const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());

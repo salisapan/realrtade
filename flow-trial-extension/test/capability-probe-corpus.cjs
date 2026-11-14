@@ -28,6 +28,6 @@ check('every declared gap is still a gap (a fixed one is removed from the list o
 check('no negative row is offered (a wrong Do It would show here)', j.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0, j.detail.filter((d) => d[3] === 'none' && d[4] !== 'none'));
 check('a payment to a new bank account stays quiet with the payment and task readers on', j.detail.filter((d) => /^pay\.bankchange/.test(d[0])).every((d) => d[4] === 'none'));
 check('the probe covers at least 25 kinds', Object.keys(j.out).length >= 25, Object.keys(j.out).length);
-check('at least 92 of the scored rows are right', j.tot.right >= 92, j.tot);
+check('at least 104 of the scored rows are right', j.tot.right >= 104, j.tot);
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
