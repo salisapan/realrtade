@@ -36,9 +36,18 @@ module.exports = [
   ['task.callback', 'en', 'Hi Sali, please call me back on Thursday about the offer.', 'task'],
   ['commit.reader', 'en', 'Hi Sali, as agreed on the call, you will send the invoice by Friday.', 'task'],
   ['commit.reader', 'he', 'היי סאלי, לפי מה שסיכמנו בשיחה, אתה שולח את החשבונית עד יום שישי.', 'task'],
+  ['commit.reader.neg', 'he', 'היי סאלי, אתה שולח את החשבונית עד יום שישי?', 'none'],
+  ['commit.reader.neg', 'he', 'היי סאלי, אולי אתה שולח את החשבונית עד יום שישי.', 'none'],
   ['commit.sender', 'en', "Hi Sali, I'll send you the signed contract by Friday. Dana", 'task'],
   ['commit.sender', 'he', 'היי סאלי, אשלח לך את החוזה החתום עד יום שישי. דנה', 'task'],
   ['commit.sender.neg', 'en', "Hi Sali, I'll try to send it at some point, no promises.", 'none'],
+  // shapes the held-out kind set exposed (2026-11-14), moved here when fixed
+  ['task.deadline', 'en', 'Sali, I need the updated budget in my inbox by Thursday.', 'task'],
+  ['task.deadline', 'he', 'סאלי, אני צריכה את התקציב המעודכן עד יום חמישי.', 'task'],
+  ['task.deadline.neg', 'en', 'Dana, I need the budget by Thursday.', 'none'],
+  ['cal.hold.neg', 'en', 'The meeting last Tuesday at 16:00 was great, thanks for coming.', 'none'],
+  ['pay.ask', 'he', 'שלום סאלי, אנא העבר לי 2,300 ש"ח עד יום שני.', 'pay'],
+  ['pay.ask.neg', 'he', 'אנא אל תעביר 2,300 ש"ח עד יום שני', 'none'],
   // --- money
   ['pay.ask', 'en', 'Hi Sali, please transfer 500 NIS to my account by Sunday.', 'pay'],
   ['pay.ask', 'he', 'היי סאלי, תעביר לי 500 שקל עד יום ראשון.', 'pay'],
