@@ -383,7 +383,9 @@ const FlowGoogleDocs = (() => {
     const type = clipProp(g.docType, 40);
     const title = clipProp(g.titleKey, 60);
     const at = clipProp(g.at, 20);
+    const message = clipProp(g.messageId, 120);
     if (thread) props.glanceThread = thread;
+    if (message) props.glanceMessage = message;
     if (type) props.glanceType = type;
     if (title) props.glanceTitle = title;
     if (at) props.glanceAt = at;
@@ -398,6 +400,7 @@ const FlowGoogleDocs = (() => {
     meta.description = 'glance ' + JSON.stringify({
       glance: true,
       thread: props.glanceThread || '',
+      message: props.glanceMessage || '',
       type: props.glanceType || '',
       title: props.glanceTitle || '',
       at: props.glanceAt || ''

@@ -228,15 +228,20 @@ const FlowFullDocumentClose = (() => {
     return 'Hi,';
   }
 
+  // The Hebrew close is the word בברכה, with the bet. A cue strip that drops a
+  // leading ב (the same letter as the preposition) turns it into ברכה. Keys
+  // come from FlowStyle (bekavod, not a misspelled bekvod). A missing key,
+  // "none", or a value that is already the stripped word stays the exact line.
   function signoffLine(styleSummary, lang) {
+    const he = lang === 'he';
+    const fallback = he ? 'בברכה,' : 'Best,';
     const S = Style();
-    if (!S || !styleSummary) return lang === 'he' ? 'בברכה,' : 'Best,';
-    const map = {
-      en: { best: 'Best,', 'best-regards': 'Best regards,', thanks: 'Thanks,', cheers: 'Cheers,', sincerely: 'Sincerely,' },
-      he: { brakha: 'בברכה,', toda: 'תודה,', 'toda-raba': 'תודה רבה,', bekvod: 'בכבוד רב,' }
-    };
-    const table = map[lang === 'he' ? 'he' : 'en'] || map.en;
-    return table[styleSummary.signoff] || (lang === 'he' ? 'בברכה,' : 'Best,');
+    const key = styleSummary && styleSummary.signoff;
+    if (!S || !key || key === 'none') return fallback;
+    const fromStyle = S.SIGN_TEXT && S.SIGN_TEXT[he ? 'he' : 'en'] && S.SIGN_TEXT[he ? 'he' : 'en'][key];
+    const line = fromStyle || fallback;
+    if (he && (line === 'ברכה,' || line === 'ברכה')) return 'בברכה,';
+    return line;
   }
 
   function composeHtml(close, opts) {
@@ -412,6 +417,63 @@ const FlowFullDocumentClose = (() => {
     return m ? m[1].trim() : '';
   }
 
+  // Whole cue words only. A single leading ב is the start of בברכה, not a prefix.
+  function stripCuePrefix(value) {
+    let s = String(value || '').trim();
+    let prev = '';
+    while (s && s !== prev) {
+      prev = s;
+      s = s.replace(/^(?:הוחלט|החלטות|משימות|משימה|לביצוע)\s*[:：]?\s*/u, '').trim();
+    }
+    return s;
+  }
+
+  function peopleFrom(text) {
+    const m = String(text || '').match(/(?:השתתפו|משתתפים|נכחו|נוכחים)\s*[:：]?\s*([^\n.]{2,180})/u);
+    if (!m) return [];
+    return splitItems(m[1]).map(stripCuePrefix).filter((name) => name && !/^(?:השתתפו|משתתפים|נכחו|נוכחים)$/.test(name));
+  }
+
+  function cueList(text, pattern, keepCue) {
+    const out = [];
+    const re = new RegExp('(' + pattern + ')\\s*[:：]?\\s*([^\\n.]{2,160})', 'g');
+    let m;
+    while ((m = re.exec(String(text || '')))) {
+      let value = stripCuePrefix(m[2]);
+      if (keepCue && m[1] === keepCue) value = (keepCue + ' ' + value).trim();
+      if (value) out.push(value);
+    }
+    return out;
+  }
+
+  function addressFrom(text) {
+    const m = String(text || '').match(/(?:רחוב|רח['׳])\s+[\u0590-\u05FF]{2,20}(?:\s+[\u0590-\u05FF]{2,20})?\s+\d{1,4}(?:\s+[\u0590-\u05FF]{2,20}(?:\s+[\u0590-\u05FF]{2,20})?)?/u);
+    return m ? m[0].replace(/\s+/g, ' ').trim() : '';
+  }
+
+  function termFrom(text) {
+    const labeled = phraseAfter(text, '(?:תקופה|תוקף)');
+    if (labeled) return stripCuePrefix(labeled);
+    const m = String(text || '').match(/(?:לשנתיים|לשנה|לחודשיים|לחודש|לשבועיים|לשבוע|ליומיים)\s+מ\s*[-–]?\s*\d{1,2}\/\d{1,2}\/\d{2,4}/);
+    if (!m) return '';
+    return m[0].replace(/\s+/g, ' ').replace(/מ\s*-\s*/, 'מ-').trim();
+  }
+
+  function amountClause(text) {
+    const m = String(text || '').match(/[\d][\d,]*(?:\.\d+)?\s*(?:₪|ש["״׳']?ח)(?:\s+(?:לחודש|לשנה|לשעה))?(?:\s+(?:כולל|לא כולל)\s+מע["״׳']?מ)?/);
+    return m ? m[0].replace(/\s+/g, ' ').trim() : '';
+  }
+
+  function richerAmount(labeled, clause) {
+    const a = String(labeled || '').trim();
+    const b = String(clause || '').trim();
+    if (!a) return b;
+    if (!b) return a;
+    if (a.indexOf(b) >= 0) return a;
+    if (b.indexOf(a) >= 0) return b;
+    return a.length >= b.length ? a : b;
+  }
+
   function placeholder(lang, label) {
     return lang === 'he' ? ('[להשלים: ' + label + ']') : ('[to fill in: ' + label + ']');
   }
@@ -427,15 +489,15 @@ const FlowFullDocumentClose = (() => {
     if (type === 'agreement') {
       const between = t.match(/בין\s+([\u0590-\u05FF][\u0590-\u05FF\s]{1,40}?)\s+לבין\s+([\u0590-\u05FF][\u0590-\u05FF\s]{1,40})/u);
       const parties = between ? (between[1].trim() + ', ' + between[2].trim()) : '';
-      const term = phraseAfter(t, '(?:תקופה|תוקף)');
+      const term = termFrom(t);
       const rent = phraseAfter(t, '(?:דמי שכירות|תנאים)');
-      const money = extractAmount(t);
-      const terms = [rent, money && amountVerbatimInSource(t, money) ? money : ''].filter(Boolean).join(' · ');
+      const terms = richerAmount(rent, amountClause(t));
       return {
         topic: topic,
         sections: [
           sectionOf('parties', 'צדדים', 'Parties', parties),
           sectionOf('subject', 'נושא', 'Subject', topic),
+          sectionOf('property', 'כתובת', 'Address', addressFrom(t)),
           sectionOf('terms', 'תנאים', 'Terms', terms),
           sectionOf('term', 'תוקף', 'Term', term),
           sectionOf('signatures', 'חתימות', 'Signatures', '')
@@ -443,15 +505,13 @@ const FlowFullDocumentClose = (() => {
       };
     }
     if (type === 'meeting-summary') {
-      const people = phraseAfter(t, 'משתתפים');
-      const decided = t.match(/(?:סוכם|הוחלט)\s*([^.\n]{2,160})/);
       return {
         topic: topic,
         sections: [
-          sectionOf('attendees', 'משתתפים', 'Attendees', people),
+          sectionOf('attendees', 'משתתפים', 'Attendees', '', peopleFrom(t)),
           sectionOf('topics', 'נושאים', 'Topics', topic),
-          sectionOf('decisions', 'החלטות', 'Decisions', decided ? decided[0].trim() : ''),
-          sectionOf('actions', 'משימות להמשך', 'Follow-ups', phraseAfter(t, '(?:משימה|משימות)'))
+          sectionOf('decisions', 'החלטות', 'Decisions', '', cueList(t, 'החלטות|הוחלט|סוכם', 'סוכם')),
+          sectionOf('actions', 'משימות להמשך', 'Follow-ups', '', cueList(t, 'משימות|משימה|לביצוע', ''))
         ]
       };
     }
@@ -560,7 +620,7 @@ const FlowFullDocumentClose = (() => {
       const value = sec.value || placeholder(useLang, label);
       html += '<p><strong>' + escapeHtml(label) + ':</strong> ' + escapeHtml(value) + '</p>';
     });
-    if (type === 'letter') html += '<p>' + escapeHtml(signoffLine(styleSummary, useLang)) + '</p>';
+    html += '<p>' + escapeHtml(signoffLine(styleSummary, useLang)) + '</p>';
     return { html: html, title: heading, previewOnly: true, closes: false, sections: filled.sections, topic: filled.topic };
   }
 
@@ -603,6 +663,7 @@ const FlowFullDocumentClose = (() => {
       url: String((raw && (raw.webViewLink || raw.url)) || ''),
       trashed: !!(raw && raw.trashed),
       threadId: String(props.glanceThread || fromDesc.thread || (raw && raw.threadId) || ''),
+      messageId: String(props.glanceMessage || fromDesc.message || (raw && raw.messageId) || ''),
       docType: String(props.glanceType || fromDesc.type || (raw && raw.docType) || ''),
       titleKey: String(props.glanceTitle || fromDesc.title || (raw && raw.titleKey) || ''),
       at: String(props.glanceAt || fromDesc.at || (raw && raw.at) || ''),
@@ -645,10 +706,18 @@ const FlowFullDocumentClose = (() => {
     const lang = input.lang === 'he' ? 'he' : 'en';
     const threadId = String(input.threadId || '');
     const titleKey = String(input.titleKey || '');
+    const messageId = String(input.messageId || '');
+    const own = {};
+    [].concat(input.ownDocumentIds || []).forEach((id) => { if (id) own[String(id)] = true; });
     if (attachmentCovers(input.attachments, type)) {
       return { mode: 'attached', reason: 'already-attached' };
     }
-    const files = (input.existingDocs == null ? [] : input.existingDocs).map(fileView).filter((file) => file.id && !file.trashed && file.glance && file.docType === type);
+    const files = (input.existingDocs == null ? [] : input.existingDocs).map(fileView).filter((file) => {
+      if (!file.id || file.trashed || !file.glance || file.docType !== type) return false;
+      if (own[file.id]) return false;
+      if (messageId && file.messageId && file.messageId === messageId) return false;
+      return true;
+    });
     const updates = files.filter((file) => threadId && file.threadId === threadId);
     const opens = files.filter((file) => titleKey && file.titleKey === titleKey && !(threadId && file.threadId === threadId));
     const drafts = (input.drafts || []).filter((row) => {
@@ -749,6 +818,8 @@ const FlowFullDocumentClose = (() => {
     const decision = decideExisting({
       docType: offer.docType || 'quote',
       threadId: input.threadId || '',
+      messageId: input.messageId || '',
+      ownDocumentIds: input.ownDocumentIds || [],
       titleKey: offer.titleKey || '',
       attachments: input.attachments || [],
       drafts: input.drafts || [],

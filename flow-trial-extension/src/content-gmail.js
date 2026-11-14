@@ -2080,6 +2080,12 @@ function glanceUiCopy(kind) {
       logScanSkip(messageId, 'lane-receipt');
       return;
     }
+    const docReceipt = await readDocReceipt(stable.legacy || messageId, stable.laneIds);
+    if (docReceipt && message.isConnected && !message.querySelector('.flow-chip-host')) {
+      mountDocReceipt(message, docReceipt, messageId);
+      logScanSkip(messageId, 'doc-receipt');
+      return;
+    }
 
     // A message can reach "seen" with no live chip in front of you two very
     // different ways: you dismissed it, or Gmail rebuilt the DOM out from
@@ -3448,6 +3454,7 @@ function glanceUiCopy(kind) {
         styleSummary: styleSummary,
         companyTemplate: template,
         threadId: c.threadId || '',
+        messageId: c.messageId || '',
         attachments: files.slice(0, 12).map((file) => ({
           filename: String((file && (file.filename || file.name)) || '').slice(0, 180),
           mimeType: String((file && (file.mimeType || file.mime)) || '').slice(0, 120)
@@ -3506,6 +3513,7 @@ function glanceUiCopy(kind) {
         docType: plan.docType || (plan.googleClose && plan.googleClose.artifact) || 'quote',
         titleKey: plan.titleKey || '',
         threadId: c.threadId || '',
+        messageId: c.messageId || '',
         at: localIsoDay()
       }
     });
@@ -4213,6 +4221,7 @@ function glanceUiCopy(kind) {
         const mark = ctx.fullDocument;
         params.glance = {
           threadId: String(mark.threadId || '').slice(0, 80),
+          messageId: String(mark.messageId || (ctx && ctx.messageId) || '').slice(0, 120),
           docType: String(mark.docType || '').slice(0, 40),
           titleKey: String(mark.titleKey || '').slice(0, 60),
           at: String(mark.at || '').slice(0, 20)
@@ -5867,8 +5876,90 @@ function glanceUiCopy(kind) {
     if (chip && typeof chip.replaceWith === 'function') chip.replaceWith(done);
   }
 
-  function showDocPreviewReceipt(host, chip, result, ctx) {
-    const response = result.response || {};
+  const DOC_RECEIPT_KEY = 'glanceDocReceipt';
+
+  function docReceiptKeys(messageId, extraIds) {
+    const keys = [];
+    function add(id) {
+      const s = String(id || '').trim();
+      if (!s || keys.indexOf(s) >= 0) return;
+      keys.push(s);
+    }
+    add(messageId);
+    (extraIds || []).forEach(add);
+    return keys;
+  }
+
+  function rememberDocReceipt(ctx, response) {
+    const ref = response && response.ref;
+    const documentId = ref && (ref.documentId || ref.externalId);
+    const keys = docReceiptKeys(ctx && ctx.messageId, [ctx && ctx.legacyMessageId].concat((ctx && ctx.laneIds) || []));
+    if (!keys.length || !documentId || !chromeLive()) return Promise.resolve();
+    const store = chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') return Promise.resolve();
+    const row = {
+      expires: Date.now() + LANE_UNDO_TTL_MS,
+      documentId: String(documentId),
+      threadId: String((ctx && ctx.threadId) || ''),
+      written: String((response && response.written) || ''),
+      url: String((response && response.url) || ''),
+      ref: ref,
+      ids: keys
+    };
+    return Promise.resolve()
+      .then(() => store.get(DOC_RECEIPT_KEY))
+      .then((bag) => {
+        const all = bag && bag[DOC_RECEIPT_KEY] && typeof bag[DOC_RECEIPT_KEY] === 'object' ? bag[DOC_RECEIPT_KEY] : {};
+        const now = Date.now();
+        Object.keys(all).forEach((key) => { if (!all[key] || !all[key].expires || all[key].expires < now) delete all[key]; });
+        keys.forEach((id) => { all[id] = row; });
+        return store.set({ [DOC_RECEIPT_KEY]: all });
+      })
+      .then(() => { try { console.info('[Glance] full-document receipt stored'); } catch (e) { /* no console */ } })
+      .catch(() => {});
+  }
+
+  function readDocReceipt(messageId, extraIds) {
+    const keys = docReceiptKeys(messageId, extraIds);
+    if (!keys.length || !chromeLive()) return Promise.resolve(null);
+    const store = chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function') return Promise.resolve(null);
+    return Promise.resolve()
+      .then(() => store.get(DOC_RECEIPT_KEY))
+      .then((bag) => {
+        const all = bag && bag[DOC_RECEIPT_KEY] && typeof bag[DOC_RECEIPT_KEY] === 'object' ? bag[DOC_RECEIPT_KEY] : {};
+        const now = Date.now();
+        for (let i = 0; i < keys.length; i++) {
+          const row = all[keys[i]];
+          if (row && row.documentId && row.expires && row.expires >= now) return row;
+        }
+        return null;
+      })
+      .catch(() => null);
+  }
+
+  function forgetDocReceipt(messageId, extraIds) {
+    const keys = docReceiptKeys(messageId, extraIds);
+    if (!keys.length || !chromeLive()) return Promise.resolve();
+    const store = chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') return Promise.resolve();
+    return Promise.resolve()
+      .then(() => store.get(DOC_RECEIPT_KEY))
+      .then((bag) => {
+        const all = bag && bag[DOC_RECEIPT_KEY] && typeof bag[DOC_RECEIPT_KEY] === 'object' ? bag[DOC_RECEIPT_KEY] : {};
+        const drop = {};
+        keys.forEach((id) => { drop[id] = true; });
+        Object.keys(all).forEach((key) => {
+          const row = all[key];
+          if (drop[key] || (row && (row.ids || []).some((id) => drop[id]))) delete all[key];
+        });
+        return store.set({ [DOC_RECEIPT_KEY]: all });
+      })
+      .catch(() => {});
+  }
+
+  function paintDocReceipt(host, chip, receipt, ctx) {
+    const response = receipt || {};
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('role', 'status');
     const he = glanceUiHebrew();
@@ -5895,6 +5986,7 @@ function glanceUiCopy(kind) {
           const written = done.querySelector('.flow-chip-written');
           if (written) written.textContent = line;
           undo.textContent = line;
+          forgetDocReceipt(ctx && ctx.messageId, [ctx && ctx.legacyMessageId].concat((ctx && ctx.laneIds) || []));
           userContextEvent({ type: 'undo', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() });
           return;
         }
@@ -5914,7 +6006,14 @@ function glanceUiCopy(kind) {
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     done.appendChild(actionsRow);
-    placeReceipt(host, chip, done);
+    if (host) placeReceipt(host, chip, done);
+    return done;
+  }
+
+  function showDocPreviewReceipt(host, chip, result, ctx) {
+    const response = result.response || {};
+    rememberDocReceipt(ctx, response);
+    paintDocReceipt(host, chip, response, ctx);
     if (response.proof && response.proof.fetchedBack === true) {
       userContextEvent({
         type: 'approved',
@@ -5924,6 +6023,15 @@ function glanceUiCopy(kind) {
         at: new Date().toISOString()
       });
     }
+  }
+
+  function mountDocReceipt(messageNode, receipt, messageId) {
+    if (!messageNode || messageNode.querySelector('.flow-chip-host')) return;
+    const host = el('div', 'flow-chip-host flow-chip-settled');
+    host.setAttribute('data-glance-message', messageId || '');
+    const done = paintDocReceipt(null, null, receipt, { messageId: messageId, legacyMessageId: messageId, laneIds: receipt && receipt.ids });
+    host.appendChild(done);
+    messageNode.insertBefore(host, messageNode.firstChild);
   }
 
   function showPreviewReceipt(host, chip, result, ctx) {

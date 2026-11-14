@@ -42,8 +42,8 @@ const FIXTURES = [
     subject: 'הסכם שכירות למשרד',
     body: 'שלום, נא לנסח טיוטת הסכם שכירות בין דנה כהן לבין רוני לוי. תקופה: שנה. דמי שכירות: 5,000 ש״ח לחודש.',
     title: 'הסכם — שכירות למשרד',
-    has: ['דנה כהן', 'רוני לוי', 'שנה'],
-    sections: ['צדדים', 'נושא', 'תנאים', 'תוקף', 'חתימות'],
+    has: ['דנה כהן', 'רוני לוי', 'שנה', '5,000 ש״ח לחודש'],
+    sections: ['צדדים', 'נושא', 'כתובת', 'תנאים', 'תוקף', 'חתימות'],
     placeholder: 'חתימות'
   },
   {
@@ -224,6 +224,63 @@ const bareDraft = offer('הסכם שכירות', 'נא לנסח הסכם שכי�
 });
 check('a reply draft with no document title is not treated as the document',
   bareDraft.mode === 'create' && bareDraft.docType === 'agreement', bareDraft);
+
+const liveMeet = offer('סיכום פגישה', 'נא להכין סיכום פגישה. השתתפו: דנה, רוני. החלטות: הוחלט: לאשר את התקציב. משימות: נועה שולחת את המספרים. לביצוע: רוני סוגר את הדוח.');
+const liveMeetHtml = (liveMeet.built && liveMeet.built.html) || '';
+check('live meeting «השתתפו: דנה, רוני» is the attendee list, not a placeholder',
+  liveMeetHtml.indexOf('<li>דנה</li>') >= 0 && liveMeetHtml.indexOf('<li>רוני</li>') >= 0 && liveMeetHtml.indexOf('[להשלים: משתתפים]') < 0, liveMeetHtml);
+check('live meeting «נכחו» and «נוכחים» without a colon are names too',
+  (offer('סיכום פגישה', 'נא להכין סיכום פגישה. נכחו דנה ורוני.').built.html || '').indexOf('<li>דנה</li>') >= 0 &&
+  (offer('סיכום פגישה', 'נא להכין סיכום פגישה. נוכחים: דנה, רוני.').built.html || '').indexOf('<li>רוני</li>') >= 0);
+check('live meeting decisions and tasks drop the cue and are one list item each',
+  liveMeetHtml.indexOf('<li>לאשר את התקציב</li>') >= 0 && liveMeetHtml.indexOf('<li>נועה שולחת את המספרים</li>') >= 0 &&
+  liveMeetHtml.indexOf('<li>רוני סוגר את הדוח</li>') >= 0 && liveMeetHtml.indexOf('הוחלט') < 0 && liveMeetHtml.indexOf('<li>משימות') < 0 &&
+  liveMeetHtml.indexOf('<li>לביצוע') < 0, liveMeetHtml);
+
+const liveAgree = offer('הסכם שכירות', 'נא לנסח הסכם שכירות. רחוב הרצל 10 תל אביב. לשנה מ-1/1/2027. תנאים: 3,000 ש״ח לחודש כולל מע״מ.');
+const liveAgreeHtml = (liveAgree.built && liveAgree.built.html) || '';
+check('live agreement keeps the address, the term with its start date, and the amount period',
+  liveAgreeHtml.indexOf('רחוב הרצל 10 תל אביב') >= 0 && liveAgreeHtml.indexOf('לשנה מ-1/1/2027') >= 0 &&
+  liveAgreeHtml.indexOf('3,000 ש״ח לחודש') >= 0 && liveAgreeHtml.indexOf('כולל מע״מ') >= 0 &&
+  liveAgreeHtml.indexOf('[להשלים: תוקף]') < 0 && liveAgreeHtml.indexOf('[להשלים: כתובת]') < 0, liveAgreeHtml);
+const hourly = offer('הסכם', 'נא לנסח הסכם. רח\' אלנבי 4 חיפה. תנאים: 200 ש״ח לשעה לא כולל מע״מ.');
+check('an abbreviated street and an hourly amount keep לא כולל מע״מ',
+  (hourly.built.html || '').indexOf("רח' אלנבי 4 חיפה") >= 0 && (hourly.built.html || '').indexOf('200 ש״ח לשעה') >= 0 &&
+  (hourly.built.html || '').indexOf('לא כולל מע״מ') >= 0, hourly.built && hourly.built.html);
+
+const signoffTemplates = ['quote'].concat(Object.keys(F.DOC_TYPES).filter((type) => type !== 'quote'));
+signoffTemplates.forEach((type) => {
+  const row = type === 'quote'
+    ? offer('בקשה להצעת מחיר לאתר חדש', 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק: 5 עמודים, טופס יצירת קשר ובלוג.')
+    : offer(FIXTURES.filter((item) => item.type === type)[0].subject, FIXTURES.filter((item) => item.type === type)[0].body);
+  const html = (row.built && row.built.html) || '';
+  check(type + ' sign-off is exactly בברכה,', html.indexOf('<p>בברכה,</p>') >= 0 && html.indexOf('<p>ברכה,</p>') < 0 && html.indexOf('>ברכה,<') < 0, html.slice(-80));
+});
+const brakha = offer('בקשה להצעת מחיר לאתר', 'נא להכין הצעת מחיר לאתר.', { styleSummary: { signoff: 'brakha', greeting: 'shalom' } });
+const bekavod = offer('מכתב תודה ללקוח', 'נא לכתוב מכתב לדנה כהן על סיום הפרויקט.', { styleSummary: { signoff: 'bekavod', greeting: 'shalom' } });
+check('a brakha profile still signs בברכה, and bekavod signs בכבוד רב,',
+  (brakha.built.html || '').indexOf('<p>בברכה,</p>') >= 0 && (bekavod.built.html || '').indexOf('<p>בכבוד רב,</p>') >= 0,
+  { quote: brakha.built && brakha.built.html, letter: bekavod.built && bekavod.built.html });
+const english = F.plan({ flags: flags, text: 'Please draft a meeting summary for the budget review.', lang: 'en', threadId: 't-1' });
+check('an English template signs off exactly Best,', (english.built && english.built.html || '').indexOf('<p>Best,</p>') >= 0, english.built && english.built.html);
+
+const ownFile = glanceFile('doc-own', 't-1', 'quote', 'הצעת מחיר', '2026-11-14');
+ownFile.appProperties.glanceMessage = 'm-1';
+const sameCard = offer('בקשה להצעת מחיר לאתר', 'נא להכין הצעת מחיר לאתר החדש.', {
+  messageId: 'm-1',
+  existingDocs: [ownFile]
+});
+check('the Doc this same card created is not a pre-existing match', sameCard.mode === 'create' && sameCard.doItLabel !== 'עדכן', sameCard);
+const byId = offer('בקשה להצעת מחיר לאתר', 'נא להכין הצעת מחיר לאתר החדש.', {
+  ownDocumentIds: ['doc-own'],
+  existingDocs: [glanceFile('doc-own', 't-1', 'quote', 'הצעת מחיר', '2026-11-14')]
+});
+check('a receipt document id is not a pre-existing match', byId.mode === 'create', byId);
+const otherMessage = offer('בקשה להצעת מחיר לאתר', 'נא להכין הצעת מחיר לאתר החדש.', {
+  messageId: 'm-2',
+  existingDocs: [ownFile]
+});
+check('another message in the thread still offers the existing Doc', otherMessage.mode === 'update' && otherMessage.doItLabel === 'עדכן', otherMessage);
 
 console.log('\n--- verify normalization for each new template ---\n');
 

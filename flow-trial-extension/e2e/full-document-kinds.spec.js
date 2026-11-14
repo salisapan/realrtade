@@ -56,7 +56,7 @@ test('quote, meeting summary, and agreement each create one Doc', async ({ glanc
       subject: 'בקשה להצעת מחיר לאתר חדש',
       body: 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק: 5 עמודים, טופס יצירת קשר ובלוג. תודה!',
       card: 'טיוטת הצעת מחיר',
-      bits: ['הצעת מחיר', '5 עמודים', '[לא צוין לקוח]']
+      bits: ['הצעת מחיר', '5 עמודים', '[לא צוין לקוח]', 'בברכה,']
     },
     {
       subject: 'סיכום פגישה — תקציב רבעון',
@@ -112,6 +112,27 @@ test('the same request a second time updates the existing Doc and does not creat
   const patches = server.calls.filter((c) => c.method === 'PATCH' && c.path.indexOf('/upload/drive/v3/files/' + id) === 0);
   expect(patches.length).toBeGreaterThan(0);
   expect(server.calls.some((c) => /\/gmail\/v1\/users\/me\/messages\/send/.test(c.path))).toBe(false);
+});
+
+test('a created Doc keeps its receipt and Undo when the same message is scanned again', async ({ glance }) => {
+  const subject = 'בקשה להצעת מחיר לאתר חדש';
+  const body = 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק: 5 עמודים, טופס יצירת קשר ובלוג. תודה!';
+  const first = await openMail(glance, { subject: subject, body: body, threadId: 't-receipt', messageId: 'm-receipt' });
+  const logs = [];
+  first.on('console', (msg) => logs.push(msg.text()));
+  const host = first.locator('.flow-chip-host');
+  await expect(host).toContainText('טיוטת הצעת מחיר', { timeout: 20000 });
+  await clickDo(host);
+  await expect(first.locator('.flow-chip-undo')).toContainText('בטל', { timeout: 20000 });
+  await expect.poll(() => logs.some((line) => line.indexOf('full-document receipt stored') >= 0)).toBe(true);
+  await first.close();
+
+  const again = await openMail(glance, { subject: subject, body: body, threadId: 't-receipt', messageId: 'm-receipt' });
+  const card = again.locator('.flow-chip-host');
+  await expect(card.locator('.flow-chip-undo')).toContainText('בטל', { timeout: 20000 });
+  await expect(card).not.toContainText('כבר קיים מסמך מהשרשור הזה');
+  await expect(card.getByRole('button', { name: 'עדכן' })).toHaveCount(0);
+  expect(docCreates()).toHaveLength(1);
 });
 
 test('a mail that already attaches the document does not create one', async ({ glance }) => {

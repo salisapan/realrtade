@@ -1184,6 +1184,8 @@ function onLaneMessage(msg, sender, sendResponse) {
         companyTemplate: msg.companyTemplate || null,
         template: msg.companyTemplate || msg.template || null,
         threadId: String(msg.threadId || ''),
+        messageId: String(msg.messageId || ''),
+        ownDocumentIds: Array.isArray(msg.ownDocumentIds) ? msg.ownDocumentIds.slice(0, 8) : [],
         attachments: Array.isArray(msg.attachments) ? msg.attachments.slice(0, 12) : [],
         drafts: Array.isArray(msg.drafts) ? msg.drafts.slice(0, 8) : [],
         existingDocs: existingDocs
