@@ -37,28 +37,40 @@ const FlowFullDocumentClose = (() => {
       .filter((part) => part.length >= 2 && part.length <= 80);
   }
 
+  // Gmail's text/plain part wraps mid-list ("קשר\r\nובלוג"); treat those
+  // breaks as spaces so the list stays one phrase.
+  function flattenMail(text) {
+    return String(text || '').replace(/\r\n?/g, '\n').replace(/[\n\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
   // Comma lists in the ask, e.g. "5 עמודים, טופס יצירת קשר ובלוג".
-  // Start after a sentence so a dated subject like "14/11" cannot begin the list.
+  // Start after a sentence or a colon so a dated subject like "14/11" cannot
+  // begin the list, and a live body like "לעסק: 5 עמודים, ..." is not missed.
   function itemsFrom(text) {
-    const t = String(text || '');
-    const he = t.match(/(?:^|[.!?…]\s+|\n)(\d+\s+[\u0590-\u05FF][^.,\n]{1,80},\s*[^.,\n]{2,80}(?:،\s*[^.,\n]{2,80}|,\s*[^.,\n]{2,80}|\s+ו[^.,\n]{2,80})*)/);
+    const t = flattenMail(text);
+    const he = t.match(/(?:^|[.!?:;…]\s+)(\d+\s+[\u0590-\u05FF][^.,]{1,80},\s*[^.,]{2,80}(?:،\s*[^.,]{2,80}|,\s*[^.,]{2,80}|\s+ו[^.,]{2,80})*)/);
     if (he) return splitItems(he[1]);
-    const en = t.match(/(?:^|[.!?…]\s+|\n)(\d+\s+\w[^.,\n]{1,80}(?:,\s*[^.,\n]{2,80}|\s+and\s+[^.,\n]{2,80})+)/);
+    const en = t.match(/(?:^|[.!?:;…]\s+)(\d+\s+\w[^.,]{1,80}(?:,\s*[^.,]{2,80}|\s+and\s+[^.,]{2,80})+)/);
     if (en) return splitItems(en[1]);
     return [];
   }
 
+  // Strip a trailing calendar date, optional time, and an optional Hebrew
+  // weekday letter: "14/11", "14/11 ב", "14/11 20:25".
   function cleanTitle(value) {
-    return String(value || '').replace(/\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\s*$/, '').trim();
+    return String(value || '')
+      .replace(/\s+\d{1,2}\/\d{1,2}(?:\/\d{2,4})?(?:\s+\d{1,2}:\d{2})?(?:\s+[א-ת])?\s*$/u, '')
+      .trim();
   }
 
   function quoteTitleFrom(text) {
-    const t = String(text || '');
+    const t = flattenMail(text);
     const quoted = t.match(/(?:titled|called|named)\s+[“"']?([^”"'\n]{3,80})[”"']?/i) || t.match(/[“"]([^”"\n]{3,80})[”"]/);
     if (quoted) return cleanTitle(quoted[1]);
-    const build = t.match(/לבני[ית]\s+([^.,\n]{3,80})/);
+    // לבניית / לבנית / לבנות — [ית] is one character and misses "לבניית".
+    const build = t.match(/לבני(?:י?ת|ות)\s+([^.,:;\n]{3,80})/);
     if (build) return cleanTitle(build[1]);
-    const forSite = t.match(/הצעת\s*מחיר\s+ל(?!בני)([^.,\n]{3,80})/);
+    const forSite = t.match(/הצעת\s*מחיר\s+ל(?!בני)([^.,:;\n]{3,80})/);
     if (forSite) return cleanTitle(forSite[1]);
     return '';
   }

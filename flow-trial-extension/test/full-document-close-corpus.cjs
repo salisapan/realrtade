@@ -80,6 +80,29 @@ check('Hebrew Gate html is RTL-ready paragraphs with Hebrew labels and placehold
 const invented = F.stripInventedAmounts({ filled: { party: 'Dana', amount: '$1,000' } }, 'Please prepare a quote for Floor 14.');
 check('invented $1,000 stripped when not verbatim in mail', invented.filled && !invented.filled.amount);
 
+const liveSubject = '[G-Quote] בקשה להצעת מחיר לאתר חדש 14/11 ב';
+const liveBody = 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק: 5 עמודים, טופס יצירת קשר ובלוג. תודה!';
+const livePlain = 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק: 5 עמודים, טופס יצירת קשר\r\nובלוג. תודה!\r\n';
+function assertLiveShape(name, text) {
+  const p = F.plan({ flags: flagsOn, text, lang: 'he' });
+  const html = (p.built && p.built.html) || '';
+  const filled = (p.googleClose && p.googleClose.filled) || {};
+  check(name + ' fills the three requested items, including ובלוג',
+    p.action === 'offer' && Array.isArray(filled.items) && filled.items[0] === '5 עמודים' && filled.items[1] === 'טופס יצירת קשר' && filled.items[2] === 'בלוג' &&
+    /5 עמודים/.test(html) && /טופס יצירת קשר/.test(html) && /בלוג/.test(html),
+    { html: html, filled: filled });
+  check(name + ' H1 is a clean title without the 14/11 ב tail',
+    /<h1>הצעת מחיר — אתר חדש(?: לעסק)?<\/h1>/.test(html) && html.indexOf('14/11') < 0,
+    html);
+}
+// content-gmail.js joins the open thread as subject + ". " + body.
+assertLiveShape('live Gate mail (colon list, subject 14/11 ב)', liveSubject + '. ' + liveBody);
+assertLiveShape('live Gate mail with Gmail plain wrap before ובלוג', liveSubject + '. ' + livePlain);
+const subjectOnlyHtml = ((F.plan({ flags: flagsOn, text: liveSubject + '. ', lang: 'he' }).built || {}).html) || '';
+check('subject-only date tail 14/11 ב is stripped from the H1',
+  /<h1>הצעת מחיר — אתר חדש<\/h1>/.test(subjectOnlyHtml) && subjectOnlyHtml.indexOf('14/11') < 0,
+  subjectOnlyHtml);
+
 check('Hebrew document ask is recognized before template fill', F.recognize('נא להכין הצעת מחיר עבור דנה כהן').kind === 'clear');
 
 check('amountInText detects currency in mail', F.amountInText('total 3900 USD') === true);

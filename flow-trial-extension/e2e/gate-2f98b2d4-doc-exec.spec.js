@@ -15,8 +15,8 @@ const { test, expect } = require('./support/harness');
 const { startGoogleLaneServer, GOOGLE_403_SCOPE, GOOGLE_403_DRIVE_DISABLED } = require('./support/google-lane-server');
 
 const SELF = 'ai.local.flow@gmail.com';
-const SUBJECT = '[G-Quote] בקשה להצעת מחיר לאתר חדש 14/11';
-const BODY = 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק. 5 עמודים, טופס יצירת קשר ובלוג. תודה';
+const SUBJECT = '[G-Quote] בקשה להצעת מחיר לאתר חדש 14/11 ב';
+const BODY = 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק: 5 עמודים, טופס יצירת קשר ובלוג. תודה!';
 const DOC_MIME = 'application/vnd.google-apps.document';
 const DRIVE_FILE = 'https://www.googleapis.com/auth/drive.file';
 const ALL_SCOPES = [
@@ -103,6 +103,8 @@ test('granted: Do It creates one Google Doc with the quote, verified, and Undo t
   expect(created.media).toContain('5 עמודים');
   expect(created.media).toContain('טופס יצירת קשר');
   expect(created.media).toContain('בלוג');
+  expect(created.media).toContain('אתר חדש');
+  expect(created.media).not.toContain('14/11');
   expect(created.media).toContain('לקוח:');
   expect(created.media).toContain('[לא צוין לקוח]');
   expect(created.media).not.toContain('Party:');
