@@ -1,10 +1,14 @@
 // One Google Doc, created or edited only when Glance made the file or the
-// person picked it. Drive files.create uses drive.file. The Docs API edits
-// that id. There is no documents OAuth scope. Undo trashes a file this
-// lane created. An edit is wrapped in a named range. Undo reads that range
-// back, locks the delete to that revision, and removes the text and the
-// named range. A changed revision is read again before any second delete.
-// A missing or edited range is refused. Handled waits for a read-back.
+// person picked it. A new Doc is a Drive multipart upload of HTML
+// (uploadType=multipart, mimeType application/vnd.google-apps.document)
+// into the Glance folder, using drive.file only. There is no documents
+// OAuth scope and no docs.googleapis.com call on that create. The write
+// is verified with Drive files.get and an export to text/plain. Undo
+// trashes a file this lane created. An edit of a picked Doc is still
+// wrapped in a named range via the Docs API. Undo reads that range back,
+// locks the delete to that revision, and removes the text and the named
+// range. A changed revision is read again before any second delete. A
+// missing or edited range is refused. Handled waits for a read-back.
 // Portable: no chrome.*, no DOM, no network.
 const FlowGoogleDocs = (() => {
   const SYSTEM = 'google/docs';
@@ -12,6 +16,10 @@ const FlowGoogleDocs = (() => {
   const DOC_MIME = 'application/vnd.google-apps.document';
   const FILES = 'https://www.googleapis.com/drive/v3/files';
   const DOCS = 'https://docs.googleapis.com/v1/documents/';
+  const FILE_FIELDS = 'id,name,mimeType,trashed,webViewLink,headRevisionId,version,modifiedTime';
+  const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=' + encodeURIComponent(FILE_FIELDS);
+  const FOLDER_NAME = 'Glance';
+  const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
   function cfg() {
     return typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
@@ -33,8 +41,25 @@ const FlowGoogleDocs = (() => {
     return s;
   }
 
+  function htmlToPlain(html) {
+    return String(html || '')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|h1|h2|h3|li|div|tr|table|ul|ol)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+  }
+
   function textOf(input) {
-    const text = String((input && input.text) || '').replace(/\u0000/g, '');
+    const raw = String((input && input.text) || '').replace(/\u0000/g, '');
+    const fromHtml = raw.trim() ? raw : htmlToPlain(input && input.html);
+    const text = String(fromHtml || '').replace(/\u0000/g, '');
     if (!text.trim() || text.length > 8000) return '';
     return text;
   }
@@ -45,7 +70,120 @@ const FlowGoogleDocs = (() => {
   }
 
   function fileUrl(id) {
-    return FILES + '/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent('id,name,mimeType,trashed,headRevisionId,version,modifiedTime');
+    return FILES + '/' + encodeURIComponent(id) + '?fields=' + encodeURIComponent(FILE_FIELDS);
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function hasHebrew(s) {
+    return /[\u0590-\u05FF]/.test(String(s || ''));
+  }
+
+  // UTF-8 HTML so Hebrew (and any other script) renders in the Doc. dir=rtl
+  // when the text has Hebrew; otherwise ltr. Block elements so Google Docs
+  // import keeps paragraphs instead of collapsing them into one line.
+  function wrapDocHtml(inner, textHint) {
+    const src = String(inner || '').trim();
+    const rtl = hasHebrew(src) || hasHebrew(textHint);
+    const dir = rtl ? 'rtl' : 'ltr';
+    const lang = rtl ? 'he' : 'en';
+    if (/<html[\s>]/i.test(src)) {
+      let out = src;
+      if (!/<meta[^>]+charset/i.test(out)) {
+        out = out.replace(/<head([^>]*)>/i, '<head$1><meta charset="UTF-8">');
+        if (!/<head[\s>]/i.test(out)) out = out.replace(/<html([^>]*)>/i, '<html$1><head><meta charset="UTF-8"></head>');
+      }
+      if (!/\sdir=/i.test(out)) out = out.replace(/<html([^>]*)>/i, '<html dir="' + dir + '" lang="' + lang + '"$1>');
+      if (!/<body[^>]*\sdir=/i.test(out)) out = out.replace(/<body([^>]*)>/i, '<body dir="' + dir + '"$1>');
+      return out;
+    }
+    return '<!DOCTYPE html><html dir="' + dir + '" lang="' + lang + '"><head><meta charset="UTF-8"></head><body dir="' + dir + '">' + src + '</body></html>';
+  }
+
+  function asHtml(text) {
+    const blocks = String(text || '').split(/\r\n|\r|\n/).map(function (line) {
+      return '<p>' + escapeHtml(line) + '</p>';
+    });
+    return wrapDocHtml(blocks.join('') || '<p></p>', text);
+  }
+
+  function utf8Bytes(s) {
+    return new TextEncoder().encode(String(s || ''));
+  }
+
+  function multipart(meta, mediaType, bytes) {
+    const boundary = 'glance_lane_drive';
+    const head = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(meta) + '\r\n--' + boundary + '\r\nContent-Type: ' + mediaType + '\r\n\r\n';
+    const tail = '\r\n--' + boundary + '--';
+    const h = utf8Bytes(head);
+    const t = utf8Bytes(tail);
+    const body = new Uint8Array(h.length + bytes.length + t.length);
+    body.set(h, 0);
+    body.set(bytes, h.length);
+    body.set(t, h.length + bytes.length);
+    return { contentType: 'multipart/related; boundary=' + boundary, body: body };
+  }
+
+  function waitMs(clock, ms) {
+    if (clock && typeof clock === 'object' && typeof clock.wait === 'function') return Promise.resolve(clock.wait(ms));
+    if (typeof setTimeout === 'function') return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    return Promise.resolve();
+  }
+
+  // Google's text/plain export of a Doc often has a BOM, CRLF, bidi marks,
+  // and "* " (or "• ") prefixes on list items. Collapse those so a faithful
+  // export still compares as the written text.
+  function normalizeText(s) {
+    return String(s || '')
+      .replace(/^\uFEFF/, '')
+      .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+      .replace(/\r\n?/g, '\n')
+      .replace(/^[ \t\u00A0]*[*\u2022\u25CF\u25E6\u00B7\u2043\u2219-]\s+/gm, '')
+      .replace(/(^| )[*\u2022\u25CF]\s+/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function keyFields(html, text) {
+    const parts = [];
+    const src = String(html || '');
+    if (src) {
+      const h1 = src.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+      if (h1) parts.push(normalizeText(htmlToPlain(h1[1])));
+      const liRe = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
+      let m;
+      while ((m = liRe.exec(src))) parts.push(normalizeText(htmlToPlain(m[1])));
+      const pRe = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+      while ((m = pRe.exec(src))) parts.push(normalizeText(htmlToPlain(m[1])));
+    }
+    if (!parts.length) {
+      String(text || '').split(/\r\n|\r|\n/).forEach(function (line) {
+        const n = normalizeText(line);
+        if (n) parts.push(n);
+      });
+    }
+    return parts.filter(function (p) { return p && p.length >= 2; });
+  }
+
+  // Honest verify: after normalize, either the written text is present as a
+  // whole, or every title / list item / paragraph from the HTML is present.
+  function exportContains(exported, text, html) {
+    const got = normalizeText(exported);
+    if (!got) return false;
+    const wantSrc = String(text || '').trim() ? text : htmlToPlain(html);
+    const want = normalizeText(wantSrc);
+    if (want && got.indexOf(want) >= 0) return true;
+    const parts = keyFields(html, wantSrc);
+    return parts.length > 0 && parts.every(function (p) { return got.indexOf(p) >= 0; });
+  }
+
+  function docLink(json, id) {
+    const link = json && typeof json.webViewLink === 'string' ? json.webViewLink.trim() : '';
+    if (link && /^https:\/\/docs\.google\.com\//.test(link)) return link;
+    return 'https://docs.google.com/document/d/' + encodeURIComponent(id) + '/edit';
   }
 
   function fileSnapshot(json) {
@@ -145,15 +283,42 @@ const FlowGoogleDocs = (() => {
     try {
       const res = await http(req);
       const status = res && typeof res.status === 'number' ? res.status : 0;
-      return { status: status, ok: !!(res && (res.ok === true || (status >= 200 && status < 300))), json: res && res.json ? res.json : null };
+      return { status: status, ok: !!(res && (res.ok === true || (status >= 200 && status < 300))), json: res && res.json ? res.json : null, text: res && res.text != null ? String(res.text) : '', denial: res && res.denial ? res.denial : null, url: req && req.url };
     } catch (e) {
       return { status: 0, ok: false, json: null };
     }
   }
 
-  function authFail(status) {
-    if (status === 401 || status === 403) return { ok: false, reason: 'not-connected' };
-    return null;
+  // A refused write says why. drive-not-granted: the token lacks drive.file
+  // (Reconnect asks for it). docs-api-disabled / drive-api-disabled: the
+  // API is off in Glance's Cloud project (Reconnect cannot fix it). A 401,
+  // or a 403 that names nothing, stays not-connected.
+  function authFail(res) {
+    const status = res && res.status;
+    if (status !== 401 && status !== 403) return null;
+    const C = cfg();
+    const d = (res && res.denial) || (C && typeof C.googleDenial === 'function' ? C.googleDenial(status, res && res.json, res && res.url) : null);
+    const out = { ok: false, reason: 'not-connected', status: status };
+    if (d && d.googleReason) out.googleReason = d.googleReason;
+    if (d && d.service) out.service = d.service;
+    if (status === 403 && d) {
+      if (d.kind === 'scope') out.reason = 'drive-not-granted';
+      else if (d.kind === 'api-disabled') out.reason = /docs\.googleapis/.test(d.service || '') ? 'docs-api-disabled' : 'drive-api-disabled';
+      else if (d.kind === 'forbidden') out.reason = 'http-403';
+    }
+    return out;
+  }
+
+  // A Doc this lane created whose text could not be written is trashed, so a
+  // failed Do It does not leave an empty Doc behind in Drive.
+  async function trashCreated(http, id) {
+    const del = await call(http, {
+      method: 'PATCH',
+      url: FILES + '/' + encodeURIComponent(id),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trashed: true })
+    });
+    return !!(del.ok || del.status === 404);
   }
 
   function revisionIdOf(doc) {
@@ -184,8 +349,11 @@ const FlowGoogleDocs = (() => {
         ]
       })
     });
-    const denied = authFail(posted.status);
-    if (denied) return denied;
+    const denied = authFail(posted);
+    if (denied) {
+      if (created === true) denied.cleanedUp = await trashCreated(http, id);
+      return denied;
+    }
     const ref = { documentId: id, externalId: id, created: created === true, inserted: text, rangeName: mark };
     const base = { where: 'Google Docs', target: name || id, written: 'Doc · ' + (name || id), url: null };
     if (!posted.ok) return Object.assign({ ok: false, reason: 'http-' + posted.status, ref: created ? ref : null, proof: null }, base);
@@ -216,28 +384,108 @@ const FlowGoogleDocs = (() => {
     }
     const name = safeName(i.name || i.title || 'Note');
     if (!name) return { ok: false, reason: 'unclear' };
+    return createAndRead(name, text, i.html, http, clock, i.fullDocument ? { fullDocument: true } : null);
+  }
+
+  // The Glance folder is one this lane made, so drive.file can see it.
+  // A 401/403 is returned as the write's reason (Reconnect or an API that
+  // is off). Any other list or create miss falls back to My Drive.
+  async function glanceFolder(http) {
+    const q = "mimeType='" + FOLDER_MIME + "' and name='" + FOLDER_NAME + "' and trashed=false";
+    const listed = await call(http, {
+      method: 'GET',
+      url: FILES + '?q=' + encodeURIComponent(q) + '&pageSize=1&fields=' + encodeURIComponent('files(id,name)')
+    });
+    const listedDenied = authFail(listed);
+    if (listedDenied) return listedDenied;
+    const hit = listed.ok && listed.json && Array.isArray(listed.json.files) ? listed.json.files[0] : null;
+    if (hit && hit.id) return { ok: true, id: String(hit.id) };
+    const made = await call(http, {
+      method: 'POST',
+      url: FILES + '?fields=' + encodeURIComponent('id,name'),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME })
+    });
+    const madeDenied = authFail(made);
+    if (madeDenied) return madeDenied;
+    if (made.ok && made.json && made.json.id) return { ok: true, id: String(made.json.id) };
+    return { ok: true, id: '' };
+  }
+
+  async function createAndRead(name, text, htmlIn, http, clock, extraRef) {
+    const C = cfg();
+    const folder = await glanceFolder(http);
+    if (folder && folder.ok === false) return folder;
+    const html = htmlIn ? wrapDocHtml(htmlIn, text) : asHtml(text);
+    const packed = multipart(
+      Object.assign({ name: name, mimeType: DOC_MIME }, folder && folder.id ? { parents: [folder.id] } : {}),
+      'text/html; charset=UTF-8',
+      utf8Bytes(html)
+    );
     const posted = await call(http, {
       method: 'POST',
-      url: FILES + '?fields=' + encodeURIComponent('id,name,mimeType,trashed'),
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name, mimeType: DOC_MIME })
+      url: UPLOAD,
+      headers: { 'Content-Type': packed.contentType },
+      body: packed.body
     });
-    const denied = authFail(posted.status);
+    const denied = authFail(posted);
     if (denied) return denied;
-    if (!posted.ok) return { ok: false, reason: 'http-' + posted.status };
-    const file = posted.json || {};
     const base = { where: 'Google Docs', target: name, written: 'Doc · ' + name, url: null };
+    if (!posted.ok) return Object.assign({ ok: false, reason: 'http-' + posted.status, ref: null, proof: null }, base);
+    const file = posted.json || {};
     if (!file.id) return Object.assign({ ok: false, reason: 'proof_pending', ref: null, proof: null }, base);
+
+    async function failClean(reason, extra) {
+      const cleanedUp = await trashCreated(http, file.id);
+      return Object.assign({ ok: false, reason: reason, ref: { documentId: file.id, externalId: file.id, created: true }, proof: null, cleanedUp: cleanedUp }, extra || {}, base);
+    }
+
     const got = await call(http, { method: 'GET', url: fileUrl(file.id) });
-    if (!got.ok || !got.json || got.json.id !== file.id || got.json.trashed === true) {
-      return Object.assign({ ok: false, reason: 'verify_failed', ref: { documentId: file.id, externalId: file.id, created: true }, proof: null }, base);
+    const gotDenied = authFail(got);
+    if (gotDenied) {
+      gotDenied.cleanedUp = await trashCreated(http, file.id);
+      return gotDenied;
     }
-    const inserted = await insertAndRead(file.id, text, http, clock, true, name);
-    if (inserted && inserted.ref && inserted.ref.created === true) {
-      const meta = await call(http, { method: 'GET', url: fileUrl(file.id) });
-      if (meta.ok && meta.json) inserted.ref.snapshot = fileSnapshot(meta.json);
+    if (!got.ok || !got.json || got.json.id !== file.id || got.json.trashed === true || got.json.mimeType !== DOC_MIME) {
+      return failClean('verify_failed');
     }
-    return inserted;
+
+    const exportUrl = FILES + '/' + encodeURIComponent(file.id) + '/export?mimeType=' + encodeURIComponent('text/plain');
+    let exported = await call(http, { method: 'GET', url: exportUrl });
+    const expDenied = authFail(exported);
+    if (expDenied) {
+      expDenied.cleanedUp = await trashCreated(http, file.id);
+      return expDenied;
+    }
+    let exportedText = exported.text || '';
+    // Drive conversion can lag the create. One short retry when the export is empty.
+    if (exported.ok && !String(exportedText).trim()) {
+      await waitMs(clock, 250);
+      exported = await call(http, { method: 'GET', url: exportUrl });
+      const retryDenied = authFail(exported);
+      if (retryDenied) {
+        retryDenied.cleanedUp = await trashCreated(http, file.id);
+        return retryDenied;
+      }
+      exportedText = exported.text || '';
+    }
+    if (!exported.ok || !exportContains(exportedText, text, html)) {
+      return failClean('verify_failed');
+    }
+
+    const link = docLink(got.json, file.id);
+    base.url = link;
+    const proof = C && C.proofOf(SYSTEM, file.id, link, C.clockIso(clock));
+    const ref = Object.assign({
+      documentId: file.id,
+      externalId: file.id,
+      created: true,
+      name: (got.json && got.json.name) || name,
+      contentText: normalizeText(exportedText),
+      snapshot: fileSnapshot(got.json)
+    }, extraRef || {});
+    if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: ref, proof: null }, base);
+    return Object.assign({ ok: true, ref: ref, proof: proof }, base);
   }
 
   async function undo(ref, http) {
@@ -246,11 +494,20 @@ const FlowGoogleDocs = (() => {
     if (ref.created === true) {
       const got = await call(http, { method: 'GET', url: fileUrl(id) });
       if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
-      if (got.status === 404) return { ok: true, written: 'Doc removed.' };
+      if (got.status === 404) return { ok: true, reason: 'trashed', written: 'Doc removed.' };
       if (!got.ok || got.status === 0) return unconfirmedResult();
-      const verdict = unchanged(ref.snapshot, got.json);
-      if (verdict === 'edited') return editedResult();
-      if (verdict !== 'match') return unconfirmedResult();
+      if (got.json && got.json.trashed === true) return { ok: true, reason: 'trashed', written: 'Doc removed.' };
+      if (ref.name && got.json && got.json.name && String(got.json.name) !== String(ref.name)) return editedResult();
+      const want = normalizeText(ref.contentText || '');
+      if (want) {
+        const exported = await call(http, {
+          method: 'GET',
+          url: FILES + '/' + encodeURIComponent(id) + '/export?mimeType=' + encodeURIComponent('text/plain')
+        });
+        if (exported.status === 401 || exported.status === 403) return { ok: false, reason: 'not-connected' };
+        if (!exported.ok || exported.status === 0) return unconfirmedResult();
+        if (normalizeText(exported.text || '') !== want) return editedResult();
+      }
       const del = await call(http, {
         method: 'PATCH',
         url: FILES + '/' + encodeURIComponent(id),
@@ -258,7 +515,7 @@ const FlowGoogleDocs = (() => {
         body: JSON.stringify({ trashed: true })
       });
       if (del.status === 401 || del.status === 403) return { ok: false, reason: 'not-connected' };
-      if (del.ok || del.status === 204 || del.status === 404) return { ok: true, written: 'Doc removed.' };
+      if (del.ok || del.status === 204 || del.status === 404) return { ok: true, reason: 'trashed', written: 'Doc removed.' };
       return { ok: false, reason: 'http-' + del.status };
     }
     const inserted = ref.inserted ? String(ref.inserted) : '';
@@ -317,7 +574,13 @@ const FlowGoogleDocs = (() => {
     namedSpan: namedSpan,
     textInRange: textInRange,
     write: write,
-    undo: undo
+    undo: undo,
+    asHtml: asHtml,
+    wrapDocHtml: wrapDocHtml,
+    htmlToPlain: htmlToPlain,
+    normalizeText: normalizeText,
+    exportContains: exportContains,
+    FOLDER_NAME: FOLDER_NAME
   };
 })();
 

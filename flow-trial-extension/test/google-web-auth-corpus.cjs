@@ -1027,15 +1027,21 @@ async function run() {
     check('a profile-only token is not kept as the Google session', !(env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'ya29.profile-only'), env.stored.googleWebAuth);
     check('a profile-only consent is not recorded as granted',
       !(env.stored.googleGrantedScopes && env.stored.googleGrantedScopes.status === 'granted'), env.stored.googleGrantedScopes);
-    const windowsBefore = env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length;
+    // A window after a partial grant asks Google's consent screen again
+    // (prompt=consent select_account), so the unticked boxes are offered.
+    const WINDOW = /^WEB prompt=(consent )?select_account interactive=true/;
+    const CONSENT_WINDOW = /^WEB prompt=consent select_account interactive=true/;
+    const windowsBefore = env.calls.filter((c) => WINDOW.test(c)).length;
+    const consentBefore = env.calls.filter((c) => CONSENT_WINDOW.test(c)).length;
     // Second click without ticking: still a window, never a silent reuse.
     const again = await attempt(env.fn('connectGoogleTasks')(true));
-    const windowsAgain = env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length;
+    const windowsAgain = env.calls.filter((c) => WINDOW.test(c)).length;
     check('a second Connect after a profile-only grant opens the Google window again', windowsAgain === windowsBefore + 1, env.calls);
+    check('that second window asks consent for the unticked scopes', env.calls.filter((c) => CONSENT_WINDOW.test(c)).length === consentBefore + 1, env.calls);
     check('that second profile-only consent still does not connect', again.ok === false && !env.stored.googleTasksAuth, again);
     grant = 'full';
     const third = await attempt(env.fn('connectGoogleTasks')(true));
-    const windowsThird = env.calls.filter((c) => /^WEB prompt=select_account interactive=true/.test(c)).length;
+    const windowsThird = env.calls.filter((c) => WINDOW.test(c)).length;
     check('ticking every box on the next window connects', third.ok === true && env.stored.googleTasksAuth && env.stored.googleTasksAuth.taskListId === 'LIST_G', { third, tasks: env.stored.googleTasksAuth });
     check('that connect opened its own window', windowsThird === windowsAgain + 1, env.calls);
     check('the full grant is recorded as granted', env.stored.googleGrantedScopes && env.stored.googleGrantedScopes.status === 'granted', env.stored.googleGrantedScopes);
@@ -1056,7 +1062,8 @@ async function run() {
       routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] }) }]]
     });
     const out = await attempt(env.fn('connectGoogleTasks')(true));
-    check('Connect with Reconnect flagged opens the Google window', env.calls.some((c) => /^WEB prompt=select_account interactive=true/.test(c)), env.calls);
+    check('Connect with Reconnect flagged opens the Google window', env.calls.some((c) => /^WEB prompt=(consent )?select_account interactive=true/.test(c)), env.calls);
+    check('a missing-scope Reconnect asks Google consent (prompt=consent), not a silent re-pick', env.calls.some((c) => /^WEB prompt=consent select_account interactive=true/.test(c)) && env.calls.some((c) => /^WEB_URL .*include_granted_scopes=true.*prompt=consent/.test(c)), env.calls);
     check('Connect with Reconnect flagged does not reuse the refused token',
       out.ok === true && env.stored.googleWebAuth && env.stored.googleWebAuth.accessToken === 'ya29.after-ask' && env.tokens.indexOf('ya29.profile-only') === -1,
       { out, web: env.stored.googleWebAuth, tokens: env.tokens });
