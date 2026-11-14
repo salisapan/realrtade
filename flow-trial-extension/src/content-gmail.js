@@ -1675,6 +1675,18 @@ function glanceUiCopy(kind) {
       const hit = FlowIncomingJudge.secondRead({ directAskOn, text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true }, q0);
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
+    // glanceSwitches.DECOMPOSE (off): a mail that asks for several things becomes ONE card with every ask's own steps (core/intent-decompose.js
+    // through the shared judge). Only a merged card is adopted; any other result keeps this classifier's own answer, so nothing else changes.
+    if (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.judge === 'function' && base && base.inbound !== false && ctx.senderIsUser !== true) {
+      let decomposeOn = false;
+      try { const bagM = await chrome.storage.local.get({ glanceSwitches: {} }); decomposeOn = !glanceLabsLocked() && !!(bagM.glanceSwitches && bagM.glanceSwitches.DECOMPOSE === true); } catch (e) { decomposeOn = false; }
+      if (decomposeOn) {
+        try {
+          const multi = FlowIncomingJudge.judge({ decomposeOn: true, directAskOn: true, text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true, attachmentCount: ctx.attachmentCount || 0, hasThreadAttachment: ctx.hasThreadAttachment === true });
+          if (multi && multi.show && multi.decomposed >= 2) return Object.assign({}, multi.intent, { plannedProcess: multi.process });
+        } catch (e) { /* keep the classifier's answer */ }
+      }
+    }
     return intent || { type: null };
   }
 

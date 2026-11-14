@@ -197,7 +197,8 @@ const FlowOutlookSync = (() => {
           now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: counted === 1, surface: 'outlook',
           to: lastRaw.toRecipients || null, cc: lastRaw.ccRecipients || null,
           ownAddresses: meSet ? Array.from(meSet) : null, userName: deps.userName || null,
-          ownNames: deps.ownNames || null
+          ownNames: deps.ownNames || null,
+          decomposeOn: deps.decomposeOn === true
         }, { intent: deps.intent, actions: deps.actions, factReply: deps.factReply }) : { show: false, reason: 'no-judge' });
       // A flag without the file list is not one file. The runner reads that
       // list before plan. A failed read, or a flag that was never read, stays
