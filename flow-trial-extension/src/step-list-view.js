@@ -194,9 +194,20 @@ const FlowStepListView = (() => {
     return base;
   }
 
-  function approveFor(rows) {
+  function approveFor(rows, he) {
     const failed = (rows || []).filter(function (r) { return r && r.state === 'failed' && r.checked !== false; });
     if (!failed.length) return null;
+    // A step that failed for a named reason (a calendar hold whose Google
+    // connection expired, say) shows that reason here in full. It is not
+    // "unconfirmed": nothing was written.
+    const blocked = failed.filter(function (r) { return r.blocker === true && r.why; });
+    if (blocked.length) {
+      return {
+        disabled: true,
+        title: he ? 'עדיין פתוח · לא נוצר דבר' : 'Still open · nothing was created',
+        sub: plainText(blocked[0].why)
+      };
+    }
     const required = failed.filter(function (r) { return !r.suggested && !r.manual && r.role !== 'close'; });
     if (required.length) {
       const n = required.length;
@@ -276,7 +287,7 @@ const FlowStepListView = (() => {
         doItLabel: o.doItLabel || null,
         rows: painted,
         chip: chip,
-        approve: approveFor(list),
+        approve: approveFor(list, he),
         state: 'propose'
       };
     }
@@ -449,8 +460,9 @@ const FlowStepListView = (() => {
         pushState(state);
         draw();
       },
-      setRow: function (id, state, why) {
-        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state, why: why || null }) : row; });
+      setRow: function (id, state, why, opts) {
+        const blocker = Boolean(opts && opts.blocker === true && state === 'failed');
+        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state, why: why || null, blocker: blocker }) : row; });
         pushState(state);
         draw();
       }

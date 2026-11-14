@@ -197,6 +197,45 @@ var GlanceCards = (function () {
     ]);
   }
 
+  function composeDoItButton(replyKey, lang) {
+    return button(lang, 'doIt', 'onComposeDoIt', { replyKey: String(replyKey || ''), source: 'compose' });
+  }
+
+  function prepareReplyButton(messageId, lang) {
+    return button(lang, 'prepareReply', 'onPrepareReply', { messageId: String(messageId || ''), source: 'message' });
+  }
+
+  function composeProposal(preview, replyKey, lang) {
+    var widgets = [text(lang, i18n().t(lang, 'draftReady'))];
+    if (preview) widgets.push(text(lang, preview));
+    widgets.push(composeDoItButton(replyKey, lang));
+    return card(lang, widgets);
+  }
+
+  function replyOnly(messageId, lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'draftReady'))]);
+  }
+
+  function composeAskFirst(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'composeAskFirst'))]);
+  }
+
+  function composeNeedsReply(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'composeNeedsReply'))]);
+  }
+
+  function composeNoReply(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'composeNoReply'))]);
+  }
+
+  function composeInserted(preview, lang) {
+    var L = i18n();
+    var widgets = [text(lang, L.t(lang, 'draftInserted'))];
+    if (preview) widgets.push(text(lang, preview));
+    widgets.push(text(lang, L.t(lang, 'draftNoUndo')));
+    return card(lang, widgets);
+  }
+
   function homepage(next, lang, buildSha) {
     var L = i18n();
     if (!next || !next.title) {
@@ -227,6 +266,13 @@ var GlanceCards = (function () {
     undone: undone,
     grant: grant,
     quiet: quiet,
+    composeProposal: composeProposal,
+    composeInserted: composeInserted,
+    composeNeedsReply: composeNeedsReply,
+    composeNoReply: composeNoReply,
+    composeAskFirst: composeAskFirst,
+    prepareReplyButton: prepareReplyButton,
+    replyOnly: replyOnly,
     spottedUnsupported: spottedUnsupported,
     planTypeLabel: planTypeLabel,
     homepage: homepage,
