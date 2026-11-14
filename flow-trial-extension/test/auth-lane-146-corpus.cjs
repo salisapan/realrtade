@@ -306,7 +306,7 @@ async function main() {
   resetFetches();
   const rejected = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });
   const after = laneView(stored.googleTasksAuth, stored.googleReconnect, STORED);
-  check('a 401 shows reconnect and Connected is gone', rejected && rejected.ok === false && rejected.reason === 'not-connected' && stored.googleReconnect && stored.googleReconnect.needed === true && after.connected === false && after.needsReconnect === true && after.label === 'Reconnect Google', { rejected, flag: stored.googleReconnect, after });
+  check('a 401 clears the grant so Connect Google shows', rejected && rejected.ok === false && rejected.reason === 'not-connected' && after.connected === false && after.needsReconnect === false && after.label === 'Connect Google' && !stored.googleTasksAuth && !stored.googleWebAuth, { rejected, flag: stored.googleReconnect, after });
 
   delete stored.googleTasksAuth;
   delete stored.googleReconnect;
@@ -318,15 +318,24 @@ async function main() {
   const noGrantView = laneView(stored.googleTasksAuth, stored.googleReconnect, STORED, stored.googleEverConnected);
   check('a 401 with no grant and no Connect is Connect', noGrant && noGrant.ok === false && !stored.googleReconnect && noGrantView.connected === false && noGrantView.needsReconnect === false && noGrantView.label === 'Connect Google', { noGrant, noGrantView });
 
+  stored.googleTasksAuth = { taskListId: LIST };
   stored.googleEverConnected = { connected: true };
+  stored.googleConnectedAccount = { email: 'me@example.com' };
+  stored.googleWebAuth = { accessToken: STORED, expiresAt: Date.now() + 60 * 60 * 1000 };
   delete stored.googleReconnect;
+  sandbox.fetch = async (url, init) => {
+    const method = (init && init.method) || 'GET';
+    fetches.push({ url: String(url), method: method, auth: (init && init.headers && init.headers.Authorization) || '' });
+    return jsonResponse(401, { error: { code: 401 } });
+  };
   resetFetches();
   const again = await dispatch('googleLaneTask', { title: 'Pay the invoice', listId: LIST, scopes: scopes });
   const againView = laneView(stored.googleTasksAuth, stored.googleReconnect, STORED, stored.googleEverConnected);
-  check('a 401 after a successful Connect is Reconnect', again && again.ok === false && stored.googleReconnect && stored.googleReconnect.needed === true && againView.needsReconnect === true && againView.label === 'Reconnect Google', { again, againView });
+  check('a 401 after a successful Connect clears to Connect Google', again && again.ok === false && againView.connected === false && againView.needsReconnect === false && againView.label === 'Connect Google' && !stored.googleTasksAuth, { again, againView });
 
   console.log('\n--- Hebrew refusal ---\n');
   delete stored.googleReconnect;
+  stored.googleConnectedAccount = { email: 'me@example.com' };
   stored.googleWebAuth = { accessToken: STORED, expiresAt: Date.now() + 60 * 60 * 1000 };
   sandbox.fetch = async () => jsonResponse(200, { id: 'file-he', modifiedTime: '2026-10-15T00:00:00.000Z' });
   sandbox.chrome.i18n.getUILanguage = () => 'he';

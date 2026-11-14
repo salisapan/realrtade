@@ -92,6 +92,16 @@ const FlowIntent = (() => {
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
   const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוח|זורם|מסתדר|מתאים)\s+לך\s+ש(?:נדבר|ניפגש|נשב|נעשה|נקבע)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוח|זורם)\s+לך\s+(?:פגישה|שיחה|זום|סינק|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:קובעים|נסגור)\s+(?:פגישה|שיחה|זום|סינק|ישיבה|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])נ?אשמח\s+(?:לפגוש\s+אותך|להיפגש|לשבת\s+איתך)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?פנ(?:ה|י|ו)\s+לי\s+(?:חצי\s+שעה|שעה|רבע\s+שעה|כמה\s+דקות)|(?:^|[^\u0590-\u05FF])אפנה\s+לך\s+(?:חצי\s+שעה|שעה|רבע\s+שעה)|(?:^|[^\u0590-\u05FF])תצטרפ(?:י|ו)?\s+אלינו\s+ל|(?:^|[^\u0590-\u05FF])(?:שריינתי|שמרתי)\s+לנו(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])הזמנתי\s+(?:לנו\s+)?חדר(?:\s+ישיבות)?(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])יש\s+לי\s+חלון(?![\u0590-\u05FF]))/;
+  // A note the person mails to themselves that asks to put a timed meeting on the calendar ("תשריין ביומן", "add it to my
+  // calendar") is that hold, not a Google Task. Without an ask like this a self-note stays the task it always was.
+  const SELF_CALENDAR_ASK_HE = /(?:^|[^\u0590-\u05FF])(?:(?:ת|ל)?שריי?ן(?![\u0590-\u05FF])|(?:תכניס|להכניס|תוסיף|להוסיף|תרשום|לרשום|תשים|לשים|תקבע|לקבוע)(?:י|ו)?(?:\s+\S+){0,3}?\s+(?:ל|ב)יומן(?![\u0590-\u05FF]))/;
+  const SELF_CALENDAR_ASK_EN = /\b(?:add|put|block|hold|save|pencil)\b(?:\s+\S+){0,4}?\s+(?:on|in|into|to)\s+(?:my|the)\s+calendar\b|\bcalendar\s+hold\b/i;
+  const SELF_CALENDAR_NEGATED = /(?:^|[^\u0590-\u05FF])אל\s+(?:ת?שריי?ן|תכניס|תוסיף|תרשום|תשים|תקבע)|\b(?:don['’]?t|do\s+not|no\s+need\s+to|never)\s+(?:add|put|block|hold|save|pencil)\b/i;
+  function selfCalendarAsk(text) {
+    const t = String(text || '');
+    if (SELF_CALENDAR_NEGATED.test(t)) return false;
+    return SELF_CALENDAR_ASK_HE.test(t) || SELF_CALENDAR_ASK_EN.test(t);
+  }
 
   // "This is not happening at the time this message names."
   //
@@ -1432,7 +1442,14 @@ const FlowIntent = (() => {
       if (replyCancelOnly(text)) intent.noReplyDraft = true;
       // A note the user sent to themselves is a task, for every kind.
       // The draft stays off. It is not Reply requested, and it is not quiet.
-      if (addressedToSelf(ctx)) {
+      // One exception: a timed meeting the note explicitly asks to put on the calendar ("תשריין ביומן") is that calendar hold.
+      const selfHold = addressedToSelf(ctx) && type === TYPES.SCHEDULED_EVENT && personalClose === 'calendar-hold'
+        && Boolean(facts && facts.date && facts.date.iso && facts.time) && !isPast && selfCalendarAsk(text);
+      if (selfHold) {
+        intent.noReplyDraft = true;
+        intent.selfHold = true;
+        delete intent.googleClose;
+      } else if (addressedToSelf(ctx)) {
         intent.noReplyDraft = true;
         intent.selfTask = true;
         // A note to self is the task. It is not a Drive save and not a draft.
@@ -1474,7 +1491,7 @@ const FlowIntent = (() => {
         intent.inviteDraft = invitePlan.draft;
       }
       // The task names the work. "Reply requested" is the draft, and this mail declined one.
-      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask) {
+      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask && !intent.selfHold) {
         const createTask = text.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n]+)/i);
         if (createTask) {
           let clause = createTask[1].trim();
@@ -1517,11 +1534,10 @@ const FlowIntent = (() => {
         const labelNow = String(intent.label || '').trim();
         if (!/^(?:Decision|החלטה): \S/.test(labelNow) && !usableSelfTitle(labelNow)) return stayQuiet('hedge', { noRescue: true });
         if (intent.confidence === 'low') intent.confidence = 'high';
-        // "Remind me to renew the domain on Friday" is that task, due Friday.
-        // The day is already on facts. The task step reads entities.dateIso.
-        if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && intent.entities && !intent.entities.dateIso) {
-          intent.entities.dateIso = facts.date.iso;
-        }
+        // The task is due the day in the sentence it is about, not the first
+        // day in a mail that also books a meeting ("meet on the 17th, and
+        // remind me to send the quote by the 22nd").
+        applyTaskClauseDate(intent, text, ctx.now, facts, isPast);
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
       // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
@@ -3421,7 +3437,77 @@ const FlowIntent = (() => {
     if (/^ל[\u0590-\u05FF]/.test(clause)) return clipTitle(clause);
     return '';
   }
+  function sentencesOfTask(text) {
+    return String(text || '').split(/\r?\n+|(?<=[.!?؟])\s+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function dateFactsOf(text, now) {
+    if (!text || typeof FlowExtract === 'undefined' || typeof FlowExtract.extract !== 'function') return null;
+    const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : null;
+    const src = D && typeof D.normalize === 'function' ? D.normalize(String(text), now) : String(text);
+    try {
+      const got = FlowExtract.extract(src, { now: now });
+      return got && got.date ? got : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function taskClauseFor(text, label, entities) {
+    const sentences = sentencesOfTask(text);
+    const remind = sentences.find((s) => /(?:^|[^\u0590-\u05FF])תזכיר(?:י|ו)?\s+לי(?![\u0590-\u05FF])|\bremind me to\b/i.test(s));
+    if (remind) return remind;
+    const needles = [label, entities && entities.requestWhat]
+      .map((v) => String(v || '').replace(/\s+/g, ' ').trim())
+      .filter((v) => v.length >= 4);
+    for (let i = 0; i < needles.length; i++) {
+      const n = needles[i];
+      const hit = sentences.find((s) => s.indexOf(n) !== -1 || n.indexOf(s) !== -1);
+      if (hit) return hit;
+    }
+    return sentences.length === 1 ? sentences[0] : '';
+  }
+  function applyTaskClauseDate(intent, text, now, facts, isPast) {
+    if (!intent || !intent.entities) return;
+    const clause = taskClauseFor(text, intent.label, intent.entities);
+    const clauseFacts = dateFactsOf(clause, now);
+    const clauseDate = clauseFacts && clauseFacts.date;
+    if (clauseDate && clauseDate.iso && !clauseDate.dropped && !isPastDate(clauseDate.iso, now)) {
+      intent.entities.dateIso = clauseDate.iso;
+      intent.entities.when = humanWhen(clauseDate, clauseFacts.time || null);
+      if (!(clauseFacts.time && Number.isInteger(clauseFacts.time.hour))) {
+        delete intent.entities.hour;
+        delete intent.entities.minute;
+      } else {
+        intent.entities.hour = clauseFacts.time.hour;
+        intent.entities.minute = clauseFacts.time.minute || 0;
+      }
+      return;
+    }
+    // "Remind me to renew the domain on Friday" is that task, due Friday.
+    // The day is already on facts. The task step reads entities.dateIso.
+    if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && !intent.entities.dateIso) {
+      intent.entities.dateIso = facts.date.iso;
+    }
+    // Any note to self with a day still ahead is due that day: the card already shows it ("עד 22 בנוב׳"), so the task
+    // step must carry it too, or Do It writes a task with no due date.
+    if (!isPast && facts && facts.date && facts.date.iso && !facts.date.dropped && !intent.entities.dateIso && !intent.entities.overdueIso) {
+      intent.entities.dateIso = facts.date.iso;
+    }
+    // A day that only lives in another sentence (the meeting) is not this task's due day.
+    const kept = intent.entities.dateIso;
+    if (kept && clause && !dateFactsOf(clause, now)) {
+      const slash = heSlashDate(kept);
+      const owns = (slash && clause.indexOf(slash) !== -1) || clause.indexOf(kept) !== -1;
+      if (!owns) {
+        intent.entities.dateIso = null;
+        intent.entities.when = null;
+        delete intent.entities.hour;
+        delete intent.entities.minute;
+      }
+    }
+  }
+
   function selfAskTitle(text, subject, ctx) {
+
     const raw = String(text || '');
     const invite = attachToInvitePlan(raw);
     if (invite) return invite.label;

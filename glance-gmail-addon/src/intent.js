@@ -427,6 +427,7 @@ var GlanceIntent = (function () {
         hour: holdClock.hour,
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
+        useMeetingSubject: holdParams.useMeetingSubject === true,
         lang: mailLang(sourceText || ''),
         reason: 'hold',
         planId: 'hold'
@@ -509,10 +510,13 @@ var GlanceIntent = (function () {
     return raw;
   }
 
-  // Card chrome follows the Gmail locale. The title written on the event
-  // and the reminder comes from the mail. A Hebrew meeting keeps its noun,
-  // the date as written, and the clock. An English meeting keeps the
-  // classifier's short label.
+  // Card chrome follows the Gmail locale. A Hebrew meeting card keeps its
+  // noun, the date as written, and the clock. The title written on the
+  // event is the meeting subject, with reply prefixes and [tags] stripped
+  // (the same rule as the extension). An empty subject falls back to the
+  // sentence already in decision.title from the engine. An English meeting
+  // keeps the classifier's short label on the card and the engine title
+  // on the event.
   var MEETING_NOUNS_HE = [
     'שיחת טלפון', 'פגישת עבודה', 'שיחת זום', 'שיחת וידאו', 'עמידה יומית',
     'פגישה', 'שיחה', 'ראיון', 'סנכרון', 'תיאום', 'ייעוץ', 'הדגמה', 'מפגש', 'ועידה'
@@ -602,6 +606,10 @@ var GlanceIntent = (function () {
 
   function contentTitle(text, decision) {
     if (!decision || (decision.kind !== 'schedule' && decision.kind !== 'hold')) return decision;
+    // Preserve the engine title for the calendar event before the card
+    // chrome overwrites decision.title. For a hold that title is already
+    // the cleaned subject, or the sentence when the subject is empty.
+    if (decision.kind === 'hold' && !decision.eventTitle) decision.eventTitle = decision.title;
     if (!mailIsHebrew(text)) return decision;
     var datePart = writtenDate(text, decision.dateIso || decision.due || '');
     var timePart = '';

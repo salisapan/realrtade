@@ -134,7 +134,7 @@ const FlowModelPlan = (() => {
     if (!intent) return { used: true, plan: null, reason: p && p.step === 'file_save' ? 'file-save-is-suggest-save' : 'no-proposal' };
     let process;
     // The mail text: planFor's own meeting veto and hedge checks run on model plans too.
-    try { process = A.planFor(intent, { threadUrl: ctx.threadUrl || null, executionMemory: ctx.executionMemory || null, text: typeof ctx.text === 'string' ? ctx.text : '' }); } catch (e) { return { used: true, plan: null, reason: 'planner-error' }; }
+    try { process = A.planFor(intent, { threadUrl: ctx.threadUrl || null, executionMemory: ctx.executionMemory || null, text: typeof ctx.text === 'string' ? ctx.text : '', subject: ctx.subject || '' }); } catch (e) { return { used: true, plan: null, reason: 'planner-error' }; }
     if (!process) return { used: true, plan: null, reason: 'no-process' };
     if (ctx.surface === 'outlook') {
       const OUT = { calendar: 'outlookCalendar', gmailDraft: 'outlookDraft', googleTask: 'outlookTask' };

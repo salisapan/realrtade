@@ -594,6 +594,30 @@ async function run() {
     check('the clock time that was stated is the event time',
       body && body.start.dateTime.indexOf('T15:00:00') > 0, body && body.start);
   }
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'ev_subj', htmlLink: 'https://calendar.google.com/event?eid=sub' }) }]]
+    });
+    const out = await attempt(env.fn('googleCalendarWrite')({
+      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/thread1',
+      params: {
+        title: 'שיחת וידאו עם אופק על ה-onboarding',
+        dateIso: '2026-11-17',
+        hour: 10,
+        minute: 0,
+        quote: 'בוא נקבע שיחת וידאו ביום שלישי 17/11 בשעה 10:00 עד 10:30.',
+        subject: 'Re: [G-Calendar] שיחת וידאו עם אופק על ה-onboarding'
+      }
+    }));
+    const body = env.bodies.find((b) => b && b.summary === 'שיחת וידאו עם אופק על ה-onboarding');
+    check('the write with a tagged subject still succeeds', out.ok === true, out);
+    check('the description Subject line strips Re: and [G-Calendar]',
+      body && body.description.indexOf('Subject: שיחת וידאו עם אופק על ה-onboarding') !== -1 &&
+      body.description.indexOf('[G-Calendar]') === -1 &&
+      body.description.indexOf('Re:') === -1,
+      body && body.description);
+  }
 
   console.log('\n--- background.js: gmailDraftWrite — a plain draft with nothing to attach ---\n');
   {
