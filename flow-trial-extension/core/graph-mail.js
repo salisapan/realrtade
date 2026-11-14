@@ -238,3 +238,4 @@ const FlowGraphMail = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowGraphMail };
+else if (typeof globalThis !== 'undefined') globalThis.FlowGraphMail = FlowGraphMail;
