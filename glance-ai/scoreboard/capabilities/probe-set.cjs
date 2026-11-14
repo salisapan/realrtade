@@ -36,6 +36,8 @@ module.exports = [
   ['task.callback', 'en', 'Hi Sali, please call me back on Thursday about the offer.', 'task'],
   ['commit.reader', 'en', 'Hi Sali, as agreed on the call, you will send the invoice by Friday.', 'task'],
   ['commit.reader', 'he', 'היי סאלי, לפי מה שסיכמנו בשיחה, אתה שולח את החשבונית עד יום שישי.', 'task'],
+  ['commit.reader.neg', 'he', 'היי סאלי, אתה שולח את החשבונית עד יום שישי?', 'none'],
+  ['commit.reader.neg', 'he', 'היי סאלי, אולי אתה שולח את החשבונית עד יום שישי.', 'none'],
   ['commit.sender', 'en', "Hi Sali, I'll send you the signed contract by Friday. Dana", 'task'],
   ['commit.sender', 'he', 'היי סאלי, אשלח לך את החוזה החתום עד יום שישי. דנה', 'task'],
   ['commit.sender.neg', 'en', "Hi Sali, I'll try to send it at some point, no promises.", 'none'],

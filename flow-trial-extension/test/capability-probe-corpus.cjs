@@ -18,7 +18,6 @@ const misses = j.detail.filter((d) => !ok(d[3], d[4])).map((d) => d[0] + ' ' + d
 const DECLARED_GAPS = [
   'cal.move en gmail', 'cal.move en outlook', 'cal.move he outlook',      // core/calendar-move.js is a writer; no host reads a "moved to" mail into it, and the family quiets it
   'cal.cancel en gmail', 'cal.cancel en outlook', 'cal.cancel he gmail', 'cal.cancel he outlook', // a cancelled meeting is vetoed (meeting-veto); the cancelled-booking path needs an earlier confirmation
-  'commit.reader he gmail', 'commit.reader he outlook',                     // «לפי מה שסיכמנו, אתה שולח ... עד יום שישי»: English reads it, Hebrew does not
   'form.create en gmail',                                                    // an imperative with no "please" and no name is not enough (precision); the named ask works
   'doc.append he gmail', 'doc.append en gmail'                               // "add this paragraph to the Q4 doc": no recognizer reads it; Hebrew falls to a reply draft
 ];
@@ -29,6 +28,6 @@ check('every declared gap is still a gap (a fixed one is removed from the list o
 check('no negative row is offered (a wrong Do It would show here)', j.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0, j.detail.filter((d) => d[3] === 'none' && d[4] !== 'none'));
 check('a payment to a new bank account stays quiet with the payment and task readers on', j.detail.filter((d) => /^pay\.bankchange/.test(d[0])).every((d) => d[4] === 'none'));
 check('the probe covers at least 25 kinds', Object.keys(j.out).length >= 25, Object.keys(j.out).length);
-check('at least 86 of the scored rows are right', j.tot.right >= 86, j.tot);
+check('at least 92 of the scored rows are right', j.tot.right >= 92, j.tot);
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

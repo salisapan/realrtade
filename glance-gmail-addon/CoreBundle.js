@@ -9118,7 +9118,10 @@ const FlowActions = (() => {
     const readerWill = /\byou(?:'|’)?ll\b|\byou will\b|\byou(?:'|’)?re\s+sending\b|\byou are sending\b/i.test(untimedSrc)
       || /אתה\s*מעב/.test(untimedSrc)
       || /אתם\s+מעבירים/.test(untimedSrc)
-      || /לפי מה שסגרנו,?\s*אתם מעבירים/.test(untimedSrc);
+      || /לפי מה שסגרנו,?\s*אתם מעבירים/.test(untimedSrc)
+      // «לפי מה שסיכמנו בשיחה, אתה שולח את החשבונית»: the same agreed commitment with a send verb (capability probe, 2026-11-14). It needs the
+      // agreement cue before the verb, so a bare «אתה שולח ...?» question is not read as a promise.
+      || /(?:סיכמנו|סגרנו|סוכם|לפי מה ש(?:אמרת|דיברנו))[^.!?\n]{0,40}(?:אתה|את|אתם|אתן)\s+(?:שולח|שולחת|שולחים|שולחות|מגיש|מגישה|מגישים|מגישות|מכין|מכינה|מכינים|מכינות|מחזיר|מחזירה|מחזירים|מחזירות|משלם|משלמת|משלמים|משלמות|מעביר|מעבירה|מעבירים|מעבירות)(?![\u0590-\u05FF])/.test(untimedSrc);
     const readerSaid = /\byou (?:said|committed|mentioned|agreed|promised)\b/i.test(untimedSrc);
     // Call is a reminder to phone someone. "I'll call you" is the sender's
     // own promise, and "you would call the bank" is the reader's commitment.

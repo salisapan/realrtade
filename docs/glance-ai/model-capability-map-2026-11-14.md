@@ -31,7 +31,7 @@ The engine is not one model. It is a union of about 25 kind-specific rule reader
 - `frozen-kinds.cjs`: the same union over the 701 frozen rows, by kind route, next to the two-pass label. Output: `last-frozen-kinds.txt`.
 - `kinds.cjs`: parses the close map into `kinds.json` / `kinds.md` (62 rows) with the model column.
 
-Result (98 scored rows, Gmail and Outlook, the Labs switches on): **86 right, 1 offered the wrong family, 11 silent, 0 offered where silence is right.** Not scored: `file.find` and `file.receipt`, because the worker's Drive and OneDrive search runs first and the judge alone is silent on purpose (`file-chain-not-run`).
+Result after the fixes below (102 scored rows, Gmail and Outlook, the Labs switches on): **92 right, 1 offered the wrong family, 9 silent, 0 offered where silence is right.** (First run, before any fix: 86 of 98.) Not scored: `file.find` and `file.receipt`, because the worker's Drive and OneDrive search runs first and the judge alone is silent on purpose (`file-chain-not-run`).
 
 ## 3. What the probe found and what changed
 
@@ -40,7 +40,7 @@ Result (98 scored rows, Gmail and Outlook, the Labs switches on): **86 right, 1 
 | **A payment to a changed bank was offered as a task.** With PAYMENT_ASK or TASK_ASK on, "our bank details have changed, please pay the ₪4,000 invoice to the new account by Friday" became "Pay ₪4,000 to the new account": the two task readers ran before the phishing and bank-change veto the reply path already had. | **Fixed.** The veto now runs before both readers (`core/incoming-judge.js`). Hebrew "פרטי החשבון שלנו השתנו … העבר … לחשבון החדש" was not in the veto at all (it fell to a reply draft); `BANK_CHANGE` and `PAY_MOVE` in `core/intent.js` now read it. `test/payment-veto-corpus.cjs` (6 of its checks failed before the change). |
 | Hebrew "תפתח קובץ אקסל / וורד בשם ..." was ignored by the OneDrive new-file reader. | **Fixed** in `core/onedrive-new-file.js`, with the negation, own-promise, third-person and no-name guards kept (`test/onedrive-new-file-corpus.cjs`). |
 | "The Thursday sync is moved to Friday" and "the meeting is cancelled": silent. `core/calendar-move.js` is a writer; no host reads a moved-meeting mail into it; a cancelled meeting is vetoed. | **Declared gap.** Rows C2 and C3 of the close map say the same ("partial"). |
-| «לפי מה שסיכמנו … אתה שולח את החשבונית עד יום שישי»: English reads "as agreed, you will send the invoice by Friday" (title "Log commitment for Oct 9", which names no work), Hebrew is silent. | **Declared gap.** |
+| «לפי מה שסיכמנו … אתה שולח את החשבונית עד יום שישי»: English reads "as agreed, you will send the invoice by Friday", Hebrew was silent because the agreed-commitment cue knew «מעביר» but not «שולח». | **Fixed** (`core/actions.js`, needs the agreement cue before the verb; a bare «אתה שולח …?» question and «אולי …» stay silent, probe rows `commit.reader.neg`). The title is still the generic "Log commitment for Oct 9", which names no work: open. |
 | "Please add this paragraph to the Q4 doc": no recognizer; Hebrew falls to a reply draft. | **Declared gap.** (D3/D4 family.) |
 | A form asked as a bare imperative with no name stays silent. | **Declared, kept for precision.** |
 | "we approved $1,200 …" becomes "Log $1,200 agreed" (the money domain). | By design, not a gap (probe row relabelled). |
@@ -54,6 +54,13 @@ Result (98 scored rows, Gmail and Outlook, the Labs switches on): **86 right, 1 
 3. **The scoreboard needs a kind column.** `frozen-kinds.cjs` is the start: route counts per kind and surface. A kind-level frozen set needs rows the two-pass labelling has not touched, so it is written by hand per kind (the probe is the seed) and kept out of training.
 4. **Chats and the other surfaces.** Rows M1 to M7 (WhatsApp, Messenger, Teams, Slack, LinkedIn) have no probe rows yet: the chat readers (`core/chat-*.js`) take a different input than a mail. They are the next probe, not covered here.
 5. **Spend.** Nothing in this page spent a token. A teacher run for kind labels is still gated on the owner's yes in the `glance-model-lab` session, and I recommend not asking for it before the silver-label path in point 2 shows how many kinds it already covers.
+
+## 4b. Same-day follow-up: chats, the training pool
+
+- **Chat probe** (`glance-ai/scoreboard/capabilities/chat-run.cjs`, `test/chat-capability-probe-corpus.cjs`): 28 hand-written lines for a one-to-one chat, through the judge with surface `chat` and the chat readers as `src/chat-task-card.js` runs them (deadline, callback, payment, appointment, delivery window, trip, invitation, hold, video call, two business questions, reminder, plus negatives: acknowledgement, hedge, past, group, changed bank, one question, another call tool). **28 of 28 right, 0 offered where silence is right.** The one thing the first run showed was by design: a chat needs two business-opener questions, and "how long" is not an opener there.
+- **The training pool has no positives for most kinds** (`silver-kinds.cjs`, the engine's union over the 21,478 synthetic training rows, `kinds-silver.json`): none 15,646, draft 2,312, task 2,224, calendar 677, pay 330, file_save 288, sheet_row 1. No doc, sheet, slides, Word, Excel, video-link or recurring row at all. Its `create_doc` scenario (132 rows) is "create an invoice / prepare a quote" (rows Y2 and Y7 of the close map), not a blank file, and the engine is silent or a task on it.
+- **So I did not build a distilled kind head.** The kind readers are regexes; a student trained on rows they label, from templates shaped like the regexes, would copy the regexes and look good on its own data. A kind head needs rare-kind paraphrases labelled by a teacher, and that spend can only happen in the `glance-model-lab` session (no lab key in this environment). The owner's blanket yes of 2026-11-14 is on record; the run itself, the 200-row cost probe first, is for that session.
+- **Not done on purpose:** move/cancel a meeting and "add to an existing doc" need a new write scope (`documents`, calendar update) and the privacy text with it, so they are a manifest decision; no Labs switch was turned on by default; nothing merged to `main` or deployed. The blanket approval does not stand in for the live Gate those need.
 
 ## 5. Surface table (every change here)
 
