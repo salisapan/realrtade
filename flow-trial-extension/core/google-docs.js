@@ -127,14 +127,57 @@ const FlowGoogleDocs = (() => {
     return { contentType: 'multipart/related; boundary=' + boundary, body: body };
   }
 
-  function normalizeText(s) {
-    return String(s || '').replace(/\s+/g, ' ').trim();
+  function waitMs(clock, ms) {
+    if (clock && typeof clock === 'object' && typeof clock.wait === 'function') return Promise.resolve(clock.wait(ms));
+    if (typeof setTimeout === 'function') return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    return Promise.resolve();
   }
 
-  function exportContains(exported, text) {
+  // Google's text/plain export of a Doc often has a BOM, CRLF, bidi marks,
+  // and "* " (or "• ") prefixes on list items. Collapse those so a faithful
+  // export still compares as the written text.
+  function normalizeText(s) {
+    return String(s || '')
+      .replace(/^\uFEFF/, '')
+      .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+      .replace(/\r\n?/g, '\n')
+      .replace(/^[ \t\u00A0]*[*\u2022\u25CF\u25E6\u00B7\u2043\u2219-]\s+/gm, '')
+      .replace(/(^| )[*\u2022\u25CF]\s+/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function keyFields(html, text) {
+    const parts = [];
+    const src = String(html || '');
+    if (src) {
+      const h1 = src.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
+      if (h1) parts.push(normalizeText(htmlToPlain(h1[1])));
+      const liRe = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
+      let m;
+      while ((m = liRe.exec(src))) parts.push(normalizeText(htmlToPlain(m[1])));
+      const pRe = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+      while ((m = pRe.exec(src))) parts.push(normalizeText(htmlToPlain(m[1])));
+    }
+    if (!parts.length) {
+      String(text || '').split(/\r\n|\r|\n/).forEach(function (line) {
+        const n = normalizeText(line);
+        if (n) parts.push(n);
+      });
+    }
+    return parts.filter(function (p) { return p && p.length >= 2; });
+  }
+
+  // Honest verify: after normalize, either the written text is present as a
+  // whole, or every title / list item / paragraph from the HTML is present.
+  function exportContains(exported, text, html) {
     const got = normalizeText(exported);
-    const want = normalizeText(text);
-    return !!(want && got && got.indexOf(want) >= 0);
+    if (!got) return false;
+    const wantSrc = String(text || '').trim() ? text : htmlToPlain(html);
+    const want = normalizeText(wantSrc);
+    if (want && got.indexOf(want) >= 0) return true;
+    const parts = keyFields(html, wantSrc);
+    return parts.length > 0 && parts.every(function (p) { return got.indexOf(p) >= 0; });
   }
 
   function docLink(json, id) {
@@ -407,17 +450,26 @@ const FlowGoogleDocs = (() => {
       return failClean('verify_failed');
     }
 
-    const exported = await call(http, {
-      method: 'GET',
-      url: FILES + '/' + encodeURIComponent(file.id) + '/export?mimeType=' + encodeURIComponent('text/plain')
-    });
+    const exportUrl = FILES + '/' + encodeURIComponent(file.id) + '/export?mimeType=' + encodeURIComponent('text/plain');
+    let exported = await call(http, { method: 'GET', url: exportUrl });
     const expDenied = authFail(exported);
     if (expDenied) {
       expDenied.cleanedUp = await trashCreated(http, file.id);
       return expDenied;
     }
-    const exportedText = exported.text || '';
-    if (!exported.ok || !exportContains(exportedText, text)) {
+    let exportedText = exported.text || '';
+    // Drive conversion can lag the create. One short retry when the export is empty.
+    if (exported.ok && !String(exportedText).trim()) {
+      await waitMs(clock, 250);
+      exported = await call(http, { method: 'GET', url: exportUrl });
+      const retryDenied = authFail(exported);
+      if (retryDenied) {
+        retryDenied.cleanedUp = await trashCreated(http, file.id);
+        return retryDenied;
+      }
+      exportedText = exported.text || '';
+    }
+    if (!exported.ok || !exportContains(exportedText, text, html)) {
       return failClean('verify_failed');
     }
 
@@ -526,6 +578,8 @@ const FlowGoogleDocs = (() => {
     asHtml: asHtml,
     wrapDocHtml: wrapDocHtml,
     htmlToPlain: htmlToPlain,
+    normalizeText: normalizeText,
+    exportContains: exportContains,
     FOLDER_NAME: FOLDER_NAME
   };
 })();

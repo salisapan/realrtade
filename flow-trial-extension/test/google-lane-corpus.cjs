@@ -14,7 +14,9 @@ const sandbox = {
   atob: (s) => Buffer.from(s, 'base64').toString('binary'),
   TextEncoder,
   Uint8Array,
-  Date
+  Date,
+  setTimeout,
+  Promise
 };
 vm.createContext(sandbox);
 const core = [
@@ -303,6 +305,54 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
     htmlPacked.indexOf('Party:') < 0 &&
     htmlPacked.indexOf('Amount:') < 0 &&
     htmlPacked.indexOf('Title:') < 0, htmlDoc);
+  const googlePlain = '\uFEFF' + [
+    'הצעת מחיר — אתר חדש',
+    '',
+    'שלום,',
+    '',
+    'לקוח: [לא צוין לקוח]',
+    '',
+    '* 5 עמודים',
+    '* בלוג',
+    '',
+    'בברכה,',
+    ''
+  ].join('\r\n');
+  check('a realistic Google text/plain export with bullets, CRLF and a BOM still matches the written HTML',
+    Docs.exportContains(googlePlain, Docs.htmlToPlain(quoteHtml), quoteHtml) === true);
+  const fromGoogle = scripted([
+    { status: 200, ok: true, json: { files: [] } },
+    { status: 200, ok: true, json: { id: 'folder-glance', name: 'Glance' } },
+    { status: 200, ok: true, json: Object.assign({}, FILE_SNAP, { id: 'doc-gexp' }) },
+    { status: 200, ok: true, json: Object.assign({}, FILE_SNAP, { id: 'doc-gexp' }) },
+    { status: 200, ok: true, json: null, text: googlePlain }
+  ]);
+  const googleDoc = await Docs.write({ scopes: Cfg.SCOPES, name: 'Receipt', html: quoteHtml, text: Docs.htmlToPlain(quoteHtml), fullDocument: true }, fromGoogle.http, CLOCK);
+  check('a write verified against a realistic Google list export is proved', proved(googleDoc) && googleDoc.ref.created === true, googleDoc);
+  const delayed = scripted([
+    { status: 200, ok: true, json: { files: [] } },
+    { status: 200, ok: true, json: { id: 'folder-glance', name: 'Glance' } },
+    { status: 200, ok: true, json: Object.assign({}, FILE_SNAP, { id: 'doc-delay' }) },
+    { status: 200, ok: true, json: Object.assign({}, FILE_SNAP, { id: 'doc-delay' }) },
+    { status: 200, ok: true, json: null, text: '' },
+    { status: 200, ok: true, json: null, text: googlePlain }
+  ]);
+  const delayedDoc = await Docs.write({ scopes: Cfg.SCOPES, name: 'Receipt', html: quoteHtml, text: Docs.htmlToPlain(quoteHtml), fullDocument: true }, delayed.http, CLOCK);
+  check('an empty first export is retried and then verifies', proved(delayedDoc) && delayed.calls.filter((c) => /\/export\?/.test(c.url)).length === 2, delayedDoc);
+  const mismatch = scripted([
+    { status: 200, ok: true, json: { files: [] } },
+    { status: 200, ok: true, json: { id: 'folder-glance', name: 'Glance' } },
+    { status: 200, ok: true, json: Object.assign({}, FILE_SNAP, { id: 'doc-miss' }) },
+    { status: 200, ok: true, json: Object.assign({}, FILE_SNAP, { id: 'doc-miss' }) },
+    { status: 200, ok: true, json: null, text: '\uFEFFA different document\r\n* unrelated\r\n' },
+    { status: 200, ok: true, json: { trashed: true } }
+  ]);
+  const missed = await Docs.write({ scopes: Cfg.SCOPES, name: 'Receipt', html: quoteHtml, text: Docs.htmlToPlain(quoteHtml), fullDocument: true }, mismatch.http, CLOCK);
+  check('a Drive export that drops the title and items is verify_failed and the created Doc is trashed',
+    missed.ok === false && missed.reason === 'verify_failed' && missed.cleanedUp === true &&
+    mismatch.calls[5].method === 'PATCH' && /"trashed":true/.test(String(mismatch.calls[5].body)),
+    missed);
+
   check('doc calls stay off gmail, off the Docs API, and off a documents scope', noGmail(created.calls) && created.calls.every((c) => c.url.indexOf('docs.googleapis.com') < 0 && c.url.indexOf('/auth/documents') < 0));
   const driveOff = scripted([
     { status: 403, ok: false, json: { error: { code: 403, message: 'Google Drive API has not been used in project 93977330357 before or it is disabled.', status: 'PERMISSION_DENIED', details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com', metadata: { service: 'drive.googleapis.com' } }] } } }

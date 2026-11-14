@@ -129,11 +129,12 @@ function bumpFile(file) {
 
 function htmlPlainText(buf) {
   const html = Buffer.from(buf || []).toString('utf8');
-  return html
+  const out = html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '* ')
+    .replace(/<\/(p|h1|h2|h3|li|div|tr|table|ul|ol)>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
@@ -144,6 +145,8 @@ function htmlPlainText(buf) {
     .replace(/\n\s+/g, '\n')
     .replace(/[ \t]+/g, ' ')
     .trim();
+  // Real Drive text/plain of a Doc: BOM, CRLF, and "* " list prefixes.
+  return '\uFEFF' + out.replace(/\n/g, '\r\n');
 }
 
 function docBody(text, name) {
