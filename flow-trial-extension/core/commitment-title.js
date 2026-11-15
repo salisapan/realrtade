@@ -7,6 +7,9 @@ const FlowCommitmentTitle = (() => {
   const MAX = 60;
   const PROMISE_EN = /\b(?:i|we)(?:'ll| will)\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete|renew)\b/i;
   const AGREED_EN = /\b(?:we|i)\s+agreed\s+to\s+[a-z]/i;
+  // «As agreed on the call, you will send the invoice by Friday»: the reader's own agreed commitment (slot gold, 2026-11-15: the task was titled «Log commitment for Oct 9»).
+  // It needs the agreement cue in the same sentence, so «you will receive an email» is not a commitment.
+  const READER_EN = /\b(?:per our (?:call|chat|meeting)|as (?:we )?(?:agreed|discussed)|we agreed|you (?:said|agreed|promised|mentioned|committed))\b[^.!?]*\byou(?:'ll|\s+will)\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete|renew)\b/i;
   const PROMISE_HE = /(?:^|\s)(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/;
   const AGREED_HE = /סוכם\s+ש|הסכמנו\s+/;
   const DATE_CUE = /\b(?:by|due|until|before|no later than|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december)\b|עד\s/i;
@@ -86,7 +89,7 @@ const FlowCommitmentTitle = (() => {
   }
 
   function fires(sentence) {
-    return PROMISE_EN.test(sentence) || AGREED_EN.test(sentence) || PROMISE_HE.test(sentence) || AGREED_HE.test(sentence);
+    return PROMISE_EN.test(sentence) || AGREED_EN.test(sentence) || READER_EN.test(sentence) || PROMISE_HE.test(sentence) || AGREED_HE.test(sentence);
   }
 
   function firingSentence(text) {
@@ -110,7 +113,7 @@ const FlowCommitmentTitle = (() => {
     return value.charAt(0).toUpperCase() + value.slice(1);
   }
 
-  const EN_TRIGGER = /(?:we|i)\s+agreed\s+to\s+|(?:i|we)(?:'ll|\s+will)\s+/i;
+  const EN_TRIGGER = /(?:we|i)\s+agreed\s+to\s+|(?:i|we|you)(?:'ll|\s+will)\s+/i;
 
   function englishSpan(sentence) {
     let t = stripGreeting(sentence).replace(/\s*,?\s*please\s*$/i, '').replace(/^(?:please\s+)/i, '');

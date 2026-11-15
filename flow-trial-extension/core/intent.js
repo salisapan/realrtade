@@ -630,7 +630,12 @@ const FlowIntent = (() => {
     const clauses = vetoClauses(raw);
     if (liveWithAsk(clauses)) return false;
     if (marketingWebinar(raw)) return true;
-    if (AUTO_REPLY_TEXT.test(raw) || /(?:אני|אנחנו)\s+לא\s+במשרד/.test(raw)) return true;
+    if (AUTO_REPLY_TEXT.test(raw) || /(?:אני|אנחנו)\s+לא\s+במשרד/.test(raw)) {
+      // «The workshop is on Sunday at 14:00. I am out of office on Thursday.» is a real meeting with a side note (slot gold, 2026-11-15). An auto-reply carries no event
+      // noun with a clock in a clause of its own, so a clause that has both keeps the meeting alive.
+      const liveMeeting = clauses.some((c) => !AUTO_REPLY_TEXT.test(c) && !/(?:אני|אנחנו)\s+לא\s+במשרד/.test(c) && clauseHasEvent(c) && /\b\d{1,2}:\d{2}\b/.test(c));
+      if (!liveMeeting) return true;
+    }
     if (clauses.some(clausePast)) return true;
     if (clauses.some(clauseCancelled)) return true;
     return false;

@@ -47,4 +47,4 @@ function recognize(over, text) {
   const h = readers(text, surface); if (h.length) { got = h[0]; via = 'reader'; }
   return { family: got, via, reason: r && r.show ? '' : (r && r.reason) || '', result: r };
 }
-module.exports = { recognize, familyOf, readers, NOW, OWN };
+module.exports = { recognize, familyOf, readers, NOW, OWN, g };
