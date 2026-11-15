@@ -17,7 +17,7 @@ The single queue both connector routines use. Built from the rows of `docs/glanc
 | tool | owner | status | branch/PR | claimed_at | notes/blockers (dev app setup = CoS) |
 |---|---|---|---|---|---|
 | Notion | claude | built (merged into the working branch in #177, 2026-10-21, switches off) | #177 | | 2026-10-14 | Foundation (token relay, consent catalogue, learning hook) built with it. Waiting on CoS/owner: Notion public integration registration + env vars, relay deploy, `api.notion.com` manifest host, unverified vendor facts, steps-list destination wiring (open-tasks row 80) |
-| ClickUp | free | free | - | - | OAuth2. CoS: ClickUp OAuth app + client id/secret |
+| ClickUp | claude | claimed | `claude/connector-2026-11-15-clickup` | 2026-11-15 | OAuth2 (secret via the relay). CoS: ClickUp OAuth app + client id/secret. Cursor's earlier claim (#167, 2026-10-18) was a claim commit only and is closed unmerged (2026-10-25): the row is free again; its branch is untouched |
 | Slack | free | free | - | - | OAuth2 + secret (relay); app review for distribution. CoS: Slack app |
 | Monday | free | free | - | - | OAuth2. CoS: monday app |
 | HubSpot | free | free | - | - | **Blocked on a decision:** Glance or Flow (owner). Do not claim until decided |
