@@ -121,6 +121,17 @@ const FLOW_CONNECTORS = [
     ]
   },
   {
+    id: 'clickup',
+    label: 'ClickUp',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Adds one task to the ClickUp list you choose and reads it back before it counts as handled. Undo archives it and leaves a task you changed alone. Off in this build; needs a ClickUp app client ID (docs/glance-ai/connectors/clickup.md).',
+    fields: [
+      { key: 'list', label: 'List URL or ID', placeholder: 'https://app.clickup.com/…/v/li/…', type: 'text' }
+    ]
+  },
+  {
     id: 'jira',
     label: 'Jira',
     kind: 'Work management',

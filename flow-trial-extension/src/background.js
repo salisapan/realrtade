@@ -94,6 +94,7 @@ import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/clickup-close.js'; // classic: sets globalThis.FlowClickupClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
 import '../core/google-contacts.js';
@@ -2141,7 +2142,7 @@ async function disconnectConnector(connectorId) {
     return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector, disableSurface: disableSurface });
   }
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth', clickup: 'clickupAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -2189,7 +2190,7 @@ async function disconnectConnector(connectorId) {
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : connectorId === 'clickup' ? [key, 'clickupLedger'] : key);
   return { ok: true };
 }
 
@@ -4740,8 +4741,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack, clickup: CONNECTORS.clickupReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file', clickup: 'clickup/task' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -4893,6 +4894,86 @@ async function asanaReadBackWrite(p) {
 async function asanaReadBackUndo(ref) {
   const r = await asanaCloseEngine().undo(ref);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'asana' });
+  return r;
+}
+
+/* ------------------------------------------------------- ClickUp, with a proof */
+// docs/glance-ai/connectors/clickup.md. One task in the list the person chose, read back; Undo archives it (never deletes) unless the person changed it.
+// Everything here is behind config/connectors.public.js (clickupReadBack, clickupOAuth), both off.
+
+const CLICKUP_API = 'https://api.clickup.com/api/v2';
+const CLICKUP_AUTH_BASE = 'https://app.clickup.com/api';
+const CLICKUP_LEDGER_KEY = 'clickupLedger';
+
+async function getClickupAuth() {
+  const { clickupAuth } = await chrome.storage.local.get('clickupAuth');
+  return clickupAuth || null;
+}
+
+// A list link ends in .../v/li/<list id> (or .../li/<id>); the bare numeric list id also works.
+function parseClickupList(input) {
+  const t = String(input || '').trim();
+  if (/^\d{5,15}$/.test(t)) return t;
+  const m = t.match(/^https:\/\/app\.clickup\.com\/.*\/li\/(\d{5,15})(?:[/?#]|$)/);
+  return m ? m[1] : null;
+}
+
+// "Sign in with ClickUp" (OAuth 2). The one-time code goes to the relay, which adds the client secret. ClickUp has no PKCE and its tokens do not expire.
+async function connectClickupOAuth(listInput) {
+  if (!CONNECTORS.clickupOAuth) throw new Error('Sign in with ClickUp is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.clickupClientId);
+  if (!clientId) throw new Error('ClickUp sign-in isn’t configured on this build yet.');
+  const listId = parseClickupList(listInput);
+  if (!listId) throw new Error('That doesn’t look like a ClickUp list link — open the list and copy the URL.');
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(CLICKUP_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&redirect_uri=' + encodeURIComponent(redirectUri), 'ClickUp');
+  const got = await relayTokenRequest({ vendor: 'clickup', grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('ClickUp connection failed (' + got.error + ').');
+  const res = await fetch(CLICKUP_API + '/list/' + listId, { headers: { Authorization: got.data.access_token, Accept: 'application/json' } });
+  if (res.status === 401 || res.status === 403 || res.status === 404) throw new Error('ClickUp signed you in but cannot open that list — check the link and that you can add tasks to it.');
+  if (!res.ok) throw new Error('ClickUp returned ' + res.status + '.');
+  const body = await res.json();
+  const name = (body && typeof body.name === 'string' && body.name.slice(0, 100)) || 'ClickUp list';
+  await chrome.storage.local.set({ clickupAuth: { token: got.data.access_token, listId: listId, listName: name, via: 'oauth' } });
+  return { title: name };
+}
+
+function clickupCloseEngine() {
+  return globalThis.FlowClickupClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getClickupAuth,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(CLICKUP_LEDGER_KEY))[CLICKUP_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(CLICKUP_LEDGER_KEY))[CLICKUP_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [CLICKUP_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+async function clickupReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await clickupCloseEngine().write({ key: notionLoopKey(p, title).replace(/^notion:/, 'clickup:'), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'clickup', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'clickup', lang: lang });
+    return { ok: true, where: 'ClickUp', target: 'your list', written: 'Added to ClickUp.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'clickup', lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'ClickUp' };
+}
+
+async function clickupReadBackUndo(ref) {
+  const r = await clickupCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'clickup' });
   return r;
 }
 
@@ -7601,6 +7682,7 @@ const WRITERS = {
   attachmentSave: attachmentSaveWrite
 };
 if (CONNECTORS.asanaReadBack) WRITERS.asana = asanaReadBackWrite;
+if (CONNECTORS.clickupReadBack) WRITERS.clickup = clickupReadBackWrite;
 if (CONNECTORS.jiraReadBack) WRITERS.jira = jiraReadBackWrite;
 if (CONNECTORS.linearReadBack) WRITERS.linear = linearReadBackWrite;
 const UNDOERS = {
@@ -7614,6 +7696,7 @@ const UNDOERS = {
   attachmentSave: attachmentSaveUndo
 };
 if (CONNECTORS.asanaReadBack) UNDOERS.asana = asanaReadBackUndo;
+if (CONNECTORS.clickupReadBack) UNDOERS.clickup = clickupReadBackUndo;
 if (CONNECTORS.jiraReadBack) UNDOERS.jira = jiraReadBackUndo;
 if (CONNECTORS.linearReadBack) UNDOERS.linear = linearReadBackUndo;
 
@@ -7799,6 +7882,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.connectorId === 'docusign') return reply(sendResponse, connectDocusignOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'jira') return reply(sendResponse, connectJiraOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'clickup') return reply(sendResponse, connectClickupOAuth(msg.list).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'asana') return reply(sendResponse, connectAsanaOAuth(msg.project).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));

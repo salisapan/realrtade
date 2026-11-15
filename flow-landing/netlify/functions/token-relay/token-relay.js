@@ -57,6 +57,16 @@ const VENDORS = {
     extraHeaders: {},
     supportsRefresh: true
   },
+  clickup: {
+    tokenUrl: 'https://api.clickup.com/api/v2/oauth/token',
+    idEnv: 'CLICKUP_CLIENT_ID',
+    secretEnv: 'CLICKUP_CLIENT_SECRET',
+    // ClickUp takes client_id, client_secret and code in the request; its access tokens do not expire and there is no refresh grant (verify against the vendor page before go-live).
+    clientAuth: 'body',
+    bodyFormat: 'json',
+    extraHeaders: {},
+    supportsRefresh: false
+  },
   // DocuSign: HTTP Basic client auth and a form body (verify against the vendor page before go-live). Production and the developer (demo) servers are two vendors:
   // the integration key is the same, the secret is not.
   docusign: {

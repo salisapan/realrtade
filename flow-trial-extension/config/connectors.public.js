@@ -28,8 +28,13 @@
 // jiraOAuth:     "Sign in with Atlassian" (OAuth 2.0 3LO) through the token relay. Needs the relay deployed, JIRA_CLIENT_ID /
 //                JIRA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.jiraClientId set.
 //
+// clickupReadBack: the ClickUp write goes through core/clickup-close.js (one task in the chosen list, read back, Undo ARCHIVES it and reads that back; never deletes;
+//                  refuses a task the person renamed, described or re-dated). Off = no ClickUp writer exists at all (nothing is registered under the id "clickup").
+// clickupOAuth:    "Sign in with ClickUp" (OAuth 2, no PKCE, tokens do not expire) through the token relay. Needs the relay deployed, CLICKUP_CLIENT_ID /
+//                  CLICKUP_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.clickupClientId set.
+//
 // asanaReadBack: the Asana write goes through core/asana-close.js (one task in the chosen project, read back, Undo read back).
 //                Off = no Asana writer exists at all (nothing is registered under the id "asana").
 // asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
 //                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false };
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, clickupReadBack: false, clickupOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false };
