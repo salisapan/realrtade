@@ -4882,12 +4882,17 @@ const FlowIntent = (() => {
   const EXPLICIT_MEETING_ASK = new RegExp([
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+meet(?!\\s+(?:the\\s+)?(?:deadline|requirement|criteria|quota|target|obligation))\\b',
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
-    '\\bplease\\s+(?:schedule|set up|book|put)\\b',
-    // «how about Monday at 9am», «can we talk on Sunday at 10:30» name the slot in the question itself (slot gold, 2026-11-15). The clock and the resolved day are still required.
+    '\\bplease\\s+(?:schedule|set up|book|put)\\b'
+
+  ].join('|'), 'i');
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוח|זורם|מסתדר|מתאים)\s+לך\s+ש(?:נדבר|ניפגש|נשב|נעשה|נקבע)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוח|זורם)\s+לך\s+(?:פגישה|שיחה|זום|סינק|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:קובעים|נסגור)\s+(?:פגישה|שיחה|זום|סינק|ישיבה|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])נ?אשמח\s+(?:לפגוש\s+אותך|להיפגש|לשבת\s+איתך)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?פנ(?:ה|י|ו)\s+לי\s+(?:חצי\s+שעה|שעה|רבע\s+שעה|כמה\s+דקות)|(?:^|[^\u0590-\u05FF])אפנה\s+לך\s+(?:חצי\s+שעה|שעה|רבע\s+שעה)|(?:^|[^\u0590-\u05FF])תצטרפ(?:י|ו)?\s+אלינו\s+ל|(?:^|[^\u0590-\u05FF])(?:שריינתי|שמרתי)\s+לנו(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])הזמנתי\s+(?:לנו\s+)?חדר(?:\s+ישיבות)?(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])יש\s+לי\s+חלון(?![\u0590-\u05FF]))/;
+  // «how about Monday at 9am», «can we talk on Sunday at 10:30», «בוא נקבע לשני בשעה 9:00» name the slot in the question itself (slot gold, 2026-11-15). Not in a chat: there
+  // «Can we talk tomorrow at 10:00?» is a call proposal that core/teams-meeting.js and core/meet-link.js own (test/chat-task-card-corpus.cjs). The clock and the day are still required.
+  const EXPLICIT_SLOT_QUESTION = new RegExp([
     '\\b(?:how|what)\\s+about\\s+(?:on\\s+)?(?:next\\s+|this\\s+)?(?:mon|tues|wednes|thurs|fri|satur|sun)day\\b[^.?!\\n]{0,12}\\d',
     '\\b(?:can|could|shall)\\s+we\\s+(?:talk|chat|speak|catch up|sync|connect|touch base)\\s+(?:on|at|tomorrow|today|this|next)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:(?:^|[^\u0590-\u05FF])(?:בוא|בואי|בואו)\s+(?:נקבע|ניפגש|נדבר|נתאם)(?![\u0590-\u05FF])|בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוח|זורם|מסתדר|מתאים)\s+לך\s+ש(?:נדבר|ניפגש|נשב|נעשה|נקבע)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוח|זורם)\s+לך\s+(?:פגישה|שיחה|זום|סינק|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:קובעים|נסגור)\s+(?:פגישה|שיחה|זום|סינק|ישיבה|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])נ?אשמח\s+(?:לפגוש\s+אותך|להיפגש|לשבת\s+איתך)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?פנ(?:ה|י|ו)\s+לי\s+(?:חצי\s+שעה|שעה|רבע\s+שעה|כמה\s+דקות)|(?:^|[^\u0590-\u05FF])אפנה\s+לך\s+(?:חצי\s+שעה|שעה|רבע\s+שעה)|(?:^|[^\u0590-\u05FF])תצטרפ(?:י|ו)?\s+אלינו\s+ל|(?:^|[^\u0590-\u05FF])(?:שריינתי|שמרתי)\s+לנו(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])הזמנתי\s+(?:לנו\s+)?חדר(?:\s+ישיבות)?(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])יש\s+לי\s+חלון(?![\u0590-\u05FF]))/;
+  const EXPLICIT_SLOT_QUESTION_HE = /(?:^|[^\u0590-\u05FF])(?:בוא|בואי|בואו)\s+(?:נקבע|ניפגש|נדבר|נתאם)(?![\u0590-\u05FF])/;
   // A note the person mails to themselves that asks to put a timed meeting on the calendar ("תשריין ביומן", "add it to my
   // calendar") is that hold, not a Google Task. Without an ask like this a self-note stays the task it always was.
   const SELF_CALENDAR_ASK_HE = /(?:^|[^\u0590-\u05FF])(?:(?:ת|ל)?שריי?ן(?![\u0590-\u05FF])|(?:תכניס|להכניס|תוסיף|להוסיף|תרשום|לרשום|תשים|לשים|תקבע|לקבוע)(?:י|ו)?(?:\s+\S+){0,3}?\s+(?:ל|ב)יומן(?![\u0590-\u05FF]))/;
@@ -6785,7 +6790,7 @@ const FlowIntent = (() => {
     const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b|נראה לי|(?:^|[^\u0590-\u05FF])אולי/.test(text);
     const eventEvidence = hasMeetingNoun && facts.date && (facts.date.iso || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast && !attachToInvite && !phoneSomeone && !meetingAskHedge;
     const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite && !phoneSomeone &&
-      (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
+      (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text) || (ctx.surface !== 'chat' && (EXPLICIT_SLOT_QUESTION.test(text) || EXPLICIT_SLOT_QUESTION_HE.test(text))));
 
     // Drive / Doc / Sheet closes. Silence here is a decision, not a miss:
     // the remote fallback must not turn it into a different chip. A wait
@@ -10742,6 +10747,7 @@ const FlowIncomingJudge = (() => {
       userName: i.userName || null,
       ownNames: i.ownNames || null,
       calendarChangeOn: i.calendarChangeOn === true,
+      surface: i.surface || null,
       autoReply: i.autoReply === true,
       noteToSelf: i.noteToSelf === true,
       senderIsUser: i.senderIsUser === true,

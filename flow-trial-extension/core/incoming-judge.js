@@ -410,6 +410,7 @@ const FlowIncomingJudge = (() => {
       userName: i.userName || null,
       ownNames: i.ownNames || null,
       calendarChangeOn: i.calendarChangeOn === true,
+      surface: i.surface || null,
       autoReply: i.autoReply === true,
       noteToSelf: i.noteToSelf === true,
       senderIsUser: i.senderIsUser === true,

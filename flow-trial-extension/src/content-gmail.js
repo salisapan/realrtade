@@ -621,7 +621,7 @@ function glanceUiCopy(kind) {
       const prepared = (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function')
         ? FlowIncomingJudge.prepareForJudge(text)
         : text;
-      intent = (typeof FlowIntent !== 'undefined') ? FlowIntent.classify(prepared, Object.assign({}, ctx, { calendarChangeOn: calendarChangeSwitch })) : null;
+      intent = (typeof FlowIntent !== 'undefined') ? FlowIntent.classify(prepared, Object.assign({}, ctx, { calendarChangeOn: typeof calendarChangeSwitch !== 'undefined' && calendarChangeSwitch === true })) : null;
     }
     if (!intent || !intent.type) return { show: false, reason: 'intent-null', intent: intent || null };
     if (intent.plannedProcess && intent.plannedProcess.steps && intent.plannedProcess.steps.length) {
@@ -640,7 +640,7 @@ function glanceUiCopy(kind) {
       attachFile: ctx.attachFile || null,
       text: text,
       subject: ctx.subject || '',
-      calendarChangeOn: calendarChangeSwitch
+      calendarChangeOn: typeof calendarChangeSwitch !== 'undefined' && calendarChangeSwitch === true
     }) : null;
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent: intent };
     return { show: true, intent: intent, process: process };
@@ -1656,7 +1656,7 @@ function glanceUiCopy(kind) {
       if (hit && await holdAlreadyMade(ctx.senderEmail, hit.intent, [ctx.messageId])) return { type: null };
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
-    let intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { calendarChangeOn: calendarChangeSwitch }));
+    let intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { calendarChangeOn: typeof calendarChangeSwitch !== 'undefined' && calendarChangeSwitch === true }));
     if (intent && intent.type === 'request' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.doItOverride === 'function'
         && base && base.inbound !== false && ctx.senderIsUser !== true) {
       const over = FlowIncomingJudge.doItOverride({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true, attachmentCount: ctx.attachmentCount || 0 }, intent);
