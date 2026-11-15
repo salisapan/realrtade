@@ -1,0 +1,242 @@
+{
+ "generatedFrom": "glance-ai/scoreboard/run.cjs (frozen set, text-bound)",
+ "frozenRows": 701,
+ "sources": [
+  {
+   "source": "owner-verified",
+   "n": 0,
+   "models": {}
+  },
+  {
+   "source": "two-pass agreement (NOT owner-verified)",
+   "n": 565,
+   "models": {
+    "engine-only": {
+     "product": {
+      "n": 565,
+      "silent": 299,
+      "act": 266,
+      "wrongDoIt": 21,
+      "missed": 125,
+      "wrongAction": 12,
+      "he": {
+       "silent": 150,
+       "act": 139,
+       "wrongDoIt": 12,
+       "missed": 56
+      },
+      "en": {
+       "silent": 149,
+       "act": 127,
+       "wrongDoIt": 9,
+       "missed": 69
+      }
+     },
+     "undatedWrongDoIt": 0
+    },
+    "kinds-head": {
+     "product": {
+      "n": 565,
+      "silent": 299,
+      "act": 266,
+      "wrongDoIt": 20,
+      "missed": 117,
+      "wrongAction": 13,
+      "he": {
+       "silent": 150,
+       "act": 139,
+       "wrongDoIt": 11,
+       "missed": 56
+      },
+      "en": {
+       "silent": 149,
+       "act": 127,
+       "wrongDoIt": 9,
+       "missed": 61
+      }
+     },
+     "undatedWrongDoIt": 0,
+     "alone": {
+      "n": 565,
+      "silent": 299,
+      "act": 266,
+      "wrongDoIt": 7,
+      "missed": 177,
+      "wrongAction": 2,
+      "he": {
+       "silent": 150,
+       "act": 139,
+       "wrongDoIt": 2,
+       "missed": 87
+      },
+      "en": {
+       "silent": 149,
+       "act": 127,
+       "wrongDoIt": 5,
+       "missed": 90
+      }
+     },
+     "calibration": {
+      "n": 565,
+      "ece": 0.078,
+      "brier": 0.097
+     }
+    }
+   }
+  },
+  {
+   "source": "single blind pass (Claude, NOT owner-verified)",
+   "n": 25,
+   "models": {
+    "engine-only": {
+     "product": {
+      "n": 25,
+      "silent": 2,
+      "act": 23,
+      "wrongDoIt": 1,
+      "missed": 9,
+      "wrongAction": 4,
+      "he": {
+       "silent": 1,
+       "act": 15,
+       "wrongDoIt": 1,
+       "missed": 5
+      },
+      "en": {
+       "silent": 1,
+       "act": 8,
+       "wrongDoIt": 0,
+       "missed": 4
+      }
+     },
+     "undatedWrongDoIt": 0
+    },
+    "kinds-head": {
+     "product": {
+      "n": 25,
+      "silent": 2,
+      "act": 23,
+      "wrongDoIt": 1,
+      "missed": 9,
+      "wrongAction": 4,
+      "he": {
+       "silent": 1,
+       "act": 15,
+       "wrongDoIt": 1,
+       "missed": 5
+      },
+      "en": {
+       "silent": 1,
+       "act": 8,
+       "wrongDoIt": 0,
+       "missed": 4
+      }
+     },
+     "undatedWrongDoIt": 0,
+     "alone": {
+      "n": 25,
+      "silent": 2,
+      "act": 23,
+      "wrongDoIt": 1,
+      "missed": 18,
+      "wrongAction": 2,
+      "he": {
+       "silent": 1,
+       "act": 15,
+       "wrongDoIt": 1,
+       "missed": 12
+      },
+      "en": {
+       "silent": 1,
+       "act": 8,
+       "wrongDoIt": 0,
+       "missed": 6
+      }
+     },
+     "calibration": {
+      "n": 25,
+      "ece": null,
+      "brier": null
+     }
+    }
+   }
+  },
+  {
+   "source": "owner-convention, rule-derived (C-4: an undated ask gets a Do It; NOT agreement, NOT owner-verified)",
+   "n": 38,
+   "models": {
+    "engine-only": {
+     "product": {
+      "n": 38,
+      "silent": 0,
+      "act": 38,
+      "wrongDoIt": 0,
+      "missed": 20,
+      "wrongAction": 8,
+      "he": {
+       "silent": 0,
+       "act": 21,
+       "wrongDoIt": 0,
+       "missed": 12
+      },
+      "en": {
+       "silent": 0,
+       "act": 17,
+       "wrongDoIt": 0,
+       "missed": 8
+      }
+     },
+     "undatedWrongDoIt": 0
+    },
+    "kinds-head": {
+     "product": {
+      "n": 38,
+      "silent": 0,
+      "act": 38,
+      "wrongDoIt": 0,
+      "missed": 19,
+      "wrongAction": 8,
+      "he": {
+       "silent": 0,
+       "act": 21,
+       "wrongDoIt": 0,
+       "missed": 12
+      },
+      "en": {
+       "silent": 0,
+       "act": 17,
+       "wrongDoIt": 0,
+       "missed": 7
+      }
+     },
+     "undatedWrongDoIt": 0,
+     "alone": {
+      "n": 38,
+      "silent": 0,
+      "act": 38,
+      "wrongDoIt": 0,
+      "missed": 34,
+      "wrongAction": 1,
+      "he": {
+       "silent": 0,
+       "act": 21,
+       "wrongDoIt": 0,
+       "missed": 19
+      },
+      "en": {
+       "silent": 0,
+       "act": 17,
+       "wrongDoIt": 0,
+       "missed": 15
+      }
+     },
+     "calibration": {
+      "n": 43,
+      "ece": 0.433,
+      "brier": 0.337
+     }
+    }
+   }
+  }
+ ]
+}
