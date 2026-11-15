@@ -41,7 +41,7 @@ function recognize(over, text) {
   const surface = over.surface || 'gmail', own = OWN[surface];
   const input = Object.assign({ text, subject: 'Subject', sender: { name: 'Dana Levi', email: 'dana@acme.io' }, now: new Date(NOW), threadUrl: 'https://x/y', hasThreadAttachment: false, attachmentCount: 0, surface,
     to: [own], cc: [], ownAddresses: [own], ownNames: ['Sali', 'Sali Sapan', 'סאלי'], userName: 'Sali', direction: 'inbound', inbound: true, namesWaitDone: true,
-    systemNoticeOn: true, bookingNoticeOn: true, paymentAskOn: true, taskAskOn: true, directAskOn: true, workspaceFileOn: true }, over);
+    systemNoticeOn: true, bookingNoticeOn: true, paymentAskOn: true, taskAskOn: true, directAskOn: true, workspaceFileOn: true, calendarChangeOn: true }, over);
   let r; try { r = J.judge(input, DEPS); } catch (e) { r = { show: false, reason: 'ERR ' + e.message }; }
   let got = familyOf(r), via = 'judge';
   const h = readers(text, surface); if (h.length) { got = h[0]; via = 'reader'; }

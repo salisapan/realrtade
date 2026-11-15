@@ -720,7 +720,9 @@ const FlowActions = (() => {
     const vetoText = ctx.text;
     const vetoed = Boolean(intent.signals && intent.signals.meetingVeto) ||
       Boolean(vetoText && typeof FlowIntent !== 'undefined' && typeof FlowIntent.meetingPlanVeto === 'function' && FlowIntent.meetingPlanVeto(vetoText));
-    if (intent.type === 'event' && vetoed) return null;
+    // A family-G cancel or move that names its slot is the delete or the update itself, not a hold the veto stands down (same exception in incoming-judge.js).
+    const slotChange = ctx.calendarChangeOn === true && typeof FlowIntent !== 'undefined' && typeof FlowIntent.slotChangeSafe === 'function' && FlowIntent.slotChangeSafe(intent, vetoText);
+    if (intent.type === 'event' && vetoed && !slotChange) return null;
 
     let e = intent.entities || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);

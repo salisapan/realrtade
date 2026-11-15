@@ -2806,10 +2806,17 @@ const FlowCloseFamilies = (() => {
   const FOLLOW_EN = /\b(?:please (?:chase|nudge|ping)|follow up with|send (?:a |the )?reminder|send \w+ a reminder|please remind|chase up|chase the|nudge \w+ about|ping \w+ about)\b/i;
   const FOLLOW_HE = /(?:תעקוב|בבקשה תעקוב|לעקוב אחרי|תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|שלח תזכורת|תשלח תזכורת|תבדוק מול)/;
 
-  const MOVE_EN = /\b(?:reschedul\w*|postpone|push (?:the |our |this )?(?:call|meeting|sync)|move (?:the |our |this )?(?:call|meeting|sync))\b/i;
+  // The narrow readers are the default. A host that passes calendarChangeOn (Labs row CALENDAR_CHANGE, off) gets the wide ones inside assess(): «push Thursday's call»,
+  // «move our Thursday 10:00 call» (up to three words between the verb and the noun), the passive notice «the sync is moved to Friday at 11:00», and «הפגישה ... בוטלה».
+  let WIDE = false;
+  const MOVE_EN_NARROW = /\b(?:reschedul\w*|postpone|push (?:the |our |this )?(?:call|meeting|sync)|move (?:the |our |this )?(?:call|meeting|sync))\b/i;
+  const MOVE_EN_WIDE = /\b(?:reschedul\w*|postpone|(?:push|move)\s+(?:(?:the|our|this|that|my|your)\s+)?(?:[\w'’:.-]+\s+){0,3}?(?:call|meeting|sync|review|stand-?up|session)|(?:is|are|was|has been|have been|will be|got)\s+(?:moved|pushed))\b/i;
+  const MOVE_EN = { test(x) { return (WIDE ? MOVE_EN_WIDE : MOVE_EN_NARROW).test(x); } };
   const MOVE_HE = /(?:לדחות|נדחתה|נדחה|להזיז את ה|תזיז(?:ו|י)? את ה|נקבע מחדש)/;
   const CANCEL_EN = /\b(?:cancel(?:led|ing)?|call(?:ed)? off)\b[^.]{0,48}\b(?:call|meeting|sync|invite|event)\b|\b(?:call|meeting|sync|invite|event)\b[^.]{0,48}\b(?:is |was )?(?:cancelled|called off)\b/i;
-  const CANCEL_HE = /(?:בטל את ה|לבטל את ה|הפגישה מבוטלת|השיחה מבוטלת)/;
+  const CANCEL_HE_NARROW = /(?:בטל את ה|לבטל את ה|הפגישה מבוטלת|השיחה מבוטלת)/;
+  const CANCEL_HE_WIDE = /(?:בטל את ה|לבטל את ה|הפגישה מבוטלת|השיחה מבוטלת|(?:הפגישה|השיחה|הישיבה|הסנכרון)\s+(?:[^\s.,!?]+\s+){0,5}?(?:בוטלה|בוטל|מבוטלת|לא\s+תתקיים)(?![\u0590-\u05FF]))/;
+  const CANCEL_HE = { test(x) { return (WIDE ? CANCEL_HE_WIDE : CANCEL_HE_NARROW).test(x); } };
 
   const HEDGE_EN = /\b(?:maybe|perhaps|possibly|no rush|if possible|tentatively|might|whenever you|if you feel|sometime|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works|any chance|not sure which|whichever)\b/i;
   const HEDGE_HE = /(?:אולי|ייתכן|אם אפשר|אין לחץ|מתישהו|נראה לי|לא בטוח(?:ה)?\s+איז|איזה\s+קובץ|איזו\s+חשבונית|יש סיכוי)/;
@@ -3259,8 +3266,10 @@ const FlowCloseFamilies = (() => {
     const clause = replacementClause(sentence);
     let date = clause ? dateOf(clause, now) : null;
     const time = clause ? movedClock(clause) : null;
-    const before = clause ? sentence.slice(0, sentence.indexOf(clause)) : sentence;
-    const oldDate = fromWeekday(before, now);
+    const before = (clause ? sentence.slice(0, sentence.indexOf(clause)) : sentence).replace(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)['’]s\b/ig, WIDE ? '$1' : '$&');
+    // «Thursday's call at 10:00», «the Thursday sync at 10:00»: the old day has a noun between it and the clock, which the date reader does not take.
+    const oldDay = before.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+    const oldDate = fromWeekday(before, now) || (WIDE && oldDay ? dateOf('on ' + oldDay[1], now) : null);
     const oldTime = clockOf(before);
     if (!date && time && oldDate) date = oldDate;
     // Both clocks named, and they differ: move that event. A new clock
@@ -3588,6 +3597,10 @@ const FlowCloseFamilies = (() => {
   }
 
   function assess(text, facts, ctx) {
+    WIDE = Boolean(ctx && ctx.calendarChangeOn === true);
+    try { return assessInner(text, facts, ctx); } finally { WIDE = false; }
+  }
+  function assessInner(text, facts, ctx) {
     ctx = ctx || {};
     if (typeof FlowJudgment !== 'undefined' && FlowJudgment.newContent) text = FlowJudgment.newContent(text || '');
     else text = String(text || '');
@@ -3597,7 +3610,10 @@ const FlowCloseFamilies = (() => {
     if (NOISE_EN.test(text) || NOISE_HE.test(text)) return null;
     if (ambiguousFiles(text)) return hit({ suppress: true, family: 'H', rule: 'ambiguousFiles', matched: distinctFiles(text) });
     const clockStarts = ambiguousClocks(text);
-    if (clockStarts) return hit({ suppress: true, family: 'H', rule: 'ambiguousClocks', matched: clockStarts });
+    // A move names two clocks on purpose («push Thursday's call at 10:00 to Friday at 11:00»): the old slot and the new one. Family G reads that sentence, so the
+    // two-clock stand-down does not apply to a sentence matchMove turns into a calendar-move (capability probe, 2026-11-14: it silenced every English move).
+    const isMove = WIDE && clockStarts && splitSentences(text).some((sn) => { const m = (MOVE_EN.test(sn) || MOVE_HE.test(sn)) ? matchMove(sn, ctx.now) : null; return m && m !== 'suppress' && m.personalClose === 'calendar-move'; });
+    if (clockStarts && !isMove) return hit({ suppress: true, family: 'H', rule: 'ambiguousClocks', matched: clockStarts });
     const now = ctx.now;
     if (!facts && typeof FlowExtract !== 'undefined') {
       facts = FlowExtract.extract(text, { now: now, senderEmail: ctx.senderEmail });
@@ -5417,6 +5433,17 @@ const FlowIntent = (() => {
     if (!named || GROUP_ADDRESSEE.test(named[1])) return '';
     return named[1];
   }
+  // A family-G cancel or move (core/close-families.js) is the close itself, so the meeting veto stands down for it, but only when the mail is plain enough that the
+  // one event to delete or update cannot be mistaken: a cancel names exactly one clock, a move names exactly two, and nothing in the mail is behind us («last Thursday»,
+  // «yesterday», «שעבר», «אתמול»). A mail that cancels one meeting and proposes another has two clocks and stays vetoed.
+  function slotChangeSafe(intent, text) {
+    const pc = intent && intent.personalClose;
+    if (pc !== 'calendar-cancel' && pc !== 'calendar-move') return false;
+    const raw = String(text || '');
+    if (/\b(?:last\s+(?:week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|yesterday|ago|earlier today)\b|שעבר|אתמול|שלשום/i.test(raw)) return false;
+    const clocks = new Set((raw.match(/\b\d{1,2}:\d{2}\b/g) || []).map((c) => c.replace(/^0/, '')));
+    return pc === 'calendar-cancel' ? clocks.size === 1 : clocks.size === 2;
+  }
   // A changed bank plus a payment is not a task. Quiet beats a wrong Do It.
   // "wire … to the new bank account below" is the same quiet: a payment
   // aimed at an account the sender just introduced. A dated invoice with
@@ -6533,7 +6560,7 @@ const FlowIntent = (() => {
     const settled = ALREADY_SETTLED.test(text);
     if (!quietHint && (contingent || settled)) quietHint = 'hedge';
     familyBox.hit = (typeof FlowCloseFamilies !== 'undefined' && !blocked && !askIsSoft && !settled)
-      ? FlowCloseFamilies.assess(text, facts, { now: ctx.now, senderEmail: ctx.senderEmail })
+      ? FlowCloseFamilies.assess(text, facts, { now: ctx.now, senderEmail: ctx.senderEmail, calendarChangeOn: ctx.calendarChangeOn === true })
       : null;
     function fromFamily(fam) {
       if (!fam || fam.suppress) return null;
@@ -6566,6 +6593,9 @@ const FlowIntent = (() => {
       }
       const intent = finish(fam.type, fam.confidence, entities, fam.personalClose || null);
       if (!intent || !intent.type) return intent;
+      // A move card names the NEW slot. The short label is built from the mail's first date and clock, which for «Thursday at 10:00 moved to Friday at 11:00» is
+      // the new day with the old clock (capability probe, 2026-11-14).
+      if (fam.personalClose === 'calendar-move' && entities.when) intent.label = 'Meeting ' + entities.when;
       // A note to self stays a plain task. Family A would mark it as the file chain.
       if (!(intent.selfTask && fam.family === 'A')) {
         intent.closeFamily = fam.family;
@@ -8320,7 +8350,7 @@ const FlowIntent = (() => {
     return titleAfter(hit.verb, hit.match, src, subject, {});
   }
 
-  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
+  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, slotChangeSafe, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };
@@ -9048,7 +9078,9 @@ const FlowActions = (() => {
     const vetoText = ctx.text;
     const vetoed = Boolean(intent.signals && intent.signals.meetingVeto) ||
       Boolean(vetoText && typeof FlowIntent !== 'undefined' && typeof FlowIntent.meetingPlanVeto === 'function' && FlowIntent.meetingPlanVeto(vetoText));
-    if (intent.type === 'event' && vetoed) return null;
+    // A family-G cancel or move that names its slot is the delete or the update itself, not a hold the veto stands down (same exception in incoming-judge.js).
+    const slotChange = ctx.calendarChangeOn === true && typeof FlowIntent !== 'undefined' && typeof FlowIntent.slotChangeSafe === 'function' && FlowIntent.slotChangeSafe(intent, vetoText);
+    if (intent.type === 'event' && vetoed && !slotChange) return null;
 
     let e = intent.entities || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);
@@ -10692,6 +10724,7 @@ const FlowIncomingJudge = (() => {
       ownAddresses: i.ownAddresses || i.own || null,
       userName: i.userName || null,
       ownNames: i.ownNames || null,
+      calendarChangeOn: i.calendarChangeOn === true,
       autoReply: i.autoReply === true,
       noteToSelf: i.noteToSelf === true,
       senderIsUser: i.senderIsUser === true,
@@ -10791,7 +10824,9 @@ const FlowIncomingJudge = (() => {
     // An event with a day and no clock that the meeting gate would veto. When the sender is asking the reader for a time
     // ("are you available for a call Tuesday afternoon?") it is a request, and the card is a reply that offers times.
     // Every other event keeps the path it had (a named hold, or the Schedule meeting task).
-    if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
+    // A family-G cancel or move that names its slot is the close itself (it removes or updates that one event), not a hold the veto must stop.
+    const slotChange = i.calendarChangeOn === true && typeof intentApi.slotChangeSafe === 'function' && intentApi.slotChangeSafe(intent, vetoText);
+    if (intent.type === 'event' && !slotChange && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
       if (intent.signals && intent.signals.slotAsk && !(intent.facts && intent.facts.time)) {
         intent = Object.assign({}, intent, { type: 'request', label: 'Reply requested', entities: Object.assign({}, intent.entities || {}, { requestWhat: null, what: null }) });
       } else {
@@ -10803,7 +10838,8 @@ const FlowIncomingJudge = (() => {
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
       executionMemory: i.executionMemory || null,
       text: vetoText,
-      subject: i.subject || ''
+      subject: i.subject || '',
+      calendarChangeOn: i.calendarChangeOn === true
     };
     // The show decision uses the unrewritten plan. A later Meeting or task
     // rewrite must not open a surface this plan leaves quiet.

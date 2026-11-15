@@ -649,6 +649,17 @@ const FlowIntent = (() => {
     if (!named || GROUP_ADDRESSEE.test(named[1])) return '';
     return named[1];
   }
+  // A family-G cancel or move (core/close-families.js) is the close itself, so the meeting veto stands down for it, but only when the mail is plain enough that the
+  // one event to delete or update cannot be mistaken: a cancel names exactly one clock, a move names exactly two, and nothing in the mail is behind us («last Thursday»,
+  // «yesterday», «שעבר», «אתמול»). A mail that cancels one meeting and proposes another has two clocks and stays vetoed.
+  function slotChangeSafe(intent, text) {
+    const pc = intent && intent.personalClose;
+    if (pc !== 'calendar-cancel' && pc !== 'calendar-move') return false;
+    const raw = String(text || '');
+    if (/\b(?:last\s+(?:week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|yesterday|ago|earlier today)\b|שעבר|אתמול|שלשום/i.test(raw)) return false;
+    const clocks = new Set((raw.match(/\b\d{1,2}:\d{2}\b/g) || []).map((c) => c.replace(/^0/, '')));
+    return pc === 'calendar-cancel' ? clocks.size === 1 : clocks.size === 2;
+  }
   // A changed bank plus a payment is not a task. Quiet beats a wrong Do It.
   // "wire … to the new bank account below" is the same quiet: a payment
   // aimed at an account the sender just introduced. A dated invoice with
@@ -1765,7 +1776,7 @@ const FlowIntent = (() => {
     const settled = ALREADY_SETTLED.test(text);
     if (!quietHint && (contingent || settled)) quietHint = 'hedge';
     familyBox.hit = (typeof FlowCloseFamilies !== 'undefined' && !blocked && !askIsSoft && !settled)
-      ? FlowCloseFamilies.assess(text, facts, { now: ctx.now, senderEmail: ctx.senderEmail })
+      ? FlowCloseFamilies.assess(text, facts, { now: ctx.now, senderEmail: ctx.senderEmail, calendarChangeOn: ctx.calendarChangeOn === true })
       : null;
     function fromFamily(fam) {
       if (!fam || fam.suppress) return null;
@@ -1798,6 +1809,9 @@ const FlowIntent = (() => {
       }
       const intent = finish(fam.type, fam.confidence, entities, fam.personalClose || null);
       if (!intent || !intent.type) return intent;
+      // A move card names the NEW slot. The short label is built from the mail's first date and clock, which for «Thursday at 10:00 moved to Friday at 11:00» is
+      // the new day with the old clock (capability probe, 2026-11-14).
+      if (fam.personalClose === 'calendar-move' && entities.when) intent.label = 'Meeting ' + entities.when;
       // A note to self stays a plain task. Family A would mark it as the file chain.
       if (!(intent.selfTask && fam.family === 'A')) {
         intent.closeFamily = fam.family;
@@ -3552,7 +3566,7 @@ const FlowIntent = (() => {
     return titleAfter(hit.verb, hit.match, src, subject, {});
   }
 
-  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
+  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, slotChangeSafe, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

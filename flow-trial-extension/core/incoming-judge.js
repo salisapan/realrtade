@@ -409,6 +409,7 @@ const FlowIncomingJudge = (() => {
       ownAddresses: i.ownAddresses || i.own || null,
       userName: i.userName || null,
       ownNames: i.ownNames || null,
+      calendarChangeOn: i.calendarChangeOn === true,
       autoReply: i.autoReply === true,
       noteToSelf: i.noteToSelf === true,
       senderIsUser: i.senderIsUser === true,
@@ -508,7 +509,9 @@ const FlowIncomingJudge = (() => {
     // An event with a day and no clock that the meeting gate would veto. When the sender is asking the reader for a time
     // ("are you available for a call Tuesday afternoon?") it is a request, and the card is a reply that offers times.
     // Every other event keeps the path it had (a named hold, or the Schedule meeting task).
-    if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
+    // A family-G cancel or move that names its slot is the close itself (it removes or updates that one event), not a hold the veto must stop.
+    const slotChange = i.calendarChangeOn === true && typeof intentApi.slotChangeSafe === 'function' && intentApi.slotChangeSafe(intent, vetoText);
+    if (intent.type === 'event' && !slotChange && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
       if (intent.signals && intent.signals.slotAsk && !(intent.facts && intent.facts.time)) {
         intent = Object.assign({}, intent, { type: 'request', label: 'Reply requested', entities: Object.assign({}, intent.entities || {}, { requestWhat: null, what: null }) });
       } else {
@@ -520,7 +523,8 @@ const FlowIncomingJudge = (() => {
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
       executionMemory: i.executionMemory || null,
       text: vetoText,
-      subject: i.subject || ''
+      subject: i.subject || '',
+      calendarChangeOn: i.calendarChangeOn === true
     };
     // The show decision uses the unrewritten plan. A later Meeting or task
     // rewrite must not open a surface this plan leaves quiet.
