@@ -91,7 +91,17 @@ const FlowIntent = (() => {
     '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
     '\\bplease\\s+(?:schedule|set up|book|put)\\b'
   ].join('|'), 'i');
-  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן)/;
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+(?:לקבוע|לתאם)\s+(?:פגיש(?:ה|ת)|שיחה)|(?:אפשר|נוכל|אוכל|תוכל(?:ו|י)?|בא\s+לך|רוצה|מתאים\s+לך)\s+(?:ל)?היפגש(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוכל|אוכל|תוכל(?:ו|י)?|אפשר|בא\s+לך)\s+(?:\S+\s+){0,3}?(?:להיפגש|לדבר|לקבוע|לתאם|להתקשר|לשוחח)|(?:^|[^\u0590-\u05FF])ת?שמור(?:י|ו)?\s+לי\s+את\s+הזמן|(?:^|[^\u0590-\u05FF])(?:נוח|זורם|מסתדר|מתאים)\s+לך\s+ש(?:נדבר|ניפגש|נשב|נעשה|נקבע)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נוח|זורם)\s+לך\s+(?:פגישה|שיחה|זום|סינק|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:קובעים|נסגור)\s+(?:פגישה|שיחה|זום|סינק|ישיבה|call|meeting)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])נ?אשמח\s+(?:לפגוש\s+אותך|להיפגש|לשבת\s+איתך)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])ת?פנ(?:ה|י|ו)\s+לי\s+(?:חצי\s+שעה|שעה|רבע\s+שעה|כמה\s+דקות)|(?:^|[^\u0590-\u05FF])אפנה\s+לך\s+(?:חצי\s+שעה|שעה|רבע\s+שעה)|(?:^|[^\u0590-\u05FF])תצטרפ(?:י|ו)?\s+אלינו\s+ל|(?:^|[^\u0590-\u05FF])(?:שריינתי|שמרתי)\s+לנו(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])הזמנתי\s+(?:לנו\s+)?חדר(?:\s+ישיבות)?(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])יש\s+לי\s+חלון(?![\u0590-\u05FF]))/;
+  // A note the person mails to themselves that asks to put a timed meeting on the calendar ("תשריין ביומן", "add it to my
+  // calendar") is that hold, not a Google Task. Without an ask like this a self-note stays the task it always was.
+  const SELF_CALENDAR_ASK_HE = /(?:^|[^\u0590-\u05FF])(?:(?:ת|ל)?שריי?ן(?![\u0590-\u05FF])|(?:תכניס|להכניס|תוסיף|להוסיף|תרשום|לרשום|תשים|לשים|תקבע|לקבוע)(?:י|ו)?(?:\s+\S+){0,3}?\s+(?:ל|ב)יומן(?![\u0590-\u05FF]))/;
+  const SELF_CALENDAR_ASK_EN = /\b(?:add|put|block|hold|save|pencil)\b(?:\s+\S+){0,4}?\s+(?:on|in|into|to)\s+(?:my|the)\s+calendar\b|\bcalendar\s+hold\b/i;
+  const SELF_CALENDAR_NEGATED = /(?:^|[^\u0590-\u05FF])אל\s+(?:ת?שריי?ן|תכניס|תוסיף|תרשום|תשים|תקבע)|\b(?:don['’]?t|do\s+not|no\s+need\s+to|never)\s+(?:add|put|block|hold|save|pencil)\b/i;
+  function selfCalendarAsk(text) {
+    const t = String(text || '');
+    if (SELF_CALENDAR_NEGATED.test(t)) return false;
+    return SELF_CALENDAR_ASK_HE.test(t) || SELF_CALENDAR_ASK_EN.test(t);
+  }
 
   // "This is not happening at the time this message names."
   //
@@ -264,7 +274,9 @@ const FlowIntent = (() => {
   // "what" for a REQUEST, not re-tested for detection. A second, narrower
   // copy of "what counts as a request" here previously meant the detected
   // request and the quoted sentence could disagree.
-  const REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE, FlowJudgment.FOLLOW_UP_ASK, FlowJudgment.FOLLOW_UP_ASK_HE];
+  const BASE_REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE, FlowJudgment.FOLLOW_UP_ASK, FlowJudgment.FOLLOW_UP_ASK_HE].filter(Boolean);
+  // The two new ask patterns join only for a message with no sign of quoted or forwarded text (FlowJudgment.newAskOpen).
+  const OPEN_REQUEST_PATTERNS = BASE_REQUEST_PATTERNS.concat([FlowJudgment.IMPERATIVE_ASK_HE, FlowJudgment.ADD_TASK_ASK].filter(Boolean));
   // The sentence a dated commitment is quoting — the sender's own delivery
   // promise, or the agreement word. Used only after REQUEST has already
   // declined the message, so this doesn't steal an explicit ask.
@@ -476,6 +488,14 @@ const FlowIntent = (() => {
   // hedges, and they never reached this gate. כשיהיה לך and מתי שנוח are
   // "whenever you" / "when convenient".
   const SOFT_ASK_HE = /(?:^|\s)אולי|במידה ו|בהנחה ש|בכפוף ל|כשיהיה לך|מתי שנוח|אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|כשיתאפשר|בהזדמנות/;
+  // A tentative sender: the ask is open on the sender's side, not owed. Not "please", "if you could", "אם אפשר" or
+  // "when you get a chance": those are how a real ask is written, and they stay out of both lists.
+  const TENTATIVE_ASK = /\b(?:no pressure|only if you have (?:the )?time|if it works out)\b/i;
+  const TENTATIVE_ASK_HE = /אם\s+יסתדר|יכול\s+להיות\s+ש|(?:^|\s)ייתכן|אם\s+(?:זה\s+)?נוח\s+לך|אם\s+(?:זה\s+)?מתאים\s+לך|רק\s+אם\s+יש\s+לך\s+זמן/;
+  // The same softener as its own sentence after the ask ("Can you send me the report? No pressure."). The whole sentence
+  // has to be the softener: "Not sure if I sent the right link" or "ייתכן שאאחר" next to an ask are not about the ask.
+  const TENTATIVE_TAIL = /^(?:but\s+)?(?:no pressure|only if you have (?:the )?time|if it works out|(?:i(?:'|’)m\s+)?not sure (?:yet )?(?:if|whether|that) (?:we|it|this)(?:'ll| will)? (?:still )?(?:need|matter|happen)s?(?: it| this| that)?|(?:i(?:'|’)m\s+)?not sure yet what we(?:'ll| will) do)[.!…]*$/i;
+  const TENTATIVE_TAIL_HE = /^(?:אבל\s+)?(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|אם\s+יסתדר(?:\s+לך)?|אם\s+לא,?\s+(?:זה\s+)?(?:בסדר|לא\s+נורא)|רק\s+אם\s+יש\s+לך\s+זמן|(?:עוד\s+)?לא\s+בטוח(?:ה)?\s+ש(?:זה\s+(?:עדיין\s+)?רלוונטי|נצטרך(?:\s+אות[וה])?))[.!…]*$/;
   // "Can you agree to the proposal by Monday" is a handoff plus a date, so
   // the request gate would draft it as a follow-up close. Agreeing is the
   // decision the reader has not made. "Could you confirm the payment by
@@ -548,6 +568,8 @@ const FlowIntent = (() => {
   const VETO_HE_LATIN_RE = new RegExp(VETO_HE_LATIN, 'i');
   const VETO_HE_CANCEL_RE = new RegExp('(?:^|[^\\u0590-\\u05FF])(?:' + VETO_HE_CANCEL + ')(?![\\u0590-\\u05FF])');
   const VETO_PAST_EN = new RegExp('\\b(?:the |our |a |this )?' + VETO_EVENT + '\\s+was\\s+(?:on|yesterday)\\b', 'i');
+  // «The meeting last Tuesday at 16:00 was great, thanks for coming.»: a meeting named with «last <day or week>», or one called great, good or productive, is behind us.
+  const VETO_PAST_EN2 = new RegExp('\\b(?:the |our |a |this )?' + VETO_EVENT + '\\s+last\\s+(?:week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b|\\b(?:the |our |a |this )?' + VETO_EVENT + '(?:[^\\n.!?]){0,40}\\b(?:was|were)\\s+(?:really\\s+)?(?:great|good|productive|helpful|useful|nice|fun)\\b', 'i');
   const VETO_PAST_HE = new RegExp('(?:' + VETO_HE_EVENT + '|' + VETO_HE_LATIN + ')(?:[^\\n.!?]){0,40}(?:הייתה|היה|היו)|(?:הייתה|היה|היו)(?:[^\\n.!?]){0,40}(?:' + VETO_HE_EVENT + '|' + VETO_HE_LATIN + ')', 'i');
   function vetoClauses(raw) {
     return String(raw || '').split(/\n+|(?<=[.!?;])\s+|,\s+|\s+\bbut\b\s+|\s+אבל\s+/i);
@@ -572,7 +594,7 @@ const FlowIntent = (() => {
   }
   function clausePast(clause) {
     if (/\bwas on my list\b/i.test(clause)) return false;
-    return VETO_PAST_EN.test(clause) || VETO_PAST_HE.test(clause);
+    return VETO_PAST_EN.test(clause) || VETO_PAST_EN2.test(clause) || VETO_PAST_HE.test(clause);
   }
   function clauseLive(clause) {
     if (clausePast(clause) || clauseCancelled(clause)) return false;
@@ -631,8 +653,8 @@ const FlowIntent = (() => {
   // "wire … to the new bank account below" is the same quiet: a payment
   // aimed at an account the sender just introduced. A dated invoice with
   // no new account is still the ask.
-  const BANK_CHANGE = /\b(?:changed banks|new account|new bank account|update (?:our |the )?(?:bank|account) details|(?:bank )?account below)\b|פרטי חשבון חדשים|החלפנו בנק/i;
-  const PAY_MOVE = /\b(?:pay|wire|transfer)\b|(?:תשלום|העברה)|(?:^|[^\u0590-\u05FF])(?:שלם|תשלם|להעביר)(?![\u0590-\u05FF])/i;
+  const BANK_CHANGE = /\b(?:changed banks|new account|new bank account|update (?:our |the )?(?:bank|account) details|(?:bank )?account below|(?:bank|account) details (?:have |has )?(?:changed|been (?:changed|updated)))\b|פרטי חשבון חדשים|החלפנו בנק|פרטי\s+(?:ה)?(?:חשבון|בנק)(?:\s+\S+){0,3}\s+(?:השתנו|עודכנו|התחלפו)|חשבון\s+(?:בנק\s+)?חדש|(?:^|[^\u0590-\u05FF])לחשבון\s+החדש/i;
+  const PAY_MOVE = /\b(?:pay|wire|transfer)\b|(?:תשלום|העברה)|(?:^|[^\u0590-\u05FF])(?:שלם|שלמו|תשלם|להעביר|העבר|העבירו|תעביר|תעבירו)(?![\u0590-\u05FF])/i;
   function bankChangePayment(text) {
     const raw = String(text || '');
     return BANK_CHANGE.test(raw) && PAY_MOVE.test(raw);
@@ -1206,6 +1228,9 @@ const FlowIntent = (() => {
 
   function classify(text, ctx) {
     ctx = ctx || {};
+    // Read on the raw message (ctx.rawText when the caller trimmed it, e.g. a phone signature), before any cut: one sign of quoted or forwarded text keeps the new ask patterns off.
+    const askGate = { newAskOpen: typeof FlowJudgment.newAskOpen === 'function' && FlowJudgment.newAskOpen(typeof ctx.rawText === 'string' ? ctx.rawText : text, ctx.subject) };
+    const REQUEST_PATTERNS = askGate.newAskOpen ? OPEN_REQUEST_PATTERNS : BASE_REQUEST_PATTERNS;
     text = FlowJudgment.newContent(text);
     // «האם תוכל לשלוח...?» and «האם אפשר לקבל...?» are the polite ask, the same as «תוכל לשלוח...?» and «אפשר לקבל...?». Only these two
     // openings: «האם אפשר לשלוח לך» asks whether the writer may send, and «האם שלחת» asks for a status.
@@ -1231,7 +1256,7 @@ const FlowIntent = (() => {
         facts.date = slot.date;
       }
     }
-    const s = FlowJudgment.score(text, domain, facts);
+    const s = FlowJudgment.score(text, domain, facts, askGate);
     // A bad deadline drops only the date. The reply stays, with no due date
     // and no quick-pick. A meeting conflict keeps both choices for the card.
     if (facts.date && (facts.date.contradictsWeekday || facts.date.invalidDate) && s.flags.handoff) {
@@ -1419,7 +1444,14 @@ const FlowIntent = (() => {
       if (replyCancelOnly(text)) intent.noReplyDraft = true;
       // A note the user sent to themselves is a task, for every kind.
       // The draft stays off. It is not Reply requested, and it is not quiet.
-      if (addressedToSelf(ctx)) {
+      // One exception: a timed meeting the note explicitly asks to put on the calendar ("תשריין ביומן") is that calendar hold.
+      const selfHold = addressedToSelf(ctx) && type === TYPES.SCHEDULED_EVENT && personalClose === 'calendar-hold'
+        && Boolean(facts && facts.date && facts.date.iso && facts.time) && !isPast && selfCalendarAsk(text);
+      if (selfHold) {
+        intent.noReplyDraft = true;
+        intent.selfHold = true;
+        delete intent.googleClose;
+      } else if (addressedToSelf(ctx)) {
         intent.noReplyDraft = true;
         intent.selfTask = true;
         // A note to self is the task. It is not a Drive save and not a draft.
@@ -1461,7 +1493,7 @@ const FlowIntent = (() => {
         intent.inviteDraft = invitePlan.draft;
       }
       // The task names the work. "Reply requested" is the draft, and this mail declined one.
-      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask) {
+      if (intent.noReplyDraft && !intent.inviteFile && !intent.selfTask && !intent.selfHold) {
         const createTask = text.match(/\bplease\s+create\s+a\s+task\s*:\s*([^\n]+)/i);
         if (createTask) {
           let clause = createTask[1].trim();
@@ -1504,11 +1536,10 @@ const FlowIntent = (() => {
         const labelNow = String(intent.label || '').trim();
         if (!/^(?:Decision|החלטה): \S/.test(labelNow) && !usableSelfTitle(labelNow)) return stayQuiet('hedge', { noRescue: true });
         if (intent.confidence === 'low') intent.confidence = 'high';
-        // "Remind me to renew the domain on Friday" is that task, due Friday.
-        // The day is already on facts. The task step reads entities.dateIso.
-        if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && intent.entities && !intent.entities.dateIso) {
-          intent.entities.dateIso = facts.date.iso;
-        }
+        // The task is due the day in the sentence it is about, not the first
+        // day in a mail that also books a meeting ("meet on the 17th, and
+        // remind me to send the quote by the 22nd").
+        applyTaskClauseDate(intent, text, ctx.now, facts, isPast);
       }
       // Outlook may show a hold that has no reply draft. Only an explicit
       // hold: a family D meet or slot, or "can we meet" / "תשמור לי את הזמן".
@@ -1585,7 +1616,17 @@ const FlowIntent = (() => {
     // ותוכל, תשלח לי את הטיוטה") used to hide a later clear send. A later
     // handoff sentence that is not itself soft is the close.
     function sentenceIsSoft(sentence) {
-      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence);
+      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence) || TENTATIVE_ASK.test(sentence) || TENTATIVE_ASK_HE.test(sentence);
+    }
+    // Softener then "but"/"however"/"אבל" yields to the ask that follows ("no pressure, but please …").
+    // The softener alone is tentative; the contrast makes the ask firm.
+    const SOFT_THEN_BUT = /\b(?:no pressure|only if you have (?:the )?time|if it works out|no rush)\b[\s,.…:;—–-]*(?:but|however)\b/i;
+    const SOFT_THEN_BUT_HE = /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף|אם\s+יסתדר(?:\s+לך)?|רק\s+אם\s+יש\s+לך\s+זמן|אם\s+(?:זה\s+)?נוח\s+לך|אם\s+(?:זה\s+)?מתאים\s+לך)[\s,.…:;—–-]*אבל/;
+    // Courtesy softeners only (not assuming / subject to / whenever you): a future date keeps these as a card.
+    function courtesySoftener(blob) {
+      const t = String(blob || '');
+      return TENTATIVE_ASK.test(t) || TENTATIVE_ASK_HE.test(t) || /\bno rush\b/i.test(t)
+        || /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)/.test(t);
     }
     let askIsSoft = Boolean(requestWhat) && sentenceIsSoft(requestWhat);
     // A slot ask with no ask sentence of its own ("אם יהיה לך זמן מתישהו אולי נדבר, לא דחוף") is soft when the text says so.
@@ -1603,6 +1644,12 @@ const FlowIntent = (() => {
         if (handoff && !sentenceIsSoft(sentence)) { askIsSoft = false; break; }
       }
     }
+    // A softener sentence next to an undated ask makes the ask tentative. A resolved future date is a firm ask and still shows.
+    if (!askIsSoft && requestWhat && !(hasResolvedDate && !isPast)
+        && String(text || '').split(/(?<=[.!?…])\s+|\n+/).some((p) => TENTATIVE_TAIL.test(p.trim()) || TENTATIVE_TAIL_HE.test(p.trim()))) askIsSoft = true;
+    // Same-sentence courtesy softener used to ignore a date and a following "but". Conditionals (assuming / whenever) stay soft even with a date.
+    if (askIsSoft && (SOFT_THEN_BUT.test(String(text || '')) || SOFT_THEN_BUT_HE.test(String(text || '')))) askIsSoft = false;
+    else if (askIsSoft && hasResolvedDate && !isPast && courtesySoftener(String(text || ''))) askIsSoft = false;
     // Names a silence the chip path already chose. It does not add a
     // return. quietHint is used only where classify already returned
     // type null with no type of its own.
@@ -2307,6 +2354,11 @@ const FlowIntent = (() => {
     if (isDecision && contingent) return stayQuiet('hedge');
     if (isDecision && settled && (isPast || !(facts.date && facts.date.iso))) return stayQuiet('hedge');
     if (isDecision && facts.money && amountIsAmbiguous(text)) return stayQuiet('hedge');
+    // "We need to cancel the <call> on Tuesday at 3pm" is a cancelled time slot, not a deal outcome to log. LOST reads
+    // "cancel the" as "not going ahead", so a cancel with a clock time used to become a Log-it task at that time.
+    // Only a decision that rests on that cancel alone (no commit, execution or dispute) and names a clock is held quiet.
+    if (isDecision && s.flags.lost && !s.flags.commit && !s.flags.executed && !s.flags.dispute && clock && hasResolvedDate &&
+        /\bcancel(?:l?ing|l?ed)?\b/i.test(text)) return stayQuiet('hedge');
 
     // --- 4. DECISION_TO_LOG: an outcome someone reported — the chip's original job. ---
     if (isDecision) {
@@ -3387,7 +3439,77 @@ const FlowIntent = (() => {
     if (/^ל[\u0590-\u05FF]/.test(clause)) return clipTitle(clause);
     return '';
   }
+  function sentencesOfTask(text) {
+    return String(text || '').split(/\r?\n+|(?<=[.!?؟])\s+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function dateFactsOf(text, now) {
+    if (!text || typeof FlowExtract === 'undefined' || typeof FlowExtract.extract !== 'function') return null;
+    const D = typeof FlowDayWords !== 'undefined' ? FlowDayWords : null;
+    const src = D && typeof D.normalize === 'function' ? D.normalize(String(text), now) : String(text);
+    try {
+      const got = FlowExtract.extract(src, { now: now });
+      return got && got.date ? got : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function taskClauseFor(text, label, entities) {
+    const sentences = sentencesOfTask(text);
+    const remind = sentences.find((s) => /(?:^|[^\u0590-\u05FF])תזכיר(?:י|ו)?\s+לי(?![\u0590-\u05FF])|\bremind me to\b/i.test(s));
+    if (remind) return remind;
+    const needles = [label, entities && entities.requestWhat]
+      .map((v) => String(v || '').replace(/\s+/g, ' ').trim())
+      .filter((v) => v.length >= 4);
+    for (let i = 0; i < needles.length; i++) {
+      const n = needles[i];
+      const hit = sentences.find((s) => s.indexOf(n) !== -1 || n.indexOf(s) !== -1);
+      if (hit) return hit;
+    }
+    return sentences.length === 1 ? sentences[0] : '';
+  }
+  function applyTaskClauseDate(intent, text, now, facts, isPast) {
+    if (!intent || !intent.entities) return;
+    const clause = taskClauseFor(text, intent.label, intent.entities);
+    const clauseFacts = dateFactsOf(clause, now);
+    const clauseDate = clauseFacts && clauseFacts.date;
+    if (clauseDate && clauseDate.iso && !clauseDate.dropped && !isPastDate(clauseDate.iso, now)) {
+      intent.entities.dateIso = clauseDate.iso;
+      intent.entities.when = humanWhen(clauseDate, clauseFacts.time || null);
+      if (!(clauseFacts.time && Number.isInteger(clauseFacts.time.hour))) {
+        delete intent.entities.hour;
+        delete intent.entities.minute;
+      } else {
+        intent.entities.hour = clauseFacts.time.hour;
+        intent.entities.minute = clauseFacts.time.minute || 0;
+      }
+      return;
+    }
+    // "Remind me to renew the domain on Friday" is that task, due Friday.
+    // The day is already on facts. The task step reads entities.dateIso.
+    if (/\bremind me to\b/i.test(text) && facts && facts.date && facts.date.iso && !intent.entities.dateIso) {
+      intent.entities.dateIso = facts.date.iso;
+    }
+    // Any note to self with a day still ahead is due that day: the card already shows it ("עד 22 בנוב׳"), so the task
+    // step must carry it too, or Do It writes a task with no due date.
+    if (!isPast && facts && facts.date && facts.date.iso && !facts.date.dropped && !intent.entities.dateIso && !intent.entities.overdueIso) {
+      intent.entities.dateIso = facts.date.iso;
+    }
+    // A day that only lives in another sentence (the meeting) is not this task's due day.
+    const kept = intent.entities.dateIso;
+    if (kept && clause && !dateFactsOf(clause, now)) {
+      const slash = heSlashDate(kept);
+      const owns = (slash && clause.indexOf(slash) !== -1) || clause.indexOf(kept) !== -1;
+      if (!owns) {
+        intent.entities.dateIso = null;
+        intent.entities.when = null;
+        delete intent.entities.hour;
+        delete intent.entities.minute;
+      }
+    }
+  }
+
   function selfAskTitle(text, subject, ctx) {
+
     const raw = String(text || '');
     const invite = attachToInvitePlan(raw);
     if (invite) return invite.label;

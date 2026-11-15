@@ -35,14 +35,17 @@ The homepage shows the next pending action when a prefetch cache returns one. Se
 
 ## Scopes
 
-- `https://www.googleapis.com/auth/gmail.addons.current.message.readonly`
+- `https://www.googleapis.com/auth/gmail.addons.current.message.readonly` (the open message)
+- `https://www.googleapis.com/auth/gmail.addons.current.message.metadata` (compose trigger: recipients and subject of the draft being written, `draftAccess: METADATA`)
+- `https://www.googleapis.com/auth/gmail.addons.current.action.compose` (insert text into that draft)
 - `https://www.googleapis.com/auth/gmail.addons.execute`
 - `https://www.googleapis.com/auth/tasks`
 - `https://www.googleapis.com/auth/calendar.events`
 - `https://www.googleapis.com/auth/script.external_request` (only if a script property URL is set)
 - `https://www.googleapis.com/auth/script.locale` (the card language follows the Gmail locale)
+- `https://www.googleapis.com/auth/userinfo.email` (the reader's address)
 
-No `gmail.readonly`, `gmail.modify`, `gmail.compose`, or `gmail.send`. No full `calendar` scope. If the Apps Script editor adds `https://www.googleapis.com/auth/calendar` when the Calendar service is enabled, delete that line and keep `calendar.events`.
+The card never sends. It does not ask for `gmail.modify`, `gmail.readonly`, `gmail.metadata`, `gmail.compose`, `gmail.send`, or any other full mailbox scope. No full `calendar` scope. If the Apps Script editor adds `https://www.googleapis.com/auth/calendar` when the Calendar service is enabled, delete that line and keep `calendar.events`. A reply on the open message adds Prepare a reply (הכן תשובה). That calls `GmailMessage.createDraftReply` after `GmailApp.setCurrentMessageAccessToken`, using `gmail.addons.current.action.compose`, and opens the draft. It does not use `gmail.compose` and it never sends. The card remembers the normalized subject and the reply text for six hours. The compose window has no message id. Glance matches `draftMetadata.subject` to that memory and Do it inserts the reply at the cursor through `UpdateDraftBodyAction`. If nothing was remembered, the card says to open the message and press Prepare a reply. It does not call `GmailApp.getDraft` or `GmailApp.getThreadById`. It does not read the draft back, and it does not undo that insert.
 
 ## Tests
 
@@ -119,5 +122,5 @@ Same Google account. Open a message and tap the Glance icon under the message. T
 
 - Do not publish, and do not create a Marketplace listing.
 - Do not add a send call (`GmailApp.sendEmail`, `MailApp`, `Drafts.send`).
-- Do not add `gmail.compose`, `gmail.modify`, `gmail.readonly`, or the full `calendar` scope. The only calendar scope is `calendar.events`.
+- Do not add `gmail.compose`, `gmail.modify`, `gmail.readonly`, `gmail.metadata`, `gmail.send`, or the full `calendar` scope. The only calendar scope is `calendar.events`. Do not call `GmailApp.getDraft`.
 - Do not put a client secret in the repo. The card uses the person's Apps Script grant.

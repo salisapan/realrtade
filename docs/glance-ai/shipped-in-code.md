@@ -5,11 +5,26 @@ Glance closes open loops. Gmail is where it starts today.
 Source: `git log origin/claude/install-uiux-pro-max-skill-a4agox --since=2026-10-20` limited to `flow-trial-extension/core`, `flow-trial-extension/src`, `flow-trial-extension/manifest.json` and `glance-gmail-addon/`. Regenerate: `scripts/what-changed.sh 2026-10-20 > docs/glance-ai/shipped-in-code.md`.
 
 - Extension version in `manifest.json` on the branch: 0.9.56
-- Commits on the working branch that are not on `main`: 190. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
-- Lines changed in core, src and the add-on since `main`: 76 files changed, 9207 insertions(+), 581 deletions(-)
+- Commits on the working branch that are not on `main`: 214. `main` and the store package do not carry them yet (merging to main and publishing need the owner's «מאשר»).
+- Lines changed in core, src and the add-on since `main`: 87 files changed, 11955 insertions(+), 806 deletions(-)
 
 | Commit | When | What it changed in code | Files in core, src or the add-on |
 |---|---|---|---|
+| 836d4905 | 2026-11-14 | Decompose v1 wired to the hosts behind the Labs switch DECOMPOSE (off) | core/README.md core/labs-switches.js core/outlook-sync.js src/background.js  |
+| 731539af | 2026-11-14 | Decompose v1: merge several intentions into one card (core only, off) | core/README.md core/incoming-judge.js core/intent-decompose.js glance-gmail-addon/CoreBundle.js  |
+| f47eb242 | 2026-11-13 | Gate 176379c0: calendar hold event uses the meeting subject; description is not doubled (#290) | core/actions.js core/google-calendar.js core/incoming-judge.js core/intent.js  |
+| 62d49e3b | 2026-11-13 | iOS-1 Gmail add-on: compose trigger + fix failing tests (#222) | glance-gmail-addon/Code.js glance-gmail-addon/CoreBundle.js glance-gmail-addon/README.md glance-gmail-addon/appsscript.json  |
+| 07c6bc42 | 2026-11-13 | Gate f2e6f3ee: Hebrew self-mail meeting is a calendar hold; Tasks Do It keeps the due day (#289) | core/actions.js core/intent.js src/content-gmail.js src/google-lane-host.js  |
+| f2e6f3ee | 2026-11-13 | Google: detect revoked access; no false טופל חלקית after Drive save (#279) | src/background.js src/content-gmail.js src/google-lane-host.js src/google-web-auth.js  |
+| d7bc5a0c | 2026-11-13 | Follow loop: an ask with several parts stays open until its parts are answered | core/README.md core/follow-up.js core/outlook-sync.js src/follow.js  |
+| 2502747e | 2026-11-13 | Follow loop: a delivery failure is its own outcome (bounced) | core/README.md core/follow-up.js core/outlook-sync.js src/follow.js  |
+| b8ef96bf | 2026-11-13 | Direct-ask reader in one-to-one chats (WhatsApp, Messenger, Instagram, Teams) | core/README.md core/incoming-judge.js src/chat-task-card.js glance-gmail-addon/CoreBundle.js  |
+| 828cac0e | 2026-11-13 | Gmail: offer Connect Google instead of dropping the card (#274) | core/display-copy.js src/background.js src/content-gmail.js src/step-kit.js  |
+| c615f4a0 | 2026-11-13 | Engine: Hebrew imperatives and "add a task" only when the message has no quote/forward (#278) | core/incoming-judge.js core/intent.js core/judgment.js glance-gmail-addon/CoreBundle.js  |
+| 1d8edbcf | 2026-11-13 | Engine: hedged asks stay quiet (#272) | core/close-families.js core/intent.js glance-gmail-addon/CoreBundle.js  |
+| 8a518b1a | 2026-11-13 | Engine: everyday Hebrew meeting proposals get a calendar step (#271) | core/intent.js glance-gmail-addon/CoreBundle.js  |
+| deae74b6 | 2026-11-13 | Engine: English cancellation of a resolved slot stays quiet (#270) | core/intent.js glance-gmail-addon/CoreBundle.js  |
+| 2adef9e2 | 2026-11-12 | Direct-ask ON on every judge surface; execution after Do It; follow loop on real threads | core/README.md core/draft-reply.js core/follow-up.js core/incoming-judge.js  |
 | 17de00e2 | 2026-11-12 | Real mailbox run: calendar-notice quiet (shipped), direct-ask second read (off) | core/README.md core/extract.js core/incoming-judge.js glance-gmail-addon/CoreBundle.js  |
 | 8ad94886 | 2026-11-12 | AI engine: every intention the model found gets its own card, an ask and a meeting in one mail are both offered (#286) | core/README.md core/ai-engine.js core/model-multi.js core/understanding-router.js  |
 | 7dd071ca | 2026-11-12 | Decompose v1: honest evaluation, a wrong-offer hole closed, stitched figures corrected | core/README.md core/intent-decompose.js  |

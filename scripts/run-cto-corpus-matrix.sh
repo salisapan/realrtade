@@ -28,6 +28,7 @@ run_one() {
 
 CORPORA=(
   "glance-gmail-addon/test/v1.test.cjs"
+  "glance-gmail-addon/test/gate-hold-event-title-corpus.cjs"
   "glance-gmail-addon/test/build-stamp.test.cjs"
   "glance-gmail-addon/test/card-titles-corpus.cjs"
   "flow-trial-extension/test/lane-plan-parity-corpus.cjs"

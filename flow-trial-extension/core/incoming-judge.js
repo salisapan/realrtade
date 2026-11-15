@@ -228,15 +228,26 @@ const FlowIncomingJudge = (() => {
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
   const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני)(?![\u0590-\u05FF])/;
   const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
+  // A chat (WhatsApp, Messenger, Instagram, Teams) has no addresses: the host asserts the message is an inbound one-to-one one
+  // (`oneToOne === true`; src/chat-task-card.js already drops groups, the person's own messages and quoted text before it asks the judge).
+  // Chat is mostly casual, so only the question shape is read there, and only the business-like openers (what, which, how much, is there,
+  // do you have): no where, when, who, why or how, which are everyday chat. The bare imperative with a day belongs to core/chat-deadline-ask.js.
+  const DIRECT_Q_EN_CHAT = /^(?:what|which|how (?:much|many)|is there|are there|do you have|does it|does the)\b/i;
+  const DIRECT_Q_HE_CHAT = /^(?:ו)?(?:מה|כמה|איזה|איזו|אילו|האם|יש)(?![\u0590-\u05FF])/;
   function directAsk(i, body) {
     const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
-    const sender = String((i.sender && i.sender.email) || '').toLowerCase();
-    const own = (i.ownAddresses || []).map((a) => String(a).toLowerCase());
-    const to = (i.to || []).map((a) => String(a).toLowerCase());
-    if (!sender || !own.length || own.indexOf(sender) >= 0) return null;
-    if (!to.some((a) => own.indexOf(a) >= 0) || to.length > 3) return null;
-    if (DIRECT_AUTO_SUBJECT.test(String(i.subject || ''))) return null;
-    if (X && typeof X.senderIsAutomated === 'function' && X.senderIsAutomated(sender, String(body || ''))) return null;
+    const chat = i.surface === 'chat';
+    if (chat) {
+      if (i.oneToOne !== true || i.fromMe === true || i.group === true) return null;
+    } else {
+      const sender = String((i.sender && i.sender.email) || '').toLowerCase();
+      const own = (i.ownAddresses || []).map((a) => String(a).toLowerCase());
+      const to = (i.to || []).map((a) => String(a).toLowerCase());
+      if (!sender || !own.length || own.indexOf(sender) >= 0) return null;
+      if (!to.some((a) => own.indexOf(a) >= 0) || to.length > 3) return null;
+      if (DIRECT_AUTO_SUBJECT.test(String(i.subject || ''))) return null;
+      if (X && typeof X.senderIsAutomated === 'function' && X.senderIsAutomated(sender, String(body || ''))) return null;
+    }
     const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
     const raw = String(body || '');
     const cut = raw.search(DIRECT_CUT);
@@ -246,8 +257,8 @@ const FlowIncomingJudge = (() => {
     const head = ownText.slice(0, 60).toLowerCase();
     const greetsReader = names.some((n) => head.indexOf(n) >= 0);
     const skip = (x, he) => (he ? ANSWER_NO_HE.test(x) : ANSWER_NO_EN.test(x)) || DIRECT_Q_NO.test(x);
-    // 2. a Hebrew bare imperative with its day
-    for (const x0 of sents) {
+    // 2. a Hebrew bare imperative with its day (email surfaces only; a chat has its own reader)
+    for (const x0 of (chat ? [] : sents)) {
       const x = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
       if (!/[\u0590-\u05FF]/.test(x) || skip(x, true) || /(?:^|\s)(?:אל|לא)\s/.test(x)) continue;
       const work = DIRECT_IMP_WORK_HE.test(x), back = DIRECT_IMP_BACK_HE.test(x);
@@ -257,26 +268,72 @@ const FlowIncomingJudge = (() => {
       return { kind: work ? 'task' : 'reply', what: x.slice(0, 200), title: x.replace(/[.!?\s]+$/, '').slice(0, 80), dateIso: d, lang: 'he' };
     }
     // 1. plain information questions
-    const qs = sents.filter((x) => /\?\s*$/.test(x)).map((x) => x.replace(/\s+\?\s*$/, '?')).filter((x) => {
+    // A chat opens on the same line as its first question ("היי, מה המחיר...?"): the greeting is not part of the question.
+    const qs = sents.filter((x) => /\?\s*$/.test(x)).map((x) => x.replace(/\s+\?\s*$/, '?').replace(/^(?:שלום|היי|הי|בוקר טוב|ערב טוב|hi|hello|hey)(?=[\s,!])[^,?!]{0,20}[,!]\s*/i, '')).filter((x) => {
       const he = /[\u0590-\u05FF]/.test(x);
       // A question that names a clock is a meeting proposal: the hold readers and the calendar path own it, not a reply.
-      return (he ? DIRECT_Q_HE.test(x) : DIRECT_Q_EN.test(x)) && !skip(x, he) && !dayOf(x, now0).time;
+      const opener = chat ? (he ? DIRECT_Q_HE_CHAT : DIRECT_Q_EN_CHAT) : (he ? DIRECT_Q_HE : DIRECT_Q_EN);
+      return opener.test(x) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
     });
-    if (qs.length >= 2 || (qs.length === 1 && greetsReader)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length };
+    // A chat needs at least two such questions: one question in a chat is conversation, not a loop.
+    if (qs.length >= 2 || (!chat && qs.length === 1 && greetsReader)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length, questionList: qs.slice(0, 8).map((q) => q.slice(0, 200)) };
     return null;
   }
   function directAskCard(i, body) {
     const hit = directAsk(i, body);
     if (!hit) return null;
     if (hit.kind === 'task') { const c = doItCard(i, hit); c.intent.directAsk = true; return c; }
+    if (i.surface === 'chat') {
+      // No email draft in a chat: the person types the answer there. The card is a task to answer, with no day invented; it closes on their
+      // own reply in that chat (core/model-plan.js chat anchors).
+      const he = hit.lang === 'he';
+      const more = hit.questions > 1 ? (he ? ' (ועוד ' + (hit.questions - 1) + ')' : ' (+' + (hit.questions - 1) + ' more)') : '';
+      const q1 = hit.what.replace(/\s+/g, ' ').slice(0, 70).replace(/^[a-z]/, (c) => c.toUpperCase());
+      const title = ((he ? 'לענות: ' : 'Reply: ') + q1 + more).slice(0, 120);
+      return { intent: { type: 'request', label: title, confidence: 0.9, directAsk: true, questions: hit.questions, personalClose: 'follow-up-ask', signals: { score: 90, threshold: 50, handoff: true }, entities: { what: hit.what, requestWhat: hit.what, when: '', dateIso: null } },
+        process: { id: 'log-it', name: 'Log It', closingLine: 'Logging this so it stays tracked.', closedLine: 'Logged and tracked.', needsDateChoice: false, dateChoices: null,
+          steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + title, params: { title, dateIso: null, amount: null, what: hit.what, threadUrl: i.threadUrl || null }, dependsOn: null }] } };
+    }
     const c = replyCard(i, hit);
     c.intent.directAsk = true; c.intent.questions = hit.questions || null;
+    // What the draft step needs to be written well: the mail's language, and every question for the answer frame (core/draft-reply.js).
+    for (const st of c.process.steps) if (st.kind === 'gmailDraft' || st.kind === 'outlookDraft') { st.params.lang = hit.lang; if (hit.questionList) st.params.questions = hit.questionList; }
     // No day in the words: the reply draft alone (owner C-4). A task with no date is not invented.
     if (!hit.dateIso) c.process.steps = c.process.steps.filter((st) => st.kind !== 'googleTask');
     return c;
   }
 
+  // ---- several intentions in one mail (core/intent-decompose.js, owner 2026-11-12) ----------------------------------------------------------
+  // Off unless the host passes decomposeOn (the Labs switch DECOMPOSE, off by default). The whole-mail decision above always runs first; this only
+  // runs when the mail shows or the judge found nothing, and it returns ONE card whose steps are each intention's own (intent-decompose merge).
+  // Every quiet of the whole mail, phishing and the take-back clauses stand (see the module). A mail with one intention comes back unchanged.
   function judge(input, deps) {
+    const i = input || {};
+    const whole = judgeOnce(i, deps);
+    if (i.decomposeOn !== true) return whole;
+    const Dc = sibling(typeof FlowIntentDecompose !== 'undefined' ? FlowIntentDecompose : null, './intent-decompose.js', 'FlowIntentDecompose');
+    const d = deps || {};
+    const intentApi = pick(d, 'intent', typeof FlowIntent !== 'undefined' ? FlowIntent : null);
+    if (!Dc || typeof Dc.decompose !== 'function' || typeof Dc.merge !== 'function') return whole;
+    const Fj = typeof FlowJudgment !== 'undefined' ? FlowJudgment : null;
+    const CF = sibling(typeof FlowCloseFamilies !== 'undefined' ? FlowCloseFamilies : null, './close-families.js', 'FlowCloseFamilies');
+    let newText = String(i.text || '');
+    try { if (Fj && typeof Fj.newContent === 'function') newText = Fj.newContent(newText); } catch (e) { /* keep the whole text */ }
+    let r = null;
+    try {
+      r = Dc.decompose({ aiDecomposeV1: true }, { text: newText, whole, sender: i.sender || null, vetoText: (i.subject ? String(i.subject) + '\n' : '') + String(i.text || '') }, {
+        judgeText: (t) => judgeOnce(Object.assign({}, i, { text: t, decomposeOn: false }), deps),
+        phishing: (t) => (intentApi && typeof intentApi.phishingOrNegative === 'function' ? intentApi.phishingOrNegative(t) : false),
+        familyHit: (t) => (CF && typeof CF.assess === 'function' ? CF.assess(t, null, { now: i.now, senderEmail: (i.sender && i.sender.email) || null }) : null)
+      });
+    } catch (e) { return whole; }
+    if (!r || !r.used || !Array.isArray(r.intentions) || r.intentions.length < 2) return whole;
+    const merged = Dc.merge(r.intentions);
+    if (!merged) return whole;
+    return { show: true, intent: merged.intent, process: merged.process, decomposed: merged.used };
+  }
+
+  function judgeOnce(input, deps) {
     const i = input || {};
     const d = deps || {};
     const intentApi = pick(d, 'intent', typeof FlowIntent !== 'undefined' ? FlowIntent : null);
@@ -310,16 +367,22 @@ const FlowIncomingJudge = (() => {
     // A reminder or a deadline asked without a question ("Don't forget to bring the signed form on Monday", "I need the signed
     // contract by Wednesday") and a request to call back on a day become a task due that day (core/chat-reminder.js,
     // chat-deadline-ask.js, chat-callback-ask.js). Only for a mail addressed to the person (their address on To, not Cc-only).
+    // Phishing, a credential harvest and a payment to a new bank account stay quiet BEFORE the task and payment readers: those two build a task
+    // "Pay X to the new account" from the same words the veto below refuses (found by the capability probe, 2026-11-14).
+    if ((i.taskAskOn === true || i.paymentAskOn === true) && i.senderIsUser !== true && i.inbound !== false && typeof intentApi.phishingOrNegative === 'function'
+      && intentApi.phishingOrNegative((i.subject ? String(i.subject) + '\n' : '') + prepareForJudge(i.text))) {
+      return { show: false, reason: 'quiet:family', intent: null };
+    }
     // Off unless the host passes taskAskOn (glanceSwitches.TASK_ASK).
     if (i.taskAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
-      const ask = taskAsk(i, prepareForJudge(i.text));
+      const ask = taskAsk(i, stripOwnVocative(prepareForJudge(i.text), i.ownNames));
       if (ask) return { show: true, intent: ask.intent, process: forSurface(ask.process, i.surface || 'gmail') };
     }
 
     // A payment asked of the person with an amount and a day ("Please transfer 500 NIS by Sunday") becomes a task "Pay 500 NIS"
     // due that day (core/chat-payment-ask.js). Glance never pays. Off unless the host passes paymentAskOn (glanceSwitches.PAYMENT_ASK).
     if (i.paymentAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
-      const pay = paymentAsk(i, prepareForJudge(i.text));
+      const pay = paymentAsk(i, stripOwnVocative(prepareForJudge(i.text), i.ownNames));
       if (pay) return { show: true, intent: pay.intent, process: forSurface(pay.process, i.surface || 'gmail') };
     }
 
@@ -333,6 +396,7 @@ const FlowIncomingJudge = (() => {
     // A Date from another realm (a test sandbox, an iframe) fails instanceof and used to fall back to the real clock.
     const now = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
     let intent = intentApi.classify(text, {
+      rawText: prepareForJudge(i.text),
       senderEmail: sender.email || null,
       senderName: sender.name || null,
       subject: i.subject || '',
@@ -455,7 +519,8 @@ const FlowIncomingJudge = (() => {
       threadUrl: i.threadUrl || null,
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
       executionMemory: i.executionMemory || null,
-      text: vetoText
+      text: vetoText,
+      subject: i.subject || ''
     };
     // The show decision uses the unrewritten plan. A later Meeting or task
     // rewrite must not open a surface this plan leaves quiet.
@@ -782,6 +847,18 @@ const FlowIncomingJudge = (() => {
     };
   }
 
+  // «Sali, I need the budget by Thursday.»: a mail that opens on the reader's own given name and a comma is addressed to the reader, and the task and payment
+  // readers want the clause itself (capability frozen set, 2026-11-14: «Hi, I need ...» read, «Sali, I need ...» did not). Another person's name ("Dana,") is not
+  // stripped, so a mail for someone else stays quiet.
+  function stripOwnVocative(body, ownNames) {
+    const names = (ownNames || []).filter(Boolean).map((n) => String(n).trim().toLowerCase());
+    if (!names.length) return body;
+    const m = String(body || '').match(/^\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})\s*[,،:]\s+/);
+    if (!m) return body;
+    const w = m[1].toLowerCase();
+    const alias = { sali: 'סאלי', 'סאלי': 'sali' };
+    return (names.indexOf(w) >= 0 || (alias[w] && names.indexOf(alias[w]) >= 0)) ? String(body).slice(m[0].length) : body;
+  }
   function taskAsk(i, body) {
     if (!addressedOnTo(i)) return null;
     const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());

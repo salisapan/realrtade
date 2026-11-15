@@ -24,7 +24,18 @@ const FlowDraftReply = (() => {
     return first;
   }
 
-  const isHe = (params) => Boolean(params && params.lang === 'he');
+  // The draft answers in the language of the ask. A step that names its language is obeyed; a step that does not (the generic reply step of
+  // core/actions.js never did, so a Hebrew ask got an English draft on every surface; found 2026-11-12) is read from the quoted ask's own words:
+  // Hebrew when its first letter is Hebrew or Hebrew letters are at least as many as Latin ones.
+  const isHe = (params) => {
+    if (!params) return false;
+    if (params.lang) return params.lang === 'he';
+    const t = String(params.what || params.askText || params.text || '');
+    const he = (t.match(/[\u0590-\u05FF]/g) || []).length, la = (t.match(/[A-Za-z]/g) || []).length;
+    if (!he) return false;
+    const first = t.match(/[A-Za-z\u0590-\u05FF]/);
+    return he >= la || (first && /[\u0590-\u05FF]/.test(first[0]));
+  };
 
   // lang is the language of the mail being answered ('he' or anything else).
   // The draft is written in it, whatever language Glance's own UI is in.
@@ -75,8 +86,10 @@ const FlowDraftReply = (() => {
 
   // Rich acknowledgment when the ask is concrete enough. Returns body lines
   // (no greeting) or null when we should fall back to the short follow-up template.
+  // The quoted ask without the greeting the sender opened with: a reply that begins "Hi Dana," does not then say "following up on: Hi Sali, ...".
+  const LEAD_GREETING = /^(?:hi|hey|hello|dear|good (?:morning|afternoon|evening)|שלום|היי|הי|בוקר טוב|ערב טוב|צהריים טובים)(?=[\s,!])[^,\n.!?]{0,40}[,!]\s*/i;
   function richAckLines(params, askText) {
-    const what = cleanLine(params && params.what);
+    const what = cleanLine(params && params.what).replace(LEAD_GREETING, '');
     const when = cleanLine(params && params.when) || null;
     const sig = askSignals(askText, what);
     if (!sig.wantsReview && !sig.wantsConfirm && !sig.wantsOwner && !sig.wantsSlot && !what) return null;
@@ -174,6 +187,17 @@ const FlowDraftReply = (() => {
       lines.push(said || (he ? 'הקובץ מוכן.' : 'The file is ready.'));
       lines.push(shareUrl);
       return lines.join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
+    }
+
+    // A mail of questions (core/incoming-judge.js directAsk): the draft is an answer frame. Every question as it was written, in the mail's
+    // order, with a place for the person's answer under each. Glance does not know the answers and never writes one.
+    if (Array.isArray(params.questions) && params.questions.length) {
+      const qs = params.questions.map((q) => cleanLine(q)).filter(Boolean).slice(0, 8);
+      if (qs.length) {
+        lines.push(he ? (qs.length > 1 ? 'תודה על השאלות. התשובות לפי הסדר:' : 'תודה על השאלה.') : (qs.length > 1 ? 'Thanks for the questions. Answers in order:' : 'Thanks for the question.'));
+        qs.forEach((q, k) => { lines.push('', (qs.length > 1 ? (k + 1) + '. ' : '') + q, he ? '[התשובה שלך]' : '[Your answer]'); });
+        return lines.join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
+      }
     }
 
     const askText = params.askText || params.text || null;

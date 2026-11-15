@@ -94,6 +94,9 @@ for (const [text, why] of [
   ['Invoice 2231 was due on Monday and I paid it yesterday', 'look back'],
   ['', 'empty']
 ]) check('not a bill without an amount (' + why + '): ' + text.slice(0, 50), A.recognizeBill(text, NOW).kind === 'none', A.recognizeBill(text, NOW));
+// «אנא + imperative» (kind-frozen set, 2026-11-14): «אנא העבר לי 2,300 ש"ח עד יום שני» is an ask; the negation and the past stay out.
+for (const t of ['אנא העבר לי 2,300 ש"ח עד יום שני.', 'שלום סאלי, אנא שלם 780 ש"ח עד יום חמישי.']) check('Hebrew «אנא» ask: ' + t.slice(0, 40), A.recognize(t, NOW).kind === 'ask', A.recognize(t, NOW));
+for (const t of ['אנא אל תעביר 2,300 ש"ח עד יום שני', 'שילמתי 2,300 ש"ח אתמול']) check('Hebrew «אנא» stays out: ' + t.slice(0, 40), A.recognize(t, NOW).kind === 'none', A.recognize(t, NOW));
 check('no throw on junk', (() => { try { A.recognize(null, null); A.recognize(undefined, 'x'); return true; } catch (e) { return false; } })());
 console.log(failures ? '\n' + failures + ' FAILED' : '\nAll chat-payment-ask checks passed');
 process.exit(failures ? 1 : 0);

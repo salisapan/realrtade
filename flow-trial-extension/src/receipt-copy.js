@@ -44,6 +44,20 @@ const FlowReceipt = (() => {
   // (Google Tasks in this slice). Handled only when every proof has
   // fetchedBack true. Omit requireProof for writers that are not on
   // this gate yet (Calendar, drafts, Drive).
+  // Undo storage meta after a Do It. Hand-offs (compose preview that closes
+  // nothing) and skipped steps are not failures: a full close must never
+  // store partial, or remounting the mail flashes "טופל חלקית" / "Partly
+  // handled." when every real write landed. attemptedCount is the number of
+  // non-skipped, non-hand-off results; storedCount is how many Undo steps
+  // were kept.
+  function laneUndoStoreMeta(input) {
+    input = input || {};
+    const stored = count(input.storedCount);
+    const attempted = count(input.attemptedCount);
+    if (input.full) return { total: stored };
+    return { total: Math.max(attempted, stored) };
+  }
+
   function confirmation(input) {
     input = input || {};
     const succeeded = count(input.succeeded);
@@ -163,7 +177,8 @@ const FlowReceipt = (() => {
   }
 
   return {
-    confirmation, undoHint, undoneLine, reverseNote, todoUiCacheLine, missingScopeLine, verifyTimeoutLine,
+    confirmation,
+    laneUndoStoreMeta, undoHint, undoneLine, reverseNote, todoUiCacheLine, missingScopeLine, verifyTimeoutLine,
     EARLY_CLOSE_LIMIT, EARLY_LINE, STATUS_HANDLED, STATUS_HANDLED_HE, STATUS_PARTIAL
   };
 })();

@@ -77,5 +77,21 @@ check('calendar-notification@ is an automated sender', X.senderIsAutomated('cale
 r = judge('Booked by Test Booking\nA 30-minute intro call with the team.\nJoin with Google Meet Meeting link https://meet.example/abc Test your setup at any time', { sender: { name: 'Google Calendar', email: 'calendar-notification@google.com' }, subject: 'Appointment booked: Intro @ Sun 1 Nov 2026 10am - 10:30am', directAskOn: false });
 check('an "Appointment booked" notice from Google Calendar offers no reply draft', !(r.show && r.process.steps.some((s) => s.kind === 'gmailDraft')), kinds(r));
 
+console.log('\n--- chats (WhatsApp, Messenger, Instagram, Teams): one-to-one only, questions only, at least two ---\n');
+const chatJudge = (text, extra) => J.judge(Object.assign({ text, subject: '', sender: { name: 'Dana', phone: '+972500000000' }, now: new Date(NOW), surface: 'chat', attachmentCount: 0, directAskOn: true, oneToOne: true }, extra || {}), DEPS);
+r = chatJudge('היי, מה המחיר לעשרה משתמשים? כמה זמן לוקח ההטמעה אצלכם?');
+check('chat: two business questions in a one-to-one chat become one task to answer, no day invented', r.show && r.process.steps.length === 1 && r.process.steps[0].kind === 'googleTask' && r.process.steps[0].params.dateIso === null && /^לענות: /.test(r.process.steps[0].params.title) && /ועוד 1/.test(r.process.steps[0].params.title), r.show && r.process.steps[0].params);
+r = chatJudge('Hi, what is the price for ten seats? How many seats does the base plan include?');
+check('chat EN: the same, titled in English', r.show && /^Reply: What is the price/.test(r.process.steps[0].params.title) && /\+1 more/.test(r.process.steps[0].params.title), r.show && r.process.steps[0].params.title);
+check('chat: no email draft step ever (the person types the answer in the chat)', r.show && !r.process.steps.some((st) => /Draft$/.test(st.kind)));
+check('chat: one question alone is conversation, not a loop', !chatJudge('מה המחיר לעשרה משתמשים?').show);
+check('chat: where, when, who, why and how are everyday chat and are not read by this reader', !chatJudge('איפה אתה עכשיו? מתי מגיע הביתה? מי בא איתך?').show && !(chatJudge('Where are you now? When are you coming home? Who is coming with you?').intent || {}).directAsk);
+check('chat: short questions are not read', !chatJudge('מה קורה? כמה אתה?').show);
+check('chat: a group chat is never read', !chatJudge('היי, מה המחיר לעשרה משתמשים? כמה זמן לוקח ההטמעה אצלכם?', { oneToOne: false }).show && !chatJudge('היי, מה המחיר לעשרה משתמשים? כמה זמן לוקח ההטמעה אצלכם?', { group: true }).show);
+check('chat: without the host saying one-to-one, nothing is read', !chatJudge('היי, מה המחיר לעשרה משתמשים? כמה זמן לוקח ההטמעה אצלכם?', { oneToOne: undefined }).show);
+check('chat: the person\'s own message is never read', !chatJudge('היי, מה המחיר לעשרה משתמשים? כמה זמן לוקח ההטמעה אצלכם?', { fromMe: true }).show);
+check('chat: without directAskOn nothing changes', !chatJudge('היי, מה המחיר לעשרה משתמשים? כמה זמן לוקח ההטמעה אצלכם?', { directAskOn: false }).show);
+check('chat: the Hebrew bare imperative is not read here (core/chat-deadline-ask.js owns it)', !(chatJudge('תשלם את החשבונית עד יום חמישי').show && chatJudge('תשלם את החשבונית עד יום חמישי').intent.directAsk));
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
