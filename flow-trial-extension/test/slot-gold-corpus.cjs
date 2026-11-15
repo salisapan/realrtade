@@ -13,7 +13,7 @@ const run = (flag) => { const r = spawnSync(process.execPath, [path.join(__dirna
 const held = run(''), dev = run('--dev');
 check('the held-out slot run works', held.r.status === 0, held.r.stderr && held.r.stderr.slice(0, 300));
 check('held-out: no offered Do It writes a wrong slot', held.j.wrong.length === 0, held.j.wrong);
-check('held-out: at least 37 of 40 rows are offered', held.j.tot.offered >= 37, held.j.tot);
+check('held-out: at least 40 of 40 rows are offered', held.j.tot.offered >= 40, held.j.tot);
 check('held-out: every day, clock, amount, currency, title and old slot checked is right', Object.values(held.j.stats).every(([r, n]) => r === n), held.j.stats);
 check('development rows: all offered, all slots right', dev.j.tot.offered === dev.j.tot.n && dev.j.wrong.length === 0, [dev.j.tot, dev.j.wrong, dev.j.silent]);
 console.log('\nTOTAL FAILURES:', failures);

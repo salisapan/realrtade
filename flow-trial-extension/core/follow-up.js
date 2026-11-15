@@ -243,6 +243,11 @@ const FlowFollowUp = (() => {
     const he = hasHebrew(body);
     const asks = he ? ASK_HE : ASK_EN;
     let askLine = candidates.find((s) => asks.some((re) => re.test(s)) || (he && ASK_EN.some((re) => re.test(s))));
+    // A request for a time to meet («Can we meet next week to go over the proposal?», «אפשר לקבוע פגישה בשבוע הבא?», «When are you free this week?») is an ask the fixed
+    // phrasings above do not carry; the shared judge's slot-ask list does (completion gold, 2026-11-15: none of these opened a loop). The reply that closes it is the time.
+    if (!askLine && typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.slotAskText === 'function') {
+      askLine = candidates.find((s) => { try { return Boolean(FlowJudgment.slotAskText(s)); } catch (e) { return false; } }) || null;
+    }
 
     // The lexicon (core/request-types.js) recognises asks the fixed phrasings
     // above miss: frame + action + object, in either language. Local code, no

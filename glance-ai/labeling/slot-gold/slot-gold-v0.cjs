@@ -3,18 +3,18 @@
 // and the title a Do It would put on the calendar or the task list. A right family with a wrong day is the worst error a closer can make, because ProofOfClose proves that
 // something was written, not that it was the right thing. The lab clock is Wednesday 2026-10-07 12:00 (+03:00), so Thursday = 2026-10-08, Friday = 10-09, Sunday = 10-11,
 // Monday = 10-12, Tuesday = 10-13, "tomorrow" = 10-08. RULES: never train on it, never tune an engine rule against a row of it; a row that exposes a fixable shape moves to
-// glance-ai/scoreboard/capabilities/probe-set.cjs (with the gold below as its check) and a fresh row is written here. v0 first reading (before any fix): 4 of 37 offered rows wrote a wrong slot (a day taken from «by end of day Monday» = today, a kickoff filed on the Monday the sender is abroad, an overdue Monday taken over «pay it by Friday», a generic commitment title; then the «out of office» side note vetoing a real meeting); those five rows moved to slot-dev-v0.cjs and were replaced here. Every text is written for this file (no real mail).
+// glance-ai/scoreboard/capabilities/probe-set.cjs (with the gold below as its check) and a fresh row is written here. v0 first reading (before any fix): 4 of 37 offered rows wrote a wrong slot (a day taken from «by end of day Monday» = today, a kickoff filed on the Monday the sender is abroad, an overdue Monday taken over «pay it by Friday», a generic commitment title; then the «out of office» side note vetoing a real meeting); those five rows moved (and then, after a second reading, three holds phrased as a question: «can we talk on Sunday at 10:30?», «how about Monday at 9am?», «בוא נקבע לשני בשעה 9:00») to slot-dev-v0.cjs and were replaced here. Every text is written for this file (no real mail).
 // Row: [kind, lang, text, gold]. gold: { date: 'YYYY-MM-DD'|null, hour, minute, amount, currency, has: [substrings of the title, lowercase], from: {date,hour,minute} } (omitted = not checked)
 module.exports = [
   // --- hold a meeting: the day and the clock
   ['hold', 'en', 'Hi Sali, are you free for a catch-up on Tuesday at 16:00?', { date: '2026-10-13', hour: 16, minute: 0 }],
   ['hold', 'en', 'Hi Sali, let us meet tomorrow at 3pm to go over the plan.', { date: '2026-10-08', hour: 15, minute: 0 }],
-  ['hold', 'en', 'Sali, can we talk on Sunday at 10:30 about the contract?', { date: '2026-10-11', hour: 10, minute: 30 }],
-  ['hold', 'en', 'Hi Sali, how about Monday at 9am for the budget review?', { date: '2026-10-12', hour: 9, minute: 0 }],
+  ['hold', 'en', 'Hi Sali, could we catch up on Tuesday at 17:30 about the offer?', { date: '2026-10-13', hour: 17, minute: 30 }],
+  ['hold', 'en', 'Hi Sali, what about Friday at 8:30 for the retro?', { date: '2026-10-09', hour: 8, minute: 30 }],
   ['hold', 'en', 'Hi Sali, I booked us a call for Friday at 11:15.', { date: '2026-10-09', hour: 11, minute: 15 }],
   ['hold', 'he', 'סאלי שלום, מתאים לך להיפגש מחר בשעה 16:00?', { date: '2026-10-08', hour: 16, minute: 0 }],
   ['hold', 'he', 'היי סאלי, נוכל להיפגש ביום ראשון ב-10:30 לדבר על החוזה?', { date: '2026-10-11', hour: 10, minute: 30 }],
-  ['hold', 'he', 'סאלי, בוא נקבע לשני בשעה 9:00 לסקירת תקציב.', { date: '2026-10-12', hour: 9, minute: 0 }],
+  ['hold', 'he', 'היי סאלי, בוא ניפגש בחמישי ב-17:00 לסיכום.', { date: '2026-10-08', hour: 17, minute: 0 }],
   ['hold', 'he', 'קבעתי לנו שיחה ביום שישי ב-11:15.', { date: '2026-10-09', hour: 11, minute: 15 }],
   // --- move / cancel: the old slot and the new one
   ['move', 'en', "Hi Sali, let's push Thursday's call at 10:00 to Friday at 11:00.", { date: '2026-10-09', hour: 11, minute: 0, from: { date: '2026-10-08', hour: 10, minute: 0 } }],
