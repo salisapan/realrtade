@@ -180,5 +180,15 @@ const run = (e, f, logs) => relay(e, { env: ENV, fetch: f, now: () => 1000, log:
     const f3 = mock(200, { access_token: 'x', note: 'DS-DEMO-SECRET' });
     assert.strictEqual((await relay(ev({ vendor: 'docusign-demo', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f3, now: () => 1 })).statusCode, 502);
   });
+  await t('clickup: client id, secret and code in a JSON body to api.clickup.com/api/v2/oauth/token; no refresh grant; the secret is never returned', async () => {
+    const env = Object.assign({}, ENV, { CLICKUP_CLIENT_ID: 'ccid', CLICKUP_CLIENT_SECRET: 'CU-SECRET' });
+    const f = mock(200, { access_token: 'pk_x', token_type: 'Bearer' });
+    const r = await relay(ev({ vendor: 'clickup', grant: 'code', code: 'c1', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f, now: () => 1 });
+    assert.strictEqual(r.statusCode, 200); assert.strictEqual(f.calls[0].url, 'https://api.clickup.com/api/v2/oauth/token');
+    const body = JSON.parse(f.calls[0].init.body); assert.strictEqual(body.client_id, 'ccid'); assert.strictEqual(body.client_secret, 'CU-SECRET'); assert.strictEqual(body.code, 'c1'); assert.ok(r.body.indexOf('CU-SECRET') < 0);
+    const r2 = await relay(ev({ vendor: 'clickup', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: mock(200, {}), now: () => 1 }); assert.strictEqual(r2.statusCode, 400);
+    const f3 = mock(200, { access_token: 'x', note: 'CU-SECRET' });
+    assert.strictEqual((await relay(ev({ vendor: 'clickup', grant: 'code', code: 'c', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f3, now: () => 1 })).statusCode, 502);
+  });
   console.log('\n' + passed + ' passed');
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });
