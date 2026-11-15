@@ -1,6 +1,6 @@
 # The refund you asked for, carried until the money is back
 
-- **Status:** experiment built (2026-11-11, Wednesday run; not approved by Sali yet: no «כן» or «לא» since Sunday, so this run took it as the newest measured gap)
+- **Status:** approved (Sali 2026-11-12: «מה שהכי נכון וקולע למהות של המוצר, לעשות דברים ולגרום להם להיות מבוצעים!»; the lab read this as: approve what makes a thing get done, and this is the one where Glance carries the loop and prepares the chase until the money is back). Experiment built 2026-11-11. Next: wire it behind `REFUND_LOOP` (off)
 - **Date:** 2026-11-08 (product lab, Sunday run)
 - **Switch:** `opts.enabled` on `FlowRefundLoop.ask`, `.reply` and `.judge` (`REFUND_LOOP`, **off**; nothing calls it). It joins `core/labs-switches.js` only when it is wired.
 - **Code:**
