@@ -49,6 +49,7 @@ global.FlowCloseFamilies = FlowCloseFamilies;
 const { FlowIntent } = require('../../../../flow-trial-extension/core/intent.js');
 const { FlowPrivacyShield } = require('../../../../flow-trial-extension/core/privacyShield.js');
 const { FlowMaskIds } = require('../../../../flow-trial-extension/core/mask-ids.js');
+const { summarizeAttachmentGeminiBlocked } = require('./gemini-paid-gate.js');
 
 const ENV_KEYS = ['ANTHROPIC_API_KEY', 'XAI_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY', 'LLAMA_API_KEY'];
 
@@ -197,12 +198,17 @@ function describe(model) {
 function planRoute(action, opts) {
   opts = opts || {};
   const env = readEnv(opts.env);
+  const gateEnv = Object.assign({}, process.env, opts.env || {});
   const state = opts.state || sharedState;
   const now = Number.isFinite(opts.now) ? opts.now : Date.now();
   let models = [];
   if (action === 'summarize-attachment') {
-    const slotC = chooseSlotC(env, state, now);
-    models = (slotC ? [slotC] : []).concat(fastPair(env, state, now));
+    if (summarizeAttachmentGeminiBlocked(opts.contentSource, gateEnv)) {
+      models = [];
+    } else {
+      const slotC = chooseSlotC(env, state, now);
+      models = (slotC ? [slotC] : []).concat(fastPair(env, state, now));
+    }
   } else if (action === 'draft-reply') {
     models = fastPair(env, state, now);
   } else if (action === 'classify') {
@@ -429,6 +435,15 @@ async function callRoutedLlm(opts) {
   const judgeNow = opts.judgeNow || new Date(clock);
   const state = opts.state || sharedState;
   const env = readEnv(opts.env);
+  const gateEnv = Object.assign({}, process.env, opts.env || {});
+
+  if (action === 'summarize-attachment' && summarizeAttachmentGeminiBlocked(opts.contentSource, gateEnv)) {
+    const err = new Error('Gemini paid tier required for Google or Microsoft attachment summaries.');
+    err.code = 'gemini_paid_gate';
+    err.silent = true;
+    err.status = 403;
+    throw err;
+  }
 
   if (action === 'classify') {
     const judged = localPass(opts.judgeText != null ? opts.judgeText : opts.userText, judgeNow);
@@ -444,7 +459,7 @@ async function callRoutedLlm(opts) {
     throw piiError();
   }
 
-  const plan = planRoute(action, { env, state, now: clock, tier: opts.tier });
+  const plan = planRoute(action, { env, state, now: clock, tier: opts.tier, contentSource: opts.contentSource });
   if (!plan.length) {
     if (action === 'classify') return { silence: true, result: silenceResult() };
     throw configError();
@@ -461,6 +476,7 @@ async function callRoutedLlm(opts) {
     const started = Date.now();
     let text;
     try {
+      if (model.provider === 'gemini' && summarizeAttachmentGeminiBlocked(opts.contentSource, gateEnv)) continue;
       text = await invoke(model, env, opts.system || '', masked, opts.maxTokens || 400, fetchImpl);
     } catch (err) {
       if (err && err.refusal) { refusals += 1; continue; }
