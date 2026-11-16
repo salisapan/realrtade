@@ -161,6 +161,25 @@ const FlowCommitmentTitle = (() => {
     return englishSpan(sentence);
   }
 
+  // The task for an ask that has no promise in it («Sali, please send me the updated budget by Thursday») is titled by the work («Send the updated budget»), not by its date
+  // («Reply requested by Oct 8»), which names nothing (instinct-level reading, 2026-11-16). English only, verb plus object, nothing guessed: no verb from the list, no title.
+  const ASK_VERBS = 'send|transfer|wire|settle|get|submit|upload|forward|share|review|sign|confirm|update|prepare|renew|pay|call|book|schedule|complete|finish|provide|fill|attach|check|approve|return|deliver|email|write|draft|fix|order|pick up|bring|finalize|finalise|arrange';
+  const ASK_FRAME = new RegExp('\\b(?:reminder:?|please|kindly|could you|can you|would you|will you|i need you to|we need you to|i(?:\'d| would) like you to)\\s+(?:please\\s+)?(?:to\\s+)?(' + ASK_VERBS + ')\\s+(?:(?:me|us|you)\\s+)?(.+?)(?=\\s+(?:by|before|until|no later than|today|tomorrow|tonight|this|next|on|at|asap|as soon|thanks|thank)\\b|\\s+and\\s+(?:let|tell|then|send|call|reply)\\b|[?!;]|[.,](?!\\d)|$)', 'i');
+  function askTitleFromBody(text) {
+    const rows = sentences(prepareText(text)).map(stripGreeting).map((x) => x.replace(/^[A-Z][a-z]+,\s+/, ''));
+    for (let i = 0; i < rows.length; i++) {
+      if (/^(?:what|which|how|when|where|who|why|is|are|do|does)\b/i.test(rows[i])) continue;
+      const m = rows[i].match(ASK_FRAME);
+      if (!m) continue;
+      const obj = clean(m[2]).replace(/\s+(?:again|please)$/i, '');
+      const words = obj.split(' ').filter(Boolean);
+      if (words.length < 1 || words.length > 9 || /^(?:it|this|that|them|these|those)$/i.test(obj)) continue;
+      const verb = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+      return clip(verb + ' ' + obj);
+    }
+    return '';
+  }
+
   // Body wins. params.what is only the sentence when the body is empty
   // (a replay that stored the ask and not the mail). Subject is ignored.
   function fromPayload(p) {
@@ -172,7 +191,7 @@ const FlowCommitmentTitle = (() => {
     return titleFromBody(body.trim() ? body : what);
   }
 
-  return { titleFromBody: titleFromBody, fromPayload: fromPayload, prepareText: prepareText, keyText: keyText, MAX: MAX };
+  return { titleFromBody: titleFromBody, askTitleFromBody: askTitleFromBody, fromPayload: fromPayload, prepareText: prepareText, keyText: keyText, MAX: MAX };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCommitmentTitle };

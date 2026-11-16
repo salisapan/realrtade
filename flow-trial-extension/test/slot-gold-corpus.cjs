@@ -16,5 +16,11 @@ check('held-out: no offered Do It writes a wrong slot', held.j.wrong.length === 
 check('held-out: at least 40 of 40 rows are offered', held.j.tot.offered >= 40, held.j.tot);
 check('held-out: every day, clock, amount, currency, title and old slot checked is right', Object.values(held.j.stats).every(([r, n]) => r === n), held.j.stats);
 check('development rows: all offered, all slots right', dev.j.tot.offered === dev.j.tot.n && dev.j.wrong.length === 0, [dev.j.tot, dev.j.wrong, dev.j.silent]);
+
+// As shipped (every Labs switch off): what the default product writes. A ratchet: no offered row writes a wrong slot, and the offered count may not fall.
+const sh = (() => { const r = spawnSync(process.execPath, [path.join(__dirname, '..', '..', 'glance-ai', 'scoreboard', 'capabilities', 'slot-run.cjs'), '--json'], { encoding: 'utf8', maxBuffer: 1 << 26, env: Object.assign({}, process.env, { GLANCE_SHIPPED: '1' }) }); return JSON.parse(r.stdout || '{"wrong":[],"tot":{}}'); })();
+check('as shipped: no offered Do It writes a wrong slot or a title that names nothing', sh.wrong.length === 0, sh.wrong);
+check('as shipped: at least 26 of 40 rows are offered (40 with every switch on)', sh.tot.offered >= 26, sh.tot);
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

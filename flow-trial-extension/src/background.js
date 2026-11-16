@@ -2887,6 +2887,12 @@ function googleTaskTitle(p) {
   const Title = globalThis.FlowCommitmentTitle;
   const span = Title && typeof Title.fromPayload === 'function' ? Title.fromPayload(p) : '';
   if (span) return String(span).slice(0, 255);
+  // A reply card whose label is only its date («Reply requested by Oct 8») is titled by the work the ask names, when the ask is a plain verb plus object.
+  if (Title && typeof Title.askTitleFromBody === 'function' && /^Reply requested\b/i.test(String((p && p.label) || ''))) {
+    const body = p && (p.text != null && String(p.text).trim() ? p.text : p.bodyText) || (p && p.params && p.params.what) || '';
+    const ask = Title.askTitleFromBody(String(body));
+    if (ask) return String(ask).slice(0, 255);
+  }
   return String((p && p.label) || '').replace(/\s+/g, ' ').trim().slice(0, 255);
 }
 

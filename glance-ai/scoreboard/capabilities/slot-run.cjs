@@ -14,6 +14,7 @@ function slotsOf(res, text) {
   // The task writer (src/background.js) retitles a generic «Log commitment for <day>» from the mail's own promise sentence; the same call is made here so the title checked is the one written.
   const CT = g && g('FlowCommitmentTitle');
   if (/^Log commitment\b/i.test(title) && CT && typeof CT.titleFromBody === 'function') { try { title = CT.titleFromBody(text) || title; } catch (e) { /* keep the card label */ } }
+  if (/^Reply requested\b/i.test(title) && CT && typeof CT.askTitleFromBody === 'function') { try { title = CT.askTitleFromBody(text) || title; } catch (e) { /* keep the card label */ } }
   const am = e.amount && typeof e.amount === 'object' ? e.amount : null;
   const amText = (title + ' ' + (res.intent && res.intent.label || '')).replace(/,/g, '');
   const money = amText.match(/[$₪]\s?(\d[\d]{0,8})(?:\.\d+)?|(\d[\d]{0,8})(?:\.\d+)?\s?(?:nis|usd|ils|שקל|ש"ח|שקלים)/i);
