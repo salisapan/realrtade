@@ -4,7 +4,7 @@
 // usage: node scoreboard/capabilities/kind-frozen-run.cjs [--list] [--json] [--preds <kind-head preds.jsonl>]
 // --preds adds the MODEL columns (lab kind head, model/train/train-kinds.py): the head alone and the product order (the engine's offer first, the head only where the engine is silent). The head is OFF and unwired.
 const { recognize } = require('./union.cjs');
-const ROWS = require('../../labeling/kind-frozen/kind-frozen-v0.cjs');
+const ROWS = process.argv.includes('--v1') ? require('../../labeling/kind-frozen/kind-frozen-v1.cjs') : require('../../labeling/kind-frozen/kind-frozen-v0.cjs');
 const SAME = { video_link: ['calendar'], slides_create: ['doc_create'], excel_create: ['word_create', 'sheet_create'], word_create: ['doc_create'], sheet_row: ['task'], pay: ['task'] };
 const ok = (w, g) => (w === 'none' ? g === 'none' : g !== 'none' && (g === w || (SAME[w] || []).indexOf(g) >= 0));
 const wilson = (k, n) => { if (!n) return [0, 0]; const z = 1.96, p = k / n, d = 1 + z * z / n, c = p + z * z / (2 * n), m = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)); return [(c - m) / d, (c + m) / d]; };

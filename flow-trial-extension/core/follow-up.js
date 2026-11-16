@@ -604,7 +604,7 @@ const FlowFollowUp = (() => {
 
   // An out-of-office or automatic reply is not an answer. Treating it as one
   // would close a follow-up the person is still waiting on.
-  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|מענה אוטומטי|בחופשה עד|בחופשה|אעדר|(?:לא|אינני|איני) נמצא(?:ת)? במשרד|המסירה לנמענים|לא ניתן למסירה)/i;
+  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|מענה אוטומטי|בחופשה עד|בחופשה|אעדר|(?:לא|אינני|איני) נמצא(?:ת)? במשרד|(?:אני|אנחנו|אנו) לא במשרד|המסירה לנמענים|לא ניתן למסירה)/i;
 
   // A delivery failure: the mail the person sent never reached the other side. It is not a reply FROM them and it says nothing about the ask,
   // so it never closes a loop and never counts as an answer, and chasing the same address again would bounce the same way
@@ -789,6 +789,11 @@ const FlowFollowUp = (() => {
     }
     // For a request for a reply, "confirmed / attached / signed" means the thing
     // was delivered even if a promise about something else is in the message.
+    // A loop that asked for a TIME is answered by a time that fits: «מחר ב-15:00 מתאים לי, נתראה» and «Tuesday at 11:00 works for me, see you then» are not promises to do
+    // something later (completion gold, 2026-11-15: «מחר» and «see you» read as one). Only on a loop whose own ask is a slot ask, and only with a clock and a fit word.
+    const timeAsked = kind === KINDS.REPLY && watch && typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.slotAskText === 'function' && (() => { try { return Boolean(FlowJudgment.slotAskText(String(watch.what || ''))); } catch (e) { return false; } })();
+    const TIME_FIT = /(?:\b\d{1,2}[:.]\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b)[^.!?\n]{0,40}(?:מתאים|מסתדר|נוח|בסדר|works|is fine|is good|sounds good|perfect|great)|(?:מתאים|מסתדר|works|fine|good|perfect)[^.!?\n]{0,25}\b\d{1,2}[:.]\d{2}\b/i;
+    if (timeAsked && TIME_FIT.test(body) && !/\?\s*$/.test(body)) return { outcome: 'closed', promisedIso: null, basis: 'rule', why: 'a time that fits' };
     const delivered = kind === KINDS.REPLY && CONFIRM.test(body);
     const promise = !delivered && (PROMISE_EN.test(body) || PROMISE_HE.test(body));
     const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);
