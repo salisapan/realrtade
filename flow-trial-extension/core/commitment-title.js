@@ -165,9 +165,25 @@ const FlowCommitmentTitle = (() => {
   // («Reply requested by Oct 8»), which names nothing (instinct-level reading, 2026-11-16). English only, verb plus object, nothing guessed: no verb from the list, no title.
   const ASK_VERBS = 'send|transfer|wire|settle|get|submit|upload|forward|share|review|sign|confirm|update|prepare|renew|pay|call|book|schedule|complete|finish|provide|fill|attach|check|approve|return|deliver|email|write|draft|fix|order|pick up|bring|finalize|finalise|arrange';
   const ASK_FRAME = new RegExp('\\b(?:reminder:?|please|kindly|could you|can you|would you|will you|i need you to|we need you to|i(?:\'d| would) like you to)\\s+(?:please\\s+)?(?:to\\s+)?(' + ASK_VERBS + ')\\s+(?:(?:me|us|you)\\s+)?(.+?)(?=\\s+(?:by|before|until|no later than|today|tomorrow|tonight|this|next|on|at|asap|as soon|thanks|thank)\\b|\\s+and\\s+(?:let|tell|then|send|call|reply)\\b|[?!;]|[.,](?!\\d)|$)', 'i');
+  // Hebrew asks: «תוכל/י לשלוח לי את X», «נא להגיש את X» (infinitive after the frame) and the bare imperative «בבקשה תכין את X» / «תשלח לי את X» (turned into the infinitive).
+  const HE_IMP = { 'שלח': 'לשלוח', 'שלחי': 'לשלוח', 'שלחו': 'לשלוח', 'גיש': 'להגיש', 'גישי': 'להגיש', 'כין': 'להכין', 'כיני': 'להכין', 'חתום': 'לחתום', 'חתמי': 'לחתום', 'עדכן': 'לעדכן', 'עדכני': 'לעדכן', 'אשר': 'לאשר', 'אשרי': 'לאשר', 'חזיר': 'להחזיר', 'חזירי': 'להחזיר', 'עביר': 'להעביר', 'עבירי': 'להעביר', 'שלם': 'לשלם', 'שלמי': 'לשלם', 'קבע': 'לקבוע', 'קבעי': 'לקבוע' };
+  const HE_STOP = '(?=\\s+(?:עד|לפני|מחר|היום|בבוקר|בערב|ביום)(?![\\u0590-\\u05FF])|\\s+ו(?:תעדכן|תגיד|תחזור)|[?!;]|[.,](?!\\d)|$)';
+  const HE_FRAME_INF = new RegExp('(?:תוכל(?:י|ו)?|אפשר|נא|אנא|בבקשה)\\s+(?:בבקשה\\s+)?(ל[\\u05D0-\\u05EA]{2,})\\s+(?:(?:לי|לנו|לך)\\s+)?(.+?)' + HE_STOP);
+  const HE_FRAME_IMP = new RegExp('(?:^|\\s)(?:בבקשה\\s+)?ת(שלח|שלחי|שלחו|גיש|גישי|כין|כיני|חתום|חתמי|עדכן|עדכני|אשר|אשרי|חזיר|חזירי|עביר|עבירי|שלם|שלמי|קבע|קבעי)\\s+(?:(?:לי|לנו)\\s+)?(.+?)' + HE_STOP);
+  function hebrewAskTitle(sentence) {
+    let verb = '', obj = '';
+    let m = sentence.match(HE_FRAME_INF);
+    if (m) { verb = m[1]; obj = m[2]; }
+    else if ((m = sentence.match(HE_FRAME_IMP))) { verb = HE_IMP[m[1]] || ''; obj = m[2]; }
+    obj = clean(obj);
+    const words = obj.split(' ').filter(Boolean);
+    if (!verb || !words.length || words.length > 8 || /^(?:אותו|אותה|אותם|את זה|זה)$/.test(obj)) return '';
+    return clip(verb + ' ' + obj);
+  }
   function askTitleFromBody(text) {
     const rows = sentences(prepareText(text)).map(stripGreeting).map((x) => x.replace(/^[A-Z][a-z]+,\s+/, ''));
     for (let i = 0; i < rows.length; i++) {
+      if (/[\u0590-\u05FF]/.test(rows[i])) { const h = hebrewAskTitle(rows[i]); if (h) return h; continue; }
       if (/^(?:what|which|how|when|where|who|why|is|are|do|does)\b/i.test(rows[i])) continue;
       const m = rows[i].match(ASK_FRAME);
       if (!m) continue;
