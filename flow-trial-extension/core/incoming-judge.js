@@ -224,7 +224,10 @@ const FlowIncomingJudge = (() => {
   const DIRECT_AUTO_SUBJECT = /^(?:\s*(?:re|fw|fwd)\s*:\s*)*(?:automatic reply|auto(?:matic)?[- ]reply|out of (?:the )?office|undeliverable|delivery status|declined:|accepted:|tentative|מענה אוטומטי|תשובה אוטומטית|[\u200e\u200f]*לא ניתן למסירה)/i;
   const DIRECT_CUT = /\n(?:-{2,}\s*(?:Original|Forwarded|הודעה)|From:\s|מאת:\s|On .{4,80} wrote:|ב[-־]?.{4,60} כתב)/;
   const DIRECT_Q_EN = /^(?:what|why|how|when|where|which|who|is there|are there|do you have|does it|does the)\b/i;
-  const DIRECT_Q_HE = /^(?:ו)?(?:מה|למה|מדוע|איך|כיצד|האם|מתי|איפה|היכן|כמה|מי|איזה|איזו|אילו|יש|אנחנו יכולים|נוכל)(?![\u0590-\u05FF])/;
+  // «מהו המועד האחרון», «מהי ההצעה», «מהם הליקויים»: the same interrogative with the pronoun fused on (real legal and business Hebrew), and «אם אני מבין נכון ...?» (a question put as an understanding to confirm).
+  const DIRECT_Q_HE = /^(?:ו)?(?:מה|מהו|מהי|מהם|מהן|מיהו|מיהי|למה|מדוע|איך|כיצד|האם|מתי|איפה|היכן|כמה|מי|איזה|איזו|אילו|יש|אנחנו יכולים|נוכל|אם אני מבין)(?![\u0590-\u05FF])/;
+  // A lead-in clause before the question («בהתבסס על מה שכתבתם, התביעה וחוו"ד מומחה, מה גובה ...?», «כ"כ, אם אני מבין נכון ...?») is not part of it: it is cut before the opener is read.
+  const DIRECT_LEADIN_HE = /^(?:(?:בהתבסס|בהסתמך|בהמשך|בהתאם|לפי|על סמך)\s+[^,?]{0,100},\s*|(?:כ"כ|כמו כן|בנוסף|ובנוסף|אז)[,\s]+)/;
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
   const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני)(?![\u0590-\u05FF])/;
   const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
@@ -273,7 +276,8 @@ const FlowIncomingJudge = (() => {
       const he = /[\u0590-\u05FF]/.test(x);
       // A question that names a clock is a meeting proposal: the hold readers and the calendar path own it, not a reply.
       const opener = chat ? (he ? DIRECT_Q_HE_CHAT : DIRECT_Q_EN_CHAT) : (he ? DIRECT_Q_HE : DIRECT_Q_EN);
-      return opener.test(x) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
+      const head = he ? x.replace(DIRECT_LEADIN_HE, '').replace(DIRECT_LEADIN_HE, '') : x;
+      return (opener.test(x) || (he && !chat && opener.test(head))) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
     });
     // A chat needs at least two such questions: one question in a chat is conversation, not a loop.
     if (qs.length >= 2 || (!chat && qs.length === 1 && greetsReader)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length, questionList: qs.slice(0, 8).map((q) => q.slice(0, 200)) };

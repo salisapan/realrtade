@@ -93,5 +93,18 @@ check('chat: the person\'s own message is never read', !chatJudge('היי, מה 
 check('chat: without directAskOn nothing changes', !chatJudge('היי, מה המחיר לעשרה משתמשים? כמה זמן לוקח ההטמעה אצלכם?', { directAskOn: false }).show);
 check('chat: the Hebrew bare imperative is not read here (core/chat-deadline-ask.js owns it)', !(chatJudge('תשלם את החשבונית עד יום חמישי').show && chatJudge('תשלם את החשבונית עד יום חמישי').intent.directAsk));
 
+
+console.log('\n--- legal and business Hebrew: «מהו», a lead-in clause, «אם אני מבין נכון» (a use case of 2026-11-16, rewritten: no real text, names or figures) ---\n');
+{
+  const LEGAL = 'רועי ולירון, נבקש לנהל דיון פנימי בנושא ולא להשיב כרגע לצד השני.\nמהו המועד האחרון למתן תשובה כאמור?\nבהתבסס על מה שכתבתם ועל חוות הדעת, מה גובה הסכום שאינו שנוי במחלוקת ומה הסכום הנותר?\nכ"כ אם אני מבין נכון, יתרת הסכום תהיה נתונה לשיקול דעת הצד השני?';
+  const r = judge(LEGAL, { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
+  check('HE: three questions, two with a lead-in clause and one fused «מהו», are one reply draft that counts them', kinds(r) === 'gmailDraft' && r.intent.directAsk === true && r.intent.questions === 3, [kinds(r), r.intent && r.intent.questions]);
+  const one = judge('רועי, מהו המועד האחרון למתן תשובה?', { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
+  check('HE: one «מהו» question to a group is not read (the two-question floor stands)', !one.show, kinds(one));
+  const stmt = judge('רועי ולירון, בהתבסס על מה שכתבתם, הסכום שאינו שנוי במחלוקת הוא 20,000.', { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
+  check('HE: a statement with a lead-in clause and no question stays quiet', !stmt.show, kinds(stmt));
+  check('HE: the same questions from an automated sender stay quiet', !judge(LEGAL, { ownNames: ['רועי'], to: [OWN], sender: { name: 'System', email: 'noreply@acme.io' }, subject: 'עדכון' }).show);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
