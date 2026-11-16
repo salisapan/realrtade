@@ -243,6 +243,13 @@ const FlowIncomingJudge = (() => {
   // do you have): no where, when, who, why or how, which are everyday chat. The bare imperative with a day belongs to core/chat-deadline-ask.js.
   const DIRECT_Q_EN_CHAT = /^(?:what|which|how (?:much|many)|is there|are there|do you have|does it|does the)\b/i;
   const DIRECT_Q_HE_CHAT = /^(?:ו)?(?:מה|כמה|איזה|איזו|אילו|האם|יש)(?![\u0590-\u05FF])/;
+  // «דנה ויואב, מהו המועד האחרון?» / "Dana and Yoav, what is the last date?": the names the mail is addressed to are not part of the question. They are cut only when what is left opens as a question.
+  function vocativeCut(x) {
+    const m = /^([^\s,?!.:;]{2,20}(?:\s+(?:and\s+|&\s+)?[^\s,?!.:;]{2,20}){0,2}),\s+([^\n]+\?)$/.exec(x);
+    if (!m) return x;
+    const rest = m[2];
+    return (/[\u0590-\u05FF]/.test(rest) ? DIRECT_Q_HE : DIRECT_Q_EN).test(rest) ? rest : x;
+  }
   function directAsk(i, body) {
     const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
     const chat = i.surface === 'chat';
@@ -278,7 +285,7 @@ const FlowIncomingJudge = (() => {
     }
     // 1. plain information questions
     // A chat opens on the same line as its first question ("היי, מה המחיר...?"): the greeting is not part of the question.
-    const qs = sents.filter((x) => /\?\s*$/.test(x)).map((x) => x.replace(/\s+\?\s*$/, '?').replace(/^(?:שלום|היי|הי|בוקר טוב|ערב טוב|hi|hello|hey)(?=[\s,!])[^,?!]{0,20}[,!]\s*/i, '')).filter((x) => {
+    const qs = sents.filter((x) => /\?\s*$/.test(x)).map((x) => x.replace(/\s+\?\s*$/, '?').replace(/^(?:שלום|היי|הי|בוקר טוב|ערב טוב|hi|hello|hey)(?=[\s,!])[^,?!]{0,20}[,!]\s*/i, '')).map(vocativeCut).filter((x) => {
       const he = /[\u0590-\u05FF]/.test(x);
       // A question that names a clock is a meeting proposal: the hold readers and the calendar path own it, not a reply.
       const opener = chat ? (he ? DIRECT_Q_HE_CHAT : DIRECT_Q_EN_CHAT) : (he ? DIRECT_Q_HE : DIRECT_Q_EN);
@@ -288,7 +295,10 @@ const FlowIncomingJudge = (() => {
       return (opener.test(x) || (he && !chat && opener.test(head))) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
     });
     // A chat needs at least two such questions: one question in a chat is conversation, not a loop.
-    if (qs.length >= 2 || (!chat && qs.length === 1 && greetsReader)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length, questionList: qs.slice(0, 8).map((q) => q.slice(0, 200)) };
+    // One question put to a group by name stays quiet (the two-question floor): the cut vocative made it a question, and a group greeting is not a personal ask.
+    const rawQ = qs.length === 1 ? sents.find((x) => /\?\s*$/.test(x) && vocativeCut(x.replace(/\s+\?\s*$/, '?')) === qs[0]) : null;
+    const groupVocative = !chat && !!rawQ && (i.to || []).length > 1 && vocativeCut(rawQ.replace(/\s+\?\s*$/, '?')) !== rawQ.replace(/\s+\?\s*$/, '?');
+    if (qs.length >= 2 || (!chat && qs.length === 1 && greetsReader && !groupVocative)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length, questionList: qs.slice(0, 8).map((q) => q.slice(0, 200)) };
     return null;
   }
   // ---- what else a mail of questions carries (2026-11-16, a real legal-and-business Hebrew mail) -------------------------------------------

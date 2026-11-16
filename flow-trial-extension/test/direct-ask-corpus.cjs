@@ -128,5 +128,22 @@ console.log('\n--- a mail of questions that also holds an answer, asks for a dat
   check('EN: the same mail in English: hold kept, date question named', enTask && /On hold: do not reply to opposing counsel yet/.test(enTask.params.title) && /including the last date/.test(enTask.params.title), enTask && enTask.params.title);
 }
 
+console.log('\n--- names the mail is addressed to are not part of the question ---\n');
+{
+  const g = { ownNames: ['דנה'], to: [OWN, 'yoav@firm.co.il'], subject: 'עדכון' };
+  const a = judge('דנה ויואב, מהו המועד האחרון?\nמה הסכום הנותר?', g);
+  const da = a.show ? a.process.steps.find((st) => st.kind === 'gmailDraft') : null;
+  check('HE: «דנה ויואב, מהו ...?» and a second question are two questions', da && da.params.questions.length === 2, a.show ? da && da.params.questions : kinds(a));
+  const e = judge('Dana and Yoav, what is the last date to respond? Which amount remains? Who signs?', { ownNames: ['Dana'], to: [OWN, 'yoav@firm.co.il'], subject: 'Update' });
+  const de = e.show ? e.process.steps.find((st) => st.kind === 'gmailDraft') : null;
+  check('EN: three questions after «Dana and Yoav,» are three questions', de && de.params.questions.length === 3, e.show ? de && de.params.questions : kinds(e));
+  check('a lone vocative question to a group still stays quiet', !judge('Dana and Yoav, what is the last date to respond?', { ownNames: ['Dana'], to: [OWN, 'yoav@firm.co.il'], subject: 'Update' }).show);
+  const q = judge('Dana, what is the last date to respond?', { ownNames: ['Dana'], to: [OWN], subject: 'Update' });
+  check('a lone vocative question to the reader alone is still read (greets the reader by name)', q.show, kinds(q));
+  const quoted = judge('דנה ויואב, מהו המועד האחרון?\nמה הסכום הנותר?\nבתאריך 5 באוק\' 2026, יואב כתב:\n> מה השעה?\n> מי בא?', g);
+  const dq = quoted.show ? quoted.process.steps.find((st) => st.kind === 'gmailDraft') : null;
+  check('a real Hebrew quote header still cuts the quoted questions off', dq && dq.params.questions.length === 2, quoted.show ? dq && dq.params.questions : kinds(quoted));
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
