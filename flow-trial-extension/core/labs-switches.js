@@ -1,6 +1,6 @@
-// The closes that ship behind an off switch, in one list, so a person can see them and turn them on. Portable: no chrome.*,
+// The closes that ship behind a switch, in one list, so a person can see them and turn them on or off. Portable: no chrome.*,
 // no DOM. The popup reads this list and keeps one storage object, glanceSwitches ({ NAME: true }); a missing key is off
-// (src/background.js glanceSwitchOn). Nothing here turns a switch on: the person does, one row at a time. None of these has
+// (src/background.js glanceSwitchOn). Nothing in THIS file turns a switch on: the person does, one row at a time, except the first wave the owner turned on on 2026-11-16 (core/labs-seed.js: TASK_ASK, PAYMENT_ASK, BOOKING_NOTICE, SYSTEM_NOTICE, in a non-store install only). None of these has
 // passed a live Gate, and every row says so. The words are Hebrew because the popup is.
 const FlowLabsSwitches = (() => {
   const LIST = [
