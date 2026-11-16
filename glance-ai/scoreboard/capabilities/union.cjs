@@ -37,14 +37,16 @@ function readers(text, surface) {
 }
 
 const OWN = { gmail: 'ai.local.flow@gmail.com', outlook: 'glance.salisapan@outlook.com' };
+// GLANCE_SHIPPED=1 reads the product the way it ships: every Labs switch OFF and the kind readers that sit behind a switch not called (what the person sees with no setup).
+const SHIPPED = process.env.GLANCE_SHIPPED === '1';
 function recognize(over, text) {
   const surface = over.surface || 'gmail', own = OWN[surface];
   const input = Object.assign({ text, subject: 'Subject', sender: { name: 'Dana Levi', email: 'dana@acme.io' }, now: new Date(NOW), threadUrl: 'https://x/y', hasThreadAttachment: false, attachmentCount: 0, surface,
     to: [own], cc: [], ownAddresses: [own], ownNames: ['Sali', 'Sali Sapan', 'סאלי'], userName: 'Sali', direction: 'inbound', inbound: true, namesWaitDone: true,
-    systemNoticeOn: true, bookingNoticeOn: true, paymentAskOn: true, taskAskOn: true, directAskOn: true, workspaceFileOn: true, calendarChangeOn: true }, over);
+    systemNoticeOn: !SHIPPED, bookingNoticeOn: !SHIPPED, paymentAskOn: !SHIPPED, taskAskOn: !SHIPPED, directAskOn: !SHIPPED, workspaceFileOn: !SHIPPED, calendarChangeOn: !SHIPPED }, over);
   let r; try { r = J.judge(input, DEPS); } catch (e) { r = { show: false, reason: 'ERR ' + e.message }; }
   let got = familyOf(r), via = 'judge';
-  const h = readers(text, surface); if (h.length) { got = h[0]; via = 'reader'; }
+  const h = SHIPPED ? [] : readers(text, surface); if (h.length) { got = h[0]; via = 'reader'; }
   return { family: got, via, reason: r && r.show ? '' : (r && r.reason) || '', result: r };
 }
 module.exports = { recognize, familyOf, readers, NOW, OWN, g };

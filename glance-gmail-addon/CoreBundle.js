@@ -553,7 +553,7 @@ const FlowExtract = (() => {
   // A clause that names a day which is NOT the close's day: where the writer will be away («I will be abroad on Monday») and what was already due («the invoice was due on
   // Monday»). With such a clause in the mail, the first date pattern to match could take that day instead of the one the ask is about (slot gold, 2026-11-15: a kickoff on
   // Tuesday was filed on the Monday the sender is abroad). The clause is dropped before matching; when nothing else carries a date the whole text is read as before.
-  const SIDE_DATE = /\b(?:i|we|he|she|they)(?:'ll|'m|'re|\s+will|\s+am|\s+are)?\s+(?:be\s+)?(?:abroad|away|out of (?:the )?office|on (?:leave|vacation|holiday|a trip)|travel(?:l)?ing|unavailable|off)\b[^.!?\n,;]*|\b(?:was|were|had been)\s+due\b[^.!?\n,;]*/gi;
+  const SIDE_DATE = /\b(?:i|we|he|she|they)(?:'ll|'m|'re|\s+will|\s+am|\s+are)?\s+(?:be\s+)?(?:abroad|away|out of (?:the )?office|on (?:leave|vacation|holiday|a trip)|travel(?:l)?ing|unavailable|off)\b[^.!?\n,;]*|\b(?:was|were|had been)\s+due\b[^.!?\n,;]*|\b(?:i|we)\s+(?:sent|emailed|e-mailed|shared|submitted|filed|paid|called|spoke|met|wrote|forwarded|attached|uploaded|signed|booked)\b[^.!?\n,;]*/gi;
   function parseDate(text, now) {
     text = dayWordsFirst(text, now);
     now = now || new Date();
