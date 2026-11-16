@@ -37,6 +37,12 @@ Two real defects the as-shipped reading found and that are fixed in the same com
 4. **Execute on the computer (P3), in three gated stages, each with ProofOfClose and Undo and never sending:** (a) wire the page driver for the allowlisted fixture page and prove it in a real browser (now possible in this lab: the Playwright path is fixed); (b) `computer/local/<app>`: read a local file, save a copy to the person's OneDrive or Drive, then the mail or chat close; (c) an errand: Glance finds the thing in the connected sources and drafts the answer in the chat, the person approves. Each stage's host list, scope and consent text is a manifest and privacy decision.
 5. **Chat as a first-class front door.** M2 and the same cards on the phone (the Gmail add-on, then Safari iOS), with the importance ranking: what is waiting on someone, what money is at risk, what is due today first.
 
+## 5b. Wave 2 is on (owner, 2026-11-16, «יש לך אישור להכול»)
+
+`core/labs-seed.js` is at version 2: a non-store install now also starts with WORKSPACE_FILE (an empty Google Doc, Sheet or Slides file and a Sheet row), MEET_LINK, TEAMS_MEETING and ONEDRIVE_NEW_FILE on. Evidence run before it went on (`GLANCE_SHIPPED=wave2`, `scoreboard/capabilities/union.cjs`): the kind sets read 67 of 89 (95% 65 to 83%) and 54 of 70 (66 to 85%), exactly what every switch on reads, with 0 wrong Do It and every contrast row silent (50 of 50, 36 of 36); the slot gold shows 0 wrong slot on 36 offered rows. Each of the four writes through a writer with a read-back and an Undo that leaves an edited object alone; each has a headless e2e. A Chrome Web Store install never seeds. A person who turned a row off keeps it off. The live Gate on both waves is still the owner's step and is not run.
+
+Still off, on purpose: CALENDAR_CHANGE (the move and cancel writers report without a read-back, and `core/proof-of-close.js` has no calendar system yet: adding one is a change to the ProofOfClose spec, for the owner), DECOMPOSE, every chat and Meta row, Planner, SharePoint, Forms, recurring rows and the full-document close.
+
 ## 6. What changed in this commit
 
 - `scoreboard/capabilities/switch-readiness.cjs`, `kinds`-style table of the 26 Labs rows (`switch-readiness.md`).

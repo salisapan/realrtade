@@ -36,5 +36,11 @@ const w0 = wave1(''), w1 = wave1('--v1');
 check('wave 1: no contrast row is offered, on v0 or v1', w0.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0 && w1.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0, [w0.tot, w1.tot]);
 check('wave 1: recall on v0 is at least 54 of 89 and on v1 at least 41 of 70 (all switches on: 67 and 54; none: 28 and 21)', w0.tot.posRight >= 54 && w1.tot.posRight >= 41, [w0.tot.posRight, w1.tot.posRight]);
 
+// Wave 2 (core/labs-seed.js: WORKSPACE_FILE, MEET_LINK, TEAMS_MEETING, ONEDRIVE_NEW_FILE on top of wave 1): a non-store install now reads what every switch on reads on these sets.
+const wave2 = (flag) => { const r = spawnSync(process.execPath, [path.join(__dirname, '..', '..', 'glance-ai', 'scoreboard', 'capabilities', 'kind-frozen-run.cjs'), '--json'].concat(flag ? [flag] : []), { encoding: 'utf8', maxBuffer: 1 << 26, env: Object.assign({}, process.env, { GLANCE_SHIPPED: 'wave2' }) }); return JSON.parse(r.stdout || '{"detail":[],"tot":{}}'); };
+const x0 = wave2(''), x1 = wave2('--v1');
+check('wave 2: no contrast row is offered and no wrong Do It, on v0 or v1', x0.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0 && x1.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0 && !x0.tot.wrong && !x1.tot.wrong, [x0.tot, x1.tot]);
+check('wave 2: recall on v0 is at least 67 of 89 and on v1 at least 54 of 70 (the same as every switch on)', x0.tot.posRight >= 67 && x1.tot.posRight >= 54, [x0.tot.posRight, x1.tot.posRight]);
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
