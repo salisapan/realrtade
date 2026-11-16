@@ -38,12 +38,14 @@ function readers(text, surface) {
 
 const OWN = { gmail: 'ai.local.flow@gmail.com', outlook: 'glance.salisapan@outlook.com' };
 // GLANCE_SHIPPED=1 reads the product the way it ships: every Labs switch OFF and the kind readers that sit behind a switch not called (what the person sees with no setup).
-const SHIPPED = process.env.GLANCE_SHIPPED === '1';
+const MODE = process.env.GLANCE_SHIPPED || '';   // '' every switch on; '1' every switch off; 'wave1' the four closes the owner turned on (core/labs-seed.js) and the rest off
+const SHIPPED = MODE === '1' || MODE === 'wave1';
+const WAVE1 = MODE === 'wave1';   // directAskOn is on in every mode: both content scripts and the chat card pass it true (owner-approved 2026-11-12)
 function recognize(over, text) {
   const surface = over.surface || 'gmail', own = OWN[surface];
   const input = Object.assign({ text, subject: 'Subject', sender: { name: 'Dana Levi', email: 'dana@acme.io' }, now: new Date(NOW), threadUrl: 'https://x/y', hasThreadAttachment: false, attachmentCount: 0, surface,
     to: [own], cc: [], ownAddresses: [own], ownNames: ['Sali', 'Sali Sapan', 'סאלי'], userName: 'Sali', direction: 'inbound', inbound: true, namesWaitDone: true,
-    systemNoticeOn: !SHIPPED, bookingNoticeOn: !SHIPPED, paymentAskOn: !SHIPPED, taskAskOn: !SHIPPED, directAskOn: !SHIPPED, workspaceFileOn: !SHIPPED, calendarChangeOn: !SHIPPED }, over);
+    systemNoticeOn: !SHIPPED || WAVE1, bookingNoticeOn: !SHIPPED || WAVE1, paymentAskOn: !SHIPPED || WAVE1, taskAskOn: !SHIPPED || WAVE1, directAskOn: true, workspaceFileOn: !SHIPPED, calendarChangeOn: !SHIPPED }, over);
   let r; try { r = J.judge(input, DEPS); } catch (e) { r = { show: false, reason: 'ERR ' + e.message }; }
   let got = familyOf(r), via = 'judge';
   const h = SHIPPED ? [] : readers(text, surface); if (h.length) { got = h[0]; via = 'reader'; }

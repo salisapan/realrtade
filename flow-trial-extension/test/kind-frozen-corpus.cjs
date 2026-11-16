@@ -27,7 +27,14 @@ check('v1: recall on rows with a close is at least 54 of 70', j1.tot.posN === 70
 const shipped = (flag) => { const r = spawnSync(process.execPath, [path.join(__dirname, '..', '..', 'glance-ai', 'scoreboard', 'capabilities', 'kind-frozen-run.cjs'), '--json'].concat(flag ? [flag] : []), { encoding: 'utf8', maxBuffer: 1 << 26, env: Object.assign({}, process.env, { GLANCE_SHIPPED: '1' }) }); return JSON.parse(r.stdout || '{"detail":[],"tot":{}}'); };
 const s0 = shipped(''), s1 = shipped('--v1');
 check('as shipped: no contrast row is offered, on v0 or v1', s0.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0 && s1.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0, [s0.tot, s1.tot]);
-check('as shipped: recall on v0 is at least 24 of 89 and on v1 at least 15 of 70 (with every switch on: 67 and 54)', s0.tot.posRight >= 24 && s1.tot.posRight >= 15, [s0.tot.posRight, s1.tot.posRight]);
+check('as shipped: recall on v0 is at least 28 of 89 and on v1 at least 21 of 70 (with every switch on: 67 and 54)', s0.tot.posRight >= 28 && s1.tot.posRight >= 21, [s0.tot.posRight, s1.tot.posRight]);
+
+
+// With the first wave the owner turned on (core/labs-seed.js: TASK_ASK, PAYMENT_ASK, BOOKING_NOTICE, SYSTEM_NOTICE) and the rest off: what a non-store install shows after setup-free install.
+const wave1 = (flag) => { const r = spawnSync(process.execPath, [path.join(__dirname, '..', '..', 'glance-ai', 'scoreboard', 'capabilities', 'kind-frozen-run.cjs'), '--json'].concat(flag ? [flag] : []), { encoding: 'utf8', maxBuffer: 1 << 26, env: Object.assign({}, process.env, { GLANCE_SHIPPED: 'wave1' }) }); return JSON.parse(r.stdout || '{"detail":[],"tot":{}}'); };
+const w0 = wave1(''), w1 = wave1('--v1');
+check('wave 1: no contrast row is offered, on v0 or v1', w0.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0 && w1.detail.filter((d) => d[3] === 'none' && d[4] !== 'none').length === 0, [w0.tot, w1.tot]);
+check('wave 1: recall on v0 is at least 54 of 89 and on v1 at least 41 of 70 (all switches on: 67 and 54; none: 28 and 21)', w0.tot.posRight >= 54 && w1.tot.posRight >= 41, [w0.tot.posRight, w1.tot.posRight]);
 
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

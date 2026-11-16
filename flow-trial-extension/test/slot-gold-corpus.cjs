@@ -22,5 +22,9 @@ const sh = (() => { const r = spawnSync(process.execPath, [path.join(__dirname, 
 check('as shipped: no offered Do It writes a wrong slot or a title that names nothing', sh.wrong.length === 0, sh.wrong);
 check('as shipped: at least 26 of 40 rows are offered (40 with every switch on)', sh.tot.offered >= 26, sh.tot);
 
+
+const w1 = (() => { const r = spawnSync(process.execPath, [path.join(__dirname, '..', '..', 'glance-ai', 'scoreboard', 'capabilities', 'slot-run.cjs'), '--json'], { encoding: 'utf8', maxBuffer: 1 << 26, env: Object.assign({}, process.env, { GLANCE_SHIPPED: 'wave1' }) }); return JSON.parse(r.stdout || '{"wrong":[],"tot":{}}'); })();
+check('wave 1: no offered Do It writes a wrong slot, and at least 36 of 40 rows are offered', w1.wrong.length === 0 && w1.tot.offered >= 36, [w1.wrong, w1.tot]);
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
