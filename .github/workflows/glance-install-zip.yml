@@ -29,3 +29,15 @@ jobs:
           node glance-gmail-addon/test/build-stamp.test.cjs
           node flow-trial-extension/test/name-match-corpus.cjs
           node flow-trial-extension/test/docs-consistency-corpus.cjs
+      - name: Outlook add-in, build the bundle and run its tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2-utils
+          node glance-outlook-addin/scripts/build-bundle.js
+          node glance-outlook-addin/scripts/pack.js
+          TZ=UTC node glance-outlook-addin/test/addin.test.cjs
+          TZ=UTC node glance-outlook-addin/test/behavior.test.cjs
+          TZ=Asia/Jerusalem node glance-outlook-addin/test/addin.test.cjs
+          TZ=Asia/Jerusalem node glance-outlook-addin/test/behavior.test.cjs
+          node glance-outlook-addin/test/test-manifest.test.cjs
+          node glance-outlook-addin/test/manifest-schema.test.cjs

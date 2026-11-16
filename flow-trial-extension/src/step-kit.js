@@ -49,8 +49,11 @@ const FlowStepKit = (() => {
   function labelsFor(cfg) {
     const ui = (cfg && cfg.uiLang) || ((cfg && cfg.he) ? 'he' : 'en');
     const base = langOf(ui === 'he');
-    if (typeof FlowDisplay === 'undefined' || typeof FlowDisplay.chrome !== 'function') return base;
-    return Object.assign({}, base, FlowDisplay.chrome(ui));
+    const L = (typeof FlowDisplay === 'undefined' || typeof FlowDisplay.chrome !== 'function')
+      ? Object.assign({}, base)
+      : Object.assign({}, base, FlowDisplay.chrome(ui));
+    if (cfg && cfg.doItLabel) L.doIt = cfg.doItLabel;
+    return L;
   }
 
   function doItHTML(label, disabled) {

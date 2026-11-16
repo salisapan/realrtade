@@ -12,6 +12,7 @@
 //
 // Switches: everything rides on the router's aiPrimary (off). aiKindCheckV1 (off) adds core/kind-check.js on each model answer.
 // aiTier0GuardV1 (off) runs core/tier0-guard.js on the mail first: an injection or fraud-shaped money gets no card at all.
+// aiMultiV1 (off): every intention the model found becomes its own card (core/model-multi.js); `cards` and `watches` carry them all.
 // aiCloudWorthV1 (off) runs core/cloud-worth.js first: a mail with no sign of something to do is not read by any model.
 // aiTier0QuietV1 (off) runs core/tier0-quiet.js on the engine's own card: a hedge, an undecided sender or a met deadline stays quiet. With it off read() returns { used:false } and calls nothing, so the host
 // keeps today's path byte for byte. aiPlanV1 (off) adds the plan and the watch; aiRelevanceV1 (off) and aiDeviceTier1 (off) are read by
@@ -28,6 +29,11 @@ const FlowAiEngine = (() => {
   const quiet = () => sibling(typeof FlowTier0Quiet !== 'undefined' ? FlowTier0Quiet : null, './tier0-quiet.js', 'FlowTier0Quiet');
   const kinds = () => sibling(typeof FlowKindCheck !== 'undefined' ? FlowKindCheck : null, './kind-check.js', 'FlowKindCheck');
   const floor = () => sibling(typeof FlowAiFloor !== 'undefined' ? FlowAiFloor : null, './ai-floor.js', 'FlowAiFloor');
+
+  // The surfaces a plan knows (core/model-plan.js); anything else is planned as Gmail.
+  const SURFACES = { gmail: true, outlook: true, whatsapp: true, messenger: true, instagram: true, teams: true };
+  // The channel names the app the mail or message came from (core/ai-host.js sets it from the surface); it wins over the surface field.
+  function surfaceOf(mail) { return SURFACES[mail.channel] ? mail.channel : (SURFACES[mail.surface] ? mail.surface : 'gmail'); }
 
   // A host that injects no gate or veto gets the production floor (core/ai-floor.js) bound to this mail. A host gate or veto wins.
   // With no floor available either, Router v2 counts the missing gate as silence.
@@ -78,22 +84,30 @@ const FlowAiEngine = (() => {
       if (why) return Object.assign(base, { card: null, reason: why });
       return Object.assign(base, { card: { source: 'engine', step: r.step } });
     }
-    const card = { source: 'model', step: r.step, proposal: r.proposal, plan: null, rows: [] };
     const P = planner();
-    if (P && P.enabled(flags)) {
-      const x = P.plan(flags, r.proposal, { text: mail.text, today: mail.today, lang: mail.lang, surface: mail.surface === 'outlook' ? 'outlook' : 'gmail' });
+    const now = typeof mail.now === 'number' ? mail.now : Date.now();
+    // One card per proposal: planned, carried; a proposal the product cannot plan is not shown (silence beats a card with no way to close it).
+    const cardFor = (proposal, n) => {
+      const card = { source: 'model', step: proposal.step, proposal, plan: null, rows: [] };
+      if (!P || !P.enabled(flags)) return { card, watch: null };
+      const x = P.plan(flags, proposal, { text: mail.text, today: mail.today, lang: mail.lang, surface: surfaceOf(mail) });
       if (x.plan) {
         card.plan = x.plan; card.rows = x.rows;
-        base.watch = P.toWatch(x.plan, r.proposal, { threadId: mail.threadId, messageId: mail.messageId, subject: mail.subject, counterpart: mail.counterpart, channel: mail.channel || mail.surface },
-          typeof mail.now === 'number' ? mail.now : Date.now());
-      } else if (x.reason === 'file-save-is-suggest-save') {
-        card.suggestSave = true; // the host hands it to core/suggest-save.js, which decides on the real attachment list
-      } else {
-        // A model card the product cannot plan is not shown: silence beats a card with no way to close it.
-        return Object.assign(base, { card: null, reason: 'plan:' + x.reason });
+        const watch = P.toWatch(x.plan, proposal, { threadId: mail.threadId, messageId: mail.messageId, subject: mail.subject, counterpart: mail.counterpart, channel: mail.channel || mail.surface }, now);
+        // A second loop in the same thread needs its own key: the follow loop stores loops by id, and the first one's id is the thread.
+        if (watch && n > 0) watch.id = watch.id + '#' + (n + 1);
+        return { card, watch };
       }
-    }
-    return Object.assign(base, { card });
+      if (x.reason === 'file-save-is-suggest-save') { card.suggestSave = true; return { card, watch: null }; } // core/suggest-save.js decides on the real attachments
+      return { card: null, watch: null, reason: 'plan:' + x.reason };
+    };
+    const list = Array.isArray(r.proposals) && r.proposals.length > 1 ? r.proposals : [r.proposal];
+    const built = list.map((p, n) => cardFor(p, n));
+    const shown = built.filter((b) => b.card);
+    if (!shown.length) return Object.assign(base, { card: null, reason: built[0].reason });
+    base.watch = shown[0].watch;
+    if (list.length > 1) { base.cards = shown.map((b) => b.card); base.watches = shown.map((b) => b.watch).filter(Boolean); }
+    return Object.assign(base, { card: shown[0].card });
   }
 
   return { read };

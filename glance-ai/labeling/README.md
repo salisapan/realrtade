@@ -58,6 +58,8 @@ node glance-ai/labeling/apply-owner-answers.cjs --answers glance-ai/labeling/bat
 
 Batch-003 (2026-10-11) is 200 cases labelled blind by Claude: `BATCH-003.md`. `labeledBy` is `claude`, never owner-verified.
 
+Batch-004 (2026-10-12) is 100 more blind Claude cases from `make-batch.cjs` (the generalised batch maker: `--batch N --size --seed --prefer`, excludes every case already in a `batch-*.json`): `BATCH-004.md`. `score-batches.cjs` scores models against every label set, alone and in the product order; `gate-inputs.cjs` turns label sets and predictions into promotion-gate inputs.
+
 Tests: `node glance-ai/labeling/test-ingest.cjs` and `node glance-ai/labeling/test-score.cjs`. Both run at the start of `bash glance-ai/run-cpu-checks.sh`. They do not need the feature files.
 
 Glance is a **close fabric** (detect → carry → execute → true close) — not a draft helper. Labeling teaches *judgment*: when to surface a single Do It vs stay silent. **Silence beats a wrong Do It.** Sending in the user's name is never automatic. Prepare/draft/attach/calendar-hold are intermediate steps on the path to Handled — never the definition of done.

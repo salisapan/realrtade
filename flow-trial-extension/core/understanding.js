@@ -162,7 +162,7 @@ const FlowUnderstanding = (() => {
             const spanText = String(unmask(it.due_span));
             const read = readDate(spanText, now);
             if (!read || !read.iso) drop(at + '.due', 'span-has-no-date');
-            else if (read.iso < todayIso) drop(at + '.due', 'past');
+            else if (read.iso < todayIso) { drop(at + '.due', 'past'); g.due_past = true; }
             else {
               if (claimsDue && it.due !== read.iso) drop(at + '.due', 'model-date-corrected');
               g.due = read.iso; g.due_span = d.span;
@@ -203,7 +203,7 @@ const FlowUnderstanding = (() => {
       else if (it.kind === 'promise_to_me') { if (it.due) step = 'task'; else why = 'promise-without-date'; }
       else if (it.kind === 'ask_of_me') {
         if (u.needs.indexOf('file') >= 0 && (ctx.attachmentCount || 0) > 0) step = 'file_save';
-        else if (it.due) step = 'draft'; else why = 'ask-without-date';
+        else if (it.due_past) why = 'ask-deadline-past'; else step = 'draft'; // owner 2026-11-11 (C-4): an ask with no date still gets a Do It; a date the words do not carry is still dropped, never invented
       }
       if (step) steps.push({ step, it });
       else if (why) steps.push({ step: null, why });

@@ -73,17 +73,11 @@ var GlanceProof = (function () {
     return instant;
   }
 
-  function offsetText(totalMinutes) {
-    var sign = totalMinutes >= 0 ? '+' : '-';
-    var abs = Math.abs(totalMinutes);
-    return sign + pad(Math.floor(abs / 60)) + ':' + pad(abs % 60);
-  }
-
-  // Local midnight in the user's zone. The date in the string is the due date.
-  function dueRfc3339(dateIso, timeZone) {
-    var zone = ianaZone(timeZone) || 'Asia/Jerusalem';
-    var ms = wallToUtcMs(dateIso, 0, 0, 0, zone);
-    return dateIso + 'T00:00:00' + offsetText(Math.round(zoneOffsetMs(ms, zone) / 60000));
+  // Google Tasks keeps only the date of `due`. It converts the value to UTC and drops the time, so local
+  // midnight with a positive offset (2026-11-18T00:00:00+02:00 = 2026-11-17T22:00Z) lands one day early.
+  // UTC midnight of the wanted date is the value the API documents and returns, in every zone.
+  function dueRfc3339(dateIso) {
+    return String(dateIso) + 'T00:00:00.000Z';
   }
 
   function instantUtc(dateIso, hour, minute, timeZone) {
@@ -114,16 +108,12 @@ var GlanceProof = (function () {
     return civil - offMin * 60000;
   }
 
-  function normalizeDue(value, timeZone) {
+  // A task due is a date, not an instant: Google returns UTC midnight of that date. Read the date as written;
+  // converting it into a zone west of UTC would move it a day back.
+  function normalizeDue(value) {
     if (value == null || value === '') return null;
     var match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
-    if (!match) return null;
-    var zone = ianaZone(timeZone);
-    if (!zone || String(value).trim().length === 10) return match[1];
-    var ms = parsePointMs(value, zone);
-    if (ms == null) return match[1];
-    var p = zoneParts(ms, zone);
-    return p.year + '-' + pad(p.month) + '-' + pad(p.day);
+    return match ? match[1] : null;
   }
 
   function snapshotOf(task, listId, timeZone) {

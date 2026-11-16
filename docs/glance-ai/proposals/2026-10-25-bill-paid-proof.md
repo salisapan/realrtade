@@ -1,6 +1,6 @@
 # A bill is closed only when it is paid
 
-- **Status:** proposed
+- **Status:** proposed. Not approved and not rejected. Sali's test on 2026-11-12 (make things get done) puts it after refund-loop: Glance does not pay, so it can prove a payment but not make it happen
 - **Date:** 2026-10-25 (product lab, Sunday run)
 - **Switch:** `opts.enabled` on `FlowBillPaid.judge` (**off**; nothing calls it). It joins `core/labs-switches.js` as `BILL_PAID` only when it is wired, so no switch is shown to the person before it does something.
 - **Code:**

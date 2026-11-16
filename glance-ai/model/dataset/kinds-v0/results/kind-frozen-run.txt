@@ -1,0 +1,230 @@
+| kind | rows | right | silent | wrong family | offered where silence is right |
+|---|---|---|---|---|---|
+| cal.hold | 12 | 5 | 3 | 4 | 0 |
+| cal.hold.neg | 6 | 6 | 0 | 0 | 0 |
+| cal.booking | 8 | 6 | 0 | 2 | 0 |
+| cal.booking.neg | 2 | 2 | 0 | 0 | 0 |
+| cal.recurring | 4 | 1 | 3 | 0 | 0 |
+| cal.video | 4 | 4 | 0 | 0 | 0 |
+| reply.ask | 8 | 8 | 0 | 0 | 0 |
+| reply.questions | 4 | 4 | 0 | 0 | 0 |
+| reply.neg | 12 | 12 | 0 | 0 | 0 |
+| task.deadline | 8 | 6 | 0 | 2 | 0 |
+| task.reminder | 4 | 4 | 0 | 0 | 0 |
+| task.callback | 4 | 4 | 0 | 0 | 0 |
+| task.neg | 6 | 6 | 0 | 0 | 0 |
+| commit.sender | 4 | 4 | 0 | 0 | 0 |
+| commit.reader | 4 | 2 | 2 | 0 | 0 |
+| commit.neg | 4 | 4 | 0 | 0 | 0 |
+| pay.ask | 6 | 6 | 0 | 0 | 0 |
+| pay.neg | 8 | 8 | 0 | 0 | 0 |
+| notice.system | 2 | 0 | 2 | 0 | 0 |
+| notice.neg | 4 | 4 | 0 | 0 | 0 |
+| file.save | 4 | 2 | 2 | 0 | 0 |
+| file.neg | 8 | 8 | 0 | 0 | 0 |
+| doc.create | 4 | 4 | 0 | 0 | 0 |
+| sheet.create | 4 | 4 | 0 | 0 | 0 |
+| slides.create | 1 | 1 | 0 | 0 | 0 |
+| word.create | 1 | 1 | 0 | 0 | 0 |
+| excel.create | 1 | 1 | 0 | 0 | 0 |
+| sheet.row | 2 | 0 | 2 | 0 | 0 |
+
+recall on rows with a close: 67/89 (95% 65 to 83%)
+silence on contrast rows: 50/50 (95% 93 to 100%); wrong Do It: 0
+
+cal.hold | en | gmail | calendar | draft | judge |  || Sali, I booked us a review for Wednesday at 11:30 in the big room. Please confir
+cal.hold | en | outlook | calendar | draft | judge |  || Sali, I booked us a review for Wednesday at 11:30 in the big room. Please confir
+cal.hold | en | outlook | calendar | none | judge | no-draft-close || Let us do the kickoff on Thursday the 8th at 09:00.
+cal.hold | he | gmail | calendar | draft | judge |  || קבעתי לנו סקירה ליום רביעי בשעה 11:30. תאשר שאתה מגיע.
+cal.hold | he | outlook | calendar | draft | judge |  || קבעתי לנו סקירה ליום רביעי בשעה 11:30. תאשר שאתה מגיע.
+cal.hold | he | gmail | calendar | none | judge | intent-null || נעשה את הקיק-אוף ביום חמישי ב-9:00.
+cal.hold | he | outlook | calendar | none | judge | intent-null || נעשה את הקיק-אוף ביום חמישי ב-9:00.
+cal.booking | en | gmail | calendar | task | judge |  || Booking confirmed. Table for 4, Saturday 20:00.
+cal.booking | en | outlook | calendar | task | judge |  || Booking confirmed. Table for 4, Saturday 20:00.
+cal.recurring | en | outlook | calendar | none | judge | no-draft-close || Our team stand-up is every weekday at 09:30, starting tomorrow.
+cal.recurring | he | gmail | calendar | none | judge | intent-null || הסטנד-אפ של הצוות כל יום ראשון ב-10:00.
+cal.recurring | he | outlook | calendar | none | judge | intent-null || הסטנד-אפ של הצוות כל יום ראשון ב-10:00.
+task.deadline | he | gmail | task | draft | judge |  || נא להגיש את דוח ההוצאות עד סוף יום שישי.
+task.deadline | he | outlook | task | draft | judge |  || נא להגיש את דוח ההוצאות עד סוף יום שישי.
+commit.reader | he | gmail | task | none | judge | intent-null || לפי מה שסיכמנו, אתה מעביר את ה-NDA החתום עד יום חמישי.
+commit.reader | he | outlook | task | none | judge | intent-null || לפי מה שסיכמנו, אתה מעביר את ה-NDA החתום עד יום חמישי.
+notice.system | en | gmail | task | none | judge | intent-null || Your trial ends on Nov 3. Add a payment method to keep your workspace.
+notice.system | en | outlook | task | none | judge | intent-null || Your trial ends on Nov 3. Add a payment method to keep your workspace.
+file.save | he | gmail | file_save | none | judge | intent-null || סאלי, תשמור בבקשה את ההסכם המצורף בתיקייה המשותפת.
+file.save | he | outlook | file_save | none | judge | intent-null || סאלי, תשמור בבקשה את ההסכם המצורף בתיקייה המשותפת.
+sheet.row | en | gmail | sheet_row | none | judge | quiet:google || Please add a row to the mileage sheet: Nov 2, client visit, 48 km.
+sheet.row | he | gmail | sheet_row | none | judge | intent-null || בבקשה תוסיף שורה לגיליון הקילומטראז: 2/11, ביקור לקוח, 48 ק"מ.
+
+## model columns (lab kind head; labels: the hand-written kind-frozen rows, never trained on)
+
+### head
+recall on rows with a close: 9/89 (95% 5 to 18%); silent 79, wrong family 1
+silence on contrast rows: 50/50 (95% 93 to 100%); wrong Do It: 0
+| kind | rows | right |
+|---|---|---|
+| cal.hold | 12 | 2 |
+| cal.hold.neg | 6 | 6 |
+| cal.booking | 8 | 1 |
+| cal.booking.neg | 2 | 2 |
+| cal.recurring | 4 | 0 |
+| cal.video | 4 | 0 |
+| reply.ask | 8 | 0 |
+| reply.questions | 4 | 0 |
+| reply.neg | 12 | 12 |
+| task.deadline | 8 | 0 |
+| task.reminder | 4 | 0 |
+| task.callback | 4 | 0 |
+| task.neg | 6 | 6 |
+| commit.sender | 4 | 1 |
+| commit.reader | 4 | 4 |
+| commit.neg | 4 | 4 |
+| pay.ask | 6 | 0 |
+| pay.neg | 8 | 8 |
+| notice.system | 2 | 0 |
+| notice.neg | 4 | 4 |
+| file.save | 4 | 0 |
+| file.neg | 8 | 8 |
+| doc.create | 4 | 0 |
+| sheet.create | 4 | 0 |
+| slides.create | 1 | 0 |
+| word.create | 1 | 1 |
+| excel.create | 1 | 0 |
+| sheet.row | 2 | 0 |
+
+misses:
+cal.hold | en | gmail | calendar | none | Hi Sali, are you free to catch up on Tuesday, October 13 at 16:00? It 
+cal.hold | en | outlook | calendar | none | Hi Sali, are you free to catch up on Tuesday, October 13 at 16:00? It 
+cal.hold | en | outlook | calendar | none | Sali, I booked us a review for Wednesday at 11:30 in the big room. Ple
+cal.hold | en | gmail | calendar | none | Let us do the kickoff on Thursday the 8th at 09:00.
+cal.hold | en | outlook | calendar | none | Let us do the kickoff on Thursday the 8th at 09:00.
+cal.hold | he | outlook | calendar | none | סאלי שלום, מתאים לך להיפגש ביום שלישי ב-16:00 לדבר על התמחור?
+cal.hold | he | gmail | calendar | none | קבעתי לנו סקירה ליום רביעי בשעה 11:30. תאשר שאתה מגיע.
+cal.hold | he | outlook | calendar | none | קבעתי לנו סקירה ליום רביעי בשעה 11:30. תאשר שאתה מגיע.
+cal.hold | he | gmail | calendar | none | נעשה את הקיק-אוף ביום חמישי ב-9:00.
+cal.hold | he | outlook | calendar | none | נעשה את הקיק-אוף ביום חמישי ב-9:00.
+cal.booking | en | gmail | calendar | none | Reminder: your dental check-up is on Monday at 08:45. Please arrive te
+cal.booking | en | outlook | calendar | none | Reminder: your dental check-up is on Monday at 08:45. Please arrive te
+cal.booking | en | gmail | calendar | none | Booking confirmed. Table for 4, Saturday 20:00.
+cal.booking | en | outlook | calendar | none | Booking confirmed. Table for 4, Saturday 20:00.
+cal.booking | he | outlook | calendar | none | תזכורת: הבדיקה שלך ביום שני בשעה 08:45. נא להגיע 10 דקות לפני.
+cal.booking | he | gmail | calendar | none | השולחן שלכם נשמר ליום שבת בשעה 20:00.
+cal.booking | he | outlook | calendar | none | השולחן שלכם נשמר ליום שבת בשעה 20:00.
+cal.recurring | en | gmail | calendar | none | Our team stand-up is every weekday at 09:30, starting tomorrow.
+cal.recurring | en | outlook | calendar | none | Our team stand-up is every weekday at 09:30, starting tomorrow.
+cal.recurring | he | gmail | calendar | none | הסטנד-אפ של הצוות כל יום ראשון ב-10:00.
+cal.recurring | he | outlook | calendar | none | הסטנד-אפ של הצוות כל יום ראשון ב-10:00.
+cal.video | en | gmail | video_link | none | Hi Sali, could we jump on a Meet on Friday at 14:00 to go over the pro
+cal.video | en | outlook | video_link | none | Hi Sali, could we jump on a Meet on Friday at 14:00 to go over the pro
+cal.video | he | gmail | video_link | none | סאלי, נוכל לדבר בשיחת וידאו ביום חמישי ב-13:00 על ההצעה?
+cal.video | he | outlook | video_link | none | סאלי, נוכל לדבר בשיחת וידאו ביום חמישי ב-13:00 על ההצעה?
+reply.ask | en | gmail | draft | none | Hi Sali, would you mind confirming the delivery address before Thursda
+reply.ask | en | outlook | draft | none | Hi Sali, would you mind confirming the delivery address before Thursda
+reply.ask | en | gmail | draft | none | Sali, please let me know which plan you prefer by Friday.
+reply.ask | en | outlook | draft | none | Sali, please let me know which plan you prefer by Friday.
+reply.ask | he | gmail | draft | none | שלום סאלי, תוכל לאשר לי את כתובת המשלוח עד יום חמישי? תודה, נועה
+reply.ask | he | outlook | draft | none | שלום סאלי, תוכל לאשר לי את כתובת המשלוח עד יום חמישי? תודה, נועה
+reply.ask | he | gmail | draft | none | סאלי, תגיד לי בבקשה איזו חבילה אתה מעדיף עד יום שישי.
+reply.ask | he | outlook | draft | none | סאלי, תגיד לי בבקשה איזו חבילה אתה מעדיף עד יום שישי.
+reply.questions | en | gmail | draft | none | Hi Sali,  A few questions before we sign: 1. Does the price include VA
+reply.questions | en | outlook | draft | none | Hi Sali,  A few questions before we sign: 1. Does the price include VA
+reply.questions | he | gmail | draft | none | שלום סאלי,  כמה שאלות לפני שחותמים: 1. האם המחיר כולל מע"מ? 2. מה תקופ
+reply.questions | he | outlook | draft | none | שלום סאלי,  כמה שאלות לפני שחותמים: 1. האם המחיר כולל מע"מ? 2. מה תקופ
+task.deadline | en | gmail | task | none | Sali, I need the final deck by Wednesday morning.
+task.deadline | en | outlook | task | none | Sali, I need the final deck by Wednesday morning.
+task.deadline | en | gmail | task | none | Please submit the expense report by end of day Friday.
+task.deadline | en | outlook | task | none | Please submit the expense report by end of day Friday.
+task.deadline | he | gmail | task | none | סאלי, אני צריכה את המצגת הסופית עד יום רביעי.
+task.deadline | he | outlook | task | none | סאלי, אני צריכה את המצגת הסופית עד יום רביעי.
+task.deadline | he | gmail | task | draft | נא להגיש את דוח ההוצאות עד סוף יום שישי.
+task.deadline | he | outlook | task | none | נא להגיש את דוח ההוצאות עד סוף יום שישי.
+task.reminder | en | gmail | task | none | Reminder: bring your ID to the appointment on Wednesday.
+task.reminder | en | outlook | task | none | Reminder: bring your ID to the appointment on Wednesday.
+task.reminder | he | gmail | task | none | תזכורת: להביא תעודת זהות לפגישה ביום רביעי.
+task.reminder | he | outlook | task | none | תזכורת: להביא תעודת זהות לפגישה ביום רביעי.
+task.callback | en | gmail | task | none | Sali, can you ring me back tomorrow about the contract?
+task.callback | en | outlook | task | none | Sali, can you ring me back tomorrow about the contract?
+task.callback | he | gmail | task | none | סאלי, תחזור אליי מחר בנוגע לחוזה, בסדר?
+task.callback | he | outlook | task | none | סאלי, תחזור אליי מחר בנוגע לחוזה, בסדר?
+commit.sender | en | gmail | task | none | Hi Sali, I will email you the revised quote on Wednesday. Noa
+commit.sender | en | outlook | task | none | Hi Sali, I will email you the revised quote on Wednesday. Noa
+commit.sender | he | outlook | task | none | שלום סאלי, אשלח לך את ההצעה המעודכנת ביום רביעי. נועה
+pay.ask | en | gmail | pay | none | Hi Sali, kindly wire 2,300 NIS to my account by Monday.
+pay.ask | en | outlook | pay | none | Hi Sali, kindly wire 2,300 NIS to my account by Monday.
+pay.ask | he | gmail | pay | none | שלום סאלי, אנא שלם לי 1,450 ש"ח עד יום שלישי.
+pay.ask | he | outlook | pay | none | שלום סאלי, אנא שלם לי 1,450 ש"ח עד יום שלישי.
+pay.ask | en | gmail | pay | none | Please settle the ₪780 balance by Thursday.
+pay.ask | en | outlook | pay | none | Please settle the ₪780 balance by Thursday.
+notice.system | en | gmail | task | none | Your trial ends on Nov 3. Add a payment method to keep your workspace.
+notice.system | en | outlook | task | none | Your trial ends on Nov 3. Add a payment method to keep your workspace.
+file.save | en | gmail | file_save | none | Hi Sali, please store the attached agreement in our shared Drive folde
+file.save | en | outlook | file_save | none | Hi Sali, please store the attached agreement in our shared Drive folde
+file.save | he | gmail | file_save | none | סאלי, תשמור בבקשה את ההסכם המצורף בתיקייה המשותפת.
+file.save | he | outlook | file_save | none | סאלי, תשמור בבקשה את ההסכם המצורף בתיקייה המשותפת.
+doc.create | en | gmail | doc_create | none | Sali, could you start a shared doc called Hiring plan 2027?
+doc.create | en | outlook | word_create | none | Sali, could you start a shared doc called Hiring plan 2027?
+doc.create | he | gmail | doc_create | none | סאלי, תוכל לפתוח מסמך משותף בשם תוכנית גיוס 2027?
+doc.create | he | outlook | word_create | none | סאלי, תוכל לפתוח מסמך משותף בשם תוכנית גיוס 2027?
+sheet.create | en | gmail | sheet_create | none | Please set up a spreadsheet called Vendor comparison.
+sheet.create | en | outlook | excel_create | none | Please set up a spreadsheet called Vendor comparison.
+sheet.create | he | gmail | sheet_create | none | בבקשה תפתח גיליון בשם השוואת ספקים.
+sheet.create | he | outlook | excel_create | none | בבקשה תפתח גיליון בשם השוואת ספקים.
+slides.create | en | gmail | slides_create | none | Can you create a slide deck called Investor update?
+excel.create | en | outlook | excel_create | none | Could you make an Excel workbook called Payroll check?
+sheet.row | en | gmail | sheet_row | none | Please add a row to the mileage sheet: Nov 2, client visit, 48 km.
+sheet.row | he | gmail | sheet_row | none | בבקשה תוסיף שורה לגיליון הקילומטראז: 2/11, ביקור לקוח, 48 ק"מ.
+
+### engine+head
+recall on rows with a close: 69/89 (95% 68 to 85%); silent 12, wrong family 8
+silence on contrast rows: 50/50 (95% 93 to 100%); wrong Do It: 0
+| kind | rows | right |
+|---|---|---|
+| cal.hold | 12 | 5 |
+| cal.hold.neg | 6 | 6 |
+| cal.booking | 8 | 6 |
+| cal.booking.neg | 2 | 2 |
+| cal.recurring | 4 | 1 |
+| cal.video | 4 | 4 |
+| reply.ask | 8 | 8 |
+| reply.questions | 4 | 4 |
+| reply.neg | 12 | 12 |
+| task.deadline | 8 | 6 |
+| task.reminder | 4 | 4 |
+| task.callback | 4 | 4 |
+| task.neg | 6 | 6 |
+| commit.sender | 4 | 4 |
+| commit.reader | 4 | 4 |
+| commit.neg | 4 | 4 |
+| pay.ask | 6 | 6 |
+| pay.neg | 8 | 8 |
+| notice.system | 2 | 0 |
+| notice.neg | 4 | 4 |
+| file.save | 4 | 2 |
+| file.neg | 8 | 8 |
+| doc.create | 4 | 4 |
+| sheet.create | 4 | 4 |
+| slides.create | 1 | 1 |
+| word.create | 1 | 1 |
+| excel.create | 1 | 1 |
+| sheet.row | 2 | 0 |
+
+misses:
+cal.hold | en | gmail | calendar | draft | Sali, I booked us a review for Wednesday at 11:30 in the big room. Ple
+cal.hold | en | outlook | calendar | draft | Sali, I booked us a review for Wednesday at 11:30 in the big room. Ple
+cal.hold | en | outlook | calendar | none | Let us do the kickoff on Thursday the 8th at 09:00.
+cal.hold | he | gmail | calendar | draft | קבעתי לנו סקירה ליום רביעי בשעה 11:30. תאשר שאתה מגיע.
+cal.hold | he | outlook | calendar | draft | קבעתי לנו סקירה ליום רביעי בשעה 11:30. תאשר שאתה מגיע.
+cal.hold | he | gmail | calendar | none | נעשה את הקיק-אוף ביום חמישי ב-9:00.
+cal.hold | he | outlook | calendar | none | נעשה את הקיק-אוף ביום חמישי ב-9:00.
+cal.booking | en | gmail | calendar | task | Booking confirmed. Table for 4, Saturday 20:00.
+cal.booking | en | outlook | calendar | task | Booking confirmed. Table for 4, Saturday 20:00.
+cal.recurring | en | outlook | calendar | none | Our team stand-up is every weekday at 09:30, starting tomorrow.
+cal.recurring | he | gmail | calendar | none | הסטנד-אפ של הצוות כל יום ראשון ב-10:00.
+cal.recurring | he | outlook | calendar | none | הסטנד-אפ של הצוות כל יום ראשון ב-10:00.
+task.deadline | he | gmail | task | draft | נא להגיש את דוח ההוצאות עד סוף יום שישי.
+task.deadline | he | outlook | task | draft | נא להגיש את דוח ההוצאות עד סוף יום שישי.
+notice.system | en | gmail | task | none | Your trial ends on Nov 3. Add a payment method to keep your workspace.
+notice.system | en | outlook | task | none | Your trial ends on Nov 3. Add a payment method to keep your workspace.
+file.save | he | gmail | file_save | none | סאלי, תשמור בבקשה את ההסכם המצורף בתיקייה המשותפת.
+file.save | he | outlook | file_save | none | סאלי, תשמור בבקשה את ההסכם המצורף בתיקייה המשותפת.
+sheet.row | en | gmail | sheet_row | none | Please add a row to the mileage sheet: Nov 2, client visit, 48 km.
+sheet.row | he | gmail | sheet_row | none | בבקשה תוסיף שורה לגיליון הקילומטראז: 2/11, ביקור לקוח, 48 ק"מ.

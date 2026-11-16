@@ -1,11 +1,13 @@
-// The closes that ship behind an off switch, in one list, so a person can see them and turn them on. Portable: no chrome.*,
+// The closes that ship behind a switch, in one list, so a person can see them and turn them on or off. Portable: no chrome.*,
 // no DOM. The popup reads this list and keeps one storage object, glanceSwitches ({ NAME: true }); a missing key is off
-// (src/background.js glanceSwitchOn). Nothing here turns a switch on: the person does, one row at a time. None of these has
+// (src/background.js glanceSwitchOn). Nothing in THIS file turns a switch on: the person does, one row at a time, except the first wave the owner turned on on 2026-11-16 (core/labs-seed.js: TASK_ASK, PAYMENT_ASK, BOOKING_NOTICE, SYSTEM_NOTICE, in a non-store install only). None of these has
 // passed a live Gate, and every row says so. The words are Hebrew because the popup is.
 const FlowLabsSwitches = (() => {
   const LIST = [
     { id: 'TASK_ASK', who: 'תזכורת, מועד אחרון או בקשה לחזור', note: 'בקשה שנכתבה בלי שאלה הופכת למשימה ביום שלה' },
     { id: 'PAYMENT_ASK', who: 'בקשת תשלום', note: '"תעביר 500 שקל עד יום ראשון" הופך למשימה עם הסכום והיום' },
+    { id: 'DECOMPOSE', who: 'מייל עם כמה בקשות', note: 'מייל שמבקש כמה דברים (למשל תשובה ופגישה) הופך לכרטיס אחד עם הצעדים של כל בקשה — לא נבדק בבדיקה חיה' },
+    { id: 'CALENDAR_CHANGE', who: 'העברה או ביטול של פגישה', note: 'מייל שמעביר או מבטל פגישה אחת בשם ובשעה הופך לכרטיס שמעדכן או מוריד את האירוע ביומן — לא נבדק בבדיקה חיה' },
     { id: 'BOOKING_NOTICE', who: 'תור, הזמנה, איסוף או נסיעה', note: 'אישור תור, הזמנה לאירוע או טיסה הופכים לאירוע ביומן' },
     { id: 'SYSTEM_NOTICE', who: 'התראת מערכת עם מועד', note: '"הפרויקט ייעצר", "הדומיין יפוג" הופכים למשימה' },
     { id: 'CHAT_TASK_CARD', who: 'צ\'אט: כרטיס עשה', note: 'וואטסאפ, מסנג\'ר ואינסטגרם: בקשה בצ\'אט מקבלת כרטיס' },
