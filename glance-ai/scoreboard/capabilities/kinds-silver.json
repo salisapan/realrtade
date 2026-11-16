@@ -1,0 +1,238 @@
+{
+ "rows": 21478,
+ "route": {
+  "draft": 2312,
+  "none": 15646,
+  "task": 2224,
+  "pay": 330,
+  "calendar": 677,
+  "file_save": 288,
+  "sheet_row": 1
+ },
+ "byScn": {
+  "request_reply": {
+   "n": 4372,
+   "fam": {
+    "draft": 1393,
+    "none": 2257,
+    "task": 586,
+    "calendar": 133,
+    "pay": 3
+   }
+  },
+  "payment": {
+   "n": 1203,
+   "fam": {
+    "draft": 173,
+    "pay": 315,
+    "none": 569,
+    "task": 146
+   }
+  },
+  "commitment_reader": {
+   "n": 879,
+   "fam": {
+    "none": 494,
+    "draft": 262,
+    "task": 123
+   }
+  },
+  "own_commitment_self": {
+   "n": 428,
+   "fam": {
+    "task": 428
+   }
+  },
+  "task_ask": {
+   "n": 387,
+   "fam": {
+    "draft": 90,
+    "none": 187,
+    "task": 110
+   }
+  },
+  "meeting": {
+   "n": 1055,
+   "fam": {
+    "calendar": 480,
+    "none": 536,
+    "task": 31,
+    "draft": 8
+   }
+  },
+  "calendar_hold": {
+   "n": 597,
+   "fam": {
+    "task": 68,
+    "none": 506,
+    "calendar": 23
+   }
+  },
+  "drive_save": {
+   "n": 810,
+   "fam": {
+    "none": 570,
+    "file_save": 181,
+    "task": 42,
+    "draft": 17
+   }
+  },
+  "onedrive_save": {
+   "n": 602,
+   "fam": {
+    "file_save": 104,
+    "none": 461,
+    "task": 29,
+    "draft": 8
+   }
+  },
+  "shared_save": {
+   "n": 44,
+   "fam": {
+    "none": 43,
+    "task": 1
+   }
+  },
+  "reply_with_file": {
+   "n": 215,
+   "fam": {
+    "none": 141,
+    "draft": 64,
+    "task": 10
+   }
+  },
+  "file_place": {
+   "n": 228,
+   "fam": {
+    "none": 192,
+    "task": 14,
+    "draft": 20,
+    "calendar": 2
+   }
+  },
+  "create_doc": {
+   "n": 132,
+   "fam": {
+    "none": 123,
+    "task": 9
+   }
+  },
+  "decision": {
+   "n": 1019,
+   "fam": {
+    "none": 601,
+    "task": 418
+   }
+  },
+  "hedge": {
+   "n": 948,
+   "fam": {
+    "none": 948
+   }
+  },
+  "negation": {
+   "n": 1121,
+   "fam": {
+    "none": 1120,
+    "file_save": 1
+   }
+  },
+  "fyi": {
+   "n": 965,
+   "fam": {
+    "none": 964,
+    "task": 1
+   }
+  },
+  "past": {
+   "n": 656,
+   "fam": {
+    "none": 654,
+    "calendar": 1,
+    "task": 1
+   }
+  },
+  "cancelled": {
+   "n": 347,
+   "fam": {
+    "none": 344,
+    "calendar": 3
+   }
+  },
+  "marketing": {
+   "n": 727,
+   "fam": {
+    "none": 727
+   }
+  },
+  "ooo": {
+   "n": 385,
+   "fam": {
+    "none": 385
+   }
+  },
+  "third_party": {
+   "n": 258,
+   "fam": {
+    "none": 240,
+    "pay": 11,
+    "task": 7
+   }
+  },
+  "quoted_forward": {
+   "n": 43,
+   "fam": {
+    "none": 43
+   }
+  },
+  "injection": {
+   "n": 304,
+   "fam": {
+    "none": 302,
+    "task": 2
+   }
+  },
+  "ack": {
+   "n": 698,
+   "fam": {
+    "none": 689,
+    "task": 9
+   }
+  },
+  "conditional": {
+   "n": 386,
+   "fam": {
+    "none": 385,
+    "task": 1
+   }
+  },
+  "approx_amount": {
+   "n": 435,
+   "fam": {
+    "none": 416,
+    "task": 19
+   }
+  },
+  "repo": {
+   "n": 1152,
+   "fam": {
+    "draft": 134,
+    "none": 965,
+    "task": 50,
+    "calendar": 3
+   }
+  },
+  "repo-test": {
+   "n": 1082,
+   "fam": {
+    "none": 784,
+    "task": 119,
+    "calendar": 32,
+    "draft": 143,
+    "sheet_row": 1,
+    "file_save": 2,
+    "pay": 1
+   }
+  }
+ }
+}

@@ -138,6 +138,55 @@ const FlowGoogleConfig = (() => {
     return false;
   }
 
+  // What a 401/403 from a Google API actually says. A 403 is not always a
+  // missing scope: an API that is not enabled in the Cloud project answers
+  // 403 SERVICE_DISABLED / accessNotConfigured, and Reconnect cannot fix that.
+  // kind: auth (401) | scope (the token lacks a scope) | api-disabled |
+  // forbidden (another named 403: quota, rate, file permission) | unknown (a
+  // 403 with no readable reason: treated like a missing scope, as before).
+  // googleReason is Google's short reason code, never the message text.
+  function googleDenial(status, json, url) {
+    const code = Number(status) || 0;
+    if (code !== 401 && code !== 403) return null;
+    if (code === 401) return { kind: 'auth', googleReason: 'UNAUTHENTICATED', service: serviceOf(url, json) };
+    const err = json && typeof json === 'object' ? (json.error && typeof json.error === 'object' ? json.error : null) : null;
+    const reasons = [];
+    if (err && Array.isArray(err.errors)) err.errors.forEach((e) => { if (e && e.reason) reasons.push(String(e.reason)); });
+    if (err && Array.isArray(err.details)) err.details.forEach((d) => { if (d && d.reason) reasons.push(String(d.reason)); });
+    const message = err && typeof err.message === 'string' ? err.message : '';
+    const service = serviceOf(url, json);
+    const has = (r) => reasons.indexOf(r) >= 0;
+    if (has('ACCESS_TOKEN_SCOPE_INSUFFICIENT') || has('insufficientPermissions') || /insufficient authentication scopes/i.test(message)) {
+      return { kind: 'scope', googleReason: has('ACCESS_TOKEN_SCOPE_INSUFFICIENT') ? 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' : 'insufficientPermissions', service: service };
+    }
+    if (has('SERVICE_DISABLED') || has('accessNotConfigured') || /has not been used in project|API has not been used|it is disabled/i.test(message)) {
+      return { kind: 'api-disabled', googleReason: has('SERVICE_DISABLED') ? 'SERVICE_DISABLED' : 'accessNotConfigured', service: service };
+    }
+    if (reasons.length) return { kind: 'forbidden', googleReason: String(reasons[0]).slice(0, 60), service: service };
+    if (err && typeof err.status === 'string' && err.status && err.status !== 'PERMISSION_DENIED') {
+      return { kind: 'forbidden', googleReason: err.status.slice(0, 60), service: service };
+    }
+    return { kind: 'unknown', googleReason: '', service: service };
+  }
+
+  function serviceOf(url, json) {
+    const err = json && json.error;
+    if (err && Array.isArray(err.details)) {
+      for (let i = 0; i < err.details.length; i++) {
+        const meta = err.details[i] && err.details[i].metadata;
+        if (meta && typeof meta.service === 'string' && meta.service) return meta.service;
+      }
+    }
+    let u;
+    try { u = new URL(String(url || '')); } catch (e) { return ''; }
+    if (u.hostname === 'www.googleapis.com') {
+      if (/^\/(drive|upload\/drive)\//.test(u.pathname)) return 'drive.googleapis.com';
+      if (/^\/calendar\//.test(u.pathname)) return 'calendar-json.googleapis.com';
+      return u.hostname;
+    }
+    return u.hostname;
+  }
+
   function clockIso(clock) {
     if (typeof clock === 'function') return clock();
     if (typeof clock === 'string' && !Number.isNaN(Date.parse(clock))) return clock;
@@ -169,6 +218,7 @@ const FlowGoogleConfig = (() => {
     gate: gate,
     proofOf: proofOf,
     isCriticalUrl: isCriticalUrl,
+    googleDenial: googleDenial,
     clockIso: clockIso
   };
 })();

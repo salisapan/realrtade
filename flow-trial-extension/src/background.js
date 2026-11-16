@@ -45,7 +45,7 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
-import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
+import { GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectionState, googleConnectErrorMessage, googleEverConnectedPatch, googleImplicitAuthUrl, googleMissingScopes, googleOAuthScopesFrom, googleRedirectUriForExtension, googleScopeAction, parseGoogleImplicitRedirect, scopeVersion, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
@@ -67,6 +67,7 @@ import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
 // Loaded after proof-of-close.js on purpose: the module reads FlowProofOfClose when it loads.
 import '../core/planner-task.js'; // classic: sets globalThis.FlowPlannerTask (switch PLANNER_TASK, off)
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
+import '../core/labs-seed.js'; // classic: sets globalThis.FlowLabsSeed (the first wave of Labs closes, on in a non-store install)
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/outlook-word.js'; // classic: sets globalThis.FlowOutlookWord (an empty .docx for a new file)
@@ -1519,9 +1520,14 @@ function invalidateGoogleWebAuthFlight() {
 // not open a window. The side panel and the popup have no tab. The popup
 // opened as a normal tab does have one, and it is still our page, so Connect
 // may open a window. A web page, or a sender from another extension, may not.
-function googleConnectWantsInteractive(sender) {
-  if (!sender || !sender.tab) return true;
+// forceInteractive is only for an explicit Connect Google click on a Gmail
+// card (msg.interactive === true). Silent auto-connect never sets it.
+function googleConnectWantsInteractive(sender, forceInteractive) {
   const runtimeId = chrome.runtime && chrome.runtime.id;
+  if (forceInteractive === true) {
+    return Boolean(runtimeId && sender && sender.id === runtimeId);
+  }
+  if (!sender || !sender.tab) return true;
   const url = typeof sender.url === 'string' ? sender.url : '';
   if (!runtimeId || sender.id !== runtimeId) return false;
   return url.indexOf('chrome-extension://' + runtimeId + '/') === 0;
@@ -1651,6 +1657,7 @@ async function commitGoogleWebAuth(record, epoch) {
   });
 }
 
+let lastGoogleGrantCheck = null;
 async function runGoogleWebAuth(interactive) {
   if (!GOOGLE_WEB_CLIENT_ID) {
     throw new Error('Glance’s backup Google sign-in isn’t configured on this build yet.');
@@ -1661,17 +1668,52 @@ async function runGoogleWebAuth(interactive) {
   const state = randomOAuthState();
   const hint = await googleLoginHint();
   const scopes = await googleManifestScopes();
+  // After Disconnect the window must show Google's consent screen, so a
+  // Cancel there cannot hand back the old grant.
+  const scopeConsent = interactive ? await googleScopeConsentNeeded() : false;
+  const forceConsent = interactive ? (scopeConsent || await googleConsentRequired()) : false;
+  const prompt = interactive ? (forceConsent ? 'consent select_account' : 'select_account') : 'none';
   const url = googleImplicitAuthUrl({
     clientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri,
     scopes,
     state,
-    prompt: interactive ? 'select_account' : 'none',
+    prompt: prompt,
     loginHint: hint
   });
-  const resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
+  let resultUrl;
+  try {
+    resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
+  } catch (flowErr) {
+    if (interactive) await glanceAuthLog({ call: 'launchWebAuthFlow', result: 'error', interactive: true, prompt: prompt, message: flowErr && flowErr.message });
+    throw flowErr;
+  }
   if (epoch !== googleWebAuthEpoch) throw new Error('Google sign-in was closed or denied.');
   const parsed = parseGoogleImplicitRedirect(resultUrl, state);
+  // A consent with boxes left unticked is not kept: the token cannot write,
+  // and keeping it made the next Connect reuse it without a window. A
+  // redirect with no scope says nothing, so tokeninfo is asked instead.
+  let check = grantedCheck(parsed.scope, scopes);
+  if (!check.known && interactive) check = grantedCheck(await googleTokenInfoScopes(parsed.accessToken), scopes);
+  lastGoogleGrantCheck = check;
+  if (interactive) {
+    await glanceAuthLog({
+      call: 'launchWebAuthFlow',
+      result: check.missing.length ? 'partial' : 'ok',
+      interactive: true,
+      prompt: prompt,
+      message: check.known
+        ? (check.missing.length ? 'missing: ' + check.missing.map(shortScopeName).join(' ') : 'granted: ' + check.granted.map(shortScopeName).join(' '))
+        : 'granted scopes unknown'
+    });
+  }
+  if (check.missing.length) {
+    const partial = new Error('Google did not grant every permission Glance needs. Connect Google again and tick every box.');
+    partial.code = 'partial-grant';
+    partial.missing = check.missing.slice();
+    partial.check = check;
+    throw partial;
+  }
   const record = { accessToken: parsed.accessToken, source: 'web', obtainedAt: Date.now() };
   if (parsed.expiresIn) record.expiresAt = Date.now() + parsed.expiresIn * 1000;
   const keptHint = parsed.email || hint;
@@ -1790,16 +1832,67 @@ async function readGoogleGrantedScopes() {
   return bag[GOOGLE_GRANTED_SCOPES_KEY] || null;
 }
 
-async function writeGoogleGrantedScopes(status, source) {
+// version is the manifest list that was asked for (googleScopeAction
+// compares it). granted / missing are what Google actually returned, when
+// the redirect or tokeninfo said so: the Doc lane reads granted.
+async function writeGoogleGrantedScopes(status, source, check) {
   const scopes = await googleManifestScopes();
-  await chrome.storage.local.set({
-    [GOOGLE_GRANTED_SCOPES_KEY]: {
-      version: scopeVersion(scopes),
-      status: status,
-      source: source || null,
-      at: Date.now()
+  const rec = {
+    version: scopeVersion(scopes),
+    status: status,
+    source: source || null,
+    at: Date.now()
+  };
+  if (check && Array.isArray(check.granted)) rec.granted = check.granted.slice();
+  if (check && Array.isArray(check.missing)) rec.missing = check.missing.slice();
+  await chrome.storage.local.set({ [GOOGLE_GRANTED_SCOPES_KEY]: rec });
+}
+
+function shortScopeName(scope) {
+  return String(scope || '').replace('https://www.googleapis.com/auth/', '');
+}
+
+// What the token actually carries, from Google's tokeninfo. null when
+// tokeninfo did not answer: unknown is not a refusal. The token is sent only
+// to Google and is never logged.
+async function googleTokenInfoScopes(token) {
+  if (!token) return null;
+  try {
+    const res = await fetch(glanceE2eRewrite('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(token)));
+    if (!res || !res.ok) return null;
+    const data = await res.json();
+    const raw = data && typeof data.scope === 'string' ? data.scope : '';
+    return raw ? raw : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// required minus what Google says is missing. Unknown (no scope string)
+// leaves granted null and missing empty.
+function grantedCheck(scopeString, required) {
+  if (typeof scopeString !== 'string' || !scopeString.trim()) return { known: false, granted: null, missing: [] };
+  const missing = googleMissingScopes(scopeString, required);
+  return { known: true, granted: required.filter((s) => missing.indexOf(s) < 0), missing: missing };
+}
+
+// The interactive ask must show Google's consent screen when a scope the
+// lanes need is missing: the Reconnect flag says a write was refused for a
+// missing scope, or the last grant is known to lack one. include_granted_scopes
+// keeps what was already granted; prompt=consent makes Google ask for the rest.
+async function googleScopeConsentNeeded() {
+  try {
+    const bag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY]);
+    const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+    if (flag && flag.needed && flag.reason === 'missing scope') return true;
+    const rec = bag && bag[GOOGLE_GRANTED_SCOPES_KEY];
+    if (rec && Array.isArray(rec.missing) && rec.missing.length) return true;
+    if (rec && Array.isArray(rec.granted)) {
+      const required = await googleManifestScopes();
+      if (required.some((s) => rec.granted.indexOf(s) < 0)) return true;
     }
-  });
+  } catch (e) { /* no storage: the normal chooser */ }
+  return false;
 }
 
 // One shared ask. Drops the cached Chrome token and the stored web token,
@@ -1810,10 +1903,37 @@ async function upgradeGoogleScopesOnce() {
   if (!googleScopeUpgradeFlight) {
     let flight;
     flight = (async () => {
+      const scopeAsk = await googleScopeConsentNeeded();
       await clearCachedChromeGoogleTokens();
       await clearGoogleWebAuth();
       try {
         const token = await getGoogleAuthToken(true);
+        // A write was refused for a missing scope: check what this token
+        // really carries before calling it a connection.
+        if (scopeAsk) {
+          const required = await googleManifestScopes();
+          const check = grantedCheck(await googleTokenInfoScopes(token), required);
+          await glanceAuthLog({
+            call: 'getAuthToken',
+            result: check.missing.length ? 'partial' : 'ok',
+            interactive: true,
+            message: check.known ? (check.missing.length ? 'missing: ' + check.missing.map(shortScopeName).join(' ') : 'granted: ' + check.granted.map(shortScopeName).join(' ')) : 'granted scopes unknown'
+          });
+          if (check.missing.length) {
+            await writeGoogleGrantedScopes('asked', 'chrome', check);
+            const partial = new Error('Google did not grant every permission Glance needs. Connect Google again and tick every box.');
+            partial.code = 'partial-grant';
+            partial.missing = check.missing.slice();
+            throw partial;
+          }
+          if (check.known) {
+            await writeGoogleGrantedScopes('granted', 'chrome', check);
+            await recordGoogleConsent(token, 'chrome');
+            const keptChecked = await rememberUpgradedGoogleToken(token, 'chrome');
+            if (!keptChecked) throw new Error('Google sign-in was closed or denied.');
+            return { token: token, source: 'chrome' };
+          }
+        }
         await writeGoogleGrantedScopes('granted', 'chrome');
         // The chooser token lives in Chrome's cache, which this function
         // just cleared. A later silent getAuthToken does not see it, and
@@ -1825,18 +1945,21 @@ async function upgradeGoogleScopesOnce() {
         return { token: token, source: 'chrome' };
       } catch (err) {
         const message = err && err.message;
+        if (err && err.code === 'partial-grant') throw err;
         if (!shouldFallbackFromGetAuthToken(message, { interactive: true })) {
           await writeGoogleGrantedScopes('asked', 'chrome');
           throw err;
         }
         try {
+          lastGoogleGrantCheck = null;
           const saved = await runGoogleWebAuth(true);
           await recordGoogleConsent(saved.accessToken, 'web');
-          await writeGoogleGrantedScopes('granted', 'web');
+          const known = lastGoogleGrantCheck && lastGoogleGrantCheck.known ? lastGoogleGrantCheck : null;
+          await writeGoogleGrantedScopes('granted', 'web', known);
           await clearGoogleReconnect();
           return { token: saved.accessToken, source: 'web' };
         } catch (webErr) {
-          await writeGoogleGrantedScopes('asked', 'web');
+          await writeGoogleGrantedScopes('asked', 'web', webErr && webErr.check ? webErr.check : null);
           throw webErr;
         }
       }
@@ -1865,6 +1988,19 @@ async function recordGoogleConsent(token, source) {
   try { await lane.record(token, source); } catch (e) { /* the first verified write records the account */ }
 }
 
+// A write was refused (401, revoked, missing scope, wrong account). The token
+// still in storage is the one Google refused, so an explicit Connect must ask
+// Google again instead of handing that token back without a window.
+async function googleReconnectFlagged() {
+  try {
+    const bag = await chrome.storage.local.get(GOOGLE_RECONNECT_STORAGE_KEY);
+    const flag = bag && bag[GOOGLE_RECONNECT_STORAGE_KEY];
+    return Boolean(flag && flag.needed);
+  } catch (e) {
+    return false;
+  }
+}
+
 async function getGoogleAccessToken(interactive) {
   const wantUi = Boolean(interactive);
   const granted = await readGoogleGrantedScopes();
@@ -1872,6 +2008,7 @@ async function getGoogleAccessToken(interactive) {
   if (googleScopeAction(granted, requiredScopes, wantUi ? 'interactive' : 'silent') === 'upgrade') {
     return upgradeGoogleScopesOnce();
   }
+  if (wantUi && await googleReconnectFlagged()) return upgradeGoogleScopesOnce();
   try {
     const token = await getGoogleAuthToken(wantUi);
     if (wantUi) await recordGoogleConsent(token, 'chrome');
@@ -1888,6 +2025,7 @@ async function getGoogleAccessToken(interactive) {
       if (wantUi) await recordGoogleConsent(web.token, 'web');
       return web;
     } catch (fallbackErr) {
+      if (wantUi && fallbackErr && fallbackErr.code === 'partial-grant') throw fallbackErr;
       if (wantUi) throw new Error(googleConnectErrorMessage(message, fallbackErr && fallbackErr.message));
       throw fallbackErr;
     }
@@ -1912,6 +2050,93 @@ async function clearCachedChromeGoogleTokens() {
   }
 }
 
+// Google's documented revoke: POST, form body token=<token>. Revoking one
+// token ends the grant for that client, so the app leaves
+// myaccount.google.com/connections. The response allows the extension
+// origin, so no extra host permission is needed.
+const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
+const GOOGLE_REVOKE_TIMEOUT_MS = 8000;
+const GOOGLE_CONSENT_REQUIRED_KEY = 'googleConsentRequired';
+const GOOGLE_REVOKE_PENDING_KEY = 'googleRevokePending';
+
+async function revokeGoogleToken(token) {
+  const t = String(token || '').trim();
+  if (!t) return { ok: false, reason: 'no-token' };
+  let timer = null;
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeout = typeof setTimeout !== 'function' ? new Promise(() => {}) : new Promise((resolve) => {
+    timer = setTimeout(() => {
+      if (ctrl) { try { ctrl.abort(); } catch (e) { /* already settled */ } }
+      resolve({ ok: false, reason: 'timeout' });
+    }, GOOGLE_REVOKE_TIMEOUT_MS);
+  });
+  const request = (async () => {
+    try {
+      const init = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'token=' + encodeURIComponent(t)
+      };
+      if (ctrl) init.signal = ctrl.signal;
+      const r = await fetch(GOOGLE_REVOKE_URL, init);
+      if (r && r.ok) return { ok: true, status: r.status };
+      let code = '';
+      try { const body = await r.json(); code = (body && (body.error || '')) || ''; } catch (e) { /* no JSON body */ }
+      return { ok: false, status: r ? r.status : 0, reason: 'http-' + (r ? r.status : 0) + (code ? ':' + String(code) : '') };
+    } catch (e) {
+      return { ok: false, reason: 'network' };
+    }
+  })();
+  try {
+    return await Promise.race([request, timeout]);
+  } finally {
+    if (timer && typeof clearTimeout === 'function') clearTimeout(timer);
+  }
+}
+
+// Every token Glance still holds for this grant, revoked at Google before
+// the local clear. Never opens a window: the Chrome token is the silent
+// getAuthToken cache, and when no usable web token is left the only extra
+// try is a prompt=none web grant (interactive:false), revoked straight away.
+async function revokeGoogleGrantBestEffort() {
+  const tokens = [];
+  const add = (t) => { const v = String(t || '').trim(); if (v && tokens.indexOf(v) === -1) tokens.push(v); };
+  let chromeToken = '';
+  try { chromeToken = await getGoogleAuthToken(false); } catch (e) { chromeToken = ''; }
+  add(chromeToken);
+  let web = null;
+  try { web = await readGoogleWebAuth(); } catch (e) { web = null; }
+  if (web && web.accessToken) add(web.accessToken);
+  let revoked = false;
+  let reason = tokens.length ? '' : 'no-token';
+  for (const t of tokens) {
+    const r = await revokeGoogleToken(t);
+    if (r.ok) revoked = true;
+    else if (!reason) reason = r.reason || 'failed';
+  }
+  if (!revoked && !chromeToken && !webTokenUsable(web) && GOOGLE_WEB_CLIENT_ID) {
+    try {
+      const minted = await runGoogleWebAuth(false);
+      const r = await revokeGoogleToken(minted && minted.accessToken);
+      if (r.ok) revoked = true;
+      else reason = r.reason || reason || 'failed';
+    } catch (e) {
+      if (!reason) reason = 'no-token';
+    }
+  }
+  return { revoked: revoked, reason: revoked ? '' : (reason || 'failed') };
+}
+
+async function googleConsentRequired() {
+  try {
+    const bag = await chrome.storage.local.get(GOOGLE_CONSENT_REQUIRED_KEY);
+    const rec = bag && bag[GOOGLE_CONSENT_REQUIRED_KEY];
+    return Boolean(rec && rec.needed);
+  } catch (e) {
+    return false;
+  }
+}
+
 async function disconnectConnector(connectorId) {
   if (connectorId === 'microsoft' || connectorId === 'meta') {
     return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector, disableSurface: disableSurface });
@@ -1929,23 +2154,39 @@ async function disconnectConnector(connectorId) {
     // Invalidate before the clear. A consent window that resolves after
     // this point sees a new epoch and must not write googleWebAuth back.
     invalidateGoogleWebAuthFlight();
+    // Revoke at Google while the tokens are still here. Clearing first left
+    // the grant live on myaccount.google.com/connections, and the next
+    // Connect came straight back without a consent screen.
+    const revoke = await revokeGoogleGrantBestEffort();
     await clearCachedChromeGoogleTokens();
-    await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([
-      key,
-      GOOGLE_WEB_AUTH_STORAGE_KEY,
-      GOOGLE_RECONNECT_STORAGE_KEY,
-      GOOGLE_EVER_CONNECTED_STORAGE_KEY,
-      GOOGLE_GRANTED_SCOPES_KEY,
-      'googleProfile',
-      'googleConnectedAccount',
-      'glanceOwnNames'
-    ]));
+    await enqueueGoogleWebAuthWrite(async () => {
+      await chrome.storage.local.remove([
+        key,
+        GOOGLE_WEB_AUTH_STORAGE_KEY,
+        GOOGLE_RECONNECT_STORAGE_KEY,
+        GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+        GOOGLE_GRANTED_SCOPES_KEY,
+        GOOGLE_REVOKE_PENDING_KEY,
+        'googleProfile',
+        'googleConnectedAccount',
+        'glanceOwnNames',
+        'googleLaneWarning'
+      ]);
+      // The next explicit Connect asks Google for consent again, and no
+      // silent caller reconnects in the meantime.
+      const patch = { [GOOGLE_CONSENT_REQUIRED_KEY]: { needed: true, at: Date.now() } };
+      if (!revoke.revoked) patch[GOOGLE_REVOKE_PENDING_KEY] = { needed: true, reason: revoke.reason, at: Date.now() };
+      await chrome.storage.local.set(patch);
+    });
+    if (!revoke.revoked) {
+      try { console.warn('[Glance] Google Disconnect: local grant cleared, Google revoke not confirmed:', revoke.reason); } catch (e) { /* no console */ }
+    }
     googleNamesFilled = false;
     const hook = globalThis.FlowProfileHook;
     if (hook && typeof hook.onDisconnect === 'function') {
       try { hook.onDisconnect('google'); } catch (e) { /* profile store not wired */ }
     }
-    return { ok: true };
+    return { ok: true, revoked: revoke.revoked, revokeReason: revoke.reason };
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
@@ -2267,22 +2508,105 @@ async function refreshGoogleSession() {
   return { ok: false, source: null, token: '' };
 }
 
-// Google ends a grant with invalid_grant, or says it was revoked. Nothing
-// else a refresh can say (no window, no session, offline) ends it.
+// Google ends a grant with invalid_grant / invalid_token, or says it was
+// revoked. Nothing else a refresh can say (no window, no session, offline)
+// ends it.
 function googleRefreshRevoked(err) {
-  return /invalid_grant|revoked/i.test(String((err && err.message) || err || ''));
+  return /invalid_grant|invalid_token|revoked/i.test(String((err && err.message) || err || ''));
+}
+
+// Remote revoke (myaccount.google.com/connections) leaves googleTasksAuth and
+// a cached Chrome token in place, so the popup still says Connected until
+// someone clicks Disconnect. Clear the same keys Disconnect clears, then the
+// panel and the card show Connect Google again. No new scopes.
+async function clearGoogleAuthForRevocation(reason) {
+  invalidateGoogleWebAuthFlight();
+  try { await clearCachedChromeGoogleTokens(); } catch (e) { /* already empty */ }
+  await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([
+    'googleTasksAuth',
+    GOOGLE_WEB_AUTH_STORAGE_KEY,
+    GOOGLE_RECONNECT_STORAGE_KEY,
+    GOOGLE_EVER_CONNECTED_STORAGE_KEY,
+    GOOGLE_GRANTED_SCOPES_KEY,
+    'googleProfile',
+    'googleConnectedAccount',
+    'glanceOwnNames',
+    'googleLaneWarning'
+  ]));
+  googleNamesFilled = false;
+  try {
+    const hook = globalThis.FlowProfileHook;
+    if (hook && typeof hook.onDisconnect === 'function') hook.onDisconnect('google');
+  } catch (e) { /* profile store not wired */ }
+  return { cleared: true, reason: String(reason || 'revoked') };
+}
+
+function googleTokenInfoSaysRevoked(data, status) {
+  if (status === 401) return true;
+  if (!data || typeof data !== 'object') return false;
+  const err = String(data.error || data.error_description || '');
+  return /invalid_token|invalid_grant|revoked/i.test(err);
+}
+
+// Cheap check for the popup: one tokeninfo call on the token we already hold.
+// No new scopes. A dead grant clears storage so Connect Google shows; a
+// network blip leaves the stored grant alone.
+async function probeGoogleAuthStillValid() {
+  let bag = {};
+  try {
+    bag = await chrome.storage.local.get([
+      'googleTasksAuth',
+      GOOGLE_WEB_AUTH_STORAGE_KEY,
+      GOOGLE_EVER_CONNECTED_STORAGE_KEY
+    ]);
+  } catch (e) { return { ok: true, probed: false }; }
+  if (!googleHadAccount(bag)) return { ok: true, probed: false };
+  let token = '';
+  try {
+    const cred = await getGoogleAccessToken(false);
+    token = (cred && cred.token) || '';
+  } catch (e) {
+    if (googleRefreshRevoked(e)) {
+      await clearGoogleAuthForRevocation('revoked');
+      return { ok: false, probed: true, cleared: true, reason: 'revoked' };
+    }
+    // getAuthToken can fail for offline / sign-in off without a revoke.
+    return { ok: true, probed: true, softFail: true };
+  }
+  if (!token) {
+    await clearGoogleAuthForRevocation('not signed in');
+    return { ok: false, probed: true, cleared: true, reason: 'not signed in' };
+  }
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(token));
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (googleTokenInfoSaysRevoked(data, res.status) || (res.status === 400 && googleTokenInfoSaysRevoked(data, 401))) {
+      const why = (data && (data.error || data.error_description)) || 'invalid_token';
+      await clearGoogleAuthForRevocation(why);
+      try { if (token) await removeCachedGoogleAuthToken(token); } catch (e) { /* already gone */ }
+      return { ok: false, probed: true, cleared: true, reason: String(why) };
+    }
+    if (!res.ok) return { ok: true, probed: true, softFail: true, status: res.status };
+    return { ok: true, probed: true };
+  } catch (e) {
+    if (googleRefreshRevoked(e)) {
+      await clearGoogleAuthForRevocation('revoked');
+      return { ok: false, probed: true, cleared: true, reason: 'revoked' };
+    }
+    return { ok: true, probed: true, softFail: true };
+  }
 }
 
 // One silent refresh after a 401, then the caller retries once. Web tokens
 // use prompt=none. Chrome tokens use getAuthToken({ interactive: false }).
-// Neither opens a consent window. The stored token is kept when the refresh
-// fails: a 401 can be a single bad answer. Consent is dropped only when the
-// refresh itself says the grant is gone. A null result means: retry once
-// with the token already in hand.
+// Neither opens a consent window. A single 401 before refresh is not enough
+// to drop consent; invalid_grant / invalid_token / revoked on the refresh
+// (or a 401 that survives the retry) clears the stored Google auth so the
+// popup shows Connect Google.
 async function refreshLaneCredential(cred) {
   const revoked = async () => {
-    if (cred && cred.source === 'web') await clearGoogleWebAuth();
-    await markGoogleReconnect('revoked');
+    await clearGoogleAuthForRevocation('revoked');
     return { revoked: true, token: '', source: cred && cred.source };
   };
   if (cred && cred.source === 'web') {
@@ -2315,16 +2639,46 @@ globalThis.FlowGoogleAccess = {
   },
   retry(cred) {
     return refreshLaneCredential(cred);
+  },
+  clearRevoked(reason) {
+    return clearGoogleAuthForRevocation(reason);
+  },
+  probeValid() {
+    return probeGoogleAuthStillValid();
   }
 };
 
-async function rememberGoogleAuthResult(res) {
+async function rememberGoogleAuthResult(res, url) {
   if (!res) return res;
-  if (res.status === 401) await markGoogleReconnect('401');
-  else if (res.status === 403) await markGoogleReconnect('missing scope');
-  // A later 2xx leaves googleReconnect set. clearGoogleReconnect runs only
-  // after Connect stores a new token.
+  if (res.status === 401) {
+    // Survived the silent refresh+retry: the grant is gone. Clear so the
+    // popup does not keep saying Connected until Disconnect is clicked.
+    await clearGoogleAuthForRevocation('401');
+  } else if (res.status === 403) {
+    // Only a 403 that says the token lacks a scope (or says nothing) asks
+    // Reconnect. An API that is off in the Cloud project, a quota or a file
+    // permission is not fixed by Reconnect, so it does not loop on it.
+    const denial = await googleDenialOf(res, url);
+    if (!denial || denial.kind === 'scope' || denial.kind === 'unknown') await markGoogleReconnect('missing scope');
+  }
   return res;
+}
+
+async function googleDenialOf(res, url) {
+  const C = globalThis.FlowGoogleConfig;
+  if (!C || typeof C.googleDenial !== 'function') return null;
+  let json = null;
+  try {
+    if (res && typeof res.clone === 'function') json = await res.clone().json();
+  } catch (e) { json = null; }
+  const denial = C.googleDenial(res.status, json, url);
+  if (denial && denial.kind !== 'auth') {
+    try { console.info('[Glance] google denial ' + res.status + ' ' + denial.kind + ' ' + (denial.service || '-') + ' ' + (denial.googleReason || '-')); } catch (e) { /* no console */ }
+    try {
+      await chrome.storage.local.set({ googleLastDenial: { status: res.status, kind: denial.kind, service: denial.service || '', googleReason: denial.googleReason || '', at: Date.now() } });
+    } catch (e) { /* diagnostics only */ }
+  }
+  return denial;
 }
 
 // options.soft marks a best-effort read (a thread lookup, a probe). Its 401
@@ -2366,16 +2720,16 @@ async function googleAuthedFetch(baseUrl, path, rawOptions) {
   }));
   const res = await doFetch(cred.token);
   if (soft) return res;
-  if (res.status !== 401) return rememberGoogleAuthResult(res);
+  if (res.status !== 401) return rememberGoogleAuthResult(res, baseUrl + path);
   // A cached token can go stale without Chrome knowing yet. One silent
   // refresh and one retry, then fail loudly. The refresh stays silent:
   // prompt=none may run for a web token; a consent window may not. The token
   // is dropped only when the refresh says the grant was revoked.
   const next = await refreshLaneCredential(cred);
-  if (next && next.revoked) return rememberGoogleAuthResult(res);
+  if (next && next.revoked) return rememberGoogleAuthResult(res, baseUrl + path);
   let retryToken = cred.token;
   if (next && next.token && (next.source !== 'chrome' || await chromeTokenIsConsented(next.token))) retryToken = next.token;
-  return rememberGoogleAuthResult(await doFetch(retryToken));
+  return rememberGoogleAuthResult(await doFetch(retryToken), baseUrl + path);
 }
 
 function googleTasksAuthedFetch(path, options) {
@@ -2475,6 +2829,10 @@ async function connectGoogleTasks(interactive, preset) {
   // script). The popup Connect click passes true. That is the one moment
   // Chrome may show the account chooser or, if browser sign-in is off, the
   // web-flow consent window. Later API calls stay silent.
+  // After Disconnect only an explicit Connect click may reconnect.
+  if (interactive === false && !preset && await googleConsentRequired()) {
+    throw new Error('Google sign-in needs you to connect again.');
+  }
   const cred = preset || await getGoogleAccessToken(interactive !== false);
   await rememberGoogleProfile(cred && cred.token);
   await clearGoogleReconnect();
@@ -2483,6 +2841,9 @@ async function connectGoogleTasks(interactive, preset) {
     googleTasksAuth: { taskListId },
     [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
   });
+  // «שלב אחד לא הושלם» belongs to a Do It on the grant this Connect replaced.
+  // Left in place it kept a fresh, fully granted connection off Connected.
+  await chrome.storage.local.remove(['googleLaneWarning', GOOGLE_CONSENT_REQUIRED_KEY, GOOGLE_REVOKE_PENDING_KEY]);
   const accountEmail = globalThis.FlowGoogleLaneAccount && typeof globalThis.FlowGoogleLaneAccount.read === 'function'
     ? await globalThis.FlowGoogleLaneAccount.read()
     : '';
@@ -2527,6 +2888,12 @@ function googleTaskTitle(p) {
   const Title = globalThis.FlowCommitmentTitle;
   const span = Title && typeof Title.fromPayload === 'function' ? Title.fromPayload(p) : '';
   if (span) return String(span).slice(0, 255);
+  // A reply card whose label is only its date («Reply requested by Oct 8») is titled by the work the ask names, when the ask is a plain verb plus object.
+  if (Title && typeof Title.askTitleFromBody === 'function' && /^Reply requested\b/i.test(String((p && p.label) || ''))) {
+    const body = p && (p.text != null && String(p.text).trim() ? p.text : p.bodyText) || (p && p.params && p.params.what) || '';
+    const ask = Title.askTitleFromBody(String(body));
+    if (ask) return String(ask).slice(0, 255);
+  }
   return String((p && p.label) || '').replace(/\s+/g, ' ').trim().slice(0, 255);
 }
 
@@ -3162,7 +3529,27 @@ async function googleCalendarChange(p, op) {
   };
 }
 
+// Same rule as FlowActions.holdSubjectTitle: reply prefixes and
+// bracket tags like [G-Calendar] are stripped from the Subject line.
+function cleanMailSubject(subject) {
+  if (typeof FlowActions !== 'undefined' && typeof FlowActions.holdSubjectTitle === 'function') {
+    return FlowActions.holdSubjectTitle(subject);
+  }
+  let s = String(subject || '')
+    .replace(/[\u200B\u200C\u200D\uFEFF\u2060\u00A0\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  let prev = '';
+  while (s && s !== prev) {
+    prev = s;
+    s = s.replace(/^(?:(?:re|fw|fwd|השב|תגובה|הועבר)\s*:\s*)+/ig, '').trim();
+    s = s.replace(/^\[[^\[\]]+\]\s*/g, '').trim();
+  }
+  return s;
+}
+
 async function googleCalendarWrite(p) {
+
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
   const params = p.params || {};
   if (params.calendarOp === 'delete' || params.calendarOp === 'update') {
@@ -3208,6 +3595,8 @@ async function googleCalendarWrite(p) {
   // same fact the chip proposed — not only a title and an attribution line.
   const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim() : '';
   if (quote) descriptionLines.push(quote.slice(0, QUOTE_MAX_CHARS));
+  const subjectLine = cleanMailSubject(params.subject);
+  if (subjectLine) descriptionLines.push('Subject: ' + subjectLine);
   if (linkedFile) descriptionLines.push('File: ' + linkedFile.name + '\n' + linkedFile.url);
   if (shareUrl) descriptionLines.push(shareUrl);
   if (p.threadUrl) descriptionLines.push('Open in Gmail: ' + p.threadUrl);
@@ -5275,6 +5664,8 @@ function outlookEcosystemRunnerDeps() {
   };
   return {
     storage,
+    // A Labs switch by name, with the store lock honoured (glanceSwitchOn above): src/outlook.js reads DECOMPOSE through it.
+    switchOn: (name) => glanceSwitchOn(name),
     cfg: globalThis.FlowOutlookConfig,
     auth: globalThis.FlowOutlookAuth,
     plan: globalThis.FlowOutlookSync && globalThis.FlowOutlookSync.plan,
@@ -5562,7 +5953,7 @@ async function outlookFetch(url, init) {
       if (ctl && ctl.signal.aborted) return { status: 0, ok: false, reason: writeMs ? 'write-timeout' : 'verify-timeout', timedOut: true };
       throw e;
     } finally {
-      if (timer) clearTimeout(timer);
+      if (timer && typeof clearTimeout === 'function') clearTimeout(timer);
     }
   };
   let res = await call(token);
@@ -5954,6 +6345,22 @@ async function outlookDeleteDraft(draftId, prefer) {
   try { await outlookFetch(delUrl, { method: 'DELETE', headers: headers }); } catch (e) { /* already gone */ }
 }
 // The owner's off switches live in one storage object. A missing key is off.
+// The first wave of Labs closes starts ON in an unpacked (non-store) install (core/labs-seed.js; owner, 2026-11-16). Once per seed version, into the storage object the popup edits; a row the person
+// turns off stays off. A Web Store install never seeds, and an e2e copy of the extension opts out through manifest.glance_no_seed.
+async function seedLabsDefaults() {
+  try {
+    const mf = (chrome.runtime && typeof chrome.runtime.getManifest === 'function' && chrome.runtime.getManifest()) || {};
+    if (mf.update_url || mf.glance_no_seed === true) return;
+    const Seed = globalThis.FlowLabsSeed;
+    if (!Seed) return;
+    const bag = await chrome.storage.local.get({ glanceSwitches: {}, glanceSwitchesSeed: 0 });
+    const next = Seed.seed(bag.glanceSwitches, bag.glanceSwitchesSeed);
+    if (next.changed) await chrome.storage.local.set({ glanceSwitches: next.bag, glanceSwitchesSeed: next.version });
+  } catch (e) { /* the seed is a convenience: a failed write leaves every row as the person had it */ }
+}
+void seedLabsDefaults();
+if (chrome.runtime && chrome.runtime.onInstalled) chrome.runtime.onInstalled.addListener(() => { void seedLabsDefaults(); });
+
 async function glanceSwitchOn(name) {
   try {
     // A Chrome Web Store install (Chrome adds update_url) never turns a Labs switch on, whatever storage says.
@@ -7239,8 +7646,11 @@ async function connectorStatus() {
   const sf = await getSalesforceAuth();
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
+  // Popup open: if we still claim a Google grant, ask tokeninfo once. A
+  // remote revoke leaves storage looking Connected otherwise.
+  try { await probeGoogleAuthStillValid(); } catch (e) { /* status below still reads storage */ }
   const gt = await getGoogleTasksAuth();
-  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, 'googleLaneWarning', 'glanceLaneUndo', 'glanceHostLanguage', 'glanceUiLanguage']);
+  const reconnectBag = await chrome.storage.local.get([GOOGLE_RECONNECT_STORAGE_KEY, GOOGLE_EVER_CONNECTED_STORAGE_KEY, GOOGLE_WEB_AUTH_STORAGE_KEY, GOOGLE_GRANTED_SCOPES_KEY, 'googleLaneWarning', 'glanceLaneUndo', 'glanceHostLanguage', 'glanceUiLanguage', GOOGLE_REVOKE_PENDING_KEY]);
   let uiLang = reconnectBag.glanceUiLanguage || reconnectBag.glanceHostLanguage || '';
   if (!uiLang) {
     try { uiLang = chrome.i18n && chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : ''; } catch (e) { uiLang = ''; }
@@ -7256,7 +7666,8 @@ async function connectorStatus() {
     everConnected: reconnectBag[GOOGLE_EVER_CONNECTED_STORAGE_KEY] || null,
     webAuth: reconnectBag[GOOGLE_WEB_AUTH_STORAGE_KEY] || null,
     laneUndo: reconnectBag.glanceLaneUndo || null,
-    scopesGranted: scopesGranted
+    scopesGranted: scopesGranted,
+    revokePending: reconnectBag[GOOGLE_REVOKE_PENDING_KEY] || null
   });
   const ecoBag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY]);
   const ecoSnap = await ecosystemStatusExtras(Object.assign({}, reconnectBag, ecoBag, { googleTasks: googleTasks }));
@@ -7373,7 +7784,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:google-reconnect') {
     if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
-    return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => ({ ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
+    return reply(sendResponse, reconnectGoogleForAccount(msg.account).catch((e) => (e && e.code === 'partial-grant'
+      ? { ok: false, reason: 'partial-grant', missing: (Array.isArray(e.missing) ? e.missing : []).map(shortScopeName) }
+      : { ok: false, reason: 'failed', error: glanceAuthSafe(e && e.message) })));
   }
 
   if (msg.type === 'flow:microsoft-optional-scopes') {
@@ -7387,7 +7800,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (ecoConnector) {
       return reply(sendResponse, glanceSwitchOn('CONNECT_ECOSYSTEM').then((ecoOn) => {
         if (ecoOn) {
-          const interactive = msg.connectorId === 'googleTasks' ? googleConnectWantsInteractive(sender) : true;
+          const interactive = msg.connectorId === 'googleTasks'
+            ? googleConnectWantsInteractive(sender, msg.interactive === true)
+            : true;
           return connectEcosystemConnector(msg.connectorId, {
             connectGoogleTasks: (force) => connectGoogleTasks(force !== false ? interactive : false),
             launchInteractive: outlookLaunchInteractive,
@@ -7396,7 +7811,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           });
         }
         if (msg.connectorId === 'googleTasks') {
-          return connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true }));
+          return connectGoogleTasks(googleConnectWantsInteractive(sender, msg.interactive === true)).then(() => ({ ok: true }));
         }
         return { ok: false, reason: 'connector-not-live' };
       }));

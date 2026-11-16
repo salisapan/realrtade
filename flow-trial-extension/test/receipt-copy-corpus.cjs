@@ -124,5 +124,21 @@ console.log('\n--- receipt-copy: a Hebrew full close says טופל ---\n');
   check('a partial close does not say טופל', partial.status === 'Partly handled.', partial);
 }
 
+
+console.log('\n--- receipt-copy: Undo meta never marks a full Drive+draft hand-off as partial ---\n');
+{
+  // Board pack: Drive wrote; compose fill is a preview hand-off (closes:false).
+  // Remount used to see total=2 with one stored step → טופל חלקית.
+  const full = FlowReceipt.laneUndoStoreMeta({ full: true, storedCount: 1, attemptedCount: 1 });
+  check('a full close stores total equal to Undo steps (no partial)', full.total === 1, full);
+  const partial = FlowReceipt.laneUndoStoreMeta({ full: false, storedCount: 1, attemptedCount: 2 });
+  check('a real partial keeps total above stored steps', partial.total === 2, partial);
+  const equal = FlowReceipt.laneUndoStoreMeta({ full: false, storedCount: 2, attemptedCount: 2 });
+  check('two real writes store total 2', equal.total === 2, equal);
+  // rememberLaneUndo sets partial only when meta.total > steps.length
+  check('full close would not trip partial (total <= steps)', full.total <= 1);
+  check('real partial would trip partial (total > steps)', partial.total > 1);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

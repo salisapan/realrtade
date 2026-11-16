@@ -227,7 +227,7 @@ test('Drive Undo refuses after the file is renamed and leaves it', async ({ glan
   expect(server.file(id).trashed).not.toBe(true);
 });
 
-test('Docs insert posts the document, reads the range back, and Undo removes it', async ({ glance }) => {
+test('Docs create is one Drive multipart upload, verified, and Undo trashes it', async ({ glance }) => {
   const page = await open(glance, {
     seed: {
       glanceCompanyTemplate: {
@@ -252,9 +252,11 @@ test('Docs insert posts the document, reads the range back, and Undo removes it'
   await clickDoIt(page);
   await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   const id = server.last.doc;
-  expect(server.calls.some((c) => c.method === 'POST' && c.path === '/drive/v3/files')).toBe(true);
-  expect(server.calls.some((c) => c.method === 'POST' && c.path.indexOf('/v1/documents/' + id + ':batchUpdate') >= 0)).toBe(true);
-  expect(server.calls.some((c) => c.method === 'GET' && c.path === '/v1/documents/' + id)).toBe(true);
+  const uploads = server.calls.filter((c) => c.method === 'POST' && c.path.indexOf('/upload/drive/v3/files') === 0 && c.body && c.body.mimeType === 'application/vnd.google-apps.document');
+  expect(uploads).toHaveLength(1);
+  expect(uploads[0].search).toContain('uploadType=multipart');
+  expect(server.calls.some((c) => /\/v1\/documents\//.test(c.path))).toBe(false);
+  expect(server.calls.some((c) => c.method === 'GET' && c.path === '/drive/v3/files/' + id + '/export')).toBe(true);
   await page.locator('div[role="main"] button.flow-chip-undo').click();
   await expect.poll(() => server.calls.some((c) => c.method === 'PATCH' && c.path === '/drive/v3/files/' + id)).toBe(true);
 });

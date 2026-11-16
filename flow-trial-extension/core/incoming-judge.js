@@ -26,6 +26,9 @@ const FlowIncomingJudge = (() => {
       .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069\u061C]/g, '')
       .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
       .replace(/[\u00A0\u202F]/g, ' ')
+      // A run of spaces or tabs is one space: the patterns below assume single spaces, and a metamorphic check (2026-11-11) found that doubling the spaces
+      // of a mail flipped about 10% of the engine's decisions (53 of 600 acts went silent). Newlines are kept.
+      .replace(/[ \t]{2,}/g, ' ')
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n');
   }
@@ -199,6 +202,12 @@ const FlowIncomingJudge = (() => {
   // an answer-needing ask with a date. Gmail's chip path calls this too, so both mailboxes share one second read.
   // The labs readers (booking notice, task ask, payment ask) stay behind their own switches, which default OFF.
   function secondRead(i, q0) {
+    // «Please do not reply to opposing counsel yet» reads as a hedge to the classifier, but in a mail that also asks real questions it is the person's HOLD instruction, not a cancel:
+    // only the direct-ask reader (two questions, a person, To the reader) may look past that one hedge, and it keeps the hold as a task.
+    if (q0 === 'hedge' && i.directAskOn === true && i.senderIsUser !== true && i.inbound !== false && i.noteToSelf !== true) {
+      const bodyH = prepareForJudge(i.text);
+      if (HOLD_EN.test(bodyH) || HOLD_HE.test(bodyH)) return directAskCard(i, bodyH);
+    }
     if (q0 && q0 !== 'noise') return null;
     if (q0 || i.senderIsUser === true || i.inbound === false || i.noteToSelf === true) return null;
     const body0 = prepareForJudge(i.text);
@@ -206,10 +215,208 @@ const FlowIncomingJudge = (() => {
       || ((hitD) => (hitD ? doItCard(i, hitD) : null))(decideAsk(i, body0))
       || ((hit1) => (hit1 ? holdCard(i, hit1) : null))(holdProposal(i, body0))
       || ((hit2) => (hit2 ? replyCard(i, hit2) : null))(answerAsk(i, body0))
-      || ((hit3) => (hit3 ? inviteCard(i, hit3) : null))(inviteAccept(i, body0));
+      || ((hit3) => (hit3 ? inviteCard(i, hit3) : null))(inviteAccept(i, body0))
+      || (i.directAskOn === true ? directAskCard(i, body0) : null);
   }
 
+  // ---- direct ask (owner 2026-11-12, after the first run on his real mailbox): the two shapes the classifier does not read ----
+  //   1. plain information questions a PERSON puts to the reader ("מה ההבדלים בין...?", "What is the price of...?"): the close is a reply.
+  //      At least two such questions, or one in a mail that greets the reader by name. No date is needed and none is invented.
+  //   2. a Hebrew bare imperative with a day ("מלא את הטופס, חתום והחזר עד מחר", "תשלם את החשבונית עד יום חמישי"): work is a task,
+  //      a payment or a send-back is a reply.
+  // Strict about who and where: a person (not an automated sender, not an auto-reply, bounce or calendar notice), a mail addressed To the
+  // reader with at most three recipients, only the mail's own text above any quoted or forwarded header. A sentence that hedges, cancels or
+  // sells is skipped. Last of the second reads, so every earlier reader and every quiet wins. Off unless the host passes directAskOn.
+  const DIRECT_AUTO_SUBJECT = /^(?:\s*(?:re|fw|fwd)\s*:\s*)*(?:automatic reply|auto(?:matic)?[- ]reply|out of (?:the )?office|undeliverable|delivery status|declined:|accepted:|tentative|מענה אוטומטי|תשובה אוטומטית|[\u200e\u200f]*לא ניתן למסירה)/i;
+  const DIRECT_CUT = /\n(?:-{2,}\s*(?:Original|Forwarded|הודעה)|From:\s|מאת:\s|On .{4,80} wrote:|ב[-־]?.{4,60} כת(?:ב|בה|בו)\s*:)/;
+  const DIRECT_Q_EN = /^(?:what|why|how|when|where|which|who|is there|are there|do you have|does it|does the)\b/i;
+  // «מהו המועד האחרון», «מהי ההצעה», «מהם הליקויים»: the same interrogative with the pronoun fused on (real legal and business Hebrew), and «אם אני מבין נכון ...?» (a question put as an understanding to confirm).
+  const DIRECT_Q_HE = /^(?:ו)?(?:מה|מהו|מהי|מהם|מהן|מיהו|מיהי|למה|מדוע|איך|כיצד|האם|מתי|איפה|היכן|כמה|מי|איזה|איזו|אילו|יש|אנחנו יכולים|נוכל|אם אני מבין)(?![\u0590-\u05FF])/;
+  // A lead-in clause before the question («בהתבסס על מה שכתבתם, התביעה וחוו"ד מומחה, מה גובה ...?», «כ"כ, אם אני מבין נכון ...?») is not part of it: it is cut before the opener is read.
+  const DIRECT_LEADIN_HE = /^(?:(?:בהתבסס|בהסתמך|בהמשך|בהתאם|לפי|על סמך)\s+[^,?]{0,100},\s*|(?:כ"כ|כמו כן|בנוסף|ובנוסף|אז)[,\s]+)/;
+  const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
+  const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני)(?![\u0590-\u05FF])/;
+  const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
+  // A chat (WhatsApp, Messenger, Instagram, Teams) has no addresses: the host asserts the message is an inbound one-to-one one
+  // (`oneToOne === true`; src/chat-task-card.js already drops groups, the person's own messages and quoted text before it asks the judge).
+  // Chat is mostly casual, so only the question shape is read there, and only the business-like openers (what, which, how much, is there,
+  // do you have): no where, when, who, why or how, which are everyday chat. The bare imperative with a day belongs to core/chat-deadline-ask.js.
+  const DIRECT_Q_EN_CHAT = /^(?:what|which|how (?:much|many)|is there|are there|do you have|does it|does the)\b/i;
+  const DIRECT_Q_HE_CHAT = /^(?:ו)?(?:מה|כמה|איזה|איזו|אילו|האם|יש)(?![\u0590-\u05FF])/;
+  // «דנה ויואב, מהו המועד האחרון?» / "Dana and Yoav, what is the last date?": the names the mail is addressed to are not part of the question. They are cut only when what is left opens as a question.
+  function vocativeCut(x) {
+    const m = /^([^\s,?!.:;]{2,20}(?:\s+(?:and\s+|&\s+)?[^\s,?!.:;]{2,20}){0,2}),\s+([^\n]+\?)$/.exec(x);
+    if (!m) return x;
+    const rest = m[2];
+    return (/[\u0590-\u05FF]/.test(rest) ? DIRECT_Q_HE : DIRECT_Q_EN).test(rest) ? rest : x;
+  }
+  function directAsk(i, body) {
+    const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
+    const chat = i.surface === 'chat';
+    if (chat) {
+      if (i.oneToOne !== true || i.fromMe === true || i.group === true) return null;
+    } else {
+      const sender = String((i.sender && i.sender.email) || '').toLowerCase();
+      const own = (i.ownAddresses || []).map((a) => String(a).toLowerCase());
+      const to = (i.to || []).map((a) => String(a).toLowerCase());
+      if (!sender || !own.length || own.indexOf(sender) >= 0) return null;
+      if (!to.some((a) => own.indexOf(a) >= 0) || to.length > 3) return null;
+      if (DIRECT_AUTO_SUBJECT.test(String(i.subject || ''))) return null;
+      if (X && typeof X.senderIsAutomated === 'function' && X.senderIsAutomated(sender, String(body || ''))) return null;
+    }
+    const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
+    const raw = String(body || '');
+    const cut = raw.search(DIRECT_CUT);
+    const ownText = cut >= 0 ? raw.slice(0, cut) : raw;
+    const sents = sentencesOf(ownText).map((x) => x.replace(/^(?:\d{1,2}[.)]|[-*•])\s*/, '').trim()).filter((x) => x.length >= 8 && x.length <= 220);
+    const names = (i.ownNames || []).filter(Boolean).map((n) => String(n).toLowerCase());
+    const head = ownText.slice(0, 60).toLowerCase();
+    const greetsReader = names.some((n) => head.indexOf(n) >= 0);
+    const skip = (x, he) => (he ? ANSWER_NO_HE.test(x) : ANSWER_NO_EN.test(x)) || DIRECT_Q_NO.test(x);
+    // 2. a Hebrew bare imperative with its day (email surfaces only; a chat has its own reader)
+    for (const x0 of (chat ? [] : sents)) {
+      const x = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
+      if (!/[\u0590-\u05FF]/.test(x) || skip(x, true) || /(?:^|\s)(?:אל|לא)\s/.test(x)) continue;
+      const work = DIRECT_IMP_WORK_HE.test(x), back = DIRECT_IMP_BACK_HE.test(x);
+      if (!work && !back) continue;
+      const d = dayOf(x, now0).date;
+      if (!d || d < ymdOf(now0)) continue;
+      return { kind: work ? 'task' : 'reply', what: x.slice(0, 200), title: x.replace(/[.!?\s]+$/, '').slice(0, 80), dateIso: d, lang: 'he' };
+    }
+    // 1. plain information questions
+    // A chat opens on the same line as its first question ("היי, מה המחיר...?"): the greeting is not part of the question.
+    const qs = sents.filter((x) => /\?\s*$/.test(x)).map((x) => x.replace(/\s+\?\s*$/, '?').replace(/^(?:שלום|היי|הי|בוקר טוב|ערב טוב|hi|hello|hey)(?=[\s,!])[^,?!]{0,20}[,!]\s*/i, '')).map(vocativeCut).filter((x) => {
+      const he = /[\u0590-\u05FF]/.test(x);
+      // A question that names a clock is a meeting proposal: the hold readers and the calendar path own it, not a reply.
+      const opener = chat ? (he ? DIRECT_Q_HE_CHAT : DIRECT_Q_EN_CHAT) : (he ? DIRECT_Q_HE : DIRECT_Q_EN);
+      // A lead-in that lists things before the question («בהתבסס על מה שכתבתם, התביעה וחוו"ד מומחה, מה גובה ...?») ends at the comma before the interrogative.
+      let head = he ? x.replace(DIRECT_LEADIN_HE, '').replace(DIRECT_LEADIN_HE, '') : x;
+      if (he && /^(?:בהתבסס|בהסתמך|בהמשך|בהתאם|לפי|על סמך)\s/.test(x)) { const cut = x.slice(0, 160).search(/,\s*(?:ו)?(?:מה|מהו|מהי|מהם|מהן|מתי|כמה|האם|איך|כיצד|מדוע|למה)(?![\u0590-\u05FF])/); if (cut > 0) head = x.slice(cut).replace(/^,\s*/, ''); }
+      return (opener.test(x) || (he && !chat && opener.test(head))) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
+    });
+    // A chat needs at least two such questions: one question in a chat is conversation, not a loop.
+    // One question put to a group by name stays quiet (the two-question floor): the cut vocative made it a question, and a group greeting is not a personal ask.
+    const rawQ = qs.length === 1 ? sents.find((x) => /\?\s*$/.test(x) && vocativeCut(x.replace(/\s+\?\s*$/, '?')) === qs[0]) : null;
+    const groupVocative = !chat && !!rawQ && (i.to || []).length > 1 && vocativeCut(rawQ.replace(/\s+\?\s*$/, '?')) !== rawQ.replace(/\s+\?\s*$/, '?');
+    if (qs.length >= 2 || (!chat && qs.length === 1 && greetsReader && !groupVocative)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length, questionList: qs.slice(0, 8).map((q) => q.slice(0, 200)) };
+    return null;
+  }
+  // ---- what else a mail of questions carries (2026-11-16, a real legal-and-business Hebrew mail) -------------------------------------------
+  // The questions are the ask, but the same mail may also (1) ask for a date that has to be found («מהו המועד האחרון למתן תשובה», "what is the last date to respond"), (2) tell the
+  // person to HOLD an answer to someone («אני מבקש כרגע לא להחזיר תשובה לב"כ התובעים», "do not reply to opposing counsel yet"), and (3) quote figures that add up («27,400 ... 19 מיליון ...
+  // 18,972,600»). Glance writes none of the answers. It keeps the hold where the person can see it (a task with no day), makes the date question a task of its own, and puts the
+  // arithmetic of the mail's own figures under the draft as a check for the person, never as an answer.
+  const DEADLINE_Q_HE = /(?:ה?מועד|ה?תאריך|ה?יום)\s+האחרון|עד\s+מתי|האם\s+יש\s+מועד\s+אחרון/;
+  const DEADLINE_Q_EN = /\b(?:last|latest|final)\s+(?:date|day|time)\b|\bby\s+when\b|\bdeadline\b/i;
+  const HOLD_HE = /(?:אני\s+)?מבק(?:ש|שת|שים)\s+(?:כרגע\s+|בשלב\s+זה\s+|בינתיים\s+)?(?:ש)?לא\s+(?:להחזיר|להשיב|לשלוח|לענות|לפנות)\s+(?:תשובה\s+|דבר\s+)?(?:ל|אל)\s*([^.\n,;]{2,50})|אל\s+ת(?:חזיר|שיב|שלח|ענ)(?:ו|י)?\s+(?:תשובה\s+)?(?:ל|אל)\s*([^.\n,;]{2,50})/;
+  const HOLD_EN = /(?:please\s+)?(?:do\s+not|don['’]t|hold\s+off\s+on|no)\s+(?:reply(?:ing)?|respon(?:d|ding)|answer(?:ing)?|send(?:ing)?\s+anything)\s+(?:back\s+)?(?:to|until)\s+([^.\n,;]{2,50})/i;
+  function figuresOf(text) {
+    const out = [];
+    const re = /(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(מיליון|million|אלף|thousand)?/gi;
+    let m;
+    while ((m = re.exec(String(text || '')))) {
+      let v = Number(m[1].replace(/,/g, ''));
+      if (m[2]) v *= /מיליון|million/i.test(m[2]) ? 1e6 : 1e3;
+      if (v >= 1000 && out.indexOf(v) < 0) out.push(v);
+    }
+    return out;
+  }
+  const fmtN = (n) => n.toLocaleString('en-US');
+  function arithmeticChecks(text, he) {
+    const f = figuresOf(text).sort((a, b) => b - a);
+    if (f.length < 3) return [];
+    const total = f[0], lines = [];
+    // The smaller figure first: «19,000,000 - 27,400 = 18,972,600» is the mail's own subtraction; read from the other end it would be the same equation turned around.
+    for (const a of f.slice(1).sort((x, y) => x - y)) {
+      const rest = total - a;
+      if (f.indexOf(rest) < 0) continue;
+      lines.push(fmtN(total) + ' - ' + fmtN(a) + ' = ' + fmtN(rest) + ' ✓');
+      f.filter((b) => b !== a && b !== rest && b !== total && b < total - a).forEach((b) => lines.push(he ? 'ובניכוי ' + fmtN(b) + ' נוסף: ' + fmtN(total) + ' - ' + fmtN(a) + ' - ' + fmtN(b) + ' = ' + fmtN(total - a - b) : 'and also minus ' + fmtN(b) + ': ' + fmtN(total) + ' - ' + fmtN(a) + ' - ' + fmtN(b) + ' = ' + fmtN(total - a - b)));
+      break;
+    }
+    return lines.slice(0, 3);
+  }
+  function askExtras(body, hit) {
+    const he = hit.lang === 'he';
+    const text = String(body || '');
+    const qs = hit.questionList || [];
+    const dq = qs.find((q) => (he ? DEADLINE_Q_HE : DEADLINE_Q_EN).test(q)) || null;
+    const hm = text.match(he ? HOLD_HE : HOLD_EN);
+    const party = hm ? String(hm[1] || hm[2] || '').replace(/\s+/g, ' ').trim() : '';
+    const checks = he === (/[֐-׿]/.test(text)) ? arithmeticChecks(text, he) : [];
+    return { deadlineQuestion: dq, holdParty: party || null, checks };
+  }
+
+  function directAskCard(i, body) {
+    const hit = directAsk(i, body);
+    if (!hit) return null;
+    if (hit.kind === 'task') { const c = doItCard(i, hit); c.intent.directAsk = true; return c; }
+    if (i.surface === 'chat') {
+      // No email draft in a chat: the person types the answer there. The card is a task to answer, with no day invented; it closes on their
+      // own reply in that chat (core/model-plan.js chat anchors).
+      const he = hit.lang === 'he';
+      const more = hit.questions > 1 ? (he ? ' (ועוד ' + (hit.questions - 1) + ')' : ' (+' + (hit.questions - 1) + ' more)') : '';
+      const q1 = hit.what.replace(/\s+/g, ' ').slice(0, 70).replace(/^[a-z]/, (c) => c.toUpperCase());
+      const title = ((he ? 'לענות: ' : 'Reply: ') + q1 + more).slice(0, 120);
+      return { intent: { type: 'request', label: title, confidence: 0.9, directAsk: true, questions: hit.questions, personalClose: 'follow-up-ask', signals: { score: 90, threshold: 50, handoff: true }, entities: { what: hit.what, requestWhat: hit.what, when: '', dateIso: null } },
+        process: { id: 'log-it', name: 'Log It', closingLine: 'Logging this so it stays tracked.', closedLine: 'Logged and tracked.', needsDateChoice: false, dateChoices: null,
+          steps: [{ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + title, params: { title, dateIso: null, amount: null, what: hit.what, threadUrl: i.threadUrl || null }, dependsOn: null }] } };
+    }
+    const c = replyCard(i, hit);
+    c.intent.directAsk = true; c.intent.questions = hit.questions || null;
+    // What the draft step needs to be written well: the mail's language, and every question for the answer frame (core/draft-reply.js).
+    for (const st of c.process.steps) if (st.kind === 'gmailDraft' || st.kind === 'outlookDraft') { st.params.lang = hit.lang; if (hit.questionList) st.params.questions = hit.questionList; }
+    // No day in the words: the reply draft alone (owner C-4). A task with no date is not invented.
+    if (!hit.dateIso) c.process.steps = c.process.steps.filter((st) => st.kind !== 'googleTask');
+    const he = hit.lang === 'he';
+    const ex = askExtras(body, hit);
+    if (ex.checks.length) for (const st of c.process.steps) if (st.kind === 'gmailDraft' || st.kind === 'outlookDraft') st.params.checks = ex.checks;
+    // ONE task, because both hosts write one task step with its own read-back and Undo: it names the work (the answers), the date that has to be found, and the instruction to hold
+    // an answer to someone, so the hold stays visible where the person tracks work. Nothing is sent to that party and no reply is drafted to them.
+    if (ex.deadlineQuestion || ex.holdParty) {
+      const n = hit.questions || (hit.questionList || []).length || 1;
+      const parts = [he ? (n === 1 ? 'לענות על שאלה אחת' : 'לענות ל-' + n + ' שאלות') + (ex.deadlineQuestion ? ' (כולל המועד האחרון)' : '') : 'Answer ' + n + ' question' + (n > 1 ? 's' : '') + (ex.deadlineQuestion ? ' (including the last date)' : '')];
+      if (ex.holdParty) parts.push((he ? 'המתנה: לא להשיב ל' : 'On hold: do not reply to ') + ex.holdParty);
+      const title = parts.join(' · ').slice(0, 120);
+      c.process.steps.push({ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + title, params: { title: title, dateIso: null, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null });
+      if (ex.deadlineQuestion) c.intent.deadlineQuestion = true;
+      if (ex.holdParty) c.intent.holdInstruction = { party: ex.holdParty };
+    }
+    if (ex.checks.length) c.intent.checks = ex.checks;
+    return c;
+  }
+
+  // ---- several intentions in one mail (core/intent-decompose.js, owner 2026-11-12) ----------------------------------------------------------
+  // Off unless the host passes decomposeOn (the Labs switch DECOMPOSE, off by default). The whole-mail decision above always runs first; this only
+  // runs when the mail shows or the judge found nothing, and it returns ONE card whose steps are each intention's own (intent-decompose merge).
+  // Every quiet of the whole mail, phishing and the take-back clauses stand (see the module). A mail with one intention comes back unchanged.
   function judge(input, deps) {
+    const i = input || {};
+    const whole = judgeOnce(i, deps);
+    if (i.decomposeOn !== true) return whole;
+    const Dc = sibling(typeof FlowIntentDecompose !== 'undefined' ? FlowIntentDecompose : null, './intent-decompose.js', 'FlowIntentDecompose');
+    const d = deps || {};
+    const intentApi = pick(d, 'intent', typeof FlowIntent !== 'undefined' ? FlowIntent : null);
+    if (!Dc || typeof Dc.decompose !== 'function' || typeof Dc.merge !== 'function') return whole;
+    const Fj = typeof FlowJudgment !== 'undefined' ? FlowJudgment : null;
+    const CF = sibling(typeof FlowCloseFamilies !== 'undefined' ? FlowCloseFamilies : null, './close-families.js', 'FlowCloseFamilies');
+    let newText = String(i.text || '');
+    try { if (Fj && typeof Fj.newContent === 'function') newText = Fj.newContent(newText); } catch (e) { /* keep the whole text */ }
+    let r = null;
+    try {
+      r = Dc.decompose({ aiDecomposeV1: true }, { text: newText, whole, sender: i.sender || null, vetoText: (i.subject ? String(i.subject) + '\n' : '') + String(i.text || '') }, {
+        judgeText: (t) => judgeOnce(Object.assign({}, i, { text: t, decomposeOn: false }), deps),
+        phishing: (t) => (intentApi && typeof intentApi.phishingOrNegative === 'function' ? intentApi.phishingOrNegative(t) : false),
+        familyHit: (t) => (CF && typeof CF.assess === 'function' ? CF.assess(t, null, { now: i.now, senderEmail: (i.sender && i.sender.email) || null }) : null)
+      });
+    } catch (e) { return whole; }
+    if (!r || !r.used || !Array.isArray(r.intentions) || r.intentions.length < 2) return whole;
+    const merged = Dc.merge(r.intentions);
+    if (!merged) return whole;
+    return { show: true, intent: merged.intent, process: merged.process, decomposed: merged.used };
+  }
+
+  function judgeOnce(input, deps) {
     const i = input || {};
     const d = deps || {};
     const intentApi = pick(d, 'intent', typeof FlowIntent !== 'undefined' ? FlowIntent : null);
@@ -243,16 +450,22 @@ const FlowIncomingJudge = (() => {
     // A reminder or a deadline asked without a question ("Don't forget to bring the signed form on Monday", "I need the signed
     // contract by Wednesday") and a request to call back on a day become a task due that day (core/chat-reminder.js,
     // chat-deadline-ask.js, chat-callback-ask.js). Only for a mail addressed to the person (their address on To, not Cc-only).
+    // Phishing, a credential harvest and a payment to a new bank account stay quiet BEFORE the task and payment readers: those two build a task
+    // "Pay X to the new account" from the same words the veto below refuses (found by the capability probe, 2026-11-14).
+    if ((i.taskAskOn === true || i.paymentAskOn === true) && i.senderIsUser !== true && i.inbound !== false && typeof intentApi.phishingOrNegative === 'function'
+      && intentApi.phishingOrNegative((i.subject ? String(i.subject) + '\n' : '') + prepareForJudge(i.text))) {
+      return { show: false, reason: 'quiet:family', intent: null };
+    }
     // Off unless the host passes taskAskOn (glanceSwitches.TASK_ASK).
     if (i.taskAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
-      const ask = taskAsk(i, prepareForJudge(i.text));
+      const ask = taskAsk(i, stripOwnVocative(prepareForJudge(i.text), i.ownNames));
       if (ask) return { show: true, intent: ask.intent, process: forSurface(ask.process, i.surface || 'gmail') };
     }
 
     // A payment asked of the person with an amount and a day ("Please transfer 500 NIS by Sunday") becomes a task "Pay 500 NIS"
     // due that day (core/chat-payment-ask.js). Glance never pays. Off unless the host passes paymentAskOn (glanceSwitches.PAYMENT_ASK).
     if (i.paymentAskOn === true && i.senderIsUser !== true && i.inbound !== false) {
-      const pay = paymentAsk(i, prepareForJudge(i.text));
+      const pay = paymentAsk(i, stripOwnVocative(prepareForJudge(i.text), i.ownNames));
       if (pay) return { show: true, intent: pay.intent, process: forSurface(pay.process, i.surface || 'gmail') };
     }
 
@@ -266,6 +479,7 @@ const FlowIncomingJudge = (() => {
     // A Date from another realm (a test sandbox, an iframe) fails instanceof and used to fall back to the real clock.
     const now = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());
     let intent = intentApi.classify(text, {
+      rawText: prepareForJudge(i.text),
       senderEmail: sender.email || null,
       senderName: sender.name || null,
       subject: i.subject || '',
@@ -278,6 +492,8 @@ const FlowIncomingJudge = (() => {
       ownAddresses: i.ownAddresses || i.own || null,
       userName: i.userName || null,
       ownNames: i.ownNames || null,
+      calendarChangeOn: i.calendarChangeOn === true,
+      surface: i.surface || null,
       autoReply: i.autoReply === true,
       noteToSelf: i.noteToSelf === true,
       senderIsUser: i.senderIsUser === true,
@@ -289,6 +505,7 @@ const FlowIncomingJudge = (() => {
       forwarded: i.forwarded === true,
       namesPending: i.namesPending === true,
       namesWaitDone: i.namesWaitDone === true,
+      confirmedAmountSilent: i.confirmedAmountSilent === true,
       readerEmail: i.readerEmail || null
     });
     // The profile names are not cached yet. No card, and not a quiet.
@@ -376,7 +593,9 @@ const FlowIncomingJudge = (() => {
     // An event with a day and no clock that the meeting gate would veto. When the sender is asking the reader for a time
     // ("are you available for a call Tuesday afternoon?") it is a request, and the card is a reply that offers times.
     // Every other event keeps the path it had (a named hold, or the Schedule meeting task).
-    if (intent.type === 'event' && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
+    // A family-G cancel or move that names its slot is the close itself (it removes or updates that one event), not a hold the veto must stop.
+    const slotChange = i.calendarChangeOn === true && typeof intentApi.slotChangeSafe === 'function' && intentApi.slotChangeSafe(intent, vetoText);
+    if (intent.type === 'event' && !slotChange && typeof intentApi.meetingPlanVeto === 'function' && intentApi.meetingPlanVeto(vetoText)) {
       if (intent.signals && intent.signals.slotAsk && !(intent.facts && intent.facts.time)) {
         intent = Object.assign({}, intent, { type: 'request', label: 'Reply requested', entities: Object.assign({}, intent.entities || {}, { requestWhat: null, what: null }) });
       } else {
@@ -387,7 +606,9 @@ const FlowIncomingJudge = (() => {
       threadUrl: i.threadUrl || null,
       hasThreadAttachment: Boolean(i.hasThreadAttachment),
       executionMemory: i.executionMemory || null,
-      text: vetoText
+      text: vetoText,
+      subject: i.subject || '',
+      calendarChangeOn: i.calendarChangeOn === true
     };
     // The show decision uses the unrewritten plan. A later Meeting or task
     // rewrite must not open a surface this plan leaves quiet.
@@ -714,6 +935,18 @@ const FlowIncomingJudge = (() => {
     };
   }
 
+  // «Sali, I need the budget by Thursday.»: a mail that opens on the reader's own given name and a comma is addressed to the reader, and the task and payment
+  // readers want the clause itself (capability frozen set, 2026-11-14: «Hi, I need ...» read, «Sali, I need ...» did not). Another person's name ("Dana,") is not
+  // stripped, so a mail for someone else stays quiet.
+  function stripOwnVocative(body, ownNames) {
+    const names = (ownNames || []).filter(Boolean).map((n) => String(n).trim().toLowerCase());
+    if (!names.length) return body;
+    const m = String(body || '').match(/^\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40})\s*[,،:]\s+/);
+    if (!m) return body;
+    const w = m[1].toLowerCase();
+    const alias = { sali: 'סאלי', 'סאלי': 'sali' };
+    return (names.indexOf(w) >= 0 || (alias[w] && names.indexOf(alias[w]) >= 0)) ? String(body).slice(m[0].length) : body;
+  }
   function taskAsk(i, body) {
     if (!addressedOnTo(i)) return null;
     const now0 = (i.now && typeof i.now.getTime === 'function') ? i.now : new Date(typeof i.now === 'number' ? i.now : Date.now());

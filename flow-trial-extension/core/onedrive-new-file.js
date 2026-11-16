@@ -52,7 +52,7 @@ const FlowOnedriveNewFile = (() => {
 
   const NOUN_EN = '(?:word\\s+|excel\\s+)?(?:shared\\s+)?(doc(?:ument)?|notes?(?:\\s+doc)?|agenda|minutes|sheet|spreadsheet|workbook|tracker|budget\\s+sheet|checklist)';
   const MAKE_EN = new RegExp('\\b(?:create|set\\s+up|start|open|make|build|put\\s+together|prepare|begin)\\s+(?:up\\s+)?(?:a|an|the|one)?\\s*(?:new\\s+)?(?:shared\\s+)?' + NOUN_EN + '\\b', 'i');
-  const MAKE_HE = /(?:לפתוח|ליצור|להכין|להקים|תפתח(?:י|ו)?|תיצור|תיצרי|תיצרו|פתח(?:י|ו)?|צור|צרי|תכין|תכיני|תכינו|הכן|הכיני|נפתח|נכין|נקים|תקים|תקימי|תקימו)\s+(?:לנו\s+|לי\s+)?(?:בבקשה\s+)?(מסמך|גיליון|טבלה|מעקב|אג'נדה|אגנדה|סיכום|רשימת\s+משימות)/;
+  const MAKE_HE = /(?:לפתוח|ליצור|להכין|להקים|תפתח(?:י|ו)?|תיצור|תיצרי|תיצרו|פתח(?:י|ו)?|צור|צרי|תכין|תכיני|תכינו|הכן|הכיני|נפתח|נכין|נקים|תקים|תקימי|תקימו)\s+(?:לנו\s+|לי\s+)?(?:בבקשה\s+)?(קובץ\s+אקסל|קובץ\s+וורד|מסמך\s+וורד|אקסל|וורד|מסמך|גיליון|טבלה|מעקב|אג'נדה|אגנדה|סיכום|רשימת\s+משימות)/;
   const ASK_EN = /\b(?:please|can you|could you|would you|will you|kindly|i need you to|let'?s|we need you to|we need to)\b|^\s*(?:create|set up|start|open|make|build|prepare)\b/i;
   const ASK_HE = /(?:בבקשה|נא\s|אפשר|תוכל|תוכלי|תוכלו|אתה יכול|את יכולה|בוא|בואו|צריך|צריכים|תפתח|תיצור|תכין|תקים|פתח|צור|הכן)/;
   const EXISTING = /\b(?:update|edit|fill\s+in|add\s+to|finish|review|attached|enclosed|already|existing|we\s+have|you\s+have|the\s+one\s+(?:we|i)|latest\s+version|latest|current)\b|עדכן|עדכני|תעדכן|מצורף|קיים|כבר\s+יש|הקיים/i;
@@ -76,7 +76,7 @@ const FlowOnedriveNewFile = (() => {
   }
 
   function kindOf(noun) {
-    return /sheet|spreadsheet|workbook|tracker|budget|checklist|גיליון|טבלה|מעקב|רשימת/i.test(noun) ? 'sheet' : 'doc';
+    return /sheet|spreadsheet|workbook|tracker|budget|checklist|גיליון|טבלה|מעקב|רשימת|אקסל/i.test(noun) ? 'sheet' : 'doc';
   }
 
   function cleanName(raw) {

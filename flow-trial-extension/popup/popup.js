@@ -908,6 +908,13 @@
       line.appendChild(named);
       card.appendChild(line);
     }
+    // Disconnect cleared Glance but Google did not confirm the revoke.
+    if (!st.connected && st.revokeNote) {
+      const pending = el('p', 'conn-note', st.revokeNote);
+      pending.setAttribute('dir', 'auto');
+      pending.setAttribute('data-glance-revoke-note', providerId);
+      card.appendChild(pending);
+    }
 
     if (c.status === 'planned') return card;
 

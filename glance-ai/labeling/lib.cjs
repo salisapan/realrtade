@@ -40,6 +40,19 @@ function isOwner(labeledBy) {
   return String(labeledBy || '').trim() === OWNER;
 }
 
+// Path A (owner authorisation 2026-10-13, docs/glance-ai/learning-from-use.md): a decision the owner made on his own accounts counts as
+// owner-verified BY ACTION when it carries the connector's read-back proof (ProofOfClose, docs/true-close.md section 7). It is a new, named
+// source. A Claude or agreement label can never carry it, and a row without proof never qualifies.
+const OWN_USE_BY = 'sali:action';
+function hasReadBackProof(p) {
+  return Boolean(p && typeof p === 'object' && typeof p.system === 'string' && p.system && typeof p.externalId === 'string' && p.externalId
+    && p.fetchedBack === true && typeof p.verifiedAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(p.verifiedAt));
+}
+function isOwnUse(row) {
+  return Boolean(row && String(row.labeledBy || '').trim() === OWN_USE_BY && row.source === 'own-use' && hasReadBackProof(row.proof)
+    && ['approve', 'edit'].indexOf(row.decision) >= 0);
+}
+
 function normMark(mark) {
   const s = String(mark || '').trim().replace(/\uFE0F/g, '');
   const m = MARK[s];
@@ -157,7 +170,7 @@ function validateRow(row, schema) {
   }
   if (row.ownerLabel === 'SILENT' && row.expectedAction != null) errors.push('SILENT requires expectedAction null');
   if (row.ownerLabel === 'ASK' && (typeof row.expectedAction !== 'string' || !row.expectedAction)) errors.push('ASK requires expectedAction');
-  if (row.ownerVerified === true && !isOwner(row.labeledBy)) errors.push('ownerVerified true but labeledBy is not the owner');
+  if (row.ownerVerified === true && !isOwner(row.labeledBy) && !isOwnUse(row)) errors.push('ownerVerified true but labeledBy is not the owner');
   return errors;
 }
 
@@ -199,5 +212,5 @@ function parseSheet(md) {
 
 module.exports = {
   OWNER, HERE, SCHEMA_PATH, ACTION_CLOSE,
-  isOwner, normMark, readJson, readJsonl, writeJsonl, loadBatch, loadBatches, rate, stepOf, metricsOf, validateRow, parseSheet
+  isOwner, isOwnUse, hasReadBackProof, OWN_USE_BY, normMark, readJson, readJsonl, writeJsonl, loadBatch, loadBatches, rate, stepOf, metricsOf, validateRow, parseSheet
 };

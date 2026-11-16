@@ -132,7 +132,7 @@ function lum(rgb) {
     reasonSlice.indexOf('ccCount:') > 0 && reasonSlice.indexOf('rawToLine:') > 0);
   check('Loops emits a Suggested or Added heading for every card state',
     popupSrc.indexOf("setAttribute('data-glance-section', which)") > 0 &&
-    popupSrc.indexOf("which === 'added' ? 'Added' : 'Suggested'") > 0 &&
+    popupSrc.indexOf("(which === 'added' ? Lw.added : Lw.suggested)") > 0 &&
     popupSrc.indexOf('receipts.forEach') > 0);
   const scoped = fs.readFileSync(path.join(ROOT, 'design/step-states-v1/scoped.css'), 'utf8');
   check('dark theme hides the Do It glyph by class, whatever its URL',

@@ -58,13 +58,23 @@ const FlowReplyMeaning = (() => {
     /\bgo(?:ing)? with (?:another|a different|someone else|a competitor|other)\b|\b(?:it|this|that)(?:['’]s| is) not (?:for (?:us|me)|(?:the )?right (?:fit|time))\b|\bnot (?:a|the) (?:right )?(?:fit|match|priority)\b/i,
     /\b(?:won['’]t|will not|not going to|not gonna) be (?:proceeding|moving forward|going ahead|continuing|pursuing|taking (?:this|it) (?:on|further))\b/i,
     /\b(?:won['’]t|will not|unable to|not going to|not gonna) be able to (?:take|do|help|make|attend|sign|accept|proceed|commit|join|participate|support)\b/i,
-    /^(?:no|nope|nah|no thanks|no thank you|not (?:now|this time|possible|happening))[.!,]?(?:\s|$)/i
+    /^(?:no|nope|nah|no thanks|no thank you|not (?:now|this time|possible|happening))[.!,]?(?:\s|$)/i,
+    // An opt-out, and "we already have our own": found on the owner's real threads (2026-11-12), where a one-word opt-out read as an
+    // acknowledgement and the loop would have chased a person who asked to be left alone.
+    /\b(?:please )?remove me from (?:your|this|the|our) (?:mailing |distribution )?list\b/i,
+    /^(?:please )?(?:unsubscribe|remove(?: me)?(?: from (?:your|this|the) (?:mailing )?list)?|stop (?:emailing|contacting|writing to) (?:me|us)|take me off (?:your|this|the) list)[.!]?\s*$/i,
+    /\bwe (?:already )?(?:have|use|work with) (?:our own|an? in-?house|internal|an existing) (?:system|systems|solution|solutions|tool|tools|team|vendor|provider)\b/i
   ];
   const DECLINE_HE = [
     /לא (?:אוכל|נוכל|אצליח|נצליח|אשלם|נשלם|אחתום|נחתום|אאשר|נאשר|מעוניין|מעוניינת|מעוניינים|רלוונטי|רלוונטית|ממשיכים|נמשיך|מתקדמים|נתקדם|מסכים|מסכימה|מסכימים)/,
     /החלטנו (?:שלא|לא|לוותר|לבטל)|החלטתי (?:שלא|לא|לוותר|לבטל)|נאלצ(?:ים|ת|ה)? (?:לסרב|לוותר|לבטל)|מסרב|מסרבת|מבטל(?:ים|ת)?|ביטלנו|ביטלתי/,
     /לא מתאים (?:לנו|לי)|לא רלוונטי (?:לנו|לי|כרגע)|(?:נלך|נבחר|בחרנו|נעבוד) עם (?:ספק|גורם|חברה) אח(?:ר|רת)/,
     /^(?:לא תודה|ממש לא|לא)[.!,]?\s*$/,
+    /^(?:נא |בבקשה )?(?:הסר|הסירו|להסיר|הסר אותי|הסירו אותי|להסיר אותי)(?: מרשימת התפוצה| מהרשימה)?[.!]?\s*$/,
+    // «נא להסיר אותי מהרשימה, אנחנו לא מעוניינים» (completion gold, 2026-11-15): an opt-out with a clause after it, which the anchored line above does not see and the
+    // loop read as a request back to the sender, so the person who said no would have been chased again.
+    /(?:^|\s)(?:להסיר|הסירו|הסר)\s+אותי\s+מ(?:ה)?(?:רשימ\S*|תפוצ\S*)/,
+    /יש לנו (?:כבר )?(?:מערכ(?:ת|ות)|פתרו(?:ן|נות)|ספק|כלי(?:ם)?) (?:פנימי(?:ת|ות|ים)?|משלנו|קיימ(?:ת|ות|ים)?|אחר(?:ת|ות|ים)?)/,
     /אין צורך \(ואי אפשר\) ל|אי אפשר לאשר/
   ];
   // "I can't do Tuesday, how about Wednesday?" is a counter-offer, not a no.
@@ -123,9 +133,11 @@ const FlowReplyMeaning = (() => {
     // «נא לצרף», «אנא הגש», «אודה לך אם תעדכן»). Only when nothing was delivered, and only in a short reply.
     const ASK_BACK_EN = /\b(?:please|kindly) (?:attach|provide|submit|upload|include|complete|fill (?:in|out)|reply with|send (?:us|me) (?:a|an|the|your))\b|\b(?:i|we) (?:kindly )?(?:ask|request) that you\b|\bwould you (?:please )?(?:send|provide|attach)\b/i;
     const ASK_BACK_HE = /(?<![א-ת])(?:נא|אנא) (?:ל|ה)[א-ת]{2,}|אודה לך אם (?:תוכל |תוכלי )?(?:ת[א-ת]{2,})|(?:תצטרך|תצטרכי|עליך|עליכם) (?:להגיש|לשלוח|לצרף|להמציא)|נבקש (?:ממך )?[^.?!]{0,25}(?:לצרף|לשלוח|להמציא)/;
+    // «נא להסיר אותי מהרשימה» is an opt-out, not a task handed back (completion gold, 2026-11-15); the decline patterns below read it.
+    const OPT_OUT = /(?:להסיר|הסירו|הסר)\s+אותי|\bremove me\b|\bunsubscribe\b|\btake me off\b/i;
     if (words(body) <= 80 && !DELIVERED.test(body)) {
       for (const s of lines) {
-        if (NOT_DECLINE.test(s)) continue;
+        if (NOT_DECLINE.test(s) || OPT_OUT.test(s)) continue;
         if (ASK_BACK_EN.test(s) || (he && ASK_BACK_HE.test(s))) return { meaning: 'question', why: 'needs something from you', line: s };
       }
     }

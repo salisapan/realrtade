@@ -67,14 +67,20 @@ assert.strictEqual(by['v2rtest-close-families-corpus-128'].why.offerAcceptance, 
 assert.strictEqual(by['v2rtest-close-families-corpus-128'].live.veto, null);
 
 assert.strictEqual(by['v2syn-6931'].live.label, 'SILENT');
-assert.strictEqual(by['v2syn-6931'].live.veto, 'cc-only');
+// Same cause as liveTip below: the engine now sees the Cc line and quiets the mail itself (quiet:hedge) before the lab's
+// own cc-only veto is reached. The label stays SILENT either way.
+assert.strictEqual(by['v2syn-6931'].live.veto, 'quiet:hedge');
 assert.strictEqual(by['v2syn-6931'].live.modelAlone, 'SILENT');
-assert.strictEqual(by['v2syn-6931'].liveTip, 'follow-up-ask|draft');
+// The person is only on Cc. Since 2026-10-19 the lab teacher passes To and Cc the way the browser host does
+// (model/teacher/engine.cjs hostCtx), so today's engine applies its own Cc-only quiet. Before, it never saw the Cc line
+// and offered a draft.
+assert.strictEqual(by['v2syn-6931'].liveTip, 'SILENT');
 
-assert.strictEqual(by['v2syn-7013'].live.veto, 'addressed-to-other');
+// Addressed by name to someone else: with the recipients passed (hostCtx), the engine quiets it itself, as with 6931.
+assert.strictEqual(by['v2syn-7013'].live.veto, 'quiet:hedge');
 assert.strictEqual(by['v2syn-7013'].live.modelAlone, 'follow-up-ask|draft');
 assert.strictEqual(by['v2syn-7013'].live.label, 'SILENT');
-assert.strictEqual(by['v2syn-7013'].liveTip, 'follow-up-ask|draft');
+assert.strictEqual(by['v2syn-7013'].liveTip, 'SILENT');
 
 assert.strictEqual(by['v2syn-9674'].live.label, 'SILENT');
 assert.strictEqual(by['v2syn-9674'].live.veto, null);

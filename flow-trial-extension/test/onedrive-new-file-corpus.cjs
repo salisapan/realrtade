@@ -191,6 +191,18 @@ const zipOk = (raw) => raw && raw[0] === 0x50 && raw[1] === 0x4b;
   check('a ref that is not Glance\'s is refused', (await N.undo({ itemId: 'X' }, io(makeGraph()))).reason === 'not-ours');
   check('no ref, no call', (await N.undo(null, io(makeGraph()))).ok === false);
 
+  // Hebrew "Excel file" and "Word file" (capability probe, 2026-11-14: «תפתח קובץ אקסל בשם ...» was ignored).
+  {
+    const x = N.recognize('היי סאלי, תפתח קובץ אקסל בשם הוצאות אוקטובר.');
+    check('Hebrew Excel file with a name is a sheet', x.kind === 'clear' && x.fileKind === 'sheet' && x.name === 'הוצאות אוקטובר', x);
+    const w = N.recognize('היי סאלי, תפתח קובץ וורד בשם סיכום חוזה.');
+    check('Hebrew Word file with a name is a doc', w.kind === 'clear' && w.fileKind === 'doc' && w.name === 'סיכום חוזה', w);
+    check('Hebrew Excel file with no name stays silent', N.recognize('היי סאלי, תפתח קובץ אקסל.').kind === 'block');
+    check('Hebrew Excel file: a negation stays silent', N.recognize('אין צורך לפתוח קובץ אקסל בשם הוצאות').kind === 'block');
+    check("Hebrew Excel file: the writer's own promise stays silent", N.recognize('היי, אני אפתח קובץ אקסל בשם הוצאות').kind === 'block');
+    check('Hebrew Excel file: ask a third person stays silent', N.recognize('היי סאלי, תבקש מדנה לפתוח קובץ אקסל בשם הוצאות').kind === 'block');
+  }
+
   console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
   process.exit(failures ? 1 : 0);
 })();

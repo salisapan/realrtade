@@ -105,6 +105,30 @@ const FlowOutlookSync = (() => {
     });
     Object.keys(unreadable).forEach((conv) => { if (!threads[conv]) out.diagnostics.push(unreadable[conv]); });
 
+    // A loop the AI engine opened (tier 'model') closes the way its plan says (core/model-plan.js closeFor, through core/ai-host.js
+    // onMessage): your real answer closes an ask of you, "I'll send it Thursday" moves the day, "got it" and an auto-reply close nothing.
+    // The host passes deps.modelClose only while the AI engine's switches are on; without it every loop takes the rules below, as before.
+    // Returns true when it decided the message (the caller then stops), false to fall through.
+    function modelClose(w, msg, at, stamp) {
+      if (!w || w.tier !== 'model' || typeof deps.modelClose !== 'function') return false;
+      let r;
+      try { r = deps.modelClose(w, msg, at); } catch (e) { return false; }
+      if (!r || r.defer || r.confirm) return false; // a payment that needs "is it paid?" takes the rule below, which asks
+      // Your own message on a loop they owe you: a chase is still recorded as a chase (the rules below); anything else leaves their promise
+      // open (the rule below would close any 'theirs' loop on your sent reply, which is not how a promise to you closes).
+      if (r.none && msg.isOwn && w.direction === 'theirs' && followUp.looksLikeChase(msg.text)) return false;
+      const patch = Object.assign({}, stamp, r.patch || {});
+      out.patches.push({ id: w.id, patch });
+      if (r.close) {
+        out.stats.closed++;
+        out.lines.push(patch.closedAs === 'declined' ? 'You said no. Loop closed.' : patch.closedAs === 'kept' ? 'Promise kept. Loop closed.' : msg.isOwn ? 'You replied. Loop closed.' : 'They answered. Loop closed.');
+      } else if (r.patch && (r.patch.chaseIso || r.rescheduled)) {
+        out.stats.moved++;
+        out.lines.push('A new day was named. I will look again then.');
+      }
+      return true;
+    }
+
     const seenParty = {};
     Object.keys(threads).forEach((conv) => {
       const utts = threads[conv].sort(sortByTime);
@@ -139,9 +163,13 @@ const FlowOutlookSync = (() => {
       if (last.direction === 'out') {
         if (w && w.status === 'waiting') {
           if (w.messageId === last.id) return;
+          if (modelClose(w, { isOwn: true, text: last.text }, last.ts || now, { messageId: last.id })) return;
           if (followUp.isMine(w)) {
             if (followUp.deliversFor(w, last.text, null)) { out.patches.push({ id, patch: Object.assign({ messageId: last.id }, followUp.closeAsKept(w, last.ts || now)) }); out.stats.closed++; out.lines.push('Promise kept. Loop closed.'); }
             else out.patches.push({ id, patch: { messageId: last.id } });
+          } else if (followUp.isBounced && followUp.isBounced(w)) {
+            // A new message of yours after a bounce is the resend: the flag clears and the chase clock runs again.
+            out.patches.push({ id, patch: Object.assign({ messageId: last.id }, followUp.unbouncePatch(w)) });
           } else if (followUp.looksLikeChase(last.text)) {
             out.patches.push({ id, patch: Object.assign({ messageId: last.id }, followUp.recordNudge(w, last.ts || now, watches)) });
             out.stats.moved++;
@@ -194,7 +222,8 @@ const FlowOutlookSync = (() => {
           now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: counted === 1, surface: 'outlook',
           to: lastRaw.toRecipients || null, cc: lastRaw.ccRecipients || null,
           ownAddresses: meSet ? Array.from(meSet) : null, userName: deps.userName || null,
-          ownNames: deps.ownNames || null
+          ownNames: deps.ownNames || null,
+          decomposeOn: deps.decomposeOn === true
         }, { intent: deps.intent, actions: deps.actions, factReply: deps.factReply }) : { show: false, reason: 'no-judge' });
       // A flag without the file list is not one file. The runner reads that
       // list before plan. A failed read, or a flag that was never read, stays
@@ -248,9 +277,14 @@ const FlowOutlookSync = (() => {
             }
           }
         }
+        if (target && target.lastReplyMessageId !== last.id && modelClose(target, { isOwn: false, text: last.text, email: party.email }, last.ts || now, { lastReplyMessageId: last.id })) {
+          if (!isAsk) note('answered-loop', { counterpart: party.email || null });
+          loopNoted = true;
+          return;
+        }
         if (target && target.lastReplyMessageId !== last.id) {
           const reply = followUp.classifyReply(last.text, target, { now, email: party.email, extract: deps.extract });
-          const res = followUp.applyReply(target, reply, last.ts || now);
+          const res = followUp.applyReply(target, reply, last.ts || now, last.text);
           if (res && !res.none) {
             if (res.confirm) {
               if (out.asks.length < MAX_ASKS) out.asks.push({ key: 'p|' + target.id + '|' + last.id, watchId: target.id, title: first(party) + ' replied. Is it paid?', detail: 'Nothing in the message says the payment was sent, so I kept the loop open.', yes: { status: 'resolved', resolvedAt: now, resolvedBy: 'manual', closedAs: 'paid', lastReplyMessageId: last.id } });
@@ -263,6 +297,10 @@ const FlowOutlookSync = (() => {
             out.patches.push({ id: target.id, patch });
             if (res.close) out.stats.closed++; else if (res.rescheduled) out.stats.moved++;
             if (res.close || res.rescheduled || res.yours) out.lines.push(lineFor(reply, target, party, res));
+            // The message to them never arrived: not a reply. The loop stays open and flagged and is not chased until the person sends it again.
+            // They replied but answered only some of what was asked: the loop stays open on the rest.
+            if (res.partial) out.lines.push(first(party) + ' replied, but did not answer everything you asked. Still open: ' + (res.remaining || []).slice(0, 3).join(' / ') + '. I kept the loop open.');
+            if (res.bounced && !target.bouncedAt) out.lines.push('Your message to ' + first(target.counterpart || party) + ' did not arrive (the address was not found or refused it). Check the address and send it again. I kept the loop open and will not chase until you do.');
             if (!isAsk) note('answered-loop', { counterpart: party.email || null });
             loopNoted = true;
             return;
@@ -344,3 +382,4 @@ const FlowOutlookSync = (() => {
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlookSync };
+else if (typeof globalThis !== 'undefined') globalThis.FlowOutlookSync = FlowOutlookSync;

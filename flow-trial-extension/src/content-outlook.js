@@ -742,6 +742,15 @@
   function glanceLabsLocked() {
     try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
   }
+  // The direct-ask second read (plain questions a person puts to the reader; a Hebrew bare imperative with a day): on, on every surface that
+  // runs the shared judge, by the owner's approval of 2026-11-12. To turn it off, set this to false.
+  const directAskSwitch = true;
+  // glanceSwitches.DECOMPOSE (off): a mail that asks for several things becomes one card with every ask's own steps (core/intent-decompose.js).
+  let decomposeSwitch = false;
+  try {
+    chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { decomposeSwitch = !glanceLabsLocked() && !!(bag.glanceSwitches && bag.glanceSwitches.DECOMPOSE === true); }).catch(() => {});
+    chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.glanceSwitches) decomposeSwitch = !glanceLabsLocked() && !!(ch.glanceSwitches.newValue && ch.glanceSwitches.newValue.DECOMPOSE === true); });
+  } catch (e) { decomposeSwitch = false; }
   // glanceSwitches.SYSTEM_NOTICE (off): a known service's deadline notice becomes a To Do task (core/system-notice.js).
   let systemNoticeSwitch = false;
   try {
@@ -821,6 +830,8 @@
     });
     const judgeWith = (text) => FlowIncomingJudge.judge({
       systemNoticeOn: systemNoticeSwitch === true,
+      directAskOn: directAskSwitch !== false,
+      decomposeOn: decomposeSwitch === true,
       bookingNoticeOn: bookingNoticeSwitch === true,
       paymentAskOn: paymentAskSwitch === true,
       taskAskOn: taskAskSwitch === true,
@@ -1526,6 +1537,7 @@
       : (file
         ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
         : (r.written || 'Reply draft ready in Outlook Drafts. Not sent.'));
+    const companion = unverified ? null : await writeCompanionTodo(ctx, taskStep);
     await FlowStorage.appendLog({
       kind: 'written',
       label: written,
@@ -1553,14 +1565,19 @@
       await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
       await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
     }
+    const writtenShown = companion && companion.proved ? written + ' Task added.' : written;
     paintIfCurrent(token, function () { FlowChipHost.showDraftReceipt(host, {
-      status: draftUnverifiedStatus(written),
-      written: written,
+      status: draftUnverifiedStatus(writtenShown),
+      written: writtenShown,
       url: r.url || r.where,
       onUndo: guardedUndo(host, async () => {
         const undoToken = captureMailToken();
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, created: r.created, outlookImmutableId: ctx.outlookImmutableId === true });
         if (u && (u.reason === 'user-edited' || u.reason === 'unconfirmed')) return { ok: false, reason: u.reason, written: u.written };
+        // The companion task goes with the draft; one the person edited stays (the writer refuses), and the draft is already gone either way.
+        if (u && u.ok && companion) {
+          try { await send({ type: 'flow:undo-action', connectorId: 'outlookTask', ref: companion.ref, created: companion.created }); } catch (e) { /* the task stays; nothing else depends on it */ }
+        }
         if (u && u.ok && typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(ctx.messageId, r.ref);
         }
@@ -1579,6 +1596,70 @@
     }); });
     } finally {
       doItInFlight = false;
+    }
+  }
+
+  // A card that carries a reply draft AND a task (a mail of questions with a hold instruction, or a request with a follow-up) writes both on one Do It, as Gmail does.
+  // The draft is written first and decides the receipt. The task follows with the same ProofOfClose rule as a task alone: a task that is not read back is never counted as
+  // done and the receipt does not mention it. Undo of the draft takes the task back too, and leaves one the person edited alone. Returns null when there is nothing to add.
+  async function writeCompanionTodo(ctx, taskStep) {
+    if (!taskStep) return null;
+    try {
+      const params = taskStep.params || {};
+      const live = await livePromiseProof(promiseItem(ctx));
+      if (live) return null;
+      const r = await send({
+        type: 'flow:execute-action',
+        payload: {
+          connectorId: 'outlookTask',
+          params: params,
+          label: artifactTitleFor(ctx, params.title || (ctx.intent && ctx.intent.label) || 'Task'),
+          senderName: ctx.sender && ctx.sender.name,
+          senderEmail: ctx.sender && ctx.sender.email,
+          subject: ctx.subject || '',
+          text: ctx.bodyText || '',
+          threadUrl: ctx.threadUrl || null,
+          facts: (ctx.intent && ctx.intent.facts) || null,
+          entities: (ctx.intent && (ctx.intent.entities || ctx.intent.facts)) || null
+        }
+      });
+      if (!r || !r.ok || !r.ref) return null;
+      const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
+        ? FlowProofOfClose.allowsHandled({ ok: true, proof: r.proof })
+        : false;
+      const taskTitle = actionTitle({
+        connectorId: 'outlookTask', process: ctx.process, intent: ctx.intent, text: ctx.bodyText,
+        writtenLine: r.written, subject: ctx.subject, params: params
+      });
+      const fields = proved && FlowProofOfClose.receiptLogFields
+        ? FlowProofOfClose.receiptLogFields(r.proof, { writtenLine: r.written, processName: faceTitle(ctx), closedLine: ctx.process && ctx.process.closedLine, status: pageChrome().handled, created: (r.ref && r.ref.created) || null })
+        : null;
+      await FlowStorage.appendLog(Object.assign({
+        kind: 'written',
+        label: proved ? taskTitle : "Created, couldn't verify",
+        actionTitle: taskTitle,
+        messageId: ctx.messageId,
+        itemId: ctx.itemId || null,
+        pathId: ctx.pathId || null,
+        threadId: ctx.threadId || ctx.conversationId || null,
+        outlookConversationId: ctx.conversationId || null,
+        outlookIncomingId: ctx.outlookIncomingId || ctx.messageId || null,
+        app: 'outlook',
+        connectorId: 'outlookTask',
+        ref: r.ref,
+        created: (r.ref && r.ref.created) || null,
+        where: r.where || null,
+        url: r.url || null,
+        fetchedBack: proved ? undefined : false,
+        intent: ctx.intent,
+        process: ctx.process,
+        sender: ctx.sender,
+        subject: ctx.subject,
+        text: ctx.bodyText
+      }, fields || {}));
+      return { ref: r.ref, created: (r.ref && r.ref.created) || null, proved: proved };
+    } catch (e) {
+      return null;
     }
   }
 
@@ -5449,6 +5530,8 @@
         });
         return FlowIncomingJudge.judge({
           systemNoticeOn: systemNoticeSwitch === true,
+      directAskOn: directAskSwitch !== false,
+      decomposeOn: decomposeSwitch === true,
           bookingNoticeOn: bookingNoticeSwitch === true,
           paymentAskOn: paymentAskSwitch === true,
           taskAskOn: taskAskSwitch === true,

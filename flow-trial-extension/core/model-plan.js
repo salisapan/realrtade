@@ -27,6 +27,10 @@ const FlowModelPlan = (() => {
   // What a model plan may contain: the writes the product can make today, each on the person's click.
   const ALLOWED_KINDS = ['calendar', 'outlookCalendar', 'gmailDraft', 'outlookDraft', 'googleTask', 'outlookTask'];
   const ANCHOR_KINDS = { calendar: ['calendar', 'outlookCalendar'], draft: ['gmailDraft', 'outlookDraft'], task: ['googleTask', 'outlookTask'] };
+  // A chat (WhatsApp, Messenger, Instagram, Teams) has no email draft: the person types the reply in the chat. There an ask of the person is
+  // anchored on their task (as the chat cards do, core/chat-deadline-ask.js) and still closes on their own reply in that chat (reply-sent).
+  const CHAT_SURFACES = { whatsapp: true, messenger: true, instagram: true, teams: true };
+  const CHAT_ANCHOR_KINDS = { calendar: ANCHOR_KINDS.calendar, draft: ANCHOR_KINDS.task, task: ANCHOR_KINDS.task };
   const MAX_STEPS = 3;
   const DAY = 86400000;
 
@@ -103,8 +107,8 @@ const FlowModelPlan = (() => {
     return Object.assign(w, { closeWhen: plan.doneWhen ? plan.doneWhen.kind : null, planProcess: plan.processId });
   }
 
-  // gate(process, proposal) -> { pass, reason }
-  function gate(process, p) {
+  // gate(process, proposal, anchors?) -> { pass, reason }
+  function gate(process, p, anchors) {
     const steps = (process && process.steps) || [];
     if (!steps.length) return { pass: false, reason: 'plan:empty' };
     if (steps.length > MAX_STEPS) return { pass: false, reason: 'plan:too-many-steps' };
@@ -114,12 +118,13 @@ const FlowModelPlan = (() => {
       if (d && d !== p.due) return { pass: false, reason: 'plan:date-not-read-by-device' };
     }
     const anchor = steps[0].kind;
-    if ((ANCHOR_KINDS[p.step] || []).indexOf(anchor) < 0) return { pass: false, reason: 'plan:anchor-mismatch:' + anchor };
+    if (((anchors || ANCHOR_KINDS)[p.step] || []).indexOf(anchor) < 0) return { pass: false, reason: 'plan:anchor-mismatch:' + anchor };
     return { pass: true, anchor };
   }
 
   // plan(flags, proposal, ctx) -> { used:false } | { used:true, plan|null, rows, reason? }
-  // ctx: { text (the mail, for planFor's own vetoes), today, lang, threadUrl, executionMemory, surface: 'gmail'|'outlook' }
+  // ctx: { text (the mail, for planFor's own vetoes), today, lang, threadUrl, executionMemory,
+  //        surface: 'gmail' (also the Gmail add-on) | 'outlook' | 'whatsapp' | 'messenger' | 'instagram' | 'teams' }
   function plan(flags, p, ctx) {
     if (!enabled(flags)) return { used: false };
     ctx = ctx || {};
@@ -129,13 +134,18 @@ const FlowModelPlan = (() => {
     if (!intent) return { used: true, plan: null, reason: p && p.step === 'file_save' ? 'file-save-is-suggest-save' : 'no-proposal' };
     let process;
     // The mail text: planFor's own meeting veto and hedge checks run on model plans too.
-    try { process = A.planFor(intent, { threadUrl: ctx.threadUrl || null, executionMemory: ctx.executionMemory || null, text: typeof ctx.text === 'string' ? ctx.text : '' }); } catch (e) { return { used: true, plan: null, reason: 'planner-error' }; }
+    try { process = A.planFor(intent, { threadUrl: ctx.threadUrl || null, executionMemory: ctx.executionMemory || null, text: typeof ctx.text === 'string' ? ctx.text : '', subject: ctx.subject || '' }); } catch (e) { return { used: true, plan: null, reason: 'planner-error' }; }
     if (!process) return { used: true, plan: null, reason: 'no-process' };
     if (ctx.surface === 'outlook') {
       const OUT = { calendar: 'outlookCalendar', gmailDraft: 'outlookDraft', googleTask: 'outlookTask' };
       process = Object.assign({}, process, { steps: process.steps.map((s) => (OUT[s.kind] ? Object.assign({}, s, { kind: OUT[s.kind] }) : s)) });
     }
-    const g = gate(process, p);
+    const chat = CHAT_SURFACES[ctx.surface] === true;
+    if (chat) {
+      process = Object.assign({}, process, { steps: process.steps.filter((s) => s.kind !== 'gmailDraft' && s.kind !== 'outlookDraft') });
+      if (!process.steps.length) return { used: true, plan: null, reason: 'plan:chat-no-step' };
+    }
+    const g = gate(process, p, chat ? CHAT_ANCHOR_KINDS : null);
     if (!g.pass) return { used: true, plan: null, reason: g.reason };
     const steps = process.steps.map((s) => Object.assign({}, s, { needsClick: true }));
     const out = {

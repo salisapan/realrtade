@@ -1,0 +1,6 @@
+{
+  "_note": "USD per million tokens, standard (non-batch) rates, prompts up to 100K tokens. Taken from the Anthropic pricing page on 2026-11-11 (platform.claude.com/docs/en/about-claude/pricing). VERIFY against the live page before any run; a run that finds a different price must edit this file first. Cache reads are charged here at 10% of the input price and cache writes at 125% (conservative).",
+  "claude-haiku-5-5": { "in": 0.10, "out": 0.50 },
+  "claude-sonnet-5-5": { "in": 2.00, "out": 10.00 },
+  "claude-opus-5-5": { "in": 4.00, "out": 20.00 }
+}

@@ -34,6 +34,44 @@ const RECONNECT_KEY = 'googleReconnect';
 const RECONNECT_LABEL = 'חבר מחדש את Google';
 let laneSource = 'chrome';
 
+function isFullDocumentLane(connectorId, bag) {
+  if (connectorId === 'googleDocFull') return true;
+  return !!(bag && (bag.fullDocument === true || (bag.params && bag.params.fullDocument === true)));
+}
+
+function emitFullDocumentLog(line) {
+  try { console.log(line); } catch (e) {}
+  try {
+    const e2e = globalThis.__glanceE2e;
+    if (e2e) (e2e.fullDocumentLogs || (e2e.fullDocumentLogs = [])).push(line);
+  } catch (e) {}
+}
+
+function logFullDocumentWrite(connectorId, input, result) {
+  if (!isFullDocumentLane(connectorId, input)) return;
+  const o = result || {};
+  let word;
+  let reason;
+  if (o.ok === true) {
+    word = 'created';
+    reason = o.proof && o.proof.fetchedBack === true ? 'verified' : 'unproved';
+  } else {
+    word = 'failed';
+    reason = o.reason || 'failed';
+    if (reason === 'drive-not-granted' || reason === 'missing-scope') reason = 'drive-scope-missing';
+  }
+  emitFullDocumentLog('[Glance] full-document write ' + word + ' ' + reason);
+  if (o.googleReason) {
+    emitFullDocumentLog('[Glance] full-document google ' + o.googleReason);
+  }
+}
+
+function logFullDocumentUndo(connectorId, ref, result) {
+  if (!isFullDocumentLane(connectorId, ref)) return;
+  const word = (result && result.ok === true) ? (result.reason || 'trashed') : ((result && result.reason) || 'failed');
+  emitFullDocumentLog('[Glance] full-document undo ' + word);
+}
+
 // The token of the account the person consented to in Glance, and only that.
 // The stored Connect token and Chrome's own token are both read, each one's
 // account comes from the openid/userinfo email claim, and the account recorded at Connect
@@ -239,12 +277,32 @@ function noteGoogleAuthFailure(reason, account) {
     .then(() => chrome.storage.local.get([EVER_KEY, 'googleTasksAuth', 'googleWebAuth', 'glanceLaneUndo']))
     .then((bag) => {
       if (!priorGoogleRecord(bag)) return null;
+      const why = String(reason || '');
+      // A remote revoke / dead token: drop the stored grant so the popup shows
+      // Connect Google (same keys Disconnect clears). wrong-account only drops
+      // the pinned mailbox; missing-scope keeps Reconnect.
+      const clearGrant = why === '401' || why === 'revoked' || why === 'invalid_token' || why === 'invalid_grant' || why === 'not signed in';
+      if (clearGrant) {
+        const bridge = typeof globalThis !== 'undefined' ? globalThis.FlowGoogleAccess : null;
+        if (bridge && typeof bridge.clearRevoked === 'function') {
+          return Promise.resolve().then(() => bridge.clearRevoked(why)).catch(() => null);
+        }
+        return chrome.storage.local.remove([
+          'googleTasksAuth',
+          'googleWebAuth',
+          RECONNECT_KEY,
+          EVER_KEY,
+          'googleGrantedScopes',
+          'googleProfile',
+          CONNECTED_ACCOUNT_KEY,
+          'glanceOwnNames'
+        ]);
+      }
       const ever = bag && everConnectedRecord(bag[EVER_KEY]);
-      const flag = { needed: true, reason: String(reason || 'auth') };
+      const flag = { needed: true, reason: why || 'auth' };
       if (account) flag.account = String(account);
       const patch = { [RECONNECT_KEY]: flag };
       if (!ever) patch[EVER_KEY] = { connected: true };
-      const why = String(reason || '');
       const clearConnected = why === 'wrong-account' || why === 'account-unverified';
       return chrome.storage.local.set(patch).then(() => {
         if (!clearConnected) return null;
@@ -271,12 +329,37 @@ function criticalUrl(url) {
 // It does not say the token is wrong, so it neither flags Reconnect nor
 // triggers a refresh. Only the Tasks, Calendar, Drive, Docs, Sheets and
 // Gmail hosts can end the grant.
+// A 403 is a missing scope only when Google says so (or says nothing). An
+// API that is not enabled in the Cloud project, a quota, or a file
+// permission is that API's answer: Reconnect cannot fix it, so it is not
+// flagged, and the writer names it instead of looping on Reconnect.
+function denialOf(res, url) {
+  const C = typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : globalThis.FlowGoogleConfig;
+  if (!res || (res.status !== 401 && res.status !== 403)) return null;
+  if (!C || typeof C.googleDenial !== 'function') return { kind: res.status === 401 ? 'auth' : 'unknown', googleReason: '', service: '' };
+  return C.googleDenial(res.status, res.json, url);
+}
+
+function noteDenial(res, url, denial) {
+  if (!denial || denial.kind === 'auth') return Promise.resolve();
+  try { console.info('[Glance] google denial ' + res.status + ' ' + denial.kind + ' ' + (denial.service || '-') + ' ' + (denial.googleReason || '-')); } catch (e) { /* no console */ }
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve();
+  return Promise.resolve()
+    .then(() => chrome.storage.local.set({ googleLastDenial: { status: res.status, kind: denial.kind, service: denial.service || '', googleReason: denial.googleReason || '', at: Date.now() } }))
+    .catch(() => {});
+}
+
 function settleAuth(res, url) {
   if (!res) return Promise.resolve(res);
   if (url && !criticalUrl(url)) return Promise.resolve(res);
   if (res.status === 401 || res.status === 403) {
-    const reason = res.status === 403 ? 'missing scope' : '401';
-    return noteGoogleAuthFailure(reason).then(() => res);
+    const denial = denialOf(res, url);
+    if (denial) res.denial = denial;
+    return noteDenial(res, url, denial).then(() => {
+      if (res.status === 401) return noteGoogleAuthFailure('401');
+      if (denial && (denial.kind === 'api-disabled' || denial.kind === 'forbidden')) return null;
+      return noteGoogleAuthFailure('missing scope');
+    }).then(() => res);
   }
   return Promise.resolve(res);
 }
@@ -334,7 +417,7 @@ function readBody(res) {
     if (text) {
       try { json = JSON.parse(text); } catch (e) { json = null; }
     }
-    return { status: res.status, ok: res.ok, json: json };
+    return { status: res.status, ok: res.ok, json: json, text: text || '' };
   });
 }
 
@@ -467,6 +550,8 @@ async function storedGrantedScopes() {
     if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return null;
     const bag = await chrome.storage.local.get('googleGrantedScopes');
     const rec = bag && bag.googleGrantedScopes;
+    // What Google actually granted wins over the list that was asked for.
+    if (rec && Array.isArray(rec.granted)) return rec.granted.map((s) => String(s || '').trim()).filter(Boolean);
     const raw = rec && rec.version;
     if (raw == null) return null;
     return String(raw).split('\n').map((s) => s.trim()).filter(Boolean);
@@ -621,19 +706,48 @@ async function guardedWrite(connectorId, input, ctx) {
   activeTab = c.tab || '';
   const picked = await laneCredential(c.tab);
   if (!picked.ok && picked.consentRevoked) {
-    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => ({
-      ok: false,
-      reason: 'not-connected',
-      needsReconnect: true,
-      reconnectLabel: reconnectWords(),
-      error: statusLanguage() === 'he' ? 'חבר מחדש את Google כדי להמשיך.' : 'Reconnect Google to continue.',
-      written: '',
-      proof: null
-    }));
+    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => {
+      const out = {
+        ok: false,
+        reason: 'not-connected',
+        needsReconnect: true,
+        reconnectLabel: reconnectWords(),
+        error: statusLanguage() === 'he' ? 'חבר מחדש את Google כדי להמשיך.' : 'Reconnect Google to continue.',
+        written: '',
+        proof: null
+      };
+      logFullDocumentWrite(connectorId, input, out);
+      return out;
+    });
   }
-  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked, null, c.lang);
+  if (!picked.ok && picked.reason !== 'no-token') {
+    const out = wrongAccountResult(picked, null, c.lang);
+    logFullDocumentWrite(connectorId, input, out);
+    return out;
+  }
+  // A Doc needs drive.file. A grant known to lack it is not sent to Google:
+  // the card asks Reconnect, and Reconnect asks Google's consent for it.
+  if (connectorId === 'googleDoc' || connectorId === 'googleDocFull') {
+    const Config = globalThis.FlowGoogleConfig;
+    const scopes = await storedGrantedScopes();
+    if (Config && typeof Config.hasScope === 'function' && Config.hasScope(scopes, Config.SCOPE_DRIVE_FILE) === false) {
+      await noteGoogleAuthFailure('missing scope');
+      const out = {
+        ok: false,
+        reason: 'drive-not-granted',
+        missingScope: 'drive.file',
+        needsReconnect: true,
+        reconnectLabel: reconnectWords(),
+        written: '',
+        proof: null
+      };
+      logFullDocumentWrite(connectorId, input, out);
+      return out;
+    }
+  }
   const result = await writeWithListRecovery(connectorId, input, picked.ok ? picked : null);
   if (result && picked.ok && result.ok !== undefined) result.account = picked.email;
+  logFullDocumentWrite(connectorId, input, result);
   return result;
 }
 
@@ -642,17 +756,27 @@ async function guardedUndo(connectorId, ref, ctx) {
   activeTab = c.tab || '';
   const picked = await laneCredential(c.tab);
   if (!picked.ok && picked.consentRevoked) {
-    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => ({
-      ok: false,
-      reason: 'not-connected',
-      needsReconnect: true,
-      reconnectLabel: reconnectWords(),
-      proof: null
-    }));
+    return noteGoogleAuthFailure('revoked', picked.tab || picked.connected || '').then(() => {
+      const out = {
+        ok: false,
+        reason: 'not-connected',
+        needsReconnect: true,
+        reconnectLabel: reconnectWords(),
+        proof: null
+      };
+      logFullDocumentUndo(connectorId, ref, out);
+      return out;
+    });
   }
-  if (!picked.ok && picked.reason !== 'no-token') return wrongAccountResult(picked, null, c.lang);
+  if (!picked.ok && picked.reason !== 'no-token') {
+    const out = wrongAccountResult(picked, null, c.lang);
+    logFullDocumentUndo(connectorId, ref, out);
+    return out;
+  }
   const prepared = await prepareUndo(connectorId, ref);
-  return Lane.undo(connectorId, prepared);
+  const result = await Lane.undo(connectorId, prepared);
+  logFullDocumentUndo(connectorId, prepared || ref, result);
+  return result;
 }
 
 function csvRow(csv) {
@@ -660,6 +784,22 @@ function csvRow(csv) {
   if (!line) return null;
   const cells = line.split(',').map((c) => c.trim()).filter(Boolean);
   return cells.length ? cells : null;
+}
+
+// The due day the card showed. The step's own date wins, as before. A card whose step carries no date still showed the
+// day from the mail's facts ("עד 22 בנוב׳"); that fallback is what background.js's taskClosePayload always used, and the
+// lane dropped it. A facts day already behind today is not a due date. core/google-tasks.js posts it as midnight UTC and
+// its read-back refuses Handled when the task comes back without that day.
+function laneTaskDue(i, params) {
+  const planned = (params && params.dateIso) || (i && i.dueIso) || null;
+  if (planned) return planned;
+  const facts = i && i.facts;
+  const iso = facts && facts.date && typeof facts.date.iso === 'string' ? facts.date.iso.trim() : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const pad = (v) => String(v).padStart(2, '0');
+  const now = new Date();
+  const today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+  return iso >= today ? iso : null;
 }
 
 async function prepareWrite(connectorId, input, cred) {
@@ -670,7 +810,7 @@ async function prepareWrite(connectorId, input, cred) {
       title: i.title || i.label || params.title || params.what || i.subject || '',
       taskListId: i.taskListId || params.taskListId || await storedTaskListId() || await resolveExistingTaskList() || '@default',
       notes: i.notes || '',
-      dueIso: params.dateIso || i.dueIso || null
+      dueIso: laneTaskDue(i, params)
     };
   }
   if (connectorId === 'googleTaskClose') {
@@ -736,15 +876,19 @@ async function prepareWrite(connectorId, input, cred) {
   }
   if (connectorId === 'googleDriveSave') return i;
   if (connectorId === 'googleDoc' || connectorId === 'googleDocFull') {
-    const text = params.text || i.text || plainText(params.html || i.html || '');
+    const html = params.html || i.html || '';
+    const text = params.text || i.text || (html ? plainText(html) : '');
     const documentId = i.documentId || params.documentId || '';
-    return {
+    const out = {
       title: params.title || i.title || 'Note',
       name: params.title || i.title || 'Note',
       text: text,
       documentId: documentId,
       origin: documentId ? (i.origin || params.origin || 'picked') : 'created'
     };
+    if (html) out.html = html;
+    if (i.fullDocument === true || params.fullDocument === true || connectorId === 'googleDocFull') out.fullDocument = true;
+    return out;
   }
   if (connectorId === 'googleSheetAppend') {
     const spreadsheetId = i.spreadsheetId || params.spreadsheetId || '';
@@ -821,6 +965,9 @@ function localizeUndo(result) {
 
 function decorate(result) {
   const value = localizeUndo(result);
+  if (value && value.ok === false && value.reason === 'drive-not-granted') {
+    return Promise.resolve(Object.assign({}, value, { missingScope: 'drive.file', needsReconnect: true, reconnectLabel: reconnectWords() }));
+  }
   if (!value || value.ok !== false || value.reason !== 'not-connected') return Promise.resolve(value);
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return Promise.resolve(value);
   return Promise.resolve()
@@ -1010,6 +1157,13 @@ function onLaneMessage(msg, sender, sendResponse) {
     Promise.resolve((async () => {
       if (!F || typeof F.plan !== 'function') return { action: 'silence', reason: 'not-configured' };
       if (!(await laneSwitchOn(F.SWITCH))) return { action: 'off', reason: 'switch-off' };
+      // A known grant list without drive.file cannot create the Doc. Ask to
+      // reconnect. An unknown list is not treated as a refusal.
+      const scopes = await storedGrantedScopes();
+      const Config = globalThis.FlowGoogleConfig;
+      if (Config && typeof Config.hasScope === 'function' && Config.hasScope(scopes, Config.SCOPE_DRIVE_FILE) === false) {
+        return { action: 'reconnect', reason: 'drive-scope' };
+      }
       return F.plan({
         flags: { [F.SWITCH]: true },
         text: String(msg.text || '').slice(0, 8000),

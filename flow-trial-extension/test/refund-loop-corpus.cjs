@@ -60,7 +60,7 @@ check('PayPal "received a refund ... from" closes in dollars', Boolean(R.judge([
 check('the merchant in capitals counts', Boolean(R.judge([Object.assign({ id: 'C' }, R.ask('Could you please issue a refund for the chair (₪640)?', o({ to: 'help@comfychairs.co.il', toName: 'Comfy Chairs' })))], { fromEmail: 'alerts@cal-online.co.il', text: 'A credit of ₪640.00 from COMFY CHAIRS was posted to your card.' }, ON)));
 check('a credit with the amount but no merchant asks once', (R.judge([loop], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 189 ₪ נקלט בכרטיסך.' }, ON) || {}).verdict === 'ask');
 check('another merchant for the same amount: silence', R.judge([loop], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 189 ₪ מבית העסק סופר-פארם נקלט בכרטיסך.' }, ON) === null);
-check('a partial refund keeps it open', R.judge([loop], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 89 ₪ מבית העסק שופ נקלט בכרטיסך.' }, ON) === null);
+check('a partial refund keeps it open (counted as a part, never a close)', (R.judge([loop], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 89 ₪ מבית העסק שופ נקלט בכרטיסך.' }, ON) || {}).verdict === 'partial');
 check('another currency is not the amount', R.judge([loop], { fromEmail: 'service@paypal.com', text: 'You received a refund of $189.00 USD from שופ.' }, ON) === null);
 check('a future or pending credit keeps it open', R.judge([loop], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 189 ₪ מבית העסק שופ יבוצע בחיוב הבא.' }, ON) === null);
 check('a charge is not a credit', R.judge([loop], { fromEmail: 'alerts@isracard.co.il', text: 'בוצע חיוב בסך 189 ₪ בבית העסק שופ.' }, ON) === null);
@@ -91,6 +91,46 @@ const d = R.due([
   Object.assign({}, loop, { id: 'e', status: 'closed' })
 ], later);
 check('due: no answer, money not back past their day, and a refusal; not a future day or a closed loop', d.map((x) => x.id + ':' + x.why).join() === 'a:no-answer,d:declined,b:not-back', d);
+
+console.log('--- Wednesday edge cases (Hebrew and English) ---');
+const NOWr = { enabled: true, now: NOW };
+check('store credit instead of money is a stage for the person, not approved', (R.reply(loop, 'We can offer you store credit of ₪189 instead.', NOWr) || {}).stage === 'store-credit');
+check('«זיכוי לחנות» / «שובר» is store credit', (R.reply(loop, 'נשמח לתת לך זיכוי לחנות על סך 189 ₪', NOWr) || {}).stage === 'store-credit' && (R.reply(loop, 'שלחנו לך שובר על הסכום', NOWr) || {}).stage === 'store-credit');
+check('a refund to the card that mentions a voucher code is still approved', (R.reply(loop, 'Your refund to your card was processed. Voucher code SAVE10 is a small gift.', NOWr) || {}).stage === 'approved');
+check('"once we receive the item" is a step for the person, not approved', (R.reply(loop, 'The refund will be issued once we receive the item.', NOWr) || {}).need === 'return-item');
+check('«לאחר שנקבל את המוצר» too', (R.reply(loop, 'ההחזר יבוצע לאחר שנקבל את המוצר בחזרה', NOWr) || {}).need === 'return-item');
+check('«הכסף יוחזר לכרטיס תוך 7 ימים» is approved with 7 workdays', (R.reply(loop, 'הכסף יוחזר לכרטיס תוך 7 ימים', NOWr) || {}).expectIso === '2026-11-17');
+check('"Can I get a refund for order 4471?" opens', Boolean(R.ask('Hi, can I get a refund for order 4471? The charge was ₪189.', o({ toName: 'Shop' }))));
+const sp = Object.assign({}, loop, { id: 'S' });
+const part1 = R.judge([sp], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 100 ₪ מבית העסק שופ נקלט בכרטיסך.' }, ON);
+check('a refund in two parts: the first part is counted', part1 && part1.verdict === 'partial' && part1.amount === 100, part1);
+const sp2 = Object.assign({}, sp, R.partialPatch(sp, part1, { id: 'n1', fetchedBack: true }, NOW));
+check('the same notice is counted once', R.partialPatch(sp2, part1, { id: 'n1' }, NOW).received === 100 && sp2.received === 100);
+check('a part without a notice id is not counted', R.partialPatch(sp, part1, {}, NOW).received === 0);
+const part2 = R.judge([sp2], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 89 ₪ מבית העסק שופ נקלט בכרטיסך.' }, ON);
+check('…and the second part that completes it closes', part2 && part2.verdict === 'close', part2);
+check('a part from an unnamed credit is never counted', R.judge([sp], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 100 ₪ נקלט בכרטיסך.' }, ON) === null);
+const mk = Object.assign({ id: 'M' }, R.ask('I would like a refund of $49 for the workshop.', o({ to: 'hello@makerspace.com', toName: 'Maker Space Tel Aviv' })));
+check('the card descriptor (the mail domain) names the merchant', (R.judge([mk], { fromEmail: 'service@paypal.com', text: 'You received a refund of $49.00 USD from MAKERSPACE*BOOKING.' }, ON) || {}).verdict === 'close');
+check('a generic domain label (shop) never names a merchant by itself', R.judge([loop], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 189 ₪ מבית העסק SHOP CENTER נקלט בכרטיסך.' }, ON) === null);
+check('the legal name around the brand («שופ אונליין בע"מ») still names it', Boolean(R.judge([loop], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 189 ₪ מבית העסק שופ אונליין בע"מ נקלט בכרטיסך.' }, ON)));
+check('cashback is not a refund', R.judge([loop], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי קאשבק בסך 189 ₪ מבית העסק שופ במסגרת מבצע.' }, ON) === null);
+check('points credited are not a refund', R.judge([loop], { fromEmail: 'alerts@max.co.il', text: 'זוכו 189 נקודות מבית העסק שופ' }, ON) === null);
+check('due lists store credit for the person to decide', R.due([Object.assign({}, loop, { id: 'sc', stage: 'store-credit' })], NOW).map((x) => x.why).join() === 'store-credit');
+
+console.log('--- real-user A/B: dormant, counts only ---');
+const { FlowPmfMetrics: P } = require('../core/pmf-metrics.js');
+check('the refund-loop experiment exists with arms A and B', P.EXPERIMENTS['refund-loop'] && P.EXPERIMENTS['refund-loop'].arms.join() === 'A,B');
+check('no arm without the switch', P.assignVariant('install-87654321', 'refund-loop', {}) === null);
+const armR = P.assignVariant('install-87654321', 'refund-loop', { enabled: true });
+check('the same install always gets the same arm', ['A', 'B'].indexOf(armR) >= 0 && armR === P.assignVariant('install-87654321', 'refund-loop', { enabled: true }));
+let ab = {};
+['refund_asked', 'refund_asked', 'refund_loop_shown', 'refund_loop_shown', 'refund_money_back', 'refund_not_back_by_day'].forEach((e) => { ab = P.foldAbEvent(ab, 'refund-loop', 'B', e); });
+ab = P.foldAbEvent(ab, 'refund-loop', 'A', 'refund_asked');
+ab = P.foldAbEvent(ab, 'refund-loop', 'B', 'free text never counts');
+const sn = P.abSnapshot(ab, 'refund-loop');
+check('per-arm rates with their n: money back per refund asked', sn.B.refundAsked === 2 && sn.B.refundBack === 0.5 && sn.B.refundNotBack === 0.5 && sn.A.refundAsked === 1 && sn.A.refundBack === 0, sn);
+check('a rate on zero is null; an unknown event changes nothing', sn.A.refundNotBack === null && sn.B.refundWrongClose === 0 && Object.keys(sn.B.counts).length === 4);
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nall refund-loop checks passed');
 process.exit(failures ? 1 : 0);

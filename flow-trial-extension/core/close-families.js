@@ -103,10 +103,17 @@ const FlowCloseFamilies = (() => {
   const FOLLOW_EN = /\b(?:please (?:chase|nudge|ping)|follow up with|send (?:a |the )?reminder|send \w+ a reminder|please remind|chase up|chase the|nudge \w+ about|ping \w+ about)\b/i;
   const FOLLOW_HE = /(?:תעקוב|בבקשה תעקוב|לעקוב אחרי|תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|שלח תזכורת|תשלח תזכורת|תבדוק מול)/;
 
-  const MOVE_EN = /\b(?:reschedul\w*|postpone|push (?:the |our |this )?(?:call|meeting|sync)|move (?:the |our |this )?(?:call|meeting|sync))\b/i;
+  // The narrow readers are the default. A host that passes calendarChangeOn (Labs row CALENDAR_CHANGE, off) gets the wide ones inside assess(): «push Thursday's call»,
+  // «move our Thursday 10:00 call» (up to three words between the verb and the noun), the passive notice «the sync is moved to Friday at 11:00», and «הפגישה ... בוטלה».
+  let WIDE = false;
+  const MOVE_EN_NARROW = /\b(?:reschedul\w*|postpone|push (?:the |our |this )?(?:call|meeting|sync)|move (?:the |our |this )?(?:call|meeting|sync))\b/i;
+  const MOVE_EN_WIDE = /\b(?:reschedul\w*|postpone|(?:push|move)\s+(?:(?:the|our|this|that|my|your)\s+)?(?:[\w'’:.-]+\s+){0,3}?(?:call|meeting|sync|review|stand-?up|session)|(?:is|are|was|has been|have been|will be|got)\s+(?:moved|pushed))\b/i;
+  const MOVE_EN = { test(x) { return (WIDE ? MOVE_EN_WIDE : MOVE_EN_NARROW).test(x); } };
   const MOVE_HE = /(?:לדחות|נדחתה|נדחה|להזיז את ה|תזיז(?:ו|י)? את ה|נקבע מחדש)/;
   const CANCEL_EN = /\b(?:cancel(?:led|ing)?|call(?:ed)? off)\b[^.]{0,48}\b(?:call|meeting|sync|invite|event)\b|\b(?:call|meeting|sync|invite|event)\b[^.]{0,48}\b(?:is |was )?(?:cancelled|called off)\b/i;
-  const CANCEL_HE = /(?:בטל את ה|לבטל את ה|הפגישה מבוטלת|השיחה מבוטלת)/;
+  const CANCEL_HE_NARROW = /(?:בטל את ה|לבטל את ה|הפגישה מבוטלת|השיחה מבוטלת)/;
+  const CANCEL_HE_WIDE = /(?:בטל את ה|לבטל את ה|הפגישה מבוטלת|השיחה מבוטלת|(?:הפגישה|השיחה|הישיבה|הסנכרון)\s+(?:[^\s.,!?]+\s+){0,5}?(?:בוטלה|בוטל|מבוטלת|לא\s+תתקיים)(?![\u0590-\u05FF]))/;
+  const CANCEL_HE = { test(x) { return (WIDE ? CANCEL_HE_WIDE : CANCEL_HE_NARROW).test(x); } };
 
   const HEDGE_EN = /\b(?:maybe|perhaps|possibly|no rush|if possible|tentatively|might|whenever you|if you feel|sometime|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works|any chance|not sure which|whichever)\b/i;
   const HEDGE_HE = /(?:אולי|ייתכן|אם אפשר|אין לחץ|מתישהו|נראה לי|לא בטוח(?:ה)?\s+איז|איזה\s+קובץ|איזו\s+חשבונית|יש סיכוי)/;
@@ -226,6 +233,14 @@ const FlowCloseFamilies = (() => {
     // An English hedge, maybe, if you're free, and אולי win before a live ask.
     // "אם אפשר, תשלח" is still the ask. אם אפשר is not this hedge.
     const t = String(sentence || '');
+    // Softener then but/however/אבל, or a softener next to an explicit deadline, yields to the ask.
+    // "No rush, but please send by Friday" and "אין לחץ, אבל תשלח עד מחר" stay live.
+    if (/\b(?:no pressure|no rush|only if you have (?:the )?time|if it works out)\b[\s,.…:;—–-]*(?:but|however)\b/i.test(t)) return false;
+    if (/(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)[\s,.…:;—–-]*אבל/.test(t)) return false;
+    const softener = /\b(?:no pressure|no rush)\b/i.test(t) || /(?:אין\s+לחץ|בלי\s+לחץ|לא\s+דחוף)/.test(t);
+    const deadline = /\b(?:by|before|until|no later than)\s+(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|tomorrow|tonight|next\s+week|\d)/i.test(t)
+      || /עד\s+(?:יום\s+)?(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת|מחר)/.test(t);
+    if (softener && deadline) return false;
     if (HEDGE_EN.test(t)) return true;
     if (/(?:^|[^\u0590-\u05FF])אולי/.test(t)) return true;
     if (sentenceLiveAsk(t)) return false;
@@ -548,8 +563,10 @@ const FlowCloseFamilies = (() => {
     const clause = replacementClause(sentence);
     let date = clause ? dateOf(clause, now) : null;
     const time = clause ? movedClock(clause) : null;
-    const before = clause ? sentence.slice(0, sentence.indexOf(clause)) : sentence;
-    const oldDate = fromWeekday(before, now);
+    const before = (clause ? sentence.slice(0, sentence.indexOf(clause)) : sentence).replace(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)['’]s\b/ig, WIDE ? '$1' : '$&');
+    // «Thursday's call at 10:00», «the Thursday sync at 10:00»: the old day has a noun between it and the clock, which the date reader does not take.
+    const oldDay = before.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+    const oldDate = fromWeekday(before, now) || (WIDE && oldDay ? dateOf('on ' + oldDay[1], now) : null);
     const oldTime = clockOf(before);
     if (!date && time && oldDate) date = oldDate;
     // Both clocks named, and they differ: move that event. A new clock
@@ -877,6 +894,10 @@ const FlowCloseFamilies = (() => {
   }
 
   function assess(text, facts, ctx) {
+    WIDE = Boolean(ctx && ctx.calendarChangeOn === true);
+    try { return assessInner(text, facts, ctx); } finally { WIDE = false; }
+  }
+  function assessInner(text, facts, ctx) {
     ctx = ctx || {};
     if (typeof FlowJudgment !== 'undefined' && FlowJudgment.newContent) text = FlowJudgment.newContent(text || '');
     else text = String(text || '');
@@ -886,7 +907,10 @@ const FlowCloseFamilies = (() => {
     if (NOISE_EN.test(text) || NOISE_HE.test(text)) return null;
     if (ambiguousFiles(text)) return hit({ suppress: true, family: 'H', rule: 'ambiguousFiles', matched: distinctFiles(text) });
     const clockStarts = ambiguousClocks(text);
-    if (clockStarts) return hit({ suppress: true, family: 'H', rule: 'ambiguousClocks', matched: clockStarts });
+    // A move names two clocks on purpose («push Thursday's call at 10:00 to Friday at 11:00»): the old slot and the new one. Family G reads that sentence, so the
+    // two-clock stand-down does not apply to a sentence matchMove turns into a calendar-move (capability probe, 2026-11-14: it silenced every English move).
+    const isMove = WIDE && clockStarts && splitSentences(text).some((sn) => { const m = (MOVE_EN.test(sn) || MOVE_HE.test(sn)) ? matchMove(sn, ctx.now) : null; return m && m !== 'suppress' && m.personalClose === 'calendar-move'; });
+    if (clockStarts && !isMove) return hit({ suppress: true, family: 'H', rule: 'ambiguousClocks', matched: clockStarts });
     const now = ctx.now;
     if (!facts && typeof FlowExtract !== 'undefined') {
       facts = FlowExtract.extract(text, { now: now, senderEmail: ctx.senderEmail });
