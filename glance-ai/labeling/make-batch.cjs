@@ -26,12 +26,22 @@ const rows = read(path.join(M, 'dataset', 'out-v2', 'test.jsonl'));
 const predsOf = (p) => (fs.existsSync(p) ? Object.fromEntries(read(p).map((r) => [r.id, r.pred])) : {});
 const V2 = predsOf(path.join(M, 'v23', 'base', 'base.test-preds.jsonl'));
 const V23 = predsOf(path.join(M, 'artifacts', 'v23.test-preds.jsonl'));
+// Row ids are positional (glance-ai/model/V23.md, CORRECTION 2026-11-11), so a case already labelled is excluded by its normalised text,
+// across this folder and sealed/ (read by the script only, never printed: the seal stays), and by the frozen set's texts.
+const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
 const used = new Set();
-for (const f of fs.readdirSync(HERE).filter((f) => /^batch-\d{3}\.json$/.test(f))) {
-  if (f === 'batch-' + NNN + '.json') continue;
-  const b = JSON.parse(fs.readFileSync(path.join(HERE, f), 'utf8'));
-  (Array.isArray(b) ? b : b.items).forEach((i) => used.add(i.id));
+for (const dir of [HERE, path.join(HERE, 'sealed')]) {
+  if (!fs.existsSync(dir)) continue;
+  for (const f of fs.readdirSync(dir).filter((f) => /^batch-\d{3}\.json$/.test(f))) {
+    if (dir === HERE && f === 'batch-' + NNN + '.json') continue;
+    const b = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+    (Array.isArray(b) ? b : b.items).forEach((i) => used.add(norm(i.body)));
+  }
 }
+for (const f of ['frozen-eval.jsonl', path.join('sealed', 'frozen-sealed.jsonl')]) {
+  const p = path.join(HERE, f); if (fs.existsSync(p)) read(p).forEach((r) => used.add(norm(r.body)));
+}
+const isUsed = (r) => used.has(norm(r.cleanBody || r.body)) || used.has(norm(r.body));
 const key = (r) => crypto.createHash('sha256').update('b' + SEED + ':' + r.id).digest('hex');
 const EASY = new Set(['marketing', 'repo', 'repo-test']);
 const OK = {
@@ -42,7 +52,7 @@ const OK = {
 };
 const want = {};
 for (const [p, l] of Object.entries(SPLIT)) for (const [lang, s] of Object.entries(l)) want[p + ':' + lang] = Math.round(s * SIZE);
-const sorted = rows.filter((r) => !used.has(r.id)).sort((a, b) => (key(a) < key(b) ? -1 : 1));
+const sorted = rows.filter((r) => !isUsed(r)).sort((a, b) => (key(a) < key(b) ? -1 : 1));
 const tpl = new Set(), picked = [];
 for (const p of Object.keys(SPLIT)) for (const lang of ['he', 'en']) {
   const n = want[p + ':' + lang] || 0;

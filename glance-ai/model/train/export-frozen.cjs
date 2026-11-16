@@ -6,6 +6,7 @@
 // rows (train/features-frozen/frozen.jsonl) that train-v2.py predicts with `--extra`. Rows are keyed `bNNN-<item>`; a text that appears in two
 // batches is kept once (the earlier batch); a text that also appears in the current train or val split is dropped (contamination), and counted.
 // usage: GLANCE_TIP=... GLANCE_V2_ENGINE=0.9.35 GLANCE_NOW=... node train/export-frozen.cjs
+// A later hold-out batch, kept apart from the frozen set (2026-11-16): FROZEN_BATCHES=010 FROZEN_OUT=labeling/holdout/frozen-b010.jsonl FROZEN_FEAT=features-b010
 'use strict';
 const fs = require('fs'), path = require('path');
 const G = path.join(__dirname, '..', '..');
@@ -22,7 +23,7 @@ const seen = new Set();
 for (const f of ['train', 'val']) for (const r of read(path.join(G, 'model', 'dataset', 'out-v2', f + '.jsonl'))) { seen.add(norm(r.body)); seen.add(norm(r.cleanBody)); }
 const frozen = [], feats = []; const stats = { rows: 0, dupText: 0, inTrainVal: 0, kept: 0 };
 const taken = new Set();
-for (const b of ['003', '004', '005', '006', '007', '008'].filter((b) => fs.existsSync(path.join(L, `batch-${b}.pass2-labels.jsonl`)))) {
+for (const b of (process.env.FROZEN_BATCHES ? process.env.FROZEN_BATCHES.split(',') : ['003', '004', '005', '006', '007', '008']).filter((b) => fs.existsSync(path.join(L, `batch-${b}.pass2-labels.jsonl`)))) {
   const rows = JSON.parse(fs.readFileSync(path.join(L, `batch-${b}.json`), 'utf8'));
   const p1 = read(path.join(L, `batch-${b}.claude-labels.jsonl`)), p2 = read(path.join(L, `batch-${b}.pass2-labels.jsonl`));
   const by1 = Object.fromEntries(p1.map((x) => [x.item, x])), by2 = Object.fromEntries(p2.map((x) => [x.item, x]));
@@ -47,7 +48,8 @@ for (const b of ['003', '004', '005', '006', '007', '008'].filter((b) => fs.exis
     stats.kept++;
   }
 }
-fs.writeFileSync(path.join(L, 'frozen-eval.jsonl'), frozen.map((x) => JSON.stringify(x)).join('\n') + '\n');
-const D = path.join(__dirname, 'features-frozen'); fs.mkdirSync(D, { recursive: true });
+fs.writeFileSync(path.join(G, process.env.FROZEN_OUT || path.join('labeling', 'frozen-eval.jsonl')), frozen.map((x) => JSON.stringify(x)).join('\n') + '\n');
+const D = path.join(__dirname, process.env.FROZEN_FEAT || 'features-frozen'); fs.mkdirSync(D, { recursive: true });
+if (process.env.FROZEN_FEAT) fs.copyFileSync(path.join(__dirname, 'features-v2', 'meta.json'), path.join(D, 'meta.json'));
 fs.writeFileSync(path.join(D, 'frozen.jsonl'), feats.map((x) => JSON.stringify(x)).join('\n') + '\n');
 console.log(JSON.stringify(stats), 'agreed:', frozen.filter((x) => x.agreed).length, 'undatedAsk:', frozen.filter((x) => x.undatedAsk).length);
