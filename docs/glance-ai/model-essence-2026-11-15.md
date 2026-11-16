@@ -30,7 +30,7 @@ The model has no job outside these five. It never closes, writes or sends by its
 
 | Weakness | Evidence | What closes it | Gated on |
 |---|---|---|---|
-| The learned part only sees 4 labels | kind map; the training pool has no positive for file, row, video or recurring kinds | a kind head trained on teacher-written paraphrases of the rare kinds, evaluated only on the held-out kind set | a teacher run: started 2026-11-15 in the `glance-model-lab` environment (cap 6 USD, owner-approved); not reported yet |
+| The learned part only sees 4 labels | kind map; the training pool had no positive for file, row, video or recurring kinds | done as a lab experiment (`glance-ai/model/V24.md`, 0.356 USD): a kind head over 21 kinds. Gate met, not useful: engine then head 69 of 89 on the kind set against the engine's 67, 20 against 21 wrong Do It on the 701 rows. It stays off. | next: a new hand-written kind set (the old one is spent for this head), a decision on the draft-or-task convention, and rows written by a different model family than the labeller |
 | Holds phrased as a question were silent | slot gold | done 2026-11-15 (`core/intent.js`, `core/day-words.js`): 40 of 40 offered, 0 wrong slot on fresh rows | nothing |
 | Move and cancel were silent | probe | done behind `CALENDAR_CHANGE` (off), Gmail only | a Gate with ProofOfClose before it is on; an Outlook writer |
 | Completion is judged by rules plus a small learned model | `reply-model`, `follow-up` | measured now (completion gold); next: information questions open no loop on purpose, a given time («מחר ב-15:00 מתאים») is read as a promise, a Hebrew out-of-office is not held | nothing: engine work |
