@@ -98,12 +98,34 @@ console.log('\n--- legal and business Hebrew: «מהו», a lead-in clause, «א
 {
   const LEGAL = 'רועי ולירון, נבקש לנהל דיון פנימי בנושא ולא להשיב כרגע לצד השני.\nמהו המועד האחרון למתן תשובה כאמור?\nבהתבסס על מה שכתבתם ועל חוות הדעת, מה גובה הסכום שאינו שנוי במחלוקת ומה הסכום הנותר?\nכ"כ אם אני מבין נכון, יתרת הסכום תהיה נתונה לשיקול דעת הצד השני?';
   const r = judge(LEGAL, { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
-  check('HE: three questions, two with a lead-in clause and one fused «מהו», are one reply draft that counts them', kinds(r) === 'gmailDraft' && r.intent.directAsk === true && r.intent.questions === 3, [kinds(r), r.intent && r.intent.questions]);
+  check('HE: three questions, two with a lead-in clause and one fused «מהו», are one reply draft that counts them', kinds(r) === 'gmailDraft+googleTask' && r.intent.directAsk === true && r.intent.questions === 3, [kinds(r), r.intent && r.intent.questions]);
   const one = judge('רועי, מהו המועד האחרון למתן תשובה?', { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
   check('HE: one «מהו» question to a group is not read (the two-question floor stands)', !one.show, kinds(one));
   const stmt = judge('רועי ולירון, בהתבסס על מה שכתבתם, הסכום שאינו שנוי במחלוקת הוא 20,000.', { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
   check('HE: a statement with a lead-in clause and no question stays quiet', !stmt.show, kinds(stmt));
   check('HE: the same questions from an automated sender stay quiet', !judge(LEGAL, { ownNames: ['רועי'], to: [OWN], sender: { name: 'System', email: 'noreply@acme.io' }, subject: 'עדכון' }).show);
+}
+
+
+console.log('\n--- a mail of questions that also holds an answer, asks for a date and quotes figures (rewritten from a real use case: no real text, names or figures) ---\n');
+{
+  const MAIL = 'דנה ויואב, אנחנו מבקשים לנהל דיון פנימי בנושא, אני מבקש כרגע לא להחזיר תשובה לב"כ הצד השני.\nמהו המועד האחרון המאפשר מתן תשובה כאמור?\nבהתבסס על מה שכתבתם, כתב ההגנה וחוות הדעת, מה גובה הסכום שאינו שנוי במחלוקת ומה הסכום הנותר?\nלפי מה שאני מבין אין מחלוקת על 12,000 + מע"מ ובנוסף 8,000 + מע"מ לשיקול דעת בית המשפט, מתוך תביעה בגובה 5 מיליון.\nכ"כ אם אני מבין נכון, אנו נשא בעלות 12,000 + מע"מ והמשך התביעה בסכום 4,988,000 תהיה נתונה לשיקול דעת התובעים?';
+  const r = judge(MAIL, { ownNames: ['דנה'], to: [OWN, 'yoav@firm.co.il'], subject: 'עדכון' });
+  const draft = r.show ? r.process.steps.find((st) => st.kind === 'gmailDraft') : null;
+  const task = r.show ? r.process.steps.find((st) => st.kind === 'googleTask') : null;
+  check('HE: the three questions (one fused «מהו», one behind a listing lead-in, one «אם אני מבין נכון») are all counted', r.show && r.intent.questions === 3 && draft && draft.params.questions.length === 3, [r.intent && r.intent.questions, draft && draft.params.questions]);
+  check('the instruction to hold an answer to the other side is kept as a task that names the party and the work, with no day invented', task && /המתנה: לא להשיב לב"כ הצד השני/.test(task.params.title) && /לענות ל-3 שאלות/.test(task.params.title) && task.params.dateIso === null && r.intent.holdInstruction && r.intent.holdInstruction.party === 'ב"כ הצד השני', task && task.params);
+  check('the question for a date is named in the task (the date is found, never guessed)', task && /כולל המועד האחרון/.test(task.params.title) && r.intent.deadlineQuestion === true);
+  check('the mail\'s own figures are added up as a check: 5,000,000 - 12,000 = 4,988,000, and also minus 8,000', draft && JSON.stringify(draft.params.checks) === JSON.stringify(['5,000,000 - 12,000 = 4,988,000 ✓', 'ובניכוי 8,000 נוסף: 5,000,000 - 12,000 - 8,000 = 4,980,000']), draft && draft.params.checks);
+  check('exactly one draft and one task: nothing is drafted to the other side', r.show && r.process.steps.filter((st) => st.kind === 'gmailDraft').length === 1 && r.process.steps.filter((st) => st.kind === 'googleTask').length === 1 && r.process.steps.length === 2, r.show && r.process.steps.map((st) => st.kind));
+  const D = vm.runInContext('FlowDraftReply', sb);
+  const body = D.draftBodyText({ params: draft.params, label: 'x' });
+  check('the draft is the answer frame in Hebrew with every question, a place for each answer, and the check under it (it writes no answer)', /1\. מהו המועד/.test(body) && /3\. כ"כ/.test(body) && (body.match(/\[התשובה שלך\]/g) || []).length === 3 && /5,000,000 - 12,000 = 4,988,000 ✓/.test(body) && /לא תשובה/.test(body), body);
+  const plain = judge('דנה ויואב, מהו המועד האחרון למתן תשובה? מה הסכום הנותר?', { ownNames: ['דנה'], to: [OWN, 'yoav@firm.co.il'], subject: 'עדכון' });
+  check('two plain questions with no hold, no date question and no figures keep the reply draft alone', plain.show && plain.process.steps.length === 1 || (plain.show && plain.process.steps.every((st) => st.kind !== 'googleTask' || /כולל המועד/.test(st.params.title))), plain.show && plain.process.steps.map((st) => st.kind));
+  const EN = judge('Dana and Yoav, we would like to discuss this internally. Please do not reply to opposing counsel yet.\nWhat is the last date to respond?\nWhich amount is undisputed, and what remains of the claim?', { ownNames: ['Dana'], to: [OWN, 'yoav@firm.co.il'], subject: 'Update' });
+  const enTask = EN.show ? EN.process.steps.find((st) => st.kind === 'googleTask') : null;
+  check('EN: the same mail in English: hold kept, date question named', enTask && /On hold: do not reply to opposing counsel yet/.test(enTask.params.title) && /including the last date/.test(enTask.params.title), enTask && enTask.params.title);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

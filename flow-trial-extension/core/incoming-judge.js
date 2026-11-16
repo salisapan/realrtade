@@ -202,6 +202,12 @@ const FlowIncomingJudge = (() => {
   // an answer-needing ask with a date. Gmail's chip path calls this too, so both mailboxes share one second read.
   // The labs readers (booking notice, task ask, payment ask) stay behind their own switches, which default OFF.
   function secondRead(i, q0) {
+    // «Please do not reply to opposing counsel yet» reads as a hedge to the classifier, but in a mail that also asks real questions it is the person's HOLD instruction, not a cancel:
+    // only the direct-ask reader (two questions, a person, To the reader) may look past that one hedge, and it keeps the hold as a task.
+    if (q0 === 'hedge' && i.directAskOn === true && i.senderIsUser !== true && i.inbound !== false && i.noteToSelf !== true) {
+      const bodyH = prepareForJudge(i.text);
+      if (HOLD_EN.test(bodyH) || HOLD_HE.test(bodyH)) return directAskCard(i, bodyH);
+    }
     if (q0 && q0 !== 'noise') return null;
     if (q0 || i.senderIsUser === true || i.inbound === false || i.noteToSelf === true) return null;
     const body0 = prepareForJudge(i.text);
@@ -222,7 +228,7 @@ const FlowIncomingJudge = (() => {
   // reader with at most three recipients, only the mail's own text above any quoted or forwarded header. A sentence that hedges, cancels or
   // sells is skipped. Last of the second reads, so every earlier reader and every quiet wins. Off unless the host passes directAskOn.
   const DIRECT_AUTO_SUBJECT = /^(?:\s*(?:re|fw|fwd)\s*:\s*)*(?:automatic reply|auto(?:matic)?[- ]reply|out of (?:the )?office|undeliverable|delivery status|declined:|accepted:|tentative|מענה אוטומטי|תשובה אוטומטית|[\u200e\u200f]*לא ניתן למסירה)/i;
-  const DIRECT_CUT = /\n(?:-{2,}\s*(?:Original|Forwarded|הודעה)|From:\s|מאת:\s|On .{4,80} wrote:|ב[-־]?.{4,60} כתב)/;
+  const DIRECT_CUT = /\n(?:-{2,}\s*(?:Original|Forwarded|הודעה)|From:\s|מאת:\s|On .{4,80} wrote:|ב[-־]?.{4,60} כת(?:ב|בה|בו)\s*:)/;
   const DIRECT_Q_EN = /^(?:what|why|how|when|where|which|who|is there|are there|do you have|does it|does the)\b/i;
   // «מהו המועד האחרון», «מהי ההצעה», «מהם הליקויים»: the same interrogative with the pronoun fused on (real legal and business Hebrew), and «אם אני מבין נכון ...?» (a question put as an understanding to confirm).
   const DIRECT_Q_HE = /^(?:ו)?(?:מה|מהו|מהי|מהם|מהן|מיהו|מיהי|למה|מדוע|איך|כיצד|האם|מתי|איפה|היכן|כמה|מי|איזה|איזו|אילו|יש|אנחנו יכולים|נוכל|אם אני מבין)(?![\u0590-\u05FF])/;
@@ -276,13 +282,61 @@ const FlowIncomingJudge = (() => {
       const he = /[\u0590-\u05FF]/.test(x);
       // A question that names a clock is a meeting proposal: the hold readers and the calendar path own it, not a reply.
       const opener = chat ? (he ? DIRECT_Q_HE_CHAT : DIRECT_Q_EN_CHAT) : (he ? DIRECT_Q_HE : DIRECT_Q_EN);
-      const head = he ? x.replace(DIRECT_LEADIN_HE, '').replace(DIRECT_LEADIN_HE, '') : x;
+      // A lead-in that lists things before the question («בהתבסס על מה שכתבתם, התביעה וחוו"ד מומחה, מה גובה ...?») ends at the comma before the interrogative.
+      let head = he ? x.replace(DIRECT_LEADIN_HE, '').replace(DIRECT_LEADIN_HE, '') : x;
+      if (he && /^(?:בהתבסס|בהסתמך|בהמשך|בהתאם|לפי|על סמך)\s/.test(x)) { const cut = x.slice(0, 160).search(/,\s*(?:ו)?(?:מה|מהו|מהי|מהם|מהן|מתי|כמה|האם|איך|כיצד|מדוע|למה)(?![\u0590-\u05FF])/); if (cut > 0) head = x.slice(cut).replace(/^,\s*/, ''); }
       return (opener.test(x) || (he && !chat && opener.test(head))) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
     });
     // A chat needs at least two such questions: one question in a chat is conversation, not a loop.
     if (qs.length >= 2 || (!chat && qs.length === 1 && greetsReader)) return { kind: 'reply', what: qs[0].slice(0, 200), dateIso: null, lang: /[\u0590-\u05FF]/.test(qs[0]) ? 'he' : 'en', questions: qs.length, questionList: qs.slice(0, 8).map((q) => q.slice(0, 200)) };
     return null;
   }
+  // ---- what else a mail of questions carries (2026-11-16, a real legal-and-business Hebrew mail) -------------------------------------------
+  // The questions are the ask, but the same mail may also (1) ask for a date that has to be found («מהו המועד האחרון למתן תשובה», "what is the last date to respond"), (2) tell the
+  // person to HOLD an answer to someone («אני מבקש כרגע לא להחזיר תשובה לב"כ התובעים», "do not reply to opposing counsel yet"), and (3) quote figures that add up («27,400 ... 19 מיליון ...
+  // 18,972,600»). Glance writes none of the answers. It keeps the hold where the person can see it (a task with no day), makes the date question a task of its own, and puts the
+  // arithmetic of the mail's own figures under the draft as a check for the person, never as an answer.
+  const DEADLINE_Q_HE = /(?:ה?מועד|ה?תאריך|ה?יום)\s+האחרון|עד\s+מתי|האם\s+יש\s+מועד\s+אחרון/;
+  const DEADLINE_Q_EN = /\b(?:last|latest|final)\s+(?:date|day|time)\b|\bby\s+when\b|\bdeadline\b/i;
+  const HOLD_HE = /(?:אני\s+)?מבק(?:ש|שת|שים)\s+(?:כרגע\s+|בשלב\s+זה\s+|בינתיים\s+)?(?:ש)?לא\s+(?:להחזיר|להשיב|לשלוח|לענות|לפנות)\s+(?:תשובה\s+|דבר\s+)?(?:ל|אל)\s*([^.\n,;]{2,50})|אל\s+ת(?:חזיר|שיב|שלח|ענ)(?:ו|י)?\s+(?:תשובה\s+)?(?:ל|אל)\s*([^.\n,;]{2,50})/;
+  const HOLD_EN = /(?:please\s+)?(?:do\s+not|don['’]t|hold\s+off\s+on|no)\s+(?:reply(?:ing)?|respon(?:d|ding)|answer(?:ing)?|send(?:ing)?\s+anything)\s+(?:back\s+)?(?:to|until)\s+([^.\n,;]{2,50})/i;
+  function figuresOf(text) {
+    const out = [];
+    const re = /(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(מיליון|million|אלף|thousand)?/gi;
+    let m;
+    while ((m = re.exec(String(text || '')))) {
+      let v = Number(m[1].replace(/,/g, ''));
+      if (m[2]) v *= /מיליון|million/i.test(m[2]) ? 1e6 : 1e3;
+      if (v >= 1000 && out.indexOf(v) < 0) out.push(v);
+    }
+    return out;
+  }
+  const fmtN = (n) => n.toLocaleString('en-US');
+  function arithmeticChecks(text, he) {
+    const f = figuresOf(text).sort((a, b) => b - a);
+    if (f.length < 3) return [];
+    const total = f[0], lines = [];
+    // The smaller figure first: «19,000,000 - 27,400 = 18,972,600» is the mail's own subtraction; read from the other end it would be the same equation turned around.
+    for (const a of f.slice(1).sort((x, y) => x - y)) {
+      const rest = total - a;
+      if (f.indexOf(rest) < 0) continue;
+      lines.push(fmtN(total) + ' - ' + fmtN(a) + ' = ' + fmtN(rest) + ' ✓');
+      f.filter((b) => b !== a && b !== rest && b !== total && b < total - a).forEach((b) => lines.push(he ? 'ובניכוי ' + fmtN(b) + ' נוסף: ' + fmtN(total) + ' - ' + fmtN(a) + ' - ' + fmtN(b) + ' = ' + fmtN(total - a - b) : 'and also minus ' + fmtN(b) + ': ' + fmtN(total) + ' - ' + fmtN(a) + ' - ' + fmtN(b) + ' = ' + fmtN(total - a - b)));
+      break;
+    }
+    return lines.slice(0, 3);
+  }
+  function askExtras(body, hit) {
+    const he = hit.lang === 'he';
+    const text = String(body || '');
+    const qs = hit.questionList || [];
+    const dq = qs.find((q) => (he ? DEADLINE_Q_HE : DEADLINE_Q_EN).test(q)) || null;
+    const hm = text.match(he ? HOLD_HE : HOLD_EN);
+    const party = hm ? String(hm[1] || hm[2] || '').replace(/\s+/g, ' ').trim() : '';
+    const checks = he === (/[֐-׿]/.test(text)) ? arithmeticChecks(text, he) : [];
+    return { deadlineQuestion: dq, holdParty: party || null, checks };
+  }
+
   function directAskCard(i, body) {
     const hit = directAsk(i, body);
     if (!hit) return null;
@@ -304,6 +358,21 @@ const FlowIncomingJudge = (() => {
     for (const st of c.process.steps) if (st.kind === 'gmailDraft' || st.kind === 'outlookDraft') { st.params.lang = hit.lang; if (hit.questionList) st.params.questions = hit.questionList; }
     // No day in the words: the reply draft alone (owner C-4). A task with no date is not invented.
     if (!hit.dateIso) c.process.steps = c.process.steps.filter((st) => st.kind !== 'googleTask');
+    const he = hit.lang === 'he';
+    const ex = askExtras(body, hit);
+    if (ex.checks.length) for (const st of c.process.steps) if (st.kind === 'gmailDraft' || st.kind === 'outlookDraft') st.params.checks = ex.checks;
+    // ONE task, because both hosts write one task step with its own read-back and Undo: it names the work (the answers), the date that has to be found, and the instruction to hold
+    // an answer to someone, so the hold stays visible where the person tracks work. Nothing is sent to that party and no reply is drafted to them.
+    if (ex.deadlineQuestion || ex.holdParty) {
+      const n = hit.questions || (hit.questionList || []).length || 1;
+      const parts = [he ? (n === 1 ? 'לענות על שאלה אחת' : 'לענות ל-' + n + ' שאלות') + (ex.deadlineQuestion ? ' (כולל המועד האחרון)' : '') : 'Answer ' + n + ' question' + (n > 1 ? 's' : '') + (ex.deadlineQuestion ? ' (including the last date)' : '')];
+      if (ex.holdParty) parts.push((he ? 'המתנה: לא להשיב ל' : 'On hold: do not reply to ') + ex.holdParty);
+      const title = parts.join(' · ').slice(0, 120);
+      c.process.steps.push({ id: 'task', kind: 'googleTask', label: 'Task', hint: 'Add a task: ' + title, params: { title: title, dateIso: null, amount: null, what: title, threadUrl: i.threadUrl || null }, dependsOn: null });
+      if (ex.deadlineQuestion) c.intent.deadlineQuestion = true;
+      if (ex.holdParty) c.intent.holdInstruction = { party: ex.holdParty };
+    }
+    if (ex.checks.length) c.intent.checks = ex.checks;
     return c;
   }
 
