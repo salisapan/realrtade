@@ -18,6 +18,12 @@ function launch(extDir, userData) {
 test('the Labs panel lists every off switch and writes only glanceSwitches', async () => {
   test.setTimeout(120000);
   const extDir = copyExtension({ bare: true });
+  // A bare copy keeps the real manifest, so the unpacked-install Labs seed (core/labs-seed.js) would turn waves 1 and 2 on
+  // before the panel opens. This spec is about the panel starting from nothing, like every other e2e copy: opt out of the seed.
+  const mfPath = path.join(extDir, 'manifest.json');
+  const mf = JSON.parse(fs.readFileSync(mfPath, 'utf8'));
+  mf.glance_no_seed = true;
+  fs.writeFileSync(mfPath, JSON.stringify(mf, null, 2));
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-labs-'));
   let context = null;
   try {
