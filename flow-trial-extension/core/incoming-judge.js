@@ -234,6 +234,8 @@ const FlowIncomingJudge = (() => {
   const DIRECT_Q_HE = /^(?:ו)?(?:מה|מהו|מהי|מהם|מהן|מיהו|מיהי|למה|מדוע|איך|כיצד|האם|מתי|איפה|היכן|כמה|מי|איזה|איזו|אילו|יש|אנחנו יכולים|נוכל|אם אני מבין)(?![\u0590-\u05FF])/;
   // A lead-in clause before the question («בהתבסס על מה שכתבתם, התביעה וחוו"ד מומחה, מה גובה ...?», «כ"כ, אם אני מבין נכון ...?») is not part of it: it is cut before the opener is read.
   const DIRECT_LEADIN_HE = /^(?:(?:בהתבסס|בהסתמך|בהמשך|בהתאם|לפי|על סמך)\s+[^,?]{0,100},\s*|(?:כ"כ|כמו כן|בנוסף|ובנוסף|אז)[,\s]+)/;
+  // «Please advise on the last date and the remaining amount.»: an ask for information with no question mark. Only the verbs that ask for information (advise, clarify) with what they ask about; «please confirm» stays with the reply-ask reader.
+  const ADVISE_EN = /^(?:please|kindly)\s+(?:advise|clarify)\s+(?:on|about|regarding|whether|what|which|when|who|how)\b/i;
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
   const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני)(?![\u0590-\u05FF])/;
   const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
@@ -285,14 +287,14 @@ const FlowIncomingJudge = (() => {
     }
     // 1. plain information questions
     // A chat opens on the same line as its first question ("היי, מה המחיר...?"): the greeting is not part of the question.
-    const qs = sents.filter((x) => /\?\s*$/.test(x)).map((x) => x.replace(/\s+\?\s*$/, '?').replace(/^(?:שלום|היי|הי|בוקר טוב|ערב טוב|hi|hello|hey)(?=[\s,!])[^,?!]{0,20}[,!]\s*/i, '')).map(vocativeCut).filter((x) => {
+    const qs = sents.filter((x) => /\?\s*$/.test(x) || (!chat && ADVISE_EN.test(x))).map((x) => x.replace(/\s+\?\s*$/, '?').replace(/^(?:שלום|היי|הי|בוקר טוב|ערב טוב|hi|hello|hey)(?=[\s,!])[^,?!]{0,20}[,!]\s*/i, '')).map(vocativeCut).filter((x) => {
       const he = /[\u0590-\u05FF]/.test(x);
       // A question that names a clock is a meeting proposal: the hold readers and the calendar path own it, not a reply.
       const opener = chat ? (he ? DIRECT_Q_HE_CHAT : DIRECT_Q_EN_CHAT) : (he ? DIRECT_Q_HE : DIRECT_Q_EN);
       // A lead-in that lists things before the question («בהתבסס על מה שכתבתם, התביעה וחוו"ד מומחה, מה גובה ...?») ends at the comma before the interrogative.
       let head = he ? x.replace(DIRECT_LEADIN_HE, '').replace(DIRECT_LEADIN_HE, '') : x;
       if (he && /^(?:בהתבסס|בהסתמך|בהמשך|בהתאם|לפי|על סמך)\s/.test(x)) { const cut = x.slice(0, 160).search(/,\s*(?:ו)?(?:מה|מהו|מהי|מהם|מהן|מתי|כמה|האם|איך|כיצד|מדוע|למה)(?![\u0590-\u05FF])/); if (cut > 0) head = x.slice(cut).replace(/^,\s*/, ''); }
-      return (opener.test(x) || (he && !chat && opener.test(head))) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
+      return (opener.test(x) || (!chat && ADVISE_EN.test(x)) || (he && !chat && opener.test(head))) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
     });
     // A chat needs at least two such questions: one question in a chat is conversation, not a loop.
     // One question put to a group by name stays quiet (the two-question floor): the cut vocative made it a question, and a group greeting is not a personal ask.

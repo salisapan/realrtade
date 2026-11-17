@@ -145,5 +145,16 @@ console.log('\n--- names the mail is addressed to are not part of the question -
   check('a real Hebrew quote header still cuts the quoted questions off', dq && dq.params.questions.length === 2, quoted.show ? dq && dq.params.questions : kinds(quoted));
 }
 
+console.log('\n--- «please advise on ...» is an ask for information without a question mark ---\n');
+{
+  const g = { ownNames: ['Dana'], to: [OWN], subject: 'Update' };
+  const a = judge('Hi Dana,\nPlease advise on the last date to respond.\nPlease advise on which amount remains undisputed.', g);
+  const da = a.show ? a.process.steps.find((st) => st.kind === 'gmailDraft') : null;
+  check('two «please advise on» asks are two questions in one reply draft', da && da.params.questions.length === 2, a.show ? da && da.params.questions : kinds(a));
+  check('a single «please advise on» to a reader greeted by name is read (greets the reader)', judge('Hi Dana,\nPlease advise on the last date to respond.', g).show);
+  check('a single one to a mail that does not greet the reader stays quiet (the one-question floor)', !judge('Please advise on the last date to respond.', g).show);
+  check('an automated sender stays quiet', !judge('Hi Dana,\nPlease advise on the last date. Please advise on the amount.', Object.assign({}, g, { sender: { name: 'System', email: 'noreply@acme.io' } })).show);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
