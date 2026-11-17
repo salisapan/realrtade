@@ -17,6 +17,12 @@ const FlowLoopAnswer = (() => {
   const ASKS = ['owe', 'owed', 'all', 'status'];
   const WHENS = ['today', 'tomorrow', 'week', 'overdue'];
 
+  function sibling(globalValue, file, name) {
+    if (globalValue) return globalValue;
+    try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
+  }
+  const nameSound = () => sibling(typeof FlowNameSound !== 'undefined' ? FlowNameSound : null, './name-sound.js', 'FlowNameSound');
+
   function enabled(flags) { return !!(flags && flags[SWITCH] === true); }
   const isHe = (s) => /[֐-׿]/.test(String(s || ''));
   const norm = (s) => String(s || '').toLowerCase().replace(/[’']/g, "'").replace(/[^\p{L}\p{N}'@.\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
@@ -75,7 +81,27 @@ const FlowLoopAnswer = (() => {
     const nq = ' ' + toks.join(' ') + ' ';
     for (const [k, set] of byKey) if (k.includes(' ') && nq.includes(' ' + k + ' ')) { set.forEach((x) => ids.add(x)); k.split(' ').forEach((x) => words.add(x)); }
     for (const t of toks) for (const v of tokenVariants(t.replace(/'s$/, ''))) if (byKey.has(v) && !STOP.has(v) && !STOP_HE.has(v)) { byKey.get(v).forEach((x) => ids.add(x)); words.add(t); }
-    return { ids, words };
+    if (ids.size) return { ids, words, ambiguous: false };
+    // The same person in the other script («מה אבי חייב לי?» for Avi Levi, "what does Shai owe me?" for «שי כהן»), by sound
+    // (core/name-sound.js). Kept only when exactly one person fits; two people who sound alike is a refusal, never a guess.
+    const NS = nameSound();
+    if (!NS) return { ids, words, ambiguous: false };
+    const people = new Map();
+    for (const t0 of toks) {
+      const t = t0.replace(/'s$/, '');
+      if (t.length < 2 || STOP.has(t) || STOP_HE.has(t) || loops.some((w) => topicHits(w, [t]) > 0)) continue;
+      for (const w of loops) {
+        const c = w.counterpart || {};
+        const parts = norm(c.name).split(' ').filter((p) => p.length >= 2);
+        if (!parts.some((p) => tokenVariants(t).some((v) => NS.same(v, p)))) continue;
+        const who = String(c.email || c.name || '').toLowerCase();
+        if (!people.has(who)) people.set(who, new Set());
+        people.get(who).add(w.id);
+        words.add(t0);
+      }
+    }
+    if (people.size === 1) for (const set of people.values()) set.forEach((x) => ids.add(x));
+    return { ids, words, ambiguous: people.size > 1 };
   }
 
   const DAYS = new Set(['i', 'glance', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'today', 'tomorrow']);
@@ -84,7 +110,9 @@ const FlowLoopAnswer = (() => {
     if (!m) return false;
     const w = m[1].toLowerCase();
     if (DAYS.has(w) || STOP.has(w)) return false;
-    return !loops.some((x) => partyKeys(x.counterpart).includes(w) || topicHits(x, [w]) > 0);
+    const NS = nameSound();
+    return !loops.some((x) => partyKeys(x.counterpart).includes(w) || topicHits(x, [w]) > 0
+      || (NS && norm((x.counterpart || {}).name).split(' ').some((p) => NS.same(w, p))));
   }
   function contentWords(q, taken) {
     return norm(q).split(' ').filter((t) => t && t.length >= 3 && !taken.has(t) && !STOP.has(t) && !STOP_HE.has(t) && !/^\d+$/.test(t))
@@ -191,6 +219,7 @@ const FlowLoopAnswer = (() => {
       if (checked) { r = checked; source = 'model'; }
     }
     if (!r) return out(refuse('not-understood', lang));
+    if (!r.personIds && people.ambiguous) return out(refuse('ambiguous-person', lang));
     const personIds = r.personIds || (people.ids.size ? people.ids : null);
     // A capitalised word that reads as a name no loop knows ("what does Moshe owe me?"): refuse rather than answer for everyone.
     if (!personIds && unknownName(q, all)) return out(refuse('unknown-person', lang));
@@ -204,7 +233,12 @@ const FlowLoopAnswer = (() => {
     pool = pool.filter((w) => whenFits(w, r.when, today));
     // Words left after the question words and the names: what the question is about. A topic no loop carries is refused
     // (or, when a person is named, answered as "nothing open that fits with <name>"), never widened to every loop.
-    const topic = source === 'model' ? (r.topic || []) : contentWords(q, people.words);
+    // A topic word is compared only with loops written in its own script: «החשבונית» cannot be checked against "Payment of invoice
+    // 118", so it neither picks nor rules out an English loop (it is dropped for that comparison, never read as "nothing fits").
+    const topicAll = source === 'model' ? (r.topic || []) : contentWords(q, people.words);
+    const poolHe = pool.some((w) => isHe(loopText(w))), poolEn = pool.some((w) => /[a-z]/.test(loopText(w)));
+    const topic = topicAll.filter((t) => (isHe(t) ? poolHe : poolEn));
+    if (!topic.length && topicAll.length && !personIds && !r.when && !r.money && r.ask === 'status') return out(refuse('unknown-topic', lang));
     if (topic.length) {
       const scored = pool.map((w) => [w, topicHits(w, topic)]);
       const best = Math.max(0, ...scored.map((x) => x[1]));
