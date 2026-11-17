@@ -166,3 +166,12 @@ One more state of the chat card, drawn with the existing canonical Do It compone
 - Line: `ענו לך. הלולאה נסגרה.` / `They answered. Loop closed.`; a file loop: `שלחו את מה שחיכית לו. הלולאה נסגרה.` / `They sent what you were waiting for. Loop closed.`; a no: `אמרו לא. הלולאה נסגרה.` / `They said no. Loop closed.`
 - While the reply is a question back, a promise, "I never got it", or only "Perfect", the card stays as the open wait. On a payment wait, "I paid" keeps it open until the money arrives.
 - No action needed; the card shows the close and offers Undo (reopens the wait). If the person changed the loop since, Undo unavailable.
+
+## C3 — cancel that meeting (added 2026-11-10)
+
+- Module `flow-trial-extension/core/calendar-cancel.js`, switch `CALENDAR_CANCEL_PROOF`. Map row C3.
+- When: a mail cancels a named slot, and the person's calendar has exactly one event of their own at that slot, with no other guests.
+- Line: `ביטול ביומן: <title> ב-<date> <HH:MM>` / `Cancel on your calendar: <title> on <date> <HH:MM>`.
+- One step: the calendar. Choice: Do It. After the read-back: Handled, the event is off the calendar.
+- Undo: brings the same event back. If the person changed it since, the card says Undo unavailable.
+- No card when the event has guests, belongs to someone else, repeats, or two events share the slot.
