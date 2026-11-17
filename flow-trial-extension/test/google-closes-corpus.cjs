@@ -263,6 +263,15 @@ console.log('\n--- family C: create is the ask ---\n');
   check('a later Hebrew אל תשמור אותו refers back and stays quiet',
     laterHe.intent && !laterHe.intent.type && laterHe.intent.googleSilence === true && !laterHe.process,
     laterHe.intent && { type: laterHe.intent.type, personal: laterHe.intent.personalClose });
+  // A Hebrew save with the attachment named and a folder or the shared Drive as the place (a different verb set, a «בבקשה» or a noun between the verb and the attachment).
+  for (const t of ['תשמרי בבקשה את החשבונית המצורפת בתיקיית הנהלת החשבונות.', 'תשימי את הדוח המצורף בדרייב המשותף של הצוות.', 'נא לשמור את הקובץ המצורף בתיקייה שלנו.']) {
+    const he = plan(t, { attachmentCount: 1 });
+    check('Hebrew save of the attached file to a folder: ' + t.slice(0, 30), he.intent && he.intent.personalClose === 'drive-file' && he.process && he.process.steps.some((st) => st.kind === 'driveFile'), he.intent && he.intent.personalClose);
+  }
+  for (const t of ['סאלי, אל תשמרי את החשבונית המצורפת בתיקייה, היא לא נכונה.', 'תשים לב שהתיקייה ריקה, ראה את המצורף.', 'תשמור על קשר, המצורף בתיקייה הישנה.']) {
+    const he = plan(t, { attachmentCount: 1 });
+    check('no Hebrew save for: ' + t.slice(0, 30), !(he.intent && he.intent.personalClose === 'drive-file'), he.intent && he.intent.personalClose);
+  }
   const laterThis = plan("Please save the attached file to Drive. Don't save this.", { attachmentCount: 1 });
   const laterThat = plan("Please save the attached file to Drive. Don't save that.", { attachmentCount: 1 });
   const laterZe = plan('תשמור את הקובץ בדרייב. אל תשמור את זה', { attachmentCount: 1 });
