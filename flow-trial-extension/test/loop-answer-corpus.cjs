@@ -14,6 +14,11 @@ const sb = { module: undefined, console };
 vm.createContext(sb);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'loop-answer.js'), 'utf8'), sb, { filename: 'loop-answer.js' });
 const A = vm.runInContext('FlowLoopAnswer', sb);
+// The same reader with core/name-sound.js loaded (one person in two scripts). The first sandbox above has no name-sound: it is "before".
+const sb2 = { module: undefined, console };
+vm.createContext(sb2);
+for (const f of ['name-sound.js', 'loop-answer.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sb2, { filename: f });
+const A2 = vm.runInContext('FlowLoopAnswer', sb2);
 const ON = { aiAskV1: true };
 const TODAY = '2026-10-07'; // a Wednesday; the week runs to Saturday 10 October
 const CTX = { today: TODAY, now: Date.parse('2026-10-07T09:00:00') };
@@ -105,11 +110,9 @@ const REFUSE = [
   'What is my password?',
   'Translate this to French',
   'כמה עולה טיסה לאילת?',
-  'מה עם החשבונית של אבי?', // the same Latin-letter contact, asked in Hebrew
   'How much did I spend last month?',
   'Remind me to call mom',
   'מתי יום ההולדת של דנה?',
-  'מה אבי חייב לי?', // a Hebrew name for a contact written in Latin letters is not matched: refused, not guessed
   ''
 ];
 
@@ -166,6 +169,44 @@ console.log('\n--- a model may read the question, never write the answer ---\n')
   check('a model that throws: refused, never a crash', thrower.refused === true);
   const lies = A.answer(ON, q, LOOPS, Object.assign({}, CTX, { deps: { parse: () => ({ ask: 'owed', person: 'Avi', items: [{ id: 'made-up', line: 'Avi owes you 1,000,000' }], text: 'Avi owes you a million' }) } }));
   check('whatever else the model returns is ignored: the lines come from the loops', ids(lies) === 'inv' && !/million/.test(lies.text), lies.text);
+}
+
+console.log('\n--- one person, two scripts (core/name-sound.js) ---\n');
+{
+  // Hebrew questions about contacts saved in Latin letters, and English questions about contacts saved in Hebrew.
+  const CROSS = [
+    ['מה אבי חייב לי?', 'inv'],
+    ['מה עם החשבונית של אבי?', 'inv'],
+    ['מה אני חייב לאבי?', 'quote'],
+    ['מה אני חייב לדנה?', 'lease'],
+    ['מה דנה חייבת לי?', 'deck'],
+    ['האם נועה אישרה את התו?', 'permit'],
+    ['על מה אני מחכה מיוסי?', 'photos'],
+    ['What do I owe Ronit?', 'hebrew'],
+    ['What does Shai owe me?', 'keys'],
+    ['Is Shai waiting on me?', ''],
+    ['מה פתוח עם לוי?', 'inv,quote']
+  ];
+  let before = 0, after = 0, stray = 0;
+  for (const [q, gold] of CROSS) {
+    const b = A.answer(ON, q, LOOPS, CTX), r = A2.answer(ON, q, LOOPS, CTX);
+    if (!b.refused && ids(b) === gold) before++;
+    if (!r.refused && ids(r) === gold) after++;
+    const g = gold ? gold.split(',') : [];
+    stray += (r.items || []).filter((x) => !g.includes(x.id)).length;
+    check(q + ' -> ' + (gold || 'nothing open'), !r.refused && ids(r) === gold, { got: ids(r), refused: r.refused, reason: r.reason, text: r.text });
+  }
+  console.log(`  cross-script questions answered right: before ${before}/${CROSS.length}, after ${after}/${CROSS.length}; lines outside the gold ${stray}`);
+  check('every cross-script question answered, no stray line', after === CROSS.length && stray === 0, { after, stray });
+  // Two people who sound alike in the other script: a refusal, never a guess.
+  const twins = LOOPS.concat([L('s1', { direction: 'theirs', counterpart: { name: 'Sarah Klein', email: 'sarah@k.com' }, what: 'The floor plan' }),
+    L('s2', { direction: 'theirs', counterpart: { name: 'Shira Gold', email: 'shira@g.com' }, what: 'The guest list' })]);
+  const tw = A2.answer(ON, 'מה שרה חייבת לי?', twins, CTX);
+  check('«שרה» with both a Sarah and a Shira: refused as two people', tw.refused === true && tw.reason === 'ambiguous-person', { reason: tw.reason, ids: ids(tw) });
+  const one = A2.answer(ON, 'מה שרה חייבת לי?', LOOPS.concat([twins[twins.length - 2]]), CTX);
+  check('...with only Sarah: answered', !one.refused && ids(one) === 's1', ids(one));
+  const nobody = A2.answer(ON, 'What does Moshe owe me?', LOOPS, CTX);
+  check('a name no loop knows in either script is still refused', nobody.refused === true, nobody.reason);
 }
 
 console.log('\n--- the switch ---\n');
