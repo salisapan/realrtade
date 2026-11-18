@@ -80,7 +80,7 @@ const FlowIntent = (() => {
   // the absolute פגישה, so a note that only uses the construct used to
   // stay silent. The artifact lookahead still refuses "the recording of
   // the meeting" and the same continuations as the absolute noun.
-  const MEETING_NOUN_HE = /(פגישת|פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
+  const MEETING_NOUN_HE = /(ישיבת|ישיבה|דיון|פגישת|פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
 
   // An explicit ask to meet, narrower than HANDOFF. "Could you please
   // confirm you can make it" is a confirm ask on a meeting that is already
@@ -651,6 +651,11 @@ const FlowIntent = (() => {
     }
     if (clauses.some(clausePast)) return true;
     if (clauses.some(clauseCancelled)) return true;
+    // «מועד ההגשה נקבע ליום חמישי בשעה 15:00» / "the deadline is set for Thursday at 15:00": a deadline with a clock is not a meeting, unless the text also names a meeting noun.
+    if (clauses.some((c) => /(?:דד-?ליין|מועד\s+ה?(?:אחרון|הגשה|תשלום|פירעון)|\bdeadline\b|\bdue\s+(?:date|on|by)\b)/i.test(c)) && !clauses.some(clauseHasEvent)) return true;
+    // «We had a meeting on Thursday at 3pm and it went well» is behind us; «לא נוכל להיפגש ביום שני ב-11:00» declines the slot. Neither is a meeting to put on the calendar.
+    if (new RegExp('\\b(?:we|i)\\s+had\\s+(?:a|an|our|the)\\s+' + VETO_EVENT + '\\b', 'i').test(raw)) return true;
+    if (/(?:^|[^\u0590-\u05FF])לא\s+(?:נוכל|אוכל|תוכל|תוכלו|נצליח|אצליח|יכול|יכולה|יכולים|יכולות)\s+(?:\S+\s+){0,2}?(?:להיפגש|להגיע|לדבר|להתקשר|להשתתף|להתחבר)/.test(raw)) return true;
     return false;
   }
   // A reply draft is offered only for an inbound ask addressed to the user.
@@ -1351,7 +1356,25 @@ const FlowIntent = (() => {
       }
       return false;
     }
-    const hasMeetingNoun = meetingAsserted(MEETING_NOUN) || meetingAsserted(MEETING_NOUN_HE);
+    // A proposal or a confirmation with no meeting noun: «Let's talk tomorrow at 12:00», «נתראה ביום חמישי ב-15:00», «נפגש מחר ב-12:00». The verb names the meeting, and the sentence must carry
+    // both a day and a clock (law-firm mailbox pass, dev probes; the held-out sets are not read). The same negation, soft-word and deadline guards as a noun apply.
+    const MEETING_VERB = /\b(?:see you|let'?s (?:talk|chat|speak|meet|connect|catch up)|we(?:'ll| will) (?:meet|talk|speak)|calling you|i(?:'ve| have) booked us|booking you)\b|\b(?:is|are|was|will be)\s+(?:scheduled|set|booked|confirmed)\s+for\b|\bwill\s+(?:take\s+place|be\s+held)\b|(?:^|[^\u0590-\u05FF])(?:מתאים\s+(?:לך|לכם)|(?:ת?שריין|ת?שמור)\s+(?:לי\s+)?(?:בבקשה\s+)?ביומן)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נקבע(?:ה|ו)?\s+ל|תתקיים|יתקיים|תיערך|ייערך|תתקיימנה)(?![\u0590-\u05FF])|(?:^|[^\u0590-\u05FF])(?:נפגש|ניפגש|נדבר|נתראה|נשוחח|נתקשר|קבענו\s+(?:\S+\s+){0,2}?(?:להיפגש|לדבר)|אשמח\s+להיפגש|(?:בוא|בואי|בואו)\s+נדבר)(?![\u0590-\u05FF])/i;
+    const SENT_DAY = /\b(?:tomorrow|today|tonight|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b|(?:^|[^\u0590-\u05FF])(?:מחר|היום|ל?יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)|ביום\s+\S+)/i;
+    const SENT_CLOCK = /\b\d{1,2}[:.]\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b/i;
+    function meetingVerbAsserted() {
+      const sentences = String(text || '').split(/(?<=[.!?;])\s+|\n+/);
+      for (const sn of sentences) {
+        const hit = sn.match(MEETING_VERB);
+        if (!hit || !SENT_DAY.test(sn) || !SENT_CLOCK.test(sn)) continue;
+        if (FlowJudgment.isNegatedBefore(sn.slice(0, hit.index))) continue;
+        if (MEETING_SOFT.test(sn)) continue;
+        if (/\b(?:deadline|due|submit(?:ted)?|filing|file by|payment)\b|דד-?ליין|מועד\s+(?:אחרון|הגשה|תשלום)|הגשה|תשלום|פירעון/i.test(sn)) continue;
+        if (/\b(?:please|kindly)\s+(?:send|upload|submit|pay|sign)\b|(?:נא|בבקשה)\s+(?:לשלוח|להעלות|להגיש|לשלם|לחתום)/i.test(sn)) continue;
+        return true;
+      }
+      return false;
+    }
+    const hasMeetingNoun = meetingAsserted(MEETING_NOUN) || meetingAsserted(MEETING_NOUN_HE) || meetingVerbAsserted();
     // A resolved date or a resolved money figure — "something concrete
     // enough to actually act on" — is one of two ways to clear both
     // COMMITMENT_OF_READER's evidence bar below (see
