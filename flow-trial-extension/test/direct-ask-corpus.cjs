@@ -174,6 +174,8 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   for (const t of ['אשמח שתהיה איתנו בחג.', 'אשמח שתבוא לארוחה ביום שני.', 'אשמח שנעביר את זה יחד עד מחר.', 'אודה על העברת הכספים שביצעת אתמול.', 'נא לא לשלוח את הנספחים עד יום שני.', 'בבקשה לא להעביר את הכסף עד יום שני.', 'אשמח שתתעדכן בהמשך.']) {
     const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('not an ask, stays quiet: ' + t.slice(0, 40), !r.show, kinds(r));
   }
+  for (const t of ['אודה לאישורכם בקבלת המסמכים.', 'אודה לתשובתך עד מחר.', 'שלום סאלי,\n\nאודה למענה.']) { const r = judge(t.indexOf('סאלי') >= 0 ? t : 'שלום,\n\n' + t + '\n\nתודה'); check('«אודה ל…» is an explicit ask: ' + t.slice(0, 30).replace(/\n/g, ' '), r.show, kinds(r)); }
+  for (const t of ['היי דנה,\n\nאשמח שתעביר לי את הנספחים.', 'דנה שלום,\n\nאודה למענה.', 'היי דנה,\n\nאודה לאישורך בקבלת המסמכים.']) { const r = judge(t); check('a framed ask that opens with another name is not the reader\'s: ' + t.slice(0, 20).replace(/\n/g, ' '), !r.show, kinds(r)); }
   const keep = judge('שלום,\n\nבבקשה לא לשכוח לשלוח את הנספחים עד יום שני.\n\nתודה'); check('«בבקשה לא לשכוח» is not read as a prohibition', !/prohibition/.test(kinds(keep)), kinds(keep));
 }
 

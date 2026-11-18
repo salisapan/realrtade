@@ -239,9 +239,9 @@ const FlowIncomingJudge = (() => {
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
   const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני)(?![\u0590-\u05FF])/;
   const POLITE_FRAME_HE = /^(?:(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA]))|(?:בבקשה|נא)\s+(?=ת[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF])))/;
-  const POLITE_NOMINAL_HE = /^(?:אודה|נודה)\s+(?:מאוד\s+)?על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)(?![\u0590-\u05FF])/;
+  const POLITE_NOMINAL_HE = /^(?:אודה|נודה)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)|(?:ל)(אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
   const NOMINAL_WORK_HE = /^(?:הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
-  const NOMINAL_BACK_HE = /^(?:שליחת|העברת|החזרת)$/;
+  const NOMINAL_BACK_HE = /^(?:שליחת|העברת|החזרת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם)$/;
   const DIRECT_IMP_SEND_HE = /^(?:תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני)(?![\u0590-\u05FF])/;
   const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
   // A chat (WhatsApp, Messenger, Instagram, Teams) has no addresses: the host asserts the message is an inbound one-to-one one
@@ -280,15 +280,20 @@ const FlowIncomingJudge = (() => {
     const head = ownText.slice(0, 60).toLowerCase();
     const greetsReader = names.some((n) => head.indexOf(n) >= 0);
     const skip = (x, he) => (he ? ANSWER_NO_HE.test(x) : ANSWER_NO_EN.test(x)) || DIRECT_Q_NO.test(x);
+    // «היי דנה,» / «דנה שלום,» at the head names someone else: a framed ask below is theirs, not the reader's (the same rule the classifier applies).
+    const greetM = /^\s*(?:(?:שלום|היי|הי|בוקר טוב|ערב טוב)\s+([\u05D0-\u05EA]{2,14})|([\u05D0-\u05EA]{2,14})\s+(?:שלום|היקר|היקרה))\s*[,:]/.exec(ownText.slice(0, 60));
+    const greetName = greetM ? String(greetM[1] || greetM[2]).toLowerCase() : '';
+    const greetsOther = !!greetName && !/^(?:כולם|כולן|צוות|חברים|חברות|חבר'ה|שלום|היי|הי|עו"ד|עורכי)$/.test(greetName) && !names.some((n) => n.indexOf(greetName) >= 0 || greetName.indexOf(n) >= 0);
     // 2. a Hebrew bare imperative with its day (email surfaces only; a chat has its own reader)
     for (const x0 of (chat ? [] : sents)) {
       const x1 = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
       if (!/[\u0590-\u05FF]/.test(x1) || skip(x1, true) || /(?:^|\s)(?:אל|לא)\s/.test(x1)) continue;
       // A polite frame in front of the verb («אשמח שתעביר לי…», «אודה אם תכין…», «אבקש שתשלח…») or a nominal («אודה על הכנת נספח…») is an explicit ask: it needs no day. A bare imperative still does.
       const framed = POLITE_FRAME_HE.test(x1), nominal = !framed && POLITE_NOMINAL_HE.exec(x1);
+      if ((framed || nominal) && greetsOther) continue;
       const x = framed ? x1.replace(POLITE_FRAME_HE, '') : x1;
-      const work = nominal ? NOMINAL_WORK_HE.test(nominal[1]) : DIRECT_IMP_WORK_HE.test(x);
-      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)));
+      const work = nominal ? NOMINAL_WORK_HE.test(nominal[1] || nominal[2]) : DIRECT_IMP_WORK_HE.test(x);
+      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)));
       if (!work && !back) continue;
       const d = dayOf(x1, now0).date;
       if (d ? d < ymdOf(now0) : !(framed || nominal)) continue;
