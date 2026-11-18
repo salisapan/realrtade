@@ -349,5 +349,13 @@ console.log('\n--- replies to a formal Hebrew ask of an office (real professiona
   check('«ביצעתי את התשלום» is a claim of payment', cr('ביצעתי את התשלום.', pw).outcome === 'paid');
 }
 
+console.log('\n--- a formal «נודה למענה / לטיפולכם» closes a mail as a chase (law-firm mailbox, 2026-11-18) ---');
+{
+  const yes = classify('שלום,\nמצ"ב חשבונית על אגרת הנוטריון.\nנודה למענה על יתר הנושאים עד מחר.\nבברכה,');
+  check('«נודה למענה על יתר הנושאים עד מחר» opens a reply loop', !!yes && yes.kind === 'reply', yes && yes.kind);
+  const no = classify('שלום,\nמצ"ב חשבונית על אגרת הנוטריון.\nבברכה,');
+  check('a mail that only attaches the invoice opens no loop', !no, no && no.kind);
+}
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);
