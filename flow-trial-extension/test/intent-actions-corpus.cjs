@@ -365,6 +365,12 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('HE: commitment to send a receipt, no anchor -> COMMITMENT_OF_READER', heNoAnchorCommit.type === FlowIntent.TYPES.COMMITMENT_OF_READER, heNoAnchorCommit.type);
   check('HE: no-anchor commitment gets medium confidence', heNoAnchorCommit.confidence === 'medium', heNoAnchorCommit.confidence);
 
+  // The polite Hebrew request put as a question («האם ניתן ל<פועל> ... עד <יום>?») and «אשמח אם תשלח ...» (found on a real professional inbox, 2026-11-18; written for this file).
+  for (const t of ['האם ניתן לשלוח לי את הדוח המעודכן עד יום חמישי?', 'האם ניתן לשלוח לי את הדוח הרבעוני עד מחר?']) {
+    const c = classify(t);
+    check('HE: «האם ניתן ל<פועל> ... עד <יום>?» is a request: ' + t.slice(0, 26), c.type === FlowIntent.TYPES.REQUEST, c.type);
+  }
+  check('HE: «האם ניתן לראות איך זה נראה?» (no action on a deliverable, no day) stays quiet', classify('האם ניתן לראות איך זה נראה?').type === null);
   // A Hebrew commitment put as «as we agreed, you <verb> ... by <day>» (the agreement said first, the reader's own verb after it).
   for (const t of ['כפי שדיברנו, את שולחת לי את הטיוטה של ההסכם עד יום רביעי.', 'לפי מה שהוסכם, אתה מגיש את הדוח הרבעוני לרואה החשבון עד יום ראשון.']) {
     const c = classify(t);
