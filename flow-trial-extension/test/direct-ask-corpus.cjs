@@ -182,6 +182,8 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
     const q = judge('שלום וברכה,\n\nאודה לקבלת הדרישות לצורך קבלת הסכמה.\n\nבברכה,'); check('«אודה לקבלת הדרישות» is an ask', q.show, kinds(q));
     for (const t of ['היי דנה,\n\nתעבור עליה בבקשה ותכין טבלה.', 'תעבור עליה ותכין טבלה.', 'הוא יעבור עליה בבקשה ויכין טבלה.', 'היי,\nבבקשה לא תכין טבלה.']) { const n = judge(t); check('not offered: ' + t.replace(/\n/g, ' ').slice(0, 36), !n.show, kinds(n)); }
   }
+  for (const t of ['יש להגיש את הבקשה לרשות עד יום חמישי.', 'עליך להגיש את הצהרת ההון עד יום ראשון.', 'חובה להעלות את האישור לפורטל עד יום שני.']) { const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('impersonal «יש / עליך / חובה» do-it is a task: ' + t.slice(0, 34), r.show && /googleTask/.test(kinds(r)), kinds(r)); }
+  for (const t of ['יש להגיש את הבקשה כפי שסוכם.', 'הוא עליו להגיש את הבקשה עד יום חמישי.', 'נא לא להגיש את הבקשה עד יום חמישי.']) { const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('not a task: ' + t.slice(0, 34), !(r.show && /googleTask/.test(kinds(r))), kinds(r)); }
   const keep = judge('שלום,\n\nבבקשה לא לשכוח לשלוח את הנספחים עד יום שני.\n\nתודה'); check('«בבקשה לא לשכוח» is not read as a prohibition', !/prohibition/.test(kinds(keep)), kinds(keep));
 }
 

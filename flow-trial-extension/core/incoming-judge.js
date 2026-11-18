@@ -708,7 +708,7 @@ const FlowIncomingJudge = (() => {
   // answer, a look back, a hedge or a promise never matches. Returns { title, dateIso, lang } or null.
   const DOIT_EN = '(?:fill\\s+(?:in|out|up)|upload|renew|submit|complete|register\\s+for|sign\\s+up\\s+for|apply\\s+(?:for|to))';
   const DOIT_HE = '(?:תחדש(?:י|ו)?|לחדש|תעלה|תעלי|תעלו|להעלות|תמלא|תמלאי|תמלאו|למלא|תגיש|תגישי|תגישו|להגיש|תשלים|תשלימי|להשלים|תירשם|תירשמי|להירשם)';
-  const DOIT_NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|forgot|already|never\s*mind|forget\s+it|i'?ll|i\s+will|maybe|might|if\s+you\s+want|cancel(?:l?ed)?|let\s+me\s+know|reply|get\s+back\s+to\s+me|tell\s+me|send\s+me|confirm|whether)\b/i;
+  const DOIT_NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|forgot|already|never\s*mind|forget\s+it|i'?ll|i\s+will|we'?ll|we\s+will|we\s+are\s+going\s+to|maybe|might|if\s+you\s+want|cancel(?:l?ed)?|let\s+me\s+know|reply|get\s+back\s+to\s+me|tell\s+me|send\s+me|confirm|whether)\b/i;
   const DOIT_NO_HE = /(?:אתמול|שבוע שעבר|שכחתי|כבר\s|אולי|בוטל|לבטל|תגיד לי|תודיע לי|תחזור אלי|תשיב|תאשר|תשלח לי|האם)/;
   function doItTitle(obj) {
     return String(obj || '')
@@ -724,7 +724,7 @@ const FlowIncomingJudge = (() => {
     const reEn = new RegExp(lead + '(?:please\\s+|kindly\\s+)?(?:(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?|you\\s+(?:need|have)\\s+to\\s+|(?:please\\s+)?(?:don\'?t\\s+forget|remember)\\s+to\\s+)?(' + DOIT_EN + '\\b.+)$', 'i');
     // A bare "don't forget to <anything>" is the TASK_ASK reader (labs, off by default); only a named do-it verb is read here.
     const reWait = /\b(?:i(?:'|’)?m|we(?:'|’)?re|i\s+am|we\s+are)\s+waiting\s+for\s+(?:an?\s+|the\s+)?(.+?)\s+from\s+you\b/i;
-    const reHe = new RegExp('^(?:[\\u0590-\\u05FF]{2,12},\\s*)?(?:נא\\s+|אנא\\s+|בבקשה\\s+)?(?:תוכל(?:י|ו)?\\s+)?(' + DOIT_HE + '(?![\\u0590-\\u05FF])(?:\\s+בבקשה)?\\s+\\S.*)$');
+    const reHe = new RegExp('^(?:[\\u0590-\\u05FF]{2,12},\\s*)?(?:תזכורת\\s*[:\\-–]\\s*)?(?:נא\\s+|אנא\\s+|בבקשה\\s+|יש\\s+|עליך\\s+|עליכם\\s+|חובה\\s+)?(?:תוכל(?:י|ו)?\\s+)?(' + DOIT_HE + '(?![\\u0590-\\u05FF])(?:\\s+בבקשה)?\\s+\\S.*)$');
     const reWaitHe = /מחכה\s+ל([\u0590-\u05FF][^\n.!?]*?)\s+ממך(?![\u0590-\u05FF])/;
     for (let k = 0; k < sentences.length; k++) {
       const sent = sentences[k];

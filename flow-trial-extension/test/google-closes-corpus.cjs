@@ -55,6 +55,9 @@ function plan(text, extra) {
 const SIX = ['party', 'amount', 'date', 'title', 'what', 'reference'];
 
 console.log('--- detail mode: chat only above 4 ---\n');
+// A filing ask that names the case folder with «בתיק» and the nominal «אודה לשמירת…» (law-firm mailbox pass, 2026-11-18); a past tense and a bare mention stay out.
+for (const t of ['סאלי, נא לתייק את הנספח המצורף בתיק.', 'אודה לשמירת המסמך המצורף בתיק הלקוח.', 'תשמור את הנספח המצורף בתיק']) check('save-shaped (case folder): ' + t.slice(0, 36), FlowGoogleCloses.needsOneAttachment(t), t);
+for (const t of ['שמרתי את הנספח המצורף בתיק.', 'הנספח המצורף נמצא בתיק.', 'אודה לתשובה על המסמך המצורף.']) check('not save-shaped: ' + t.slice(0, 36), !FlowGoogleCloses.needsOneAttachment(t), t);
 check('0 missing is ready', FlowGoogleCloses.detailMode(0) === 'ready');
 check('1 missing is fields', FlowGoogleCloses.detailMode(1) === 'fields');
 check('4 missing is fields', FlowGoogleCloses.detailMode(4) === 'fields');
