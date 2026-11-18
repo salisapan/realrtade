@@ -10583,6 +10583,11 @@ const FlowIncomingJudge = (() => {
   const ADVISE_EN = /^(?:please|kindly)\s+(?:advise|clarify)\s+(?:on|about|regarding|whether|what|which|when|who|how)\b/i;
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
   const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני)(?![\u0590-\u05FF])/;
+  const POLITE_FRAME_HE = /^(?:(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA]))|(?:בבקשה|נא)\s+(?=ת[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF])))/;
+  const POLITE_NOMINAL_HE = /^(?:אודה|נודה)\s+(?:מאוד\s+)?על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)(?![\u0590-\u05FF])/;
+  const NOMINAL_WORK_HE = /^(?:הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
+  const NOMINAL_BACK_HE = /^(?:שליחת|העברת|החזרת)$/;
+  const DIRECT_IMP_SEND_HE = /^(?:תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני)(?![\u0590-\u05FF])/;
   const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
   // A chat (WhatsApp, Messenger, Instagram, Teams) has no addresses: the host asserts the message is an inbound one-to-one one
   // (`oneToOne === true`; src/chat-task-card.js already drops groups, the person's own messages and quoted text before it asks the judge).
@@ -10622,12 +10627,16 @@ const FlowIncomingJudge = (() => {
     const skip = (x, he) => (he ? ANSWER_NO_HE.test(x) : ANSWER_NO_EN.test(x)) || DIRECT_Q_NO.test(x);
     // 2. a Hebrew bare imperative with its day (email surfaces only; a chat has its own reader)
     for (const x0 of (chat ? [] : sents)) {
-      const x = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
-      if (!/[\u0590-\u05FF]/.test(x) || skip(x, true) || /(?:^|\s)(?:אל|לא)\s/.test(x)) continue;
-      const work = DIRECT_IMP_WORK_HE.test(x), back = DIRECT_IMP_BACK_HE.test(x);
+      const x1 = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
+      if (!/[\u0590-\u05FF]/.test(x1) || skip(x1, true) || /(?:^|\s)(?:אל|לא)\s/.test(x1)) continue;
+      // A polite frame in front of the verb («אשמח שתעביר לי…», «אודה אם תכין…», «אבקש שתשלח…») or a nominal («אודה על הכנת נספח…») is an explicit ask: it needs no day. A bare imperative still does.
+      const framed = POLITE_FRAME_HE.test(x1), nominal = !framed && POLITE_NOMINAL_HE.exec(x1);
+      const x = framed ? x1.replace(POLITE_FRAME_HE, '') : x1;
+      const work = nominal ? NOMINAL_WORK_HE.test(nominal[1]) : DIRECT_IMP_WORK_HE.test(x);
+      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)));
       if (!work && !back) continue;
-      const d = dayOf(x, now0).date;
-      if (!d || d < ymdOf(now0)) continue;
+      const d = dayOf(x1, now0).date;
+      if (d ? d < ymdOf(now0) : !(framed || nominal)) continue;
       return { kind: work ? 'task' : 'reply', what: x.slice(0, 200), title: x.replace(/[.!?\s]+$/, '').slice(0, 80), dateIso: d, lang: 'he' };
     }
     // 1. plain information questions
@@ -10861,6 +10870,8 @@ const FlowIncomingJudge = (() => {
     if (buriedRememberRelayQuiet(text)) {
       return { show: false, reason: 'quiet:relay', intent: intent || null };
     }
+    // «נא לא לשלוח…», «בבקשה לא להעביר…»: a please-do-not is a prohibition, not a request (the same as «אל תשלח…», which already stays quiet).
+    if (intent && intent.type && /(?:^|[\s,.;:!])(?:נא|אנא|בבקשה)\s+לא\s+(?!לשכוח|לפספס|לאחר|להתעכב)[\u05D0-\u05EA]/.test(String(text || ''))) return { show: false, reason: 'quiet:prohibition', intent };
     if (!intent || !intent.type) {
       // The general classifier found nothing, or only a notice sender. The structural readers the chat card uses run
       // second, each strict about its own shape: a booking told to the person, a pickup with a last day, a reminder or a

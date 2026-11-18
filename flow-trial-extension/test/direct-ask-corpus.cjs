@@ -166,5 +166,16 @@ console.log('\n--- a Hebrew auto-reply that tells the sender to contact the offi
   check('a real mail that says «I am not in the office Thursday» and proposes a call is still offered', real.show, kinds(real));
 }
 
+console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a request (law-firm mailbox pass, 2026-11-18) ---\n');
+{
+  for (const t of ['אשמח שתעביר לי את הנספחים הנדרשים.', 'אשמח שתעביר לי את הנספחים עד יום שני.', 'אשמח שתכין את הנספח עד יום שני.', 'אודה על הכנת נספח שינויים לכתב התחייבות.', 'אודה על שליחת הנספחים עד יום שני.']) {
+    const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('polite-framed ask is offered: ' + t.slice(0, 40), r.show, kinds(r));
+  }
+  for (const t of ['אשמח שתהיה איתנו בחג.', 'אשמח שתבוא לארוחה ביום שני.', 'אשמח שנעביר את זה יחד עד מחר.', 'אודה על העברת הכספים שביצעת אתמול.', 'נא לא לשלוח את הנספחים עד יום שני.', 'בבקשה לא להעביר את הכסף עד יום שני.', 'אשמח שתתעדכן בהמשך.']) {
+    const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('not an ask, stays quiet: ' + t.slice(0, 40), !r.show, kinds(r));
+  }
+  const keep = judge('שלום,\n\nבבקשה לא לשכוח לשלוח את הנספחים עד יום שני.\n\nתודה'); check('«בבקשה לא לשכוח» is not read as a prohibition', !/prohibition/.test(kinds(keep)), kinds(keep));
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
