@@ -57,6 +57,16 @@ const VENDORS = {
     extraHeaders: {},
     supportsRefresh: true
   },
+  box: {
+    tokenUrl: 'https://api.box.com/oauth2/token',
+    idEnv: 'BOX_CLIENT_ID',
+    secretEnv: 'BOX_CLIENT_SECRET',
+    // Box takes a form-encoded body with client_id and client_secret; refresh tokens are single-use and rotate (verify against the vendor page before go-live).
+    clientAuth: 'body',
+    bodyFormat: 'form',
+    extraHeaders: {},
+    supportsRefresh: true
+  },
   // DocuSign: HTTP Basic client auth and a form body (verify against the vendor page before go-live). Production and the developer (demo) servers are two vendors:
   // the integration key is the same, the secret is not.
   docusign: {

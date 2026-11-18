@@ -41,6 +41,8 @@ const FlowConsentCatalog = (() => {
       steps: [{ type: 'oauth-relay', vendor: 'docusign' }, { type: 'host-permission', origin: 'https://account.docusign.com/*' }, { type: 'host-permission', origin: 'https://*.docusign.net/*' }] },
     { id: 'dropbox', label: 'Dropbox', detail: 'Save one file you approve into a Glance folder in your Dropbox and read it back. It never overwrites or renames, and Undo leaves a file you edited alone. Nothing else in your Dropbox is read.', group: 'files', state: 'experimental',
       steps: [{ type: 'oauth-pkce', vendor: 'dropbox' }, { type: 'host-permission', origin: 'https://api.dropboxapi.com/*' }, { type: 'host-permission', origin: 'https://content.dropboxapi.com/*' }] },
+    { id: 'box', label: 'Box', detail: 'Save one file you approve into the Box folder you choose and read it back. It never overwrites, and Undo leaves a file you edited alone. Nothing else in your Box is read.', group: 'files', state: 'experimental',
+      steps: [{ type: 'oauth-relay', vendor: 'box' }, { type: 'host-permission', origin: 'https://api.box.com/*' }, { type: 'host-permission', origin: 'https://upload.box.com/*' }] },
     // Listed so the screen can show them honestly. Select all never includes these.
     { id: 'zoom', label: 'Zoom', detail: 'Create one meeting link and read it back.', group: 'meetings', state: 'coming', steps: [] },
     { id: 'slack', label: 'Slack', detail: 'Count a request closed when the answer arrives in the DM.', group: 'chat', state: 'coming', steps: [] },

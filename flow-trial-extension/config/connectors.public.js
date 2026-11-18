@@ -11,6 +11,9 @@
 // dropboxReadBack: one file saved into the person's Dropbox app folder, read back by id, size and content hash (core/dropbox-close.js). Never overwrites, never
 //                  renames; Undo refuses a file the person edited. Off = the messages flow:dropbox-save / flow:dropbox-undo answer connector-not-live.
 // dropboxOAuth:    "Sign in with Dropbox" (OAuth with PKCE, no secret, no relay). Needs OAUTH_PUBLIC.dropboxAppKey set.
+// boxReadBack:     one file saved into the Box folder the person chose, read back by id, size and SHA-1 (core/box-close.js). Never overwrites; Undo moves it to the
+//                  Box trash and refuses a file the person edited. Off = flow:box-save / flow:box-undo answer connector-not-live.
+// boxOAuth:        "Sign in with Box" (OAuth through the token relay: Box has a client secret). Needs OAUTH_PUBLIC.boxClientId and the relay vendor box.
 //
 // docusignReadBack: READ-ONLY. The person links one envelope they already sent to one loop; Glance reads its status and counts the loop closed only when the
 //                   envelope is completed (core/docusign-close.js). It never creates, sends or changes an envelope. Off = the message type answers connector-not-live.
@@ -32,4 +35,4 @@
 //                Off = no Asana writer exists at all (nothing is registered under the id "asana").
 // asanaOAuth:    "Sign in with Asana" (OAuth with PKCE) through the token relay. Needs the relay deployed, ASANA_CLIENT_ID /
 //                ASANA_CLIENT_SECRET set in Netlify, and OAUTH_PUBLIC.asanaClientId set.
-export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false };
+export const CONNECTORS = { notionReadBack: false, notionOAuth: false, asanaReadBack: false, asanaOAuth: false, jiraReadBack: false, jiraOAuth: false, linearReadBack: false, linearOAuth: false, docusignReadBack: false, docusignOAuth: false, docusignDemo: false, dropboxReadBack: false, dropboxOAuth: false, boxReadBack: false, boxOAuth: false };
