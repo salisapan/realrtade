@@ -373,5 +373,15 @@ console.log('\n--- short asks: availability and a clarifying question (law-firm 
   for (const x of ['אתה זמין מחר, תודה.', 'הכוונה לאישור זכויות.']) { const r = classify(x); check('a statement opens none: ' + x, !r, r && r.kind); }
 }
 
+console.log('\n--- thanks and done-reports are not asks (law-firm mailbox, sent pass 6) ---');
+{
+  for (const x of ['שלום,\nתודה על העברת המסמכים.\nהנושא נמצא בטיפולנו ונעדכן.\nבברכה,', 'תוקן מלבד הבקשה לרשום ת.ד יחד עם המיקוד, אין אפשרות כזו.\nמצ"ב המש"ח כפי שדווח.\nבברכה,']) { const r = classify(x); check('opens no loop: ' + x.split('\n')[x[0] === 'ת' && x[1] === 'ו' && x[2] === 'ק' ? 0 : 1].slice(0, 36), !r, r && r.what); }
+  for (const x of ['שלום,\nתודה על העברת המסמכים.\nאודה שתשלח לי את החוזה החתום עד יום חמישי.\nבברכה,']) { const r = classify(x); check('thanks + a real ask still opens a loop', !!r, r && r.kind); }
+}
+
+{
+  const r = classify('היי מה שלומכן?\nאבקש את עזרתכן בהדפסה דחופה להיום.\nתודה רבה!'); check('«אבקש את עזרתכן ב…» opens a loop', !!r, r && r.kind);
+}
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

@@ -89,6 +89,7 @@ const FlowFollowUp = (() => {
     // «עדכן אותי מה לעשות», «תעדכנו אותי»: the person asks to be told. «נעדכן אותך» / «אעדכן אותך» (the sender's own promise) have a letter in front and do not match.
     /(?<![\u0590-\u05FF])ת?עדכ(?:ן|ני|נו)\s+(?:אותי|אותנו)(?![\u0590-\u05FF])/,
     /(?<![\u0590-\u05FF])(?:אתה|את|אתם|אתן)\s+זמי[ןנ](?:ה|ים|ות)?\s*\?/,
+    /(?<![\u0590-\u05FF])(?:אבקש|נבקש|אבקשך)\s+(?:את\s+)?עזרת(?:ך|כם|כן)(?![\u0590-\u05FF])/,
     // Formal Hebrew of an office: «ממתין ממך לתצהיר», «ממתינים לתשובתכם», «יש להעביר 100 ₪ לחשבון», «יש להמציא את המסמכים» (found on the owner's own professional sent mail, 2026-11-18).
     // «אודה לסיוע» / «נודה לעדכון» / «אשמח לקבל» (the polite formal request, outgoing).
     /(?:אודה|נודה|אשמח|נשמח) (?:לך |לכם )?(?:מאוד )?ל(?:סיוע|עזרה|קבלת|עדכון|תשובה|אישור|ציון|קבל|דעת|בירור|מענה|טיפול(?:ך|כם)?|התייחס(?:ות)?(?:ך|כם)?|תגובה|תגובת(?:ך|כם))/,
@@ -255,7 +256,9 @@ const FlowFollowUp = (() => {
     const deadlineIso = date && date.iso ? date.iso : null;
 
     const lines = sentences(body);
-    const candidates = lines.filter((s) => !COURTESY.test(s) && !/(?:^|\s)אל\s+ת[\u05D0-\u05EA]/.test(s) && (words(s) >= 4 || isShortScheduleAsk(s) || /^(?:אודה|נודה|אשמח|נשמח)\s+ל\S+[.!]?$/.test(s.trim())));
+    // «תודה על העברת המסמכים.» is thanks, and «תוקן מלבד הבקשה לרשום…» / «טופל.» reports work done: neither is an ask, whatever noun the lexicon finds in it.
+    const THANKS_OR_DONE_HE = /^\s*(?:תודה(?:\s+רבה)?\s+(?:על|ל)(?![\u0590-\u05FF])|(?:תוקן|בוצע|טופל|עודכן|נשלח|נבדק|הועבר|הוסדר)(?![\u0590-\u05FF]))/;
+    const candidates = lines.filter((s) => !COURTESY.test(s) && !THANKS_OR_DONE_HE.test(s) && !/(?:^|\s)אל\s+ת[\u05D0-\u05EA]/.test(s) && (words(s) >= 4 || isShortScheduleAsk(s) || /^(?:אודה|נודה|אשמח|נשמח)\s+ל\S+[.!]?$/.test(s.trim())));
     if (!candidates.length) return null;
 
     const he = hasHebrew(body);

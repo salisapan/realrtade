@@ -31,3 +31,7 @@ Read so far: inbox 178 of 2,369, sent 150 of 553. Sent: 34 of 37 asks open a loo
 ## Sixth pass (inbox 179-203)
 
 Read so far: inbox 203 of 2,369, sent 150 of 553. The partner's table request («צריכה את עזרתך בתיק… תעבור עליה בבקשה ותכין טבלה מסודרת») was silent; it is now offered as a task. Silent by design: group lists, mails addressed to another name, status chases to a list, and HR/IT notices.
+
+## Seventh pass (sent 151-175)
+
+Read so far: inbox 203 of 2,369, sent 175 of 553. Found two false chases (thanks and a done-report) and fixed them with contrast tests. Still silent: «אמרי לו שישלח אלי מייל» (an ask to relay a message), and an own promise («ברגע שנאתר נעדכן») which opens no loop yet because own-promise detection in sent mail is not built.
