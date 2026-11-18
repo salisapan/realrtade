@@ -347,7 +347,15 @@ const FlowFollowUp = (() => {
   function partsOf(text) {
     const body = String(text || '').replace(/^\s*(?:hi|hello|dear|שלום|היי)[^\n]{0,30}\n/i, '');
     const asks = sentences(body).map((x) => x.replace(/^(?:\d{1,2}[.)]|[-*•])\s*/, '').trim()).filter(isAskSentence);
-    if (asks.length < 2) return null;
+    if (asks.length < 2) {
+      // One ask that lists items by number («אשמח אם תעביר את פרוטוקולי המסירה של דירות 13, 17, 19 ו-21», «please send the protocols for units 13, 17, 19 and 21») is several things asked:
+      // a reply that brings one of them leaves the rest open. Small whole numbers only (a year or an amount is not an item); three or more.
+      const line = sentences(body).find((x) => isAskSentence(x) && /\d{1,3}(?:\s*,\s*\d{1,3}){1,5}\s*(?:,|ו-?|and|&)\s*\d{1,3}(?!\d)/i.test(x));
+      if (!line) return null;
+      const nums = Array.from(new Set((line.match(/(?<![\d.,])\d{1,3}(?![\d.,]\d)/g) || []))).slice(0, 8);
+      if (nums.length < 3) return null;
+      return nums.map((n) => ({ key: 'n' + n, text: clip('#' + n + ': ' + line, 120), kind: 'request', num: n, status: 'open' }));
+    }
     // A lead-in before a colon ("to make the demo real, we would like to know: which process?") is not the part: the part is what follows it.
     const own = asks.map((t) => { const k = t.lastIndexOf(':'); return k > 0 && words(t.slice(k + 1)) >= 3 ? t.slice(k + 1).trim() : t; });
     return own.slice(0, 6).map((t, i) => ({ key: 'p' + (i + 1), text: clip(t, 120), kind: /\?\s*$/.test(t) ? 'question' : 'request', status: 'open' }));
@@ -359,6 +367,7 @@ const FlowFollowUp = (() => {
   // thing a wrong "answered" does is give back today's behaviour (the reply closes the loop); a wrong "open" would hold a loop that is done.
   function sameStem(a, b) { return a === b || (a.length >= 5 && b.length >= 5 && a.slice(0, 4) === b.slice(0, 4)); }
   function partAnswered(part, reply) {
+    if (part.num) return new RegExp('(?<![\\d.,])' + part.num + '(?![\\d]|[.,]\\d)').test(String(reply || ''));
     const pt = partTokens(part.text); const rt = partTokens(reply);
     if (pt.some((w) => rt.some((r) => sameStem(w, r)))) return true;
     return LINK_PART.test(part.text) && HAS_LINK.test(reply);
@@ -678,7 +687,7 @@ const FlowFollowUp = (() => {
   // "I paid" / "payment was sent" — and the sentence-level guards that turn it
   // into a hypothetical or a negative ("not paid", "once it is paid").
   const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|^(?:paid|transferred|wired)\b|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been |just |already )?(?:sent|made|done|completed|processed|released|initiated|went out|has gone out)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
-  const PAID_HE = /(?:העברה בוצעה|שילמתי|שילמנו|העברתי|העברנו|שולם|התשלום (?:בוצע|הועבר|נשלח)|בוצעה העברה|הועבר)/;
+  const PAID_HE = /(?:אסמכתא (?:על |ל)(?:ה)?תשלום|אישור (?:ה)?תשלום|הוכחת תשלום|ביצע(?:תי|נו) (?:את )?(?:ה)?(?:תשלום|העברה)|העברה בוצעה|שילמתי|שילמנו|העברתי|העברנו|שולם|התשלום (?:בוצע|הועבר|נשלח)|בוצעה העברה|הועבר)/;
   const GUARD_EN = /\b(?:not|never|once|if|when|unless|until)\b|n't\b/i;
   const GUARD_HE = /(?:^|\s)(?:לא|טרם|אם|כש\S*|ברגע)(?=\s|$)/;
   // Greetings are not content: "Hi Dana, got it" is an acknowledgement.

@@ -333,5 +333,21 @@ for (const [name, text] of [
   check('no loop: ' + name, classify(text) === null);
 }
 
+console.log('\n--- replies to a formal Hebrew ask of an office (real professional threads, 2026-11-18; written for this file) ---\n');
+{
+  const mk = (text, id) => F.buildWatch({ threadId: id, messageId: id, subject: 'x', counterpart: { email: 'p@o.example', name: 'P' }, ask: classify(text), now: NOW - 3 * 86400000 });
+  const listAsk = 'שלום,\nאשמח אם תוכל להעביר אלינו בהקדם את פרוטוקולי המסירה של דירות 13, 17, 19 ו-21, שטרם התקבלו אצלנו.\nתודה מראש,';
+  const lw = mk(listAsk, 'l1');
+  const one = F.applyReply(lw, cr('מצ״ב פרוטוקול דירה 21', lw), NOW, 'מצ״ב פרוטוקול דירה 21');
+  check('an ask that lists four numbered items is not closed by a reply that brings one', one.partial === true && !one.close, one);
+  const all = F.applyReply(lw, cr('מצ״ב הפרוטוקולים של דירות 13, 17, 19 ו-21', lw), NOW, 'מצ״ב הפרוטוקולים של דירות 13, 17, 19 ו-21');
+  check('a reply that names all four items closes it', !all.partial, all);
+  const yearAsk = mk('שלום,\nאודה לקבל את הדוח השנתי לשנת 2025 ואת דוחות 2024 ו-2023.\nתודה,', 'l2');
+  check('years are not items (no parts are made from them)', !yearAsk || !Array.isArray(yearAsk.parts) || yearAsk.parts.length < 2, yearAsk && yearAsk.parts);
+  const pw = mk('שלום רב,\nבהמשך שיחתנו, לצורך קבלת אישור זכויות יש להעביר 100 ₪ לחשבון המצ"ב.\nבברכה,', 'pay1');
+  check('«מצ"ב אסמכתא על תשלום ...» is a claim of payment on a payment loop', cr('מצ"ב אסמכתא על תשלום אגרה עבור אישור הזכויות.', pw).outcome === 'paid', cr('מצ"ב אסמכתא על תשלום אגרה עבור אישור הזכויות.', pw));
+  check('«ביצעתי את התשלום» is a claim of payment', cr('ביצעתי את התשלום.', pw).outcome === 'paid');
+}
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);
