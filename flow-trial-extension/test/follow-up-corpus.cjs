@@ -306,7 +306,25 @@ for (const [name, text] of [
   ['«יש להמציא את המסמכים»', 'שלום,\nלצורך המשך הטיפול יש להמציא את המסמכים החתומים.\nתודה מראש,'],
 ]) {
   const a = classify(text);
-  check('a formal Hebrew ask opens a loop: ' + name, a && a.kind === 'reply', a && a.kind);
+  check('a formal Hebrew ask opens a loop: ' + name, a && (a.kind === 'reply' || (a.kind === 'payment' && /₪/.test(text))), a && a.kind);
+}
+for (const [name, text] of [
+  ['«אודה לסיוע» on a line of its own', 'שלום רב, ניסיתי מספר פעמים לבצע את הפעולה אך המערכת חוסמת את האפשרות.\nאודה לסיוע.'],
+  ['a clock put as a question («אפשרי היום ב14:30?»)', 'היי [NAME]!\nאפשרי היום ב14:30?'],
+]) {
+  const a = classify(text);
+  check('a short formal Hebrew ask opens a loop: ' + name, a && a.kind === 'reply', a && a.kind);
+}
+{
+  const rights = classify('שלום,\nלצורך השלמת הטיפול בבקשה יש להשלים תחילה את הליך העברת הזכויות.\nאנא עדכן האם כבר הוגשה בקשה להעברת הזכויות בהתאם לנוהל.');
+  check('«העברת הזכויות» (transfer of rights) is a reply loop, not a payment', rights && rights.kind === 'reply', rights && rights.kind);
+  const money = classify('שלום,\nלצורך קבלת האישור יש להעביר 150 ₪ לחשבון המצורף עד יום חמישי.\nבברכה,');
+  check('a transfer with an amount is still a payment loop', money && money.kind === 'payment', money && money.kind);
+  const remind = classify('שלום,\nנזכיר בהזדמנות זו כי טרם התקבלו המסמכים החתומים.\nבברכה,');
+  check('«נזכיר כי טרם התקבלו ...» (a chase) opens a loop', remind && remind.kind === 'reply', remind && remind.kind);
+  const still = classify('שלום,\nעדיין ממתינים לקבל את ייפוי הכוח.\nבברכה,');
+  check('«עדיין ממתינים לקבל ...» opens a loop', still && still.kind === 'reply', still && still.kind);
+  check('«אל תעבירי עדיין ... עד שנסיים» (a hold instruction to a colleague) opens no loop', classify('תשמרי אצלך אך אל תעבירי עדיין לעו"ד עד שלא נסיים עם שאר הטיוטות.') === null);
 }
 for (const [name, text] of [
   ['a statement that has «יש» but asks nothing', 'שלום,\nבהתאם לבדיקה, יש בידינו את כל המסמכים והם תויקו במערכת. הכל תקין.\nבברכה,'],

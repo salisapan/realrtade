@@ -86,6 +86,11 @@ const FlowFollowUp = (() => {
     /(?:תשלח(?:ו|י)?|שלח(?:ו|י)?|אשר(?:ו|י)?|תאשר(?:ו|י)?|חתום|תחתום|עדכן|תעדכן|תחזור|תחזרו|תחזרי|העבר(?:ו|י)?|תעביר(?:ו|י)?) (?:לי|לנו|אלי|בבקשה|את|עד|מיד)/,
     /(?:נא|בבקשה) (?:לשלוח|לאשר|להשיב|לחתום|להעביר|לעדכן|לשלם)/,
     // Formal Hebrew of an office: «ממתין ממך לתצהיר», «ממתינים לתשובתכם», «יש להעביר 100 ₪ לחשבון», «יש להמציא את המסמכים» (found on the owner's own professional sent mail, 2026-11-18).
+    // «אודה לסיוע» / «נודה לעדכון» / «אשמח לקבל» (the polite formal request, outgoing).
+    /(?:אודה|נודה|אשמח|נשמח) (?:לך |לכם )?(?:מאוד )?ל(?:סיוע|עזרה|קבלת|עדכון|תשובה|אישור|ציון|קבל|דעת|בירור)/,
+    // A chase that says nothing is yet received: «נזכיר כי טרם התקבלו המסמכים», «עדיין ממתינים לקבל את ...».
+    /(?:נזכיר|מזכירים|אזכיר)(?: לך| לכם)?[^.!?]{0,30}(?:כי |ש)?טרם התקבל/,
+    /עדיין (?:ממתין|ממתינה|ממתינים|מחכה|מחכים) ל(?:קבל|תשובה|אישור|מסמכ|חתימ)/,
     /(?:ממתין|ממתינה|ממתינים|מחכה|מחכים) (?:לקבל )?(?:ממך|ממכם|מכם|ממנה|ממנו) ל\S+/,
     /(?:ממתין|ממתינה|ממתינים|מחכה|מחכים) ל(?:תשובתך|תשובתכם|תגובתך|תגובתכם|אישורך|אישורכם|עדכונך|עדכונכם|מסמכים|קבלת)/,
     /(?:^|[\s,.])יש (?:ל)?(?:העביר|שלוח|המציא|הגיש|מלא|חתום|שלם|אשר|הסדיר|צרף)(?:\s|$)/,
@@ -105,7 +110,10 @@ const FlowFollowUp = (() => {
 
   // A scheduling question too short for the four-word line filter, and nothing else.
   function isShortScheduleAsk(s) {
-    return /^(?:מתי (?:נוח|מתאים) (?:לך|לכם|לי|לכן)|when (?:is|would be) (?:a )?good time)\s*\??$/i.test(String(s || '').trim());
+    const t = String(s || '').trim();
+    // A clock put as a question with no verb («אפשרי היום ב14:30?», «15:00 אפשרי?», «מתאים מחר ב-10:00?») is a request for a time in a real office thread.
+    if (/^(?:אפשרי|מתאים|נוח|פנוי|פנויה)\s+(?:(?:היום|מחר|מחרתיים|ביום\s+\S+)\s+)?(?:ב-?\s*)?\d{1,2}[:.]\d{2}\s*\?$/.test(t) || /^\d{1,2}[:.]\d{2}\s+(?:אפשרי|מתאים|נוח)\s*\?$/.test(t)) return true;
+    return /^(?:מתי (?:נוח|מתאים) (?:לך|לכם|לי|לכן)|when (?:is|would be) (?:a )?good time)\s*\??$/i.test(t);
   }
   // A suggestion to talk, with no delivery in it, is not the answer to the open ask.
   const TALK_SUGGESTION = /(?:כדאי (?:שנדבר|לדבר|לשוחח)|בוא(?:ו|י)? נדבר|בואי נדבר)|\b(?:we should|let's|lets) (?:talk|discuss|speak|chat)\b|\bworth (?:a|us) (?:call|chat|talk)\b/i;
@@ -214,7 +222,7 @@ const FlowFollowUp = (() => {
     const types = c.types || requestTypes;
     if (!types || !types.detectShortAsk) return null;
     const bare = body.replace(/^\s*(?:hi|hello|hey|היי|שלום)[^\n,!?]{0,20}[,!:]\s*/i, '').trim();
-    const req = types.detectShortAsk(bare);
+    const req = types.detectShortAsk(bare) || (isShortScheduleAsk(bare.split(/\n/).pop().trim()) ? { action: 'reply', type: 'schedule', label: 'Time to meet', days: null } : null);
     if (!req) return null;
     const kind = req.action === 'pay' ? KINDS.PAYMENT : KINDS.REPLY;
     return {
@@ -241,7 +249,7 @@ const FlowFollowUp = (() => {
     const deadlineIso = date && date.iso ? date.iso : null;
 
     const lines = sentences(body);
-    const candidates = lines.filter((s) => !COURTESY.test(s) && (words(s) >= 4 || isShortScheduleAsk(s)));
+    const candidates = lines.filter((s) => !COURTESY.test(s) && !/(?:^|\s)אל\s+ת[\u05D0-\u05EA]/.test(s) && (words(s) >= 4 || isShortScheduleAsk(s) || /^(?:אודה|נודה|אשמח|נשמח)\s+ל\S+[.!]?$/.test(s.trim())));
     if (!candidates.length) return null;
 
     const he = hasHebrew(body);
@@ -277,11 +285,12 @@ const FlowFollowUp = (() => {
     if (askLine && vetoed === askLine && !(typed && typed.line === askLine)) askLine = null;
 
     // Payment: a payment word AND a figure AND some instruction or due date.
-    const payLine = money ? candidates.find((s) => PAY_WORD.test(s)) : null;
+    const payLine = money ? candidates.find((s) => PAY_WORD.test(s) || /(?:^|\s)ל?(?:העביר|הפקיד)(?![\u05D0-\u05EA])/.test(s)) : null; // with a figure on the line, «יש להעביר 150 ₪» is a payment
     const dueCue = /\b(?:due|by|before|within|no later than|please|kindly|overdue|outstanding)\b|(?:עד|לפני|בתוך|נא|בבקשה|באיחור)/i;
     const isPayment = Boolean(payLine && (dueCue.test(payLine) || deadlineIso || askLine));
     // "Please pay the invoice" with no figure is still a payment being chased.
-    const payAsk = !isPayment && typed && typed.req.action === 'pay' ? typed : null;
+    // «העברת הזכויות» (transfer of rights) and «תעביר» (pass it on) are not money: the request type reads them as a payment verb, so the payment label needs a payment word or a figure on the line too.
+    const payAsk = !isPayment && typed && typed.req.action === 'pay' && (money || PAY_WORD.test(typed.line)) ? typed : null;
 
     if (!askLine && !isPayment) return null;
 
