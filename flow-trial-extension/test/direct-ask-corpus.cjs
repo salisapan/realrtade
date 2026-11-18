@@ -156,5 +156,15 @@ console.log('\n--- «please advise on ...» is an ask for information without a 
   check('an automated sender stays quiet', !judge('Hi Dana,\nPlease advise on the last date. Please advise on the amount.', Object.assign({}, g, { sender: { name: 'System', email: 'noreply@acme.io' } })).show);
 }
 
+console.log('\n--- a Hebrew auto-reply that tells the sender to contact the office is not a request ---\n');
+{
+  const ooo = judge('לא במשרד ולא זמינה יש ליצור קשר עם המשרד בטלפון [PHONE] מילים שישלחו יטופלו תוך 48 שעות מיום חזרתי לפעילות', { sender: { name: '[ORG]', email: 'person@org.example' }, subject: 'מענה אוטומטי: פרסומת' });
+  check('an out-of-office reply with «יש ליצור קשר עם המשרד» stays quiet', !ooo.show, kinds(ooo));
+  const ack = judge('לקוח/ה יקר/ה, קיבלנו את פנייתך שהועברה להמשך טיפול. אנו משתדלים לענות בתוך 3 ימי עסקים', { sender: { name: '[ORG]', email: 'person@org.example' }, subject: 'תודה על פנייתך' });
+  check('an acknowledgement of an inquiry stays quiet', !ack.show, kinds(ack));
+  const real = judge('היי סאלי, אני לא במשרד ביום חמישי, אפשר לקבוע שיחת וידאו ביום שלישי ב-10:00?', { sender: { name: 'Dana', email: 'dana@acme.io' }, subject: 'פגישה' });
+  check('a real mail that says «I am not in the office Thursday» and proposes a call is still offered', real.show, kinds(real));
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

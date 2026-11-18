@@ -604,7 +604,7 @@ const FlowFollowUp = (() => {
 
   // An out-of-office or automatic reply is not an answer. Treating it as one
   // would close a follow-up the person is still waiting on.
-  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|מענה אוטומטי|בחופשה עד|בחופשה|אעדר|(?:לא|אינני|איני) נמצא(?:ת)? במשרד|(?:אני|אנחנו|אנו) לא במשרד|המסירה לנמענים|לא ניתן למסירה)/i;
+  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|מענה אוטומטי|בחופשה עד|בחופשה|אעדר|(?:לא|אינני|איני) נמצא(?:ת)? במשרד|(?:אני|אנחנו|אנו) לא במשרד|המסירה לנמענים|לא ניתן למסירה|^\s*לא\s+במשרד\b|לא\s+במשרד\s+ו?לא\s+זמינ|מיום\s+חזרתי\s+(?:לפעילות|למשרד))/i;
 
   // A delivery failure: the mail the person sent never reached the other side. It is not a reply FROM them and it says nothing about the ask,
   // so it never closes a loop and never counts as an answer, and chasing the same address again would bounce the same way

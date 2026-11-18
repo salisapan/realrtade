@@ -5277,6 +5277,9 @@ const FlowIntent = (() => {
   // Bumps and calendar-acceptance mail the existing noise list does not
   // name. "Just following up — could you share the contract" is not in
   // here; that ask still chips.
+  // A Hebrew auto-reply that tells the sender to contact the office («לא במשרד ולא זמינה, יש ליצור קשר עם המשרד בטלפון ... יטופלו תוך 48 שעות מיום חזרתי לפעילות») carries a request
+  // sentence of its own and used to be offered as a reply (found on the owner's connected mailbox, 2026-11-18). Only the two shapes an automatic reply has and a person does not.
+  const HE_AUTO_REPLY = /לא\s+במשרד\s+ו?לא\s+זמינ|מיום\s+חזרתי\s+(?:לפעילות|למשרד)|(?:קיבלנו|התקבלה)\s+את\s+פנייתך[^.]{0,120}(?:טיפול|נחזור)/;
   const EXTRA_NOISE = /\b(?:quick bump|friendly bump|bumping this|just a nudge|accepted invitation|invitation accepted|updated invitation|event reminder|calendar reminder|automated reminder|your response:\s*accepted)\b|^\s*accepted\s*:|^\s*reminder:\s*(?:meeting|sync|call)\b/im;
   // Uncertainty on the ask itself. Deliberately not "would", "could", or
   // "if you could" — those are how a real request is written, and the
@@ -5362,7 +5365,7 @@ const FlowIntent = (() => {
   const VETO_CANCEL = '(?:cancell?ed|cancel|postponed|postpone|postone|no loner needed|no lnoger needed)';
   const VETO_EVENT_RE = new RegExp('\\b' + VETO_EVENT + '\\b', 'i');
   const VETO_CANCEL_RE = new RegExp('\\b' + VETO_CANCEL + '\\b', 'i');
-  const VETO_HE_EVENT = '(?:הפגישת\\s+\\S+|פגישת\\s+\\S+|השיחת\\s+זום|שיחת\\s+זום|ההדגמה|הדגמה|הראיון|ראיון|הפגישה|פגישה|השיחה|שיחה)';
+  const VETO_HE_EVENT = '(?:שיחת\\s+וידאו|שיחת\\s+טלפון|הפגישת\\s+\\S+|פגישת\\s+\\S+|השיחת\\s+זום|שיחת\\s+זום|ההדגמה|הדגמה|הראיון|ראיון|הפגישה|פגישה|השיחה|שיחה)';
   const VETO_HE_LATIN = '(?:^|[^A-Za-z\\u0590-\\u05FF])ה?(?:call|meeting)(?![A-Za-z])';
   const VETO_HE_CANCEL = '(?:בוטלה|בוטל|מבוטתל|מבטלת|מבטל|ביטלנו|ביטלה|ביטל|לא\\s+תתקיים|נדחה|תידחה|יידחה|לבטל|תבטל|בטל|מוטלת)';
   const VETO_HE_EVENT_RE = new RegExp(VETO_HE_EVENT);
@@ -5434,7 +5437,9 @@ const FlowIntent = (() => {
     if (AUTO_REPLY_TEXT.test(raw) || /(?:אני|אנחנו)\s+לא\s+במשרד/.test(raw)) {
       // «The workshop is on Sunday at 14:00. I am out of office on Thursday.» is a real meeting with a side note (slot gold, 2026-11-15). An auto-reply carries no event
       // noun with a clock in a clause of its own, so a clause that has both keeps the meeting alive.
-      const liveMeeting = clauses.some((c) => !AUTO_REPLY_TEXT.test(c) && !/(?:אני|אנחנו)\s+לא\s+במשרד/.test(c) && clauseHasEvent(c) && /\b\d{1,2}:\d{2}\b/.test(c));
+      // The out-of-office phrase and what it says up to the next comma are cut from a clause before it is read («אני לא במשרד ביום חמישי, אפשר שיחת וידאו ביום שלישי ב-10:00?»).
+      const withoutAway = (c) => String(c).replace(/(?:(?:אני|אנחנו)\s+לא\s+במשרד|\bout of (?:the )?office|\baway until|(?:מחוץ למשרד|אעדר))[^,.;?!]*[,;]?/gi, ' ');
+      const liveMeeting = clauses.some((c) => { const r = withoutAway(c); return !AUTO_REPLY_TEXT.test(r) && clauseHasEvent(r) && /\b\d{1,2}:\d{2}\b/.test(r); });
       if (!liveMeeting) return true;
     }
     if (clauses.some(clausePast)) return true;
@@ -6426,7 +6431,7 @@ const FlowIntent = (() => {
     // It is a task, not a calendar-acceptance notice.
     const bankCallReminder = /\breminder\b[\s\S]{0,80}\bcall the bank\b/i.test(text)
       && /\bnext\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(text);
-    const infoOrNoise = infoOnlyMail(text, ctx) || (EXTRA_NOISE.test(text) && !bankCallReminder);
+    const infoOrNoise = infoOnlyMail(text, ctx) || (EXTRA_NOISE.test(text) && !bankCallReminder) || HE_AUTO_REPLY.test(String(text || '').slice(0, 600));
     const blocked = s.flags.noise || infoOrNoise;
     // Softness is about the ask that would actually chip. The quoted
     // sentence is the first handoff, so a conditional opener ("במידה

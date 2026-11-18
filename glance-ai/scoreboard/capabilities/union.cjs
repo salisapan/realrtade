@@ -41,9 +41,9 @@ const OWN = { gmail: 'ai.local.flow@gmail.com', outlook: 'glance.salisapan@outlo
 const MODE = process.env.GLANCE_SHIPPED || '';   // '' every switch on; '1' every switch off; 'wave1' the four closes the owner turned on (core/labs-seed.js) and the rest off
 const SHIPPED = MODE === '1' || MODE === 'wave1' || MODE === 'wave2';
 const WAVE1 = MODE === 'wave1' || MODE === 'wave2';
-// wave2 = wave1 + the closes that create a new file or a video link (WORKSPACE_FILE, SHEET row, MEET_LINK, TEAMS_MEETING, ONEDRIVE_NEW_FILE); CALENDAR_CHANGE, recurring and the rest stay off.
+// wave2 = wave1 + the closes that create a new file or a video link (WORKSPACE_FILE, MEET_LINK, TEAMS_MEETING, ONEDRIVE_NEW_FILE); CALENDAR_CHANGE, recurring and the rest stay off.
 const WAVE2 = MODE === 'wave2';
-const WAVE2_READERS = ['FlowWorkspaceFile', 'FlowSheetRow', 'FlowMeetLink', 'FlowTeamsMeeting', 'FlowOnedriveNewFile'];   // directAskOn is on in every mode: both content scripts and the chat card pass it true (owner-approved 2026-11-12)
+const WAVE2_READERS = ['FlowWorkspaceFile', 'FlowMeetLink', 'FlowTeamsMeeting', 'FlowOnedriveNewFile'];   // directAskOn is on in every mode: both content scripts and the chat card pass it true (owner-approved 2026-11-12)
 function recognize(over, text) {
   const surface = over.surface || 'gmail', own = OWN[surface];
   const input = Object.assign({ text, subject: 'Subject', sender: { name: 'Dana Levi', email: 'dana@acme.io' }, now: new Date(NOW), threadUrl: 'https://x/y', hasThreadAttachment: false, attachmentCount: 0, surface,
