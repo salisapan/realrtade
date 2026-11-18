@@ -140,6 +140,22 @@ const run = (e, f, logs) => relay(e, { env: ENV, fetch: f, now: () => 1000, log:
     const f2 = mock(200, { access_token: 'x', echo: 'ASANA-SECRET-1' });
     assert.strictEqual((await relay(ev({ vendor: 'asana', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 })).statusCode, 502);
   });
+  await t('box: form body with client id and secret goes to the Box token url only; no PKCE field; rotating refresh forwarded; secret never returned', async () => {
+    const f = mock(200, { access_token: 'b-tok', refresh_token: 'b-ref2', expires_in: 3600 });
+    const env = Object.assign({}, ENV, { BOX_CLIENT_ID: 'bcid', BOX_CLIENT_SECRET: 'BOX-SECRET-1' });
+    const r = await relay(ev({ vendor: 'box', grant: 'code', code: 'c1', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env, fetch: f, now: () => 1 });
+    assert.strictEqual(r.statusCode, 200); assert.strictEqual(JSON.parse(r.body).access_token, 'b-tok');
+    assert.strictEqual(f.calls[0].url, 'https://api.box.com/oauth2/token');
+    const sent = new URLSearchParams(f.calls[0].init.body);
+    assert.strictEqual(sent.get('grant_type'), 'authorization_code'); assert.strictEqual(sent.get('client_id'), 'bcid'); assert.strictEqual(sent.get('client_secret'), 'BOX-SECRET-1'); assert.strictEqual(sent.get('code'), 'c1');
+    assert.ok(r.body.indexOf('BOX-SECRET-1') < 0);
+    const f2 = mock(200, { access_token: 'b2', refresh_token: 'b-ref3' });
+    const r2 = await relay(ev({ vendor: 'box', grant: 'refresh', refresh_token: 'rr-1', install_id: 'install-0001' }), { env, fetch: f2, now: () => 1 });
+    assert.strictEqual(r2.statusCode, 200); assert.strictEqual(new URLSearchParams(f2.calls[0].init.body).get('refresh_token'), 'rr-1'); assert.strictEqual(new URLSearchParams(f2.calls[0].init.body).get('grant_type'), 'refresh_token');
+    const f3 = mock(200, { access_token: 'x', echo: 'BOX-SECRET-1' });
+    assert.strictEqual((await relay(ev({ vendor: 'box', grant: 'refresh', refresh_token: 'rr', install_id: 'install-0001' }), { env, fetch: f3, now: () => 1 })).statusCode, 502);
+    const f4 = mock(200, {}); assert.strictEqual((await relay(ev({ vendor: 'box', grant: 'code', code: 'c', redirect_uri: REDIRECT, install_id: 'install-0001' }), { env: ENV, fetch: f4, now: () => 1 })).statusCode, 503); assert.strictEqual(f4.calls.length, 0);
+  });
   await t('asana is not configured when only notion vars are set', async () => {
     const f = mock(200, {}); const r = await relay(ev(Object.assign({}, base, { vendor: 'asana' })), { env: ENV, fetch: f, now: () => 1 });
     assert.strictEqual(r.statusCode, 503); assert.strictEqual(f.calls.length, 0);

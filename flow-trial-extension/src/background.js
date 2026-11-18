@@ -95,6 +95,7 @@ import '../core/jira-close.js'; // classic: sets globalThis.FlowJiraClose
 import '../core/linear-close.js'; // classic: sets globalThis.FlowLinearClose
 import '../core/docusign-close.js'; // classic: sets globalThis.FlowDocusignClose
 import '../core/dropbox-close.js'; // classic: sets globalThis.FlowDropboxClose
+import '../core/box-close.js'; // classic: sets globalThis.FlowBoxClose
 import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 import { CARRY } from '../config/carry.public.js';
 import '../core/google-contacts.js';
@@ -2142,7 +2143,7 @@ async function disconnectConnector(connectorId) {
     return disconnectEcosystemConnector(connectorId, { disconnectConnector: disconnectConnector, disableSurface: disableSurface });
   }
   const STORAGE_KEYS = {
-    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth',
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth', asana: 'asanaAuth', jira: 'jiraAuth', linear: 'linearAuth', docusign: 'docusignAuth', dropbox: 'dropboxAuth', box: 'boxAuth',
     googleTasks: 'googleTasksAuth'
   };
   const key = STORAGE_KEYS[connectorId] || null;
@@ -2189,8 +2190,9 @@ async function disconnectConnector(connectorId) {
     return { ok: true, revoked: revoke.revoked, revokeReason: revoke.reason };
   }
   if (connectorId === 'dropbox') await dropboxRevokeBestEffort();
+  if (connectorId === 'box') await boxRevokeBestEffort();
   // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
-  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : key);
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : connectorId === 'asana' ? [key, 'asanaLedger'] : connectorId === 'jira' ? [key, 'jiraLedger'] : connectorId === 'linear' ? [key, 'linearLedger'] : connectorId === 'docusign' ? [key, 'docusignLedger'] : connectorId === 'dropbox' ? [key, 'dropboxLedger'] : connectorId === 'box' ? [key, 'boxLedger'] : key);
   return { ok: true };
 }
 
@@ -4747,8 +4749,8 @@ async function noteConnectorOutcome(stage, startedAt, extra) {
   const O = globalThis.FlowConnectorOutcome;
   const e = extra || {};
   const connector = e.connector || 'notion';
-  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack };
-  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file' };
+  const ON = { notion: CONNECTORS.notionReadBack, asana: CONNECTORS.asanaReadBack, jira: CONNECTORS.jiraReadBack, linear: CONNECTORS.linearReadBack, docusign: CONNECTORS.docusignReadBack, dropbox: CONNECTORS.dropboxReadBack, box: CONNECTORS.boxReadBack };
+  const DEST = { notion: 'notion/page', asana: 'asana/task', jira: 'jira/issue', linear: 'linear/issue', docusign: 'docusign/envelope', dropbox: 'dropbox/file', box: 'box/file' };
   const enabled = ON[connector];
   if (!O || !enabled) return;
   const input = Object.assign({ closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: DEST[connector] }, e, { connector: connector });
@@ -5275,6 +5277,103 @@ async function dropboxSave(payload) {
 async function dropboxUndo(payload) {
   const r = await dropboxCloseEngine().undo((payload || {}).ref);
   if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'dropbox', closeType: 'file' });
+  return r;
+}
+
+/* ----------------------------------------------------------------------- Box */
+// docs/glance-ai/connectors/box.md. One file saved into the folder the person chose, read back by id, size and SHA-1.
+// Behind config/connectors.public.js (boxReadBack, boxOAuth), both off. Box has a client secret, so the token request goes through the relay.
+
+const BOX_AUTH_BASE = 'https://account.box.com/api/oauth2/authorize';
+const BOX_API = 'https://api.box.com/2.0';
+const BOX_REVOKE_URL = 'https://api.box.com/oauth2/revoke';
+const BOX_LEDGER_KEY = 'boxLedger';
+
+async function getBoxAuth() {
+  const { boxAuth } = await chrome.storage.local.get('boxAuth');
+  return boxAuth || null;
+}
+
+// A folder link is https://app.box.com/folder/<digits>; a bare number also works. The root folder (0) is never accepted.
+function parseBoxFolderId(input) {
+  const t = String(input || '').trim();
+  const m = /^[1-9]\d{3,17}$/.test(t) ? [0, t] : t.match(/^https:\/\/[a-z0-9.-]*box\.com\/folder\/([1-9]\d{3,17})(?:[/?#]|$)/i);
+  return m ? m[1] : null;
+}
+
+async function connectBoxOAuth(folderInput) {
+  if (!CONNECTORS.boxOAuth) throw new Error('Sign in with Box is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.boxClientId);
+  if (!clientId) throw new Error('Box sign-in isn’t configured on this build yet.');
+  const folderId = parseBoxFolderId(folderInput);
+  if (!folderId) throw new Error('That doesn’t look like a Box folder link — open the folder and copy the URL.');
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(BOX_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&response_type=code&redirect_uri=' + encodeURIComponent(redirectUri), 'Box');
+  const got = await relayTokenRequest({ vendor: 'box', grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Box connection failed (' + got.error + ').');
+  const res = await fetch(BOX_API + '/folders/' + folderId + '?fields=id,name', { headers: { Authorization: 'Bearer ' + got.data.access_token, Accept: 'application/json' } });
+  if (res.status === 403 || res.status === 404) throw new Error('Box signed you in but cannot open that folder — check the link and that you can add files to it.');
+  if (!res.ok) throw new Error('Box returned ' + res.status + '.');
+  const body = await res.json();
+  const name = (body && typeof body.name === 'string' && body.name.slice(0, 80)) || 'Box folder';
+  await chrome.storage.local.set({ boxAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, folderId: folderId, folderName: name, via: 'oauth' } });
+  return { title: name };
+}
+
+// Box refresh tokens are single-use: the new one replaces the old.
+async function boxRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ vendor: 'box', grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || null };
+}
+
+// Best effort on Disconnect: the revoke call needs the client secret, which lives only on the relay, so only the local token is removed here.
+async function boxRevokeBestEffort() { /* the token is removed locally; the person can also remove the app in Box */ }
+
+function boxCloseEngine() {
+  return globalThis.FlowBoxClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getBoxAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ boxAuth: a }); },
+    refresh: boxRefreshToken,
+    sha1: async (u8) => new Uint8Array(await crypto.subtle.digest('SHA-1', u8)),
+    randomHex: (n) => Array.from(crypto.getRandomValues(new Uint8Array(Math.ceil(n / 2)))).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, n),
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(BOX_LEDGER_KEY))[BOX_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(BOX_LEDGER_KEY))[BOX_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [BOX_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+// payload: { key, name, base64 } — the loop's own id, the file name and the file's bytes (base64), all from the person's own Do It.
+async function boxSave(payload) {
+  const started = Date.now();
+  const p = payload || {};
+  const b64 = typeof p.base64 === 'string' ? p.base64 : '';
+  if (!b64 || b64.length > Math.ceil(globalThis.FlowBoxClose.MAX_BYTES * 4 / 3) + 8) return { ok: false, reason: b64 ? 'too-large' : 'bad-params' };
+  if (b64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return { ok: false, reason: 'bad-params' };
+  let bytes;
+  try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); } catch (e) { return { ok: false, reason: 'bad-params' }; }
+  const lang = /[֐-׿]/.test(String(p.name || '')) ? 'he' : 'en';
+  const r = await boxCloseEngine().save({ key: String(p.key || ''), name: p.name, bytes: bytes });
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { connector: 'box', closeType: 'file', lang: lang });
+    await noteConnectorOutcome('handled', started, { connector: 'box', closeType: 'file', lang: lang });
+  } else if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { connector: 'box', closeType: 'file', lang: lang });
+  return r;
+}
+
+async function boxUndo(payload) {
+  const r = await boxCloseEngine().undo((payload || {}).ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, { connector: 'box', closeType: 'file' });
   return r;
 }
 
@@ -7818,6 +7917,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'box') return reply(sendResponse, connectBoxOAuth(msg.folder).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'dropbox') return reply(sendResponse, connectDropboxOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'docusign') return reply(sendResponse, connectDocusignOAuth().then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'linear') return reply(sendResponse, connectLinearOAuth(msg.team).then((r) => ({ ok: true, detail: r.title })));
@@ -7839,6 +7939,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   // Dropbox: save one file the person approved into their Dropbox app folder, read it back; undo removes it unless the person edited it. Off = not live.
+  if (msg.type === 'flow:box-save' || msg.type === 'flow:box-undo') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (!CONNECTORS.boxReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
+    return reply(sendResponse, msg.type === 'flow:box-save' ? boxSave(msg.payload) : boxUndo(msg.payload));
+  }
   if (msg.type === 'flow:dropbox-save' || msg.type === 'flow:dropbox-undo') {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     if (!CONNECTORS.dropboxReadBack) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
