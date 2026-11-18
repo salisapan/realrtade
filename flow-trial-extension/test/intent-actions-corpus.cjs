@@ -365,6 +365,16 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('HE: commitment to send a receipt, no anchor -> COMMITMENT_OF_READER', heNoAnchorCommit.type === FlowIntent.TYPES.COMMITMENT_OF_READER, heNoAnchorCommit.type);
   check('HE: no-anchor commitment gets medium confidence', heNoAnchorCommit.confidence === 'medium', heNoAnchorCommit.confidence);
 
+  // A Hebrew commitment put as «as we agreed, you <verb> ... by <day>» (the agreement said first, the reader's own verb after it).
+  for (const t of ['כפי שדיברנו, את שולחת לי את הטיוטה של ההסכם עד יום רביעי.', 'לפי מה שהוסכם, אתה מגיש את הדוח הרבעוני לרואה החשבון עד יום ראשון.']) {
+    const c = classify(t);
+    check('HE: «as we agreed, you <verb> by <day>» is the reader\'s commitment: ' + t.slice(0, 24), c.type === FlowIntent.TYPES.COMMITMENT_OF_READER, c.type);
+  }
+  for (const t of ['לפי מה שסיכמנו אתמול, הפגישה תתקיים ביום חמישי.', 'כמו שסיכמנו, אנחנו שולחים לך את ההצעה עד יום שלישי.']) {
+    const c = classify(t);
+    check('HE: an agreement with no reader verb is not the reader\'s commitment: ' + t.slice(0, 24), c.type !== FlowIntent.TYPES.COMMITMENT_OF_READER, c.type);
+  }
+
   // Sanity: the same commitment phrase WITH a real anchor must still fire
   // at 'high' confidence exactly as before — the widening adds a second
   // path, it doesn't downgrade the original one.
