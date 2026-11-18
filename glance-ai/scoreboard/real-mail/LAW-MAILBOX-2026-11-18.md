@@ -35,3 +35,7 @@ Read so far: inbox 203 of 2,369, sent 150 of 553. The partner's table request (�
 ## Seventh pass (sent 151-175)
 
 Read so far: inbox 203 of 2,369, sent 175 of 553. Found two false chases (thanks and a done-report) and fixed them with contrast tests. Still silent: «אמרי לו שישלח אלי מייל» (an ask to relay a message), and an own promise («ברגע שנאתר נעדכן») which opens no loop yet because own-promise detection in sent mail is not built.
+
+## Eighth pass (inbox 204-228, sent 176-200)
+
+Read so far: inbox 228 of 2,371, sent 200 of 554. Roughly nine in ten inbox mails here are lists, notices and circulars, which the reader keeps quiet. Still silent: a bare «תאשר ואשלח», a request to relay a message («אמרי לו שישלח אלי מייל»), and a one-word «לאישורך.».

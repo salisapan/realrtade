@@ -383,5 +383,10 @@ console.log('\n--- thanks and done-reports are not asks (law-firm mailbox, sent 
   const r = classify('היי מה שלומכן?\nאבקש את עזרתכן בהדפסה דחופה להיום.\nתודה רבה!'); check('«אבקש את עזרתכן ב…» opens a loop', !!r, r && r.kind);
 }
 
+{
+  for (const x of ['היי [NAME], לא מצאתי. אודה לקבלת הנמען.\nבברכה,', 'היי [NAME], מצ"ב הסט לאישורך.\nבברכה,']) { const r = classify(x); check('short formal ask opens a loop: ' + x.split('\n')[0].slice(0, 36), !!r, r && r.kind); }
+  for (const x of ['שלום,\nאישורך התקבל, תודה.\nבברכה,']) { const r = classify(x); check('«אישורך» without the «ל» opens none', !r, r && r.kind); }
+}
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);
