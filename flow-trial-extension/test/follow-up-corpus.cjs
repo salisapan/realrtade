@@ -357,5 +357,15 @@ console.log('\n--- a formal «נודה למענה / לטיפולכם» closes a 
   check('a mail that only attaches the invoice opens no loop', !no, no && no.kind);
 }
 
+console.log('\n--- word boundaries in the Hebrew ask frames (law-firm mailbox sent pass 4, 2026-11-18) ---');
+{
+  for (const t of ['שלום רב,\nמצ"ב אישור זכויות.\nהחשבונית תישלח אליכם בהקדם.\nבברכה,', 'מצ"ב אישור.\nההסכם יישלח אליכם בקרוב.\nבברכה,', 'מצ"ב אישור.\nנעדכן אותך בהקדם כשיהיה חדש.\nבברכה,', 'מצ"ב אישור.\nאעדכן אותך כשיתקבל חדש.\nבברכה,']) {
+    const r = classify(t); check('the sender\'s own promise opens no loop: ' + t.split('\n')[1].slice(0, 36), !r, r && r.kind);
+  }
+  for (const t of ['שלום,\nמה שלומך?\nעדכן אותי מה לעשות בנידון.\nבברכה,', 'שלום,\nתשלח לי בבקשה את המסמך החתום עד מחר.\nבברכה,']) {
+    const r = classify(t); check('an ask to be told or sent still opens a loop: ' + t.split('\n')[2].slice(0, 36), !!r, r && r.kind);
+  }
+}
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

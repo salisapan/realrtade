@@ -19,3 +19,7 @@ Owner, 2026-11-18: «עבור גם כל המייל של Microsoft ssapan@fbclawy
 Read 25 more inbox mails (128 of 2,369 so far); masked rows stay in the gitignored private folder. Findings: polite-framed Hebrew asks («אשמח שתעביר…», «אודה על הכנת…») were silent unless the verb was «תשלח»; they are now offered, with the framing, not a day, as the explicit ask. A negated please («נא לא לשלוח…») was offered a draft; it now stays quiet. Still silent by design: a bare imperative with no day («שלח אליי בבקשה לבדיקה»), a status question («אשמח לדעת היכן הדברים עומדים»), a hold instruction. Group status-chase mails and «היעדר תביעות» circulars to a mailing list stay quiet.
 
 Sent pass 3 (sent 76-100): 13 more outgoing rows read, 22 of 23 asks now open a loop and 0 of 23 non-ask rows do. «נודה למענה / לטיפולכם / להתייחסותכם» now counts as a chase in a multi-line mail; a one-line «נודה למענה.» still opens no loop, because it names nothing to wait for. Read so far: inbox 128 of 2,369, sent 100 of 553.
+
+## Fourth pass (inbox 129-153, sent 101-125)
+
+Read 25 more inbox and 25 more sent mails (153 of 2,369 and 125 of 553 so far). Inbox: «אודה לאישורכם / לתשובתך / למענה» is now an explicit ask; a framed ask whose greeting names someone else stays quiet. Sent: 28 of 30 asks open a loop, 0 of 31 non-ask rows. A real false loop was found and fixed: the ask frame «שלח אלי» matched inside «יישלח אליכם», so a promise to send opened a chase. Still silent by design: a one-word «לאישורך.», a send-the-file ask (file chain off), «אני צריך בבקשה…».
