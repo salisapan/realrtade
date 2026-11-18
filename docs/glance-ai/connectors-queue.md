@@ -32,7 +32,7 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 | 11 | Trello | a card exists | API key + token flow, not OAuth2 | not started |
 | 12 | Monday | an item exists | OAuth2 | not started |
 | 13 | ClickUp | a task exists | OAuth2 | not started |
-| 14 | Box | the file is saved | OAuth2 + secret (relay) | not started |
+| 14 | Box | the file is saved | OAuth2 + secret (relay) | **ready, waiting for owner** (2026-11-18): [doc](connectors/box.md); built and tested against a mock; DRAFT PR #301; switches `boxReadBack`, `boxOAuth` off; proof = id, chosen folder, size and SHA-1 |
 | 15 | Calendly | the meeting is booked | OAuth2 | not started |
 | 16 | Adobe Sign | the agreement is signed | OAuth2 + secret (relay) | not started |
 | 17 | Google Meet link | the link is on the event | inside the existing Calendar scope, if possible | not started |
