@@ -35,7 +35,7 @@ const FlowLoopAnswer = (() => {
     /מה אני (?:חייב|חייבת|צריך|צריכה)/, /מה הבטחתי/, /מה עליי/, /מה עלי(?=\s|$)/, /מחכ(?:ה|ים|ות) לי(?=\s|$)/, /מחכ(?:ה|ים|ות) ממני/, /על מי אני מעכב/, /אני חייב/, /אני חייבת/
   ];
   const OWED = [
-    /\bwho owes me\b/, /\bwhat (?:do|does) \S+(?: \S+)? owe me\b/, /\bowes? me\b/, /\bwhat am i waiting (?:on|for)(?=\s|$)/, /\bwho am i waiting (?:on|for)(?=\s|$)/,
+    /\bwho owes me\b/, /\bam i owed\b/, /\bi'?m owed\b/, /\bowed to me\b/, /מגיע לי(?=\s|$)/, /\bwhat (?:do|does) \S+(?: \S+)? owe me\b/, /\bowes? me\b/, /\bwhat am i waiting (?:on|for)(?=\s|$)/, /\bwho am i waiting (?:on|for)(?=\s|$)/,
     /\bwaiting (?:on|for) (?!me\b)\S+/, /\bwho (?:hasn'?t|has not|didn'?t|did not) (?:answer|reply|replied|answered|pay|paid|send|sent)/, /\bwho (?:still )?needs to (?:pay|answer|send)/,
     /\bwhat (?:did|has) \S+(?: \S+)? promise/, /\bpromised (?:me|to send me)(?=\s|$)/,
     /\bwhat (?:does|do) (?!i\b)\S+(?: \S+)? (?:need|have) to\b/, /מי חייב לי/, /מי (?:עוד |עדיין )?לא (?:ענה|ענתה|שילם|שילמה|שלח|שלחה|החזיר|החזירה)/, /חייב(?:ת|ים)? לי/, /על מה אני מחכה/, /למה אני מחכה/, /אני מחכה ל/, /מחכה ל(?!י(?=\s|$))/, /מי לא (?:ענה|ענתה|שילם|שילמה|שלח|שלחה)/, /מה \S+ הבטיח(?:ה)?/
@@ -54,10 +54,10 @@ const FlowLoopAnswer = (() => {
     'promise promised promises need needs needed send sent sending answer answered reply replied respond responded pay paid payment money ' +
     'today tomorrow week this that late overdue due past missed pending left handle handled settled happened get back supposed meant should ' +
     'could would will can please tell show list glance hasn\'t has not didn\'t did not haven\'t keeping on\'s right now currently there else anyone someone people ' +
-    'hey also just all everything things thing stuff back urgent asap').split(' '));
+    'hey also just all everything things thing stuff back urgent asap much many how when total sum altogether in amount i\'m i\'ve it\'s that\'s').split(' '));
   const STOP_HE = new Set(('מה מי על את של עם לי ממני אני אתה את הוא היא הם הן זה זו כבר עוד עדיין האם למה איך יש אין צריך צריכה חייב חייבת חייבים ' +
     'מחכה מחכים מחכות הבטחתי הבטיח הבטיחה פתוח פתוחה פתוחים נשאר נשארו תלוי באיחור היום מחר השבוע ענה ענתה שילם שילמה שלח שלחה לשלם כסף ' +
-    'תשלום תשלומים חשבונית חשבוניות נסגר סגור טופל קרה לגבי עליי עלי לעשות לשלוח לענות להחזיר לתת דחוף דחופה דחופים בהקדם').split(' '));
+    'תשלום תשלומים חשבונית חשבוניות נסגר סגור טופל קרה לגבי עליי עלי לעשות לשלוח לענות להחזיר לתת דחוף דחופה דחופים בהקדם כמה מתי עד סך הכל בסך מגיע').split(' '));
 
   function firstName(c) { return String((c && c.name) || '').trim().split(/\s+/)[0] || ''; }
   function partyKeys(c) {
@@ -136,10 +136,17 @@ const FlowLoopAnswer = (() => {
     else if (ALL.some((r) => r.test(s))) ask = 'all';
     const whenHit = WHEN.find(([, r]) => r.test(s));
     const when = whenHit ? whenHit[0] : null;
-    const money = MONEY.test(s);
+    // "how much" / «כמה»: the amounts and their total; "when" / «מתי»: the dates.
+    const measure = /\bhow much\b|\btotal\b|(?:^|\s)כמה(?=\s|$)|סך הכל/.test(s) ? 'amount' : /^(?:by )?when\b|\bwhen (?:is|are|was|did|do|does|will|should|must|can)\b|(?:^|\s)(?:עד )?מתי(?=\s|$)/.test(s) ? 'date' : null;
+    const money = MONEY.test(s) || measure === 'amount';
+    if (!ask && measure === 'date' && /\bwhen (?:do|did|should|must|can) i\b|(?:^|\s)אני (?:צריך|צריכה|חייב|חייבת)(?=\s|$)/.test(s)) ask = 'owe';
+    if (!ask && measure === 'date' && /\bwhen (?:did|will|does|is) (?!i\b|the\b|my\b|it\b)\S+(?: \S+)? (?:promise|send|pay|answer|reply|deliver|approve|get)/.test(s)) ask = 'owed';
+    // «מתי דנה תשלח?»: a name and a third-person future verb after מתי is what they owe you.
+    if (!ask && measure === 'date' && /(?:^|\s)מתי (?!אני|את|אתה|צריך|צריכה)\S+ (?:ת|י)\S{2,}/.test(s)) ask = 'owed';
+    if (!ask && measure) ask = 'all';
     if (!ask && when) ask = 'all';
     if (!ask && money && /\?|^(?:who|what|any|מי|מה|יש)(?=\s|$)/.test(s)) ask = 'all';
-    return ask ? { ask, when, money } : null;
+    return ask ? { ask, when, money, measure } : null;
   }
 
   const dayOf = (w) => w.promisedIso || w.deadlineIso || null;
@@ -172,7 +179,7 @@ const FlowLoopAnswer = (() => {
     if (lang === 'he') {
       const day = d ? (d < today && isOpen(w) ? ' (באיחור, מ־' + d + ')' : ' (עד ' + d + ')') : '';
       if (!isOpen(w)) return (w.closedAs === 'declined' ? 'נסגר בסירוב: ' : w.closedAs === 'paid' ? 'שולם: ' : 'נסגר: ') + who + ', ' + what + (w.resolvedAt ? ' (' + new Date(w.resolvedAt).toISOString().slice(0, 10) + ')' : '');
-      return (w.direction === 'mine' ? 'את/ה חייב/ת ל' + who + ': ' : who + ' חייב/ת לך: ') + what + day;
+      return (w.direction === 'mine' ? 'את/ה חייב/ת ל' + (isHe(who) ? '' : '־') + who + ': ' : who + ' חייב/ת לך: ') + what + day;
     }
     const day = d ? (d < today && isOpen(w) ? ' (overdue since ' + d + ')' : ' (by ' + d + ')') : '';
     if (!isOpen(w)) return (w.closedAs === 'declined' ? 'Closed, they said no: ' : w.closedAs === 'paid' ? 'Paid: ' : 'Closed: ') + who + ', ' + what + (w.resolvedAt ? ' (' + new Date(w.resolvedAt).toISOString().slice(0, 10) + ')' : '');
@@ -238,7 +245,7 @@ const FlowLoopAnswer = (() => {
     const topicAll = source === 'model' ? (r.topic || []) : contentWords(q, people.words);
     const poolHe = pool.some((w) => isHe(loopText(w))), poolEn = pool.some((w) => /[a-z]/.test(loopText(w)));
     const topic = topicAll.filter((t) => (isHe(t) ? poolHe : poolEn));
-    if (!topic.length && topicAll.length && !personIds && !r.when && !r.money && r.ask === 'status') return out(refuse('unknown-topic', lang));
+    if (!topic.length && topicAll.length && !personIds && !r.when) return out(refuse('unknown-topic', lang));
     if (topic.length) {
       const scored = pool.map((w) => [w, topicHits(w, topic)]);
       const best = Math.max(0, ...scored.map((x) => x[1]));
@@ -247,7 +254,8 @@ const FlowLoopAnswer = (() => {
       else return out(refuse('unknown-topic', lang));
     }
     pool.sort((a, b) => String(dayOf(a) || '9999').localeCompare(String(dayOf(b) || '9999')) || (a.createdAt || 0) - (b.createdAt || 0));
-    const items = pool.slice(0, MAX_ITEMS).map((w) => ({ id: w.id, line: lineFor(w, lang, today), cite: cite(w) }));
+    const noDay = lang === 'he' ? ' (אין תאריך)' : ' (no date set)';
+    const items = pool.slice(0, MAX_ITEMS).map((w) => ({ id: w.id, line: lineFor(w, lang, today) + (r.measure === 'date' && !dayOf(w) && isOpen(w) ? noDay : ''), cite: cite(w) }));
     const more = Math.max(0, pool.length - items.length);
     let text;
     if (!items.length) {
@@ -256,7 +264,24 @@ const FlowLoopAnswer = (() => {
     } else {
       text = items.map((x) => x.line).join('\n') + (more ? (lang === 'he' ? '\nועוד ' + more + '.' : '\nand ' + more + ' more.') : '');
     }
-    return out({ ask: r.ask, when: r.when || null, source, items, more, text });
+    // A total is only the loops' own figures, per currency, over every loop that fits (not only the five shown); a money loop with no
+    // figure is counted, never guessed.
+    let totals = null;
+    if (r.measure === 'amount' && pool.length) {
+      const by = new Map();
+      let unknown = 0;
+      for (const w of pool) {
+        const v = w.amount && Number(w.amount.value);
+        if (!Number.isFinite(v) || v <= 0) { unknown++; continue; }
+        const cur = String(w.amount.currency || '').toUpperCase() || '?';
+        by.set(cur, (by.get(cur) || 0) + v);
+      }
+      totals = [...by].map(([currency, value]) => ({ currency, value: Math.round(value * 100) / 100 }));
+      const fmt = (t) => t.value.toLocaleString('en-US') + ' ' + t.currency;
+      if (totals.length) text += (lang === 'he' ? '\nסך הכל: ' : '\nTotal: ') + totals.map(fmt).join(' + ');
+      if (unknown) text += lang === 'he' ? '\n' + unknown + ' בלי סכום.' : '\n' + unknown + ' without a figure.';
+    }
+    return out({ ask: r.ask, when: r.when || null, measure: r.measure || null, source, items, more, totals, text });
   }
 
   return { SWITCH, DEFAULTS, MAX_ITEMS, enabled, readQuestion, answer };
