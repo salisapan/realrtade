@@ -388,5 +388,12 @@ console.log('\n--- thanks and done-reports are not asks (law-firm mailbox, sent 
   for (const x of ['שלום,\nאישורך התקבל, תודה.\nבברכה,']) { const r = classify(x); check('«אישורך» without the «ל» opens none', !r, r && r.kind); }
 }
 
+console.log('\n--- real-mail dev set grammar (2026-11-18): bare Hebrew amount, short «לאישורך», delivery lines, third-party source ---');
+{
+  const pay = classify('שלום,\nבהמשך לחתימה אודה להסדרת הנושאים הבאים:\n1. תשלום שכ"ט ע"ס 6,979 כולל מע"מ לחשבון המצ"ב.\nבברכה,'); check('a Hebrew amount with «ע"ס» and no sign is a payment chase', !!pay && pay.kind === 'payment', pay && pay.kind);
+  for (const x of ['מצ"ב אישור זכויות, לאישורך.\nבברכה,', 'כתב הסכמה לאישורך.', 'שלום [NAME], מקפיץ את המייל על מנת לקבל מכם עדכון על הסדרת הנושאים.\nבברכה,']) { const r = classify(x); check('formal ask opens a loop: ' + x.slice(0, 30).replace(/\n/g, ' '), !!r, r && r.kind); }
+  for (const x of ['מצ"ב אישור ניהול חשבון להעברת שכ"ט.', 'שלחתי מספר מיילים לעורך הדין וגם וואטצפ, ממתין לעדכון ממנו.', 'מצ"ב הסכם מכר חתום.\nבברכה,']) { const r = classify(x); check('opens none: ' + x.slice(0, 30), !r, r && r.kind); }
+}
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

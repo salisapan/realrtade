@@ -92,6 +92,8 @@ const FlowFollowUp = (() => {
     /(?<![\u0590-\u05FF])(?:אבקש|נבקש|אבקשך)\s+(?:את\s+)?עזרת(?:ך|כם|כן)(?![\u0590-\u05FF])/,
     // «מצ"ב הסט לאישורך» / «לאישורכם»: the document is attached for approval, the reply is the approval.
     /(?<![\u0590-\u05FF])לאישור(?:ך|כם)(?![\u0590-\u05FF])/,
+    /(?:אודה|נודה)\s+מראש\s+ל\S+|(?:אודה|נודה)\s+ל(?:השלמ(?:ה|ת)|הסדר(?:ה|ת)|טיפול)(?![\u0590-\u05FF])/,
+    /מקפי[צץ](?:ה|ים)?\s+את\s+(?:המייל|השרשור|הפנייה)/,
     // Formal Hebrew of an office: «ממתין ממך לתצהיר», «ממתינים לתשובתכם», «יש להעביר 100 ₪ לחשבון», «יש להמציא את המסמכים» (found on the owner's own professional sent mail, 2026-11-18).
     // «אודה לסיוע» / «נודה לעדכון» / «אשמח לקבל» (the polite formal request, outgoing).
     /(?:אודה|נודה|אשמח|נשמח) (?:לך |לכם )?(?:מאוד )?ל(?:סיוע|עזרה|קבלת|עדכון|תשובה|אישור|ציון|קבל|דעת|בירור|מענה|טיפול(?:ך|כם)?|התייחס(?:ות)?(?:ך|כם)?|תגובה|תגובת(?:ך|כם))/,
@@ -115,9 +117,18 @@ const FlowFollowUp = (() => {
 
   function words(text) { return (String(text || '').match(/\S+/g) || []).length; }
 
+  // The last sentence that is not a sign-off: «מצ"ב אישור זכויות, לאישורך.\nבברכה,» ends in «לאישורך», not in «בברכה».
+  function lastAskSentence(text) {
+    const SIGNOFF = /^(?:בברכה|בכבוד\s+רב|תודה(?:\s+רבה)?(?:\s+מראש)?|best(?:\s+regards)?|regards|thanks)[,.!\s]*$/i;
+    const lines = String(text || '').split(/\n/).map((x) => x.trim()).filter(Boolean);
+    while (lines.length > 1 && SIGNOFF.test(lines[lines.length - 1])) lines.pop();
+    return (lines.pop() || '').split(/(?<=[?!.])\s+/).pop().trim();
+  }
   // A scheduling question too short for the four-word line filter, and nothing else.
   function isShortScheduleAsk(s) {
     const t = String(s || '').trim();
+    // «לאישורך.» / «לאישרוך» / «כתב הסכמה לאישורך.»: attached for approval, the reply is the approval.
+    if (/(?:^|\s)(?:לאישור(?:ך|כם)|לאישרוך)[.!]*$/.test(t)) return true;
     // A clock put as a question with no verb («אפשרי היום ב14:30?», «15:00 אפשרי?», «מתאים מחר ב-10:00?») is a request for a time in a real office thread.
     if (/^(?:אפשרי|מתאים|נוח|פנוי|פנויה)\s+(?:(?:היום|מחר|מחרתיים|ביום\s+\S+)\s+)?(?:ב-?\s*)?\d{1,2}[:.]\d{2}\s*\?$/.test(t) || /^\d{1,2}[:.]\d{2}\s+(?:אפשרי|מתאים|נוח)\s*\?$/.test(t)) return true;
     // «אתה זמין?» / «את זמינה?» and a short clarifying question («האם הכוונה לאישור זכויות?») are asks too short for the four-word filter (law-firm mailbox, 2026-11-18).
@@ -231,7 +242,7 @@ const FlowFollowUp = (() => {
     const types = c.types || requestTypes;
     if (!types || !types.detectShortAsk) return null;
     const bare = body.replace(/^\s*(?:hi|hello|hey|היי|שלום)[^\n,!?]{0,20}[,!:]\s*/i, '').trim();
-    const req = types.detectShortAsk(bare) || (isShortScheduleAsk(bare.split(/\n/).pop().trim().split(/(?<=[?!.])\s+/).pop().trim()) ? { action: 'reply', type: 'schedule', label: 'Time to meet', days: null } : null);
+    const req = types.detectShortAsk(bare) || (isShortScheduleAsk(lastAskSentence(bare)) ? { action: 'reply', type: 'schedule', label: 'Time to meet', days: null } : null);
     if (!req) return null;
     const kind = req.action === 'pay' ? KINDS.PAYMENT : KINDS.REPLY;
     return {
@@ -253,14 +264,22 @@ const FlowFollowUp = (() => {
     if (RECEIPT.test(body)) return null;
 
     const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);
-    const money = ex && ex.parseMoney ? ex.parseMoney(body) : null;
+    // «תשלום שכ"ט ע"ס 6,979 כולל מע"מ» / «בסך 4,500»: a Hebrew amount with no currency sign is shekels when the same text speaks of a payment.
+    let money = ex && ex.parseMoney ? ex.parseMoney(body) : null;
+    if (!money && PAY_WORD.test(body)) {
+      const bare = /(?:ע"ס|ע״ס|בסך(?:\s+של)?|על\s+סך(?:\s+של)?)\s+(\d[\d,]*(?:\.\d{1,2})?)/.exec(body);
+      if (bare && parseFloat(bare[1].replace(/,/g, '')) > 0) money = { raw: bare[0], value: parseFloat(bare[1].replace(/,/g, '')), currency: 'ILS', index: bare.index };
+    }
     const date = ex && ex.parseDate ? ex.parseDate(body, new Date(typeof c.now === 'number' ? c.now : Date.now())) : null;
     const deadlineIso = date && date.iso ? date.iso : null;
 
     const lines = sentences(body);
     // «תודה על העברת המסמכים.» is thanks, and «תוקן מלבד הבקשה לרשום…» / «טופל.» reports work done: neither is an ask, whatever noun the lexicon finds in it.
     const THANKS_OR_DONE_HE = /^\s*(?:תודה(?:\s+רבה)?\s+(?:על|ל)(?![\u0590-\u05FF])|(?:תוקן|בוצע|טופל|עודכן|נשלח|נבדק|הועבר|הוסדר)(?![\u0590-\u05FF]))/;
-    const candidates = lines.filter((s) => !COURTESY.test(s) && !THANKS_OR_DONE_HE.test(s) && !/(?:^|\s)אל\s+ת[\u05D0-\u05EA]/.test(s) && (words(s) >= 4 || isShortScheduleAsk(s) || /^(?:אודה|נודה|אשמח|נשמח)\s+ל\S+(?:\s+\S+){0,2}[.!]?$/.test(s.trim()) || /(?:^|\s)לאישור(?:ך|כם)[.!]?$/.test(s.trim())));
+    const DELIVERY_ONLY_HE = /^\s*מצ"ב(?![\u0590-\u05FF])/;
+    const ASK_WORD_HE = /(?:אודה|נודה|אשמח|נשמח|אבקש|נבקש|נא\s|אנא|בבקשה|לאישור(?:ך|כם)|להשלמ|להסדר|עד\s+(?:יום|מחר|ה-?\d))/;
+    const THIRD_PARTY_SOURCE_HE = /(?:ממתינ(?:ה|ים|ות)?\s+(?:לקבל\s+)?(?:\S+\s+){0,3}?(?:ממנו|ממנה|מהם|מהן)|(?:ממנו|ממנה|מהם|מהן)\s*[.!]?$)/;
+    const candidates = lines.filter((s) => !COURTESY.test(s) && !THANKS_OR_DONE_HE.test(s) && !(DELIVERY_ONLY_HE.test(s) && !ASK_WORD_HE.test(s)) && !(THIRD_PARTY_SOURCE_HE.test(s) && !/(?:ממך|ממכם|מכם|מכן|ממך)/.test(s)) && !/(?:^|\s)אל\s+ת[\u05D0-\u05EA]/.test(s) && (words(s) >= 4 || isShortScheduleAsk(s) || /^(?:אודה|נודה|אשמח|נשמח)\s+ל\S+(?:\s+\S+){0,2}[.!]?$/.test(s.trim()) || /(?:^|\s)לאישור(?:ך|כם)[.!]?$/.test(s.trim())));
     if (!candidates.length) return null;
 
     const he = hasHebrew(body);
