@@ -10583,11 +10583,11 @@ const FlowIncomingJudge = (() => {
   const ADVISE_EN = /^(?:please|kindly)\s+(?:advise|clarify)\s+(?:on|about|regarding|whether|what|which|when|who|how)\b/i;
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
   const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני)(?![\u0590-\u05FF])/;
-  const POLITE_FRAME_HE = /^(?:(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA]))|(?:בבקשה|נא)\s+(?=ת[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF])))/;
+  const POLITE_FRAME_HE = /^(?:(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA]))|(?:בבקשה|נא)\s+(?=ת[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF]))|נא\s+(?=(?:עדכנ[וי]|שלח[וי]|אשר[וי]|השיב[וי]|החזיר[וי]|העביר[וי]|צרפ[וי])(?![\u0590-\u05FF])))/;
   const POLITE_NOMINAL_HE = /^(?:אודה|נודה)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)|(?:ל)(אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
   const NOMINAL_WORK_HE = /^(?:הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
   const NOMINAL_BACK_HE = /^(?:שליחת|העברת|החזרת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם)$/;
-  const DIRECT_IMP_SEND_HE = /^(?:תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני)(?![\u0590-\u05FF])/;
+  const DIRECT_IMP_SEND_HE = /^(?:תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני|עדכנו|עדכני|שלחו|שלחי|אשרו|אשרי|השיבו|השיבי|החזירו|החזירי|העבירו|העבירי|צרפו|צרפי)(?![\u0590-\u05FF])/;
   const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
   // A chat (WhatsApp, Messenger, Instagram, Teams) has no addresses: the host asserts the message is an inbound one-to-one one
   // (`oneToOne === true`; src/chat-task-card.js already drops groups, the person's own messages and quoted text before it asks the judge).
@@ -10628,7 +10628,7 @@ const FlowIncomingJudge = (() => {
     // «היי דנה,» / «דנה שלום,» at the head names someone else: a framed ask below is theirs, not the reader's (the same rule the classifier applies).
     const greetM = /^\s*(?:(?:שלום|היי|הי|בוקר טוב|ערב טוב)\s+([\u05D0-\u05EA]{2,14})|([\u05D0-\u05EA]{2,14})\s+(?:שלום|היקר|היקרה))\s*[,:]/.exec(ownText.slice(0, 60));
     const greetName = greetM ? String(greetM[1] || greetM[2]).toLowerCase() : '';
-    const greetsOther = !!greetName && !/^(?:כולם|כולן|צוות|חברים|חברות|חבר'ה|שלום|היי|הי|עו"ד|עורכי)$/.test(greetName) && !names.some((n) => n.indexOf(greetName) >= 0 || greetName.indexOf(n) >= 0);
+    const greetsOther = !!greetName && !/^(?:כולם|כולן|צוות|חברים|חברות|חבר'ה|שלום|היי|הי|עו"ד|עורכי|רב|רבה|רבות|וברכה|לכולם|לכם|לכן|עורכת|עורך)$/.test(greetName) && !names.some((n) => n.indexOf(greetName) >= 0 || greetName.indexOf(n) >= 0);
     // 2. a Hebrew bare imperative with its day (email surfaces only; a chat has its own reader)
     for (const x0 of (chat ? [] : sents)) {
       const x1 = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');

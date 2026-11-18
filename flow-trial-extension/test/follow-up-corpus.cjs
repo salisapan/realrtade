@@ -367,5 +367,11 @@ console.log('\n--- word boundaries in the Hebrew ask frames (law-firm mailbox se
   }
 }
 
+console.log('\n--- short asks: availability and a clarifying question (law-firm mailbox, sent pass 5) ---');
+{
+  for (const x of ['מה קורה [NAME]? אתה זמין?', 'האם הכוונה לאישור זכויות?']) { const r = classify(x); check('short ask opens a loop: ' + x, !!r, r && r.kind); }
+  for (const x of ['אתה זמין מחר, תודה.', 'הכוונה לאישור זכויות.']) { const r = classify(x); check('a statement opens none: ' + x, !r, r && r.kind); }
+}
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

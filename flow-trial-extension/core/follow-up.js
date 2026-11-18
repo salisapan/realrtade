@@ -88,6 +88,7 @@ const FlowFollowUp = (() => {
     /(?:נא|בבקשה) (?:לשלוח|לאשר|להשיב|לחתום|להעביר|לעדכן|לשלם)/,
     // «עדכן אותי מה לעשות», «תעדכנו אותי»: the person asks to be told. «נעדכן אותך» / «אעדכן אותך» (the sender's own promise) have a letter in front and do not match.
     /(?<![\u0590-\u05FF])ת?עדכ(?:ן|ני|נו)\s+(?:אותי|אותנו)(?![\u0590-\u05FF])/,
+    /(?<![\u0590-\u05FF])(?:אתה|את|אתם|אתן)\s+זמי[ןנ](?:ה|ים|ות)?\s*\?/,
     // Formal Hebrew of an office: «ממתין ממך לתצהיר», «ממתינים לתשובתכם», «יש להעביר 100 ₪ לחשבון», «יש להמציא את המסמכים» (found on the owner's own professional sent mail, 2026-11-18).
     // «אודה לסיוע» / «נודה לעדכון» / «אשמח לקבל» (the polite formal request, outgoing).
     /(?:אודה|נודה|אשמח|נשמח) (?:לך |לכם )?(?:מאוד )?ל(?:סיוע|עזרה|קבלת|עדכון|תשובה|אישור|ציון|קבל|דעת|בירור|מענה|טיפול(?:ך|כם)?|התייחס(?:ות)?(?:ך|כם)?|תגובה|תגובת(?:ך|כם))/,
@@ -116,6 +117,8 @@ const FlowFollowUp = (() => {
     const t = String(s || '').trim();
     // A clock put as a question with no verb («אפשרי היום ב14:30?», «15:00 אפשרי?», «מתאים מחר ב-10:00?») is a request for a time in a real office thread.
     if (/^(?:אפשרי|מתאים|נוח|פנוי|פנויה)\s+(?:(?:היום|מחר|מחרתיים|ביום\s+\S+)\s+)?(?:ב-?\s*)?\d{1,2}[:.]\d{2}\s*\?$/.test(t) || /^\d{1,2}[:.]\d{2}\s+(?:אפשרי|מתאים|נוח)\s*\?$/.test(t)) return true;
+    // «אתה זמין?» / «את זמינה?» and a short clarifying question («האם הכוונה לאישור זכויות?») are asks too short for the four-word filter (law-firm mailbox, 2026-11-18).
+    if (/^(?:האם\s+)?(?:אתה|את|אתם|אתן)\s+זמי[ןנ](?:ה|ים|ות)?\s*\?$/.test(t) || /^האם\s+הכוונה\s+ל\S+(?:\s+\S+){0,2}\s*\?$/.test(t)) return true;
     return /^(?:מתי (?:נוח|מתאים) (?:לך|לכם|לי|לכן)|when (?:is|would be) (?:a )?good time)\s*\??$/i.test(t);
   }
   // A suggestion to talk, with no delivery in it, is not the answer to the open ask.
@@ -225,7 +228,7 @@ const FlowFollowUp = (() => {
     const types = c.types || requestTypes;
     if (!types || !types.detectShortAsk) return null;
     const bare = body.replace(/^\s*(?:hi|hello|hey|היי|שלום)[^\n,!?]{0,20}[,!:]\s*/i, '').trim();
-    const req = types.detectShortAsk(bare) || (isShortScheduleAsk(bare.split(/\n/).pop().trim()) ? { action: 'reply', type: 'schedule', label: 'Time to meet', days: null } : null);
+    const req = types.detectShortAsk(bare) || (isShortScheduleAsk(bare.split(/\n/).pop().trim().split(/(?<=[?!.])\s+/).pop().trim()) ? { action: 'reply', type: 'schedule', label: 'Time to meet', days: null } : null);
     if (!req) return null;
     const kind = req.action === 'pay' ? KINDS.PAYMENT : KINDS.REPLY;
     return {

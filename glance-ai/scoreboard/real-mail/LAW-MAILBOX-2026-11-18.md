@@ -23,3 +23,7 @@ Sent pass 3 (sent 76-100): 13 more outgoing rows read, 22 of 23 asks now open a 
 ## Fourth pass (inbox 129-153, sent 101-125)
 
 Read 25 more inbox and 25 more sent mails (153 of 2,369 and 125 of 553 so far). Inbox: «אודה לאישורכם / לתשובתך / למענה» is now an explicit ask; a framed ask whose greeting names someone else stays quiet. Sent: 28 of 30 asks open a loop, 0 of 31 non-ask rows. A real false loop was found and fixed: the ask frame «שלח אלי» matched inside «יישלח אליכם», so a promise to send opened a chase. Still silent by design: a one-word «לאישורך.», a send-the-file ask (file chain off), «אני צריך בבקשה…».
+
+## Fifth pass (inbox 154-178, sent 126-150)
+
+Read so far: inbox 178 of 2,369, sent 150 of 553. Sent: 34 of 37 asks open a loop, 0 of 37 non-ask rows. Findings: «שלום וברכה» was read as a name; a short «אתה זמין?» opened nothing because the final-nun spelling was missing from the pattern; a retraction («אבקש להתעלם מפנייתי הקודמת… אין צורך בהתייחסות») correctly opens nothing, and the earlier open loop on that thread is not yet released by it (not built). Open question for the owner: a «נא + infinitive» line sent to a 21-recipient list offers a task to every recipient; per the user-context lock that needs a contrast-pair shadow test before any quiet is added.

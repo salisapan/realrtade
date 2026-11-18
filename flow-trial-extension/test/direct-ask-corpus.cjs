@@ -176,6 +176,7 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   }
   for (const t of ['אודה לאישורכם בקבלת המסמכים.', 'אודה לתשובתך עד מחר.', 'שלום סאלי,\n\nאודה למענה.']) { const r = judge(t.indexOf('סאלי') >= 0 ? t : 'שלום,\n\n' + t + '\n\nתודה'); check('«אודה ל…» is an explicit ask: ' + t.slice(0, 30).replace(/\n/g, ' '), r.show, kinds(r)); }
   for (const t of ['היי דנה,\n\nאשמח שתעביר לי את הנספחים.', 'דנה שלום,\n\nאודה למענה.', 'היי דנה,\n\nאודה לאישורך בקבלת המסמכים.']) { const r = judge(t); check('a framed ask that opens with another name is not the reader\'s: ' + t.slice(0, 20).replace(/\n/g, ' '), !r.show, kinds(r)); }
+  for (const t of ['שלום וברכה,\n\nאני ממתין כבר הרבה זמן.\n\nאודה למענה בהקדם.', 'שלום רב,\n\nנא עדכנו אותי אם זה מספק.']) { const r = judge(t); check('a formal greeting («שלום וברכה», «שלום רב») is not a name: ' + t.split('\n').pop().slice(0, 30), r.show, kinds(r)); }
   const keep = judge('שלום,\n\nבבקשה לא לשכוח לשלוח את הנספחים עד יום שני.\n\nתודה'); check('«בבקשה לא לשכוח» is not read as a prohibition', !/prohibition/.test(kinds(keep)), kinds(keep));
 }
 
