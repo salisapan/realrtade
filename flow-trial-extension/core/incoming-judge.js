@@ -237,12 +237,14 @@ const FlowIncomingJudge = (() => {
   // «Please advise on the last date and the remaining amount.»: an ask for information with no question mark. Only the verbs that ask for information (advise, clarify) with what they ask about; «please confirm» stays with the reply-ask reader.
   const ADVISE_EN = /^(?:please|kindly)\s+(?:advise|clarify)\s+(?:on|about|regarding|whether|what|which|when|who|how)\b/i;
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
-  const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני|תעבור|תעברי|תכתוב|תכתבי|תנסח|תנסחי|תסכם|תסכמי|תאתר|תאתרי|תרכז|תרכזי)(?![\u0590-\u05FF])/;
+  const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני|תעבור|תעברי|תכתוב|תכתבי|תנסח|תנסחי|תסכם|תסכמי|תאתר|תאתרי|תרכז|תרכזי|תוודא|תוודאי|ודא|וודא|תתקן|תתקני|תקן|תוסיף|תוסיפי|תוסיפו|הוסף|הוסיפי|תמצא|תמצאי|תצור\s+קשר|צור\s+קשר|צרי\s+קשר|תנסה|תנסי)(?![\u0590-\u05FF])/;
   const POLITE_FRAME_HE = /^(?:(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA]))|(?:בבקשה|נא)\s+(?=ת[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF]))|נא\s+(?=(?:עדכנ[וי]|שלח[וי]|אשר[וי]|השיב[וי]|החזיר[וי]|העביר[וי]|צרפ[וי])(?![\u0590-\u05FF])))/;
-  const POLITE_NOMINAL_HE = /^(?:אודה|נודה)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)|(?:ל)(קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
-  const NOMINAL_WORK_HE = /^(?:הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
+  const POLITE_NOMINAL_HE = /^(?:אודה|נודה|אשמח|נשמח)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)|(?:ל(?:המשך\s+)?(?:דבר\s+)?)(טיפולך|טיפולכם|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
+  const NOMINAL_WORK_HE = /^(?:טיפולך|טיפולכם|הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
   const NOMINAL_BACK_HE = /^(?:שליחת|העברת|החזרת|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם)$/;
-  const DIRECT_IMP_SEND_HE = /^(?:תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני|עדכנו|עדכני|שלחו|שלחי|אשרו|אשרי|השיבו|השיבי|החזירו|החזירי|העבירו|העבירי|צרפו|צרפי)(?![\u0590-\u05FF])/;
+  const DIRECT_IMP_SEND_HE = /^(?:שלח|שלחי|תגיב|תגיבי|תענה|תעני|תשיב|תשיבי|תחזור|תחזרי|תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני|עדכנו|עדכני|שלחו|שלחי|אשרו|אשרי|השיבו|השיבי|החזירו|החזירי|העבירו|העבירי|צרפו|צרפי)(?![\u0590-\u05FF])/;
+  // «תוכל להשיב?», «תוכלו לענות בבקשה ל…», «[NAME], תוכל להגיב?»: the modal ask for an answer; «טרם קיבלנו מענה / תשובה / התייחסות», «למה אתה לא עונה?»: a chase. No day needed (real-mail dev set, 2026-11-18).
+  const MODAL_REPLY_HE = /^(?:כן,?\s*)?(?:[\u05D0-\u05EA\[\]A-Z\u2013-]{2,12}\s*[,\u2013-]\s*)?(?:תוכל(?:י|ו)?)\s+(?:בבקשה\s+)?(?:להשיב|לענות|להגיב|לחזור|לעדכן)(?![\u0590-\u05FF])(?!\s+ל(?!י(?![\u0590-\u05FF])|נו(?![\u0590-\u05FF])|גבי|פני|הצע|מייל|שאל|בקש|מענה)[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF]))|^(?:טרם|עדיין\s+לא)\s+(?:קיבלנו|קיבלתי)\s+(?:מענה|תשובה|התייחסות|עדכון)|(?:למה|מדוע)\s+(?:אתה|את|אתם|אתן)\s+לא\s+(?:עונה|עונים|עונות|משיב|משיבה|משיבים|מגיב|מגיבה)/;
   const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
   // A chat (WhatsApp, Messenger, Instagram, Teams) has no addresses: the host asserts the message is an inbound one-to-one one
   // (`oneToOne === true`; src/chat-task-card.js already drops groups, the person's own messages and quoted text before it asks the judge).
@@ -289,11 +291,13 @@ const FlowIncomingJudge = (() => {
       const x1 = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
       if (!/[\u0590-\u05FF]/.test(x1) || skip(x1, true) || /(?:^|\s)(?:אל|לא)\s/.test(x1)) continue;
       // A polite frame in front of the verb («אשמח שתעביר לי…», «אודה אם תכין…», «אבקש שתשלח…») or a nominal («אודה על הכנת נספח…») is an explicit ask: it needs no day. A bare imperative still does.
-      const framed = POLITE_FRAME_HE.test(x1) || (DIRECT_IMP_WORK_HE.test(x1) && /(?:^|\s)בבקשה(?:\s|[,.]|$)/.test(x1)), nominal = !POLITE_FRAME_HE.test(x1) && !framed && POLITE_NOMINAL_HE.exec(x1);
+      const pleaseIn = /(?:^|\s)בבקשה(?:\s|[,.]|$)/.test(x1);
+      const modal = MODAL_REPLY_HE.test(x1);
+      const framed = POLITE_FRAME_HE.test(x1) || modal || (pleaseIn && (DIRECT_IMP_WORK_HE.test(x1) || DIRECT_IMP_SEND_HE.test(x1))), nominal = !POLITE_FRAME_HE.test(x1) && !framed && POLITE_NOMINAL_HE.exec(x1);
       if ((framed || nominal) && greetsOther) continue;
       const x = framed ? x1.replace(POLITE_FRAME_HE, '') : x1;
       const work = nominal ? NOMINAL_WORK_HE.test(nominal[1] || nominal[2]) : DIRECT_IMP_WORK_HE.test(x);
-      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)));
+      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)) || modal);
       if (!work && !back) continue;
       const d = dayOf(x1, now0).date;
       if (d ? d < ymdOf(now0) : !(framed || nominal)) continue;

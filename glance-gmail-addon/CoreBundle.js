@@ -5445,7 +5445,7 @@ const FlowIntent = (() => {
     if (clauses.some(clausePast)) return true;
     if (clauses.some(clauseCancelled)) return true;
     // «מועד ההגשה נקבע ליום חמישי בשעה 15:00» / "the deadline is set for Thursday at 15:00": a deadline with a clock is not a meeting, unless the text also names a meeting noun.
-    if (clauses.some((c) => /(?:דד-?ליין|מועד\s+ה?(?:אחרון|הגשה|תשלום|פירעון)|\bdeadline\b|\bdue\s+(?:date|on|by)\b)/i.test(c)) && !clauses.some(clauseHasEvent)) return true;
+    if (clauses.some((c) => /(?:דד-?ליין|מועד\s+ה?(?:אחרון|הגשה|תשלום|פירעון)|\bdeadline\b|\bdue\s+(?:date|on|by)\b)/i.test(c) && /\b\d{1,2}[:.]\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b/i.test(c)) && !clauses.some(clauseHasEvent)) return true;
     // «We had a meeting on Thursday at 3pm and it went well» is behind us; «לא נוכל להיפגש ביום שני ב-11:00» declines the slot. Neither is a meeting to put on the calendar.
     if (new RegExp('\\b(?:we|i)\\s+had\\s+(?:a|an|our|the)\\s+' + VETO_EVENT + '\\b', 'i').test(raw)) return true;
     if (/(?:^|[^\u0590-\u05FF])לא\s+(?:נוכל|אוכל|תוכל|תוכלו|נצליח|אצליח|יכול|יכולה|יכולים|יכולות)\s+(?:\S+\s+){0,2}?(?:להיפגש|להגיע|לדבר|להתקשר|להשתתף|להתחבר)/.test(raw)) return true;
@@ -6155,6 +6155,8 @@ const FlowIntent = (() => {
     const SENT_DAY = /\b(?:tomorrow|today|tonight|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b|(?:^|[^\u0590-\u05FF])(?:מחר|היום|ל?יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)|ביום\s+\S+)/i;
     const SENT_CLOCK = /\b\d{1,2}[:.]\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b/i;
     function meetingVerbAsserted() {
+      // «נדבר מחר ב-16:00? אני אתקשר»: the person promises to call, which is a task, not a slot to hold.
+      if (/(?:^|[^\u0590-\u05FF])(?:אני\s+אתקשר|אתקשר\s+אלי?ך|אצלצל)(?![\u0590-\u05FF])|\bi(?:'ll| will)\s+(?:call|phone|ring)\b/i.test(String(text || ''))) return false;
       const sentences = String(text || '').split(/(?<=[.!?;])\s+|\n+/);
       for (const sn of sentences) {
         const hit = sn.match(MEETING_VERB);
@@ -10605,12 +10607,14 @@ const FlowIncomingJudge = (() => {
   // «Please advise on the last date and the remaining amount.»: an ask for information with no question mark. Only the verbs that ask for information (advise, clarify) with what they ask about; «please confirm» stays with the reply-ask reader.
   const ADVISE_EN = /^(?:please|kindly)\s+(?:advise|clarify)\s+(?:on|about|regarding|whether|what|which|when|who|how)\b/i;
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
-  const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני|תעבור|תעברי|תכתוב|תכתבי|תנסח|תנסחי|תסכם|תסכמי|תאתר|תאתרי|תרכז|תרכזי)(?![\u0590-\u05FF])/;
+  const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני|תעבור|תעברי|תכתוב|תכתבי|תנסח|תנסחי|תסכם|תסכמי|תאתר|תאתרי|תרכז|תרכזי|תוודא|תוודאי|ודא|וודא|תתקן|תתקני|תקן|תוסיף|תוסיפי|תוסיפו|הוסף|הוסיפי|תמצא|תמצאי|תצור\s+קשר|צור\s+קשר|צרי\s+קשר|תנסה|תנסי)(?![\u0590-\u05FF])/;
   const POLITE_FRAME_HE = /^(?:(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA]))|(?:בבקשה|נא)\s+(?=ת[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF]))|נא\s+(?=(?:עדכנ[וי]|שלח[וי]|אשר[וי]|השיב[וי]|החזיר[וי]|העביר[וי]|צרפ[וי])(?![\u0590-\u05FF])))/;
-  const POLITE_NOMINAL_HE = /^(?:אודה|נודה)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)|(?:ל)(קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
-  const NOMINAL_WORK_HE = /^(?:הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
+  const POLITE_NOMINAL_HE = /^(?:אודה|נודה|אשמח|נשמח)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)|(?:ל(?:המשך\s+)?(?:דבר\s+)?)(טיפולך|טיפולכם|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
+  const NOMINAL_WORK_HE = /^(?:טיפולך|טיפולכם|הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
   const NOMINAL_BACK_HE = /^(?:שליחת|העברת|החזרת|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם)$/;
-  const DIRECT_IMP_SEND_HE = /^(?:תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני|עדכנו|עדכני|שלחו|שלחי|אשרו|אשרי|השיבו|השיבי|החזירו|החזירי|העבירו|העבירי|צרפו|צרפי)(?![\u0590-\u05FF])/;
+  const DIRECT_IMP_SEND_HE = /^(?:שלח|שלחי|תגיב|תגיבי|תענה|תעני|תשיב|תשיבי|תחזור|תחזרי|תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני|עדכנו|עדכני|שלחו|שלחי|אשרו|אשרי|השיבו|השיבי|החזירו|החזירי|העבירו|העבירי|צרפו|צרפי)(?![\u0590-\u05FF])/;
+  // «תוכל להשיב?», «תוכלו לענות בבקשה ל…», «[NAME], תוכל להגיב?»: the modal ask for an answer; «טרם קיבלנו מענה / תשובה / התייחסות», «למה אתה לא עונה?»: a chase. No day needed (real-mail dev set, 2026-11-18).
+  const MODAL_REPLY_HE = /^(?:כן,?\s*)?(?:[\u05D0-\u05EA\[\]A-Z\u2013-]{2,12}\s*[,\u2013-]\s*)?(?:תוכל(?:י|ו)?)\s+(?:בבקשה\s+)?(?:להשיב|לענות|להגיב|לחזור|לעדכן)(?![\u0590-\u05FF])(?!\s+ל(?!י(?![\u0590-\u05FF])|נו(?![\u0590-\u05FF])|גבי|פני|הצע|מייל|שאל|בקש|מענה)[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF]))|^(?:טרם|עדיין\s+לא)\s+(?:קיבלנו|קיבלתי)\s+(?:מענה|תשובה|התייחסות|עדכון)|(?:למה|מדוע)\s+(?:אתה|את|אתם|אתן)\s+לא\s+(?:עונה|עונים|עונות|משיב|משיבה|משיבים|מגיב|מגיבה)/;
   const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
   // A chat (WhatsApp, Messenger, Instagram, Teams) has no addresses: the host asserts the message is an inbound one-to-one one
   // (`oneToOne === true`; src/chat-task-card.js already drops groups, the person's own messages and quoted text before it asks the judge).
@@ -10657,11 +10661,13 @@ const FlowIncomingJudge = (() => {
       const x1 = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
       if (!/[\u0590-\u05FF]/.test(x1) || skip(x1, true) || /(?:^|\s)(?:אל|לא)\s/.test(x1)) continue;
       // A polite frame in front of the verb («אשמח שתעביר לי…», «אודה אם תכין…», «אבקש שתשלח…») or a nominal («אודה על הכנת נספח…») is an explicit ask: it needs no day. A bare imperative still does.
-      const framed = POLITE_FRAME_HE.test(x1) || (DIRECT_IMP_WORK_HE.test(x1) && /(?:^|\s)בבקשה(?:\s|[,.]|$)/.test(x1)), nominal = !POLITE_FRAME_HE.test(x1) && !framed && POLITE_NOMINAL_HE.exec(x1);
+      const pleaseIn = /(?:^|\s)בבקשה(?:\s|[,.]|$)/.test(x1);
+      const modal = MODAL_REPLY_HE.test(x1);
+      const framed = POLITE_FRAME_HE.test(x1) || modal || (pleaseIn && (DIRECT_IMP_WORK_HE.test(x1) || DIRECT_IMP_SEND_HE.test(x1))), nominal = !POLITE_FRAME_HE.test(x1) && !framed && POLITE_NOMINAL_HE.exec(x1);
       if ((framed || nominal) && greetsOther) continue;
       const x = framed ? x1.replace(POLITE_FRAME_HE, '') : x1;
       const work = nominal ? NOMINAL_WORK_HE.test(nominal[1] || nominal[2]) : DIRECT_IMP_WORK_HE.test(x);
-      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)));
+      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)) || modal);
       if (!work && !back) continue;
       const d = dayOf(x1, now0).date;
       if (d ? d < ymdOf(now0) : !(framed || nominal)) continue;

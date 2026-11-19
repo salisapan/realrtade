@@ -185,6 +185,13 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   for (const t of ['יש להגיש את הבקשה לרשות עד יום חמישי.', 'עליך להגיש את הצהרת ההון עד יום ראשון.', 'חובה להעלות את האישור לפורטל עד יום שני.']) { const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('impersonal «יש / עליך / חובה» do-it is a task: ' + t.slice(0, 34), r.show && /googleTask/.test(kinds(r)), kinds(r)); }
   for (const t of ['יש להגיש את הבקשה כפי שסוכם.', 'הוא עליו להגיש את הבקשה עד יום חמישי.', 'נא לא להגיש את הבקשה עד יום חמישי.']) { const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('not a task: ' + t.slice(0, 34), !(r.show && /googleTask/.test(kinds(r))), kinds(r)); }
   const keep = judge('שלום,\n\nבבקשה לא לשכוח לשלוח את הנספחים עד יום שני.\n\nתודה'); check('«בבקשה לא לשכוח» is not read as a prohibition', !/prohibition/.test(kinds(keep)), kinds(keep));
+  // Round 2 (real-mail dev set, 2026-11-18; invented sentences): a modal ask for an answer, a chase, «בבקשה» with a plain imperative, a nominal «אודה לטיפולך».
+  for (const t of ['היי סאלי,\n\nתוכל בבקשה להשיב לי לגבי ההצעה?\n\nתודה', 'שלום,\n\nטרם קיבלנו מענה לפנייתנו מהשבוע שעבר.\n\nבברכה', 'היי,\n\nבבקשה שלח לי את הנתונים המעודכנים.\n\nתודה', 'שלום,\n\nאודה לטיפולך בנושא.\n\nבברכה']) {
+    const r = judge(t); check('round-2 ask offers: ' + t.split('\n')[2].slice(0, 28), r.show, kinds(r));
+  }
+  for (const t of ['שלום,\n\nהוא שלח לי את הנתונים המעודכנים.\n\nבברכה', 'שלום,\n\nטרם קיבלנו את המשלוח מהספק.\n\nבברכה', 'היי,\n\nתוכל להשיב לדנה אם נוח לה, אנחנו רק מעדכנים.']) {
+    const r = judge(t); check('round-2 contrast stays quiet: ' + t.split('\n').filter(Boolean).slice(-1)[0].slice(0, 28), !r.show, kinds(r));
+  }
 }
 
 console.log('\nTOTAL FAILURES:', failures);

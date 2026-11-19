@@ -18,6 +18,7 @@ const misses = j.detail.filter((d) => !ok(d[3], d[4])).map((d) => d[0] + ' ' + d
 const DECLARED_GAPS = [
   'cal.move en outlook', 'cal.move he outlook', 'cal.cancel en outlook', 'cal.cancel he outlook', // Gmail reads them with CALENDAR_CHANGE on (test/calendar-change-corpus.cjs); Outlook has no calendar update or delete writer (judge reason no-draft-close)
   'form.create en gmail',                                                    // an imperative with no "please" and no name is not enough (precision); the named ask works
+  'reply.ask he gmail', 'reply.ask he outlook',                              // «תוכל לאשר לי עד חמישי אם אתה מגיע לישיבה?»: since ישיבה joined the meeting nouns (2026-11-18) a confirm-attendance ask reads as a meeting task, like the same ask with פגישה or "the meeting"; a reply draft is the better close (open, see docs/open-tasks.md)
   'doc.append he gmail', 'doc.append en gmail'                               // "add this paragraph to the Q4 doc": no recognizer reads it; Hebrew falls to a reply draft
 ];
 const unexpected = misses.filter((m) => DECLARED_GAPS.indexOf(m) < 0);

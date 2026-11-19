@@ -652,7 +652,7 @@ const FlowIntent = (() => {
     if (clauses.some(clausePast)) return true;
     if (clauses.some(clauseCancelled)) return true;
     // «מועד ההגשה נקבע ליום חמישי בשעה 15:00» / "the deadline is set for Thursday at 15:00": a deadline with a clock is not a meeting, unless the text also names a meeting noun.
-    if (clauses.some((c) => /(?:דד-?ליין|מועד\s+ה?(?:אחרון|הגשה|תשלום|פירעון)|\bdeadline\b|\bdue\s+(?:date|on|by)\b)/i.test(c)) && !clauses.some(clauseHasEvent)) return true;
+    if (clauses.some((c) => /(?:דד-?ליין|מועד\s+ה?(?:אחרון|הגשה|תשלום|פירעון)|\bdeadline\b|\bdue\s+(?:date|on|by)\b)/i.test(c) && /\b\d{1,2}[:.]\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b/i.test(c)) && !clauses.some(clauseHasEvent)) return true;
     // «We had a meeting on Thursday at 3pm and it went well» is behind us; «לא נוכל להיפגש ביום שני ב-11:00» declines the slot. Neither is a meeting to put on the calendar.
     if (new RegExp('\\b(?:we|i)\\s+had\\s+(?:a|an|our|the)\\s+' + VETO_EVENT + '\\b', 'i').test(raw)) return true;
     if (/(?:^|[^\u0590-\u05FF])לא\s+(?:נוכל|אוכל|תוכל|תוכלו|נצליח|אצליח|יכול|יכולה|יכולים|יכולות)\s+(?:\S+\s+){0,2}?(?:להיפגש|להגיע|לדבר|להתקשר|להשתתף|להתחבר)/.test(raw)) return true;
@@ -1362,6 +1362,8 @@ const FlowIntent = (() => {
     const SENT_DAY = /\b(?:tomorrow|today|tonight|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b|(?:^|[^\u0590-\u05FF])(?:מחר|היום|ל?יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)|ביום\s+\S+)/i;
     const SENT_CLOCK = /\b\d{1,2}[:.]\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b/i;
     function meetingVerbAsserted() {
+      // «נדבר מחר ב-16:00? אני אתקשר»: the person promises to call, which is a task, not a slot to hold.
+      if (/(?:^|[^\u0590-\u05FF])(?:אני\s+אתקשר|אתקשר\s+אלי?ך|אצלצל)(?![\u0590-\u05FF])|\bi(?:'ll| will)\s+(?:call|phone|ring)\b/i.test(String(text || ''))) return false;
       const sentences = String(text || '').split(/(?<=[.!?;])\s+|\n+/);
       for (const sn of sentences) {
         const hit = sn.match(MEETING_VERB);
