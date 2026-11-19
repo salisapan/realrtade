@@ -8,14 +8,17 @@ const { recognize, OWN, g } = require('../capabilities/union.cjs');
 const F = g('FlowFollowUp');
 const NOW = new Date('2026-11-17T10:00:00+02:00').getTime();
 const set = process.argv[2] || 'v2', show = process.argv.includes('--show');
-const dir = path.join(__dirname, 'private', set === 'v2' ? 'v2' : set);
-const file = fs.readdirSync(dir).filter((f) => /messages\.jsonl$/.test(f)).map((f) => path.join(dir, f));
+// Sets: v2 (held-out), v2b (re-masked + expanded held-out), dev2, dev3 (development). GLANCE_PRIVATE points at the private folder when this runs from another checkout.
+const HELD = set === 'v2' || set === 'v2b';
+const dir = path.join(process.env.GLANCE_PRIVATE || path.join(__dirname, 'private'), set);
+const JSON_OUT = process.argv.includes('--json'), ROWS_OUT = (process.argv.find((a) => a.startsWith('--rows-out=')) || '').slice(11);
+const file = fs.readdirSync(dir).filter((f) => (set === 'v2b' ? /^v2b-.*\.jsonl$/ : /messages\.jsonl$/).test(f)).map((f) => path.join(dir, f));
 const rows = [].concat(...file.map((f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } }))).filter(Boolean);
 const MAP = { draft: 'reply', task: 'task', pay: 'payment', calendar: 'calendar', file_save: 'document' };
 const goldKind = (r) => (r.label && r.label.has_request ? (r.label.kind || 'none') : 'none');
 // The mask replaced the owner's own name too. A first [NAME] within the first 30 characters is the vocative to the reader (these mails sit in the owner's inbox), so with GLANCE_ADDRESSEE=1 it is put back as the owner's name; the default run leaves the mask as it is.
 const ADDRESSEE = process.env.GLANCE_ADDRESSEE === '1';
-const addressee = (b, r) => (ADDRESSEE && r.ownInTo !== false ? String(b || '').replace(/\[NAME\]/, (m, off) => (off < 30 ? 'סאלי' : m)) : b);
+const addressee = (b, r) => (b = String(b || '').replace(/\[OWNER\]/g, 'סאלי'), ADDRESSEE && r.ownInTo !== false ? String(b || '').replace(/\[NAME\]/, (m, off) => (off < 30 ? 'סאלי' : m)) : b);
 function engineInbound(r, surface) {
   const own = OWN[surface];
   const colleagues = []; for (let i = 0; i < Math.max(0, (r.toN || 1) - (r.ownInTo ? 1 : 0)); i++) colleagues.push('colleague' + i + '@firm.example');
@@ -31,7 +34,7 @@ function engineSent(r) {
 }
 const out = {};
 function bump(group, key) { out[group] = out[group] || {}; out[group][key] = (out[group][key] || 0) + 1; }
-const wrongRows = [];
+const wrongRows = [], rowOut = [];
 for (const [name, surfaces] of [['inbox', ['gmail', 'outlook']], ['sent', ['follow']]]) {
   for (const surface of surfaces) {
     const key = name + '/' + surface;
@@ -39,17 +42,19 @@ for (const [name, surfaces] of [['inbox', ['gmail', 'outlook']], ['sent', ['foll
       const gold = goldKind(r);
       const got = name === 'sent' ? engineSent(r) : engineInbound(r, surface);
       bump(key, 'n');
-      if (gold === 'none') { bump(key, 'neg'); if (got !== 'none') { bump(key, 'falseOffer'); wrongRows.push([key, r.id, 'FALSE', gold, got, r.body]); } }
+      if (gold === 'none') { bump(key, 'neg'); if (got !== 'none') { bump(key, 'falseOffer'); wrongRows.push([key, r.id, 'FALSE', gold, got, r.body]); rowOut.push({ key, id: r.id, o: 'FALSE', gold, got }); } }
       else {
         bump(key, 'pos'); bump(key, 'pos:' + gold);
         const sentLoose = name === 'sent' && got !== 'none' && gold !== 'payment';
-        if (got === 'none') { bump(key, 'silent'); bump(key, 'silent:' + gold); wrongRows.push([key, r.id, 'MISS', gold, got, r.body]); }
+        if (got === 'none') { bump(key, 'silent'); bump(key, 'silent:' + gold); wrongRows.push([key, r.id, 'MISS', gold, got, r.body]); rowOut.push({ key, id: r.id, o: 'MISS', gold, got }); }
         else if (got === gold || sentLoose) { bump(key, 'hit'); bump(key, 'hit:' + gold); }
-        else { bump(key, 'wrongType'); bump(key, 'wrongType:' + gold); wrongRows.push([key, r.id, 'WRONGTYPE', gold, got, r.body]); }
+        else { bump(key, 'wrongType'); bump(key, 'wrongType:' + gold); wrongRows.push([key, r.id, 'WRONGTYPE', gold, got, r.body]); rowOut.push({ key, id: r.id, o: 'WRONGTYPE', gold, got }); }
       }
     }
   }
 }
+if (JSON_OUT) { console.log(JSON.stringify({ set, rows: rows.length, out })); process.exit(0); }
+if (ROWS_OUT && !HELD) fs.writeFileSync(ROWS_OUT, JSON.stringify(rowOut));
 console.log('rows', rows.length, '| inbox', rows.filter((r) => r.folder === 'inbox').length, 'sent', rows.filter((r) => r.folder === 'sent').length);
 for (const [k, v] of Object.entries(out)) {
   const pos = v.pos || 0, hit = v.hit || 0, fo = v.falseOffer || 0, wt = v.wrongType || 0;
@@ -57,4 +62,4 @@ for (const [k, v] of Object.entries(out)) {
   const kinds = Object.keys(v).filter((x) => x.startsWith('pos:')).map((x) => x.slice(4));
   for (const kd of kinds) console.log('   ', kd.padEnd(9), 'n', v['pos:' + kd], 'hit', v['hit:' + kd] || 0, 'silent', v['silent:' + kd] || 0, 'wrongType', v['wrongType:' + kd] || 0);
 }
-if (show) { console.log('\n--- rows the engine got wrong (masked; dev set only) ---'); for (const w of wrongRows) console.log(w[0], w[1], w[2], 'gold=' + w[3], 'got=' + w[4], '|', String(w[5]).replace(/\n/g, ' / ').slice(0, 260)); }
+if (show && !HELD) { console.log('\n--- rows the engine got wrong (masked; dev set only) ---'); for (const w of wrongRows) console.log(w[0], w[1], w[2], 'gold=' + w[3], 'got=' + w[4], '|', String(w[5]).replace(/\n/g, ' / ').slice(0, 260)); }
