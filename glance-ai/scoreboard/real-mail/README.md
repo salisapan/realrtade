@@ -12,4 +12,4 @@ Row format (`*.jsonl`): `{ id, lang, direction, redactedBody, ownerLabel, step, 
 
 Rules (`docs/human-eval.md` §6): a row here is never a training row; every fix made after looking at a row is declared in the run record; the owner-verified count is reported with every number. Nothing enters `private/` without the owner's say and masking first.
 
-Status: 0 owner-verified rows; waits on path A (`docs/glance-ai/learning-from-use.md`). 2026-11-12: a first masked sample of the owner's connected mailbox (76 mails, read on his say in session, labels by Claude in one pass, NOT owner-verified) lives in `private/`; runner `run-owner-mailbox.cjs`, aggregates in `REAL-MAILBOX-2026-11-12.md`.
+Status: 0 owner-verified rows; waits on path A (`docs/glance-ai/learning-from-use.md`). A first masked sample of the owner's connected mailbox lives only in `private/` (gitignored, never committed); runner `run-owner-mailbox.cjs`. Mailbox aggregate reports are not kept in the repository.

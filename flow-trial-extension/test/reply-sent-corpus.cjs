@@ -15,7 +15,7 @@ function check(name, cond, detail) {
 }
 
 const ON = { REPLY_SENT_CLOSE: true };
-const ME = 'sali@realtrade.co.il';
+const ME = 'sali@example.com';
 const T0 = Date.parse('2026-11-02T09:00:00Z');
 const MIN = 60000;
 const loop = (extra) => Object.assign({ id: 'L1', status: 'open', direction: 'mine', threadId: 'th1', askAt: T0, lang: 'en', draftRef: { draftId: 'd1', threadId: 'th1' } }, extra || {});

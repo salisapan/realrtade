@@ -174,7 +174,7 @@ console.log('\n--- «please advise on ...» is an ask for information without a 
 
 console.log('\n--- a Hebrew auto-reply that tells the sender to contact the office is not a request ---\n');
 {
-  const ooo = judge('לא במשרד ולא זמינה יש ליצור קשר עם המשרד בטלפון [PHONE] מילים שישלחו יטופלו תוך 48 שעות מיום חזרתי לפעילות', { sender: { name: '[ORG]', email: 'person@org.example' }, subject: 'מענה אוטומטי: פרסומת' });
+  const ooo = judge('לא במשרד ולא זמינה כרגע. נא לפנות למזכירות בטלפון [PHONE]. פניות ממתינות יטופלו תוך 48 שעות מיום חזרתי לפעילות', { sender: { name: '[ORG]', email: 'person@org.example' }, subject: 'מענה אוטומטי: פרסומת' });
   check('an out-of-office reply with «יש ליצור קשר עם המשרד» stays quiet', !ooo.show, kinds(ooo));
   const ack = judge('לקוח/ה יקר/ה, קיבלנו את פנייתך שהועברה להמשך טיפול. אנו משתדלים לענות בתוך 3 ימי עסקים', { sender: { name: '[ORG]', email: 'person@org.example' }, subject: 'תודה על פנייתך' });
   check('an acknowledgement of an inquiry stays quiet', !ack.show, kinds(ack));
@@ -182,7 +182,7 @@ console.log('\n--- a Hebrew auto-reply that tells the sender to contact the offi
   check('a real mail that says «I am not in the office Thursday» and proposes a call is still offered', real.show, kinds(real));
 }
 
-console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a request (law-firm mailbox pass, 2026-11-18) ---\n');
+console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a request (invented wording) ---\n');
 {
   for (const t of ['אשמח שתעביר לי את הטפסים הנדרשים.', 'אשמח שתעביר לי את הטפסים עד יום שלישי.', 'אשמח שתכין את התקציר עד יום שלישי.', 'אודה על הכנת טבלת השוואה להצעת המחיר.', 'אודה על שליחת הטפסים עד יום שלישי.']) {
     const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('polite-framed ask is offered: ' + t.slice(0, 40), r.show, kinds(r));
