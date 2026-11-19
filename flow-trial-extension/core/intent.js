@@ -1151,6 +1151,12 @@ const FlowIntent = (() => {
       if (m && readerToken(m[1], c)) return 'reader';
     }
     if (vocativeIsOther(text, c)) return 'other';
+    // «דנה- אפשר להעביר לסבב», «@דנה מחכים שתחתום»: a line that opens on someone else's name (a dash, or an @) and asks.
+    for (let k = 0; k < lines.length && k < 8; k++) {
+      const dash = /^(@?)([A-Za-z\u0590-\u05FF'’]{2,30})(?:\s*[-\u2013\u2014:]\s*(\S[^\n]*)|\s+(\S[^\n]*))?$/.exec(lines[k]);
+      if (!dash || !personToken(dash[2]) || readerToken(dash[2], c)) continue;
+      if (dash[1] === '@' || (dash[3] && restStartsAsk(dash[3]))) return 'other';
+    }
     // A name alone on a line, with a colon or a comma, and the ask on the next line («Dana:» / «דנה,»): a vocative to someone else.
     for (let k = 0; k < lines.length - 1 && k < 6; k++) {
       const lone = /^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{1,30})\s*[:,،]$/.exec(lines[k]);
