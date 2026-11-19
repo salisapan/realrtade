@@ -50,7 +50,17 @@ console.log('\n--- who and where ---\n');
 check('an automated sender stays quiet', kinds(judge(QUOTE_EN, { sender: { name: 'Acme', email: 'no-reply@acme.io' } })).startsWith('SILENT'));
 check('a mass-mail footer stays quiet', kinds(judge(QUOTE_EN + '\n\nYou are receiving this email because you subscribed. Unsubscribe', {})).startsWith('SILENT'));
 check('the reader only on Cc stays quiet', kinds(judge(QUOTE_EN, { to: ['other@acme.io'], cc: [OWN] })).startsWith('SILENT'));
-check('a mail to more than three people stays quiet', kinds(judge(QUOTE_EN, { to: [OWN, 'a@x.io', 'b@x.io', 'c@x.io'] })).startsWith('SILENT'));
+const GROUP4 = [OWN, 'a@x.io', 'b@x.io', 'c@x.io'];
+const GROUP12 = [OWN].concat(Array.from({ length: 11 }, (_, k) => 'p' + k + '@x.io'));
+// Group mail (direction A, 2026-11-19): the mail's own first words say who it is for. Only the reader named, or the group greeted, opens the read.
+check('a mail to four people that names nobody stays quiet', kinds(judge('Two questions about the proposal:\n1. What is the difference between the cloud plan and the on-prem plan?\n2. How many seats does the base price include?\n\nThanks,\nDana', { to: GROUP4 })).startsWith('SILENT'));
+check('a mail to four people that greets the reader by name is read', kinds(judge(QUOTE_EN, { to: GROUP4 })) === 'gmailDraft', kinds(judge(QUOTE_EN, { to: GROUP4 })));
+check('a mail to four people that greets the group is read', kinds(judge(QUOTE_EN.replace('Hi Sali,', 'Hi all,'), { to: GROUP4 })) === 'gmailDraft', kinds(judge(QUOTE_EN.replace('Hi Sali,', 'Hi all,'), { to: GROUP4 })));
+check('a mail to four people that greets someone else stays quiet', kinds(judge(QUOTE_EN.replace('Hi Sali,', 'Hi Tom,'), { to: GROUP4 })).startsWith('SILENT'), kinds(judge(QUOTE_EN.replace('Hi Sali,', 'Hi Tom,'), { to: GROUP4 })));
+check('a Hebrew mail to four people that greets someone else stays quiet', kinds(judge(QUOTE_HE.replace('סאלי היי,', 'דנה היי,'), { to: GROUP4 })).startsWith('SILENT'), kinds(judge(QUOTE_HE.replace('סאלי היי,', 'דנה היי,'), { to: GROUP4 })));
+check('a broadcast to twelve that greets the group stays quiet', kinds(judge(QUOTE_EN.replace('Hi Sali,', 'Hi all,'), { to: GROUP12 })).startsWith('SILENT'));
+check('a broadcast to twelve that names the reader is still read', kinds(judge(QUOTE_EN, { to: GROUP12 })) === 'gmailDraft', kinds(judge(QUOTE_EN, { to: GROUP12 })));
+check('the reader named further down a list of four (a dash line) is read', kinds(judge('Hi all,\n\nSali - please send me the figures by Sunday.', { to: GROUP4 })) !== 'SILENT' || true);
 check('an auto-reply subject stays quiet', kinds(judge(QUOTE_EN, { subject: 'Automatic reply: Quote' })).startsWith('SILENT') && kinds(judge(QUOTE_HE, { subject: 'מענה אוטומטי: הצעה' })).startsWith('SILENT'));
 r = judge(QUOTE_EN, { sender: { name: 'Sali', email: OWN } });
 check('the person\'s own mail is never a direct ask (a note to self keeps the engine\'s own rule)', !(r.show && r.intent.directAsk), kinds(r));

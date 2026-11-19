@@ -1657,6 +1657,10 @@ function glanceUiCopy(kind) {
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
     let intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { calendarChangeOn: typeof calendarChangeSwitch !== 'undefined' && calendarChangeSwitch === true }));
+    // Group mail (four or more on To): a request aimed at someone else, or a broadcast that does not name the reader, is not this person's Do It.
+    // The same rule the shared judge applies on the other mail surfaces (core/incoming-judge.js groupAddressing).
+    if (intent && intent.type === 'request' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.groupAddressing === 'function' && base && base.inbound !== false && ctx.senderIsUser !== true
+        && FlowIncomingJudge.groupAddressing({ text: prepared, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail' }, prepared) === 'quiet') intent = { type: null, quiet: 'hedge' };
     if (intent && intent.type === 'request' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.doItOverride === 'function'
         && base && base.inbound !== false && ctx.senderIsUser !== true) {
       const over = FlowIncomingJudge.doItOverride({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true, attachmentCount: ctx.attachmentCount || 0 }, intent);

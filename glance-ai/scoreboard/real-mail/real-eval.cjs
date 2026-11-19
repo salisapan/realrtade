@@ -15,10 +15,15 @@ const JSON_OUT = process.argv.includes('--json'), ROWS_OUT = (process.argv.find(
 const file = fs.readdirSync(dir).filter((f) => (set === 'v2b' ? /^v2b-.*\.jsonl$/ : /messages\.jsonl$/).test(f)).map((f) => path.join(dir, f));
 const rows = [].concat(...file.map((f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } }))).filter(Boolean);
 const MAP = { draft: 'reply', task: 'task', pay: 'payment', calendar: 'calendar', file_save: 'document' };
-const goldKind = (r) => (r.label && r.label.has_request ? (r.label.kind || 'none') : 'none');
+// dev3 labels name the close kind the way the plan does (draft, file_save); dev2 and the engine side use reply and document.
+const GOLD_ALIAS = { draft: 'reply', file_save: 'document' };
+const goldKind = (r) => (r.label && r.label.has_request ? (GOLD_ALIAS[r.label.kind] || r.label.kind || 'none') : 'none');
 // The mask replaced the owner's own name too. A first [NAME] within the first 30 characters is the vocative to the reader (these mails sit in the owner's inbox), so with GLANCE_ADDRESSEE=1 it is put back as the owner's name; the default run leaves the mask as it is.
 const ADDRESSEE = process.env.GLANCE_ADDRESSEE === '1';
-const addressee = (b, r) => (b = String(b || '').replace(/\[OWNER\]/g, 'סאלי'), ADDRESSEE && r.ownInTo !== false ? String(b || '').replace(/\[NAME\]/, (m, off) => (off < 30 ? 'סאלי' : m)) : b);
+// GLANCE_NAMES=1 (only on a set whose rows carry [OWNER], i.e. the reader is marked apart from everyone else): every other [NAME] is put back as a stand-in first name, the way real unmasked mail reads, so the name rules (vocative to someone else) can run. The default run leaves the mask as it is.
+const NAMES = process.env.GLANCE_NAMES === '1' && rows.some((r) => /\[OWNER\]/.test(String(r.body || '')));
+const standIn = (b) => (NAMES ? String(b).replace(/\[NAME\]/g, () => (/[\u0590-\u05FF]/.test(b) ? 'דנה' : 'Dana')) : b);
+const addressee = (b, r) => { b = String(b || '').replace(/\[OWNER\]/g, 'סאלי'); if (ADDRESSEE && r.ownInTo !== false) b = b.replace(/\[NAME\]/, (m, off) => (off < 30 ? 'סאלי' : m)); return standIn(b); };
 function engineInbound(r, surface) {
   const own = OWN[surface];
   const colleagues = []; for (let i = 0; i < Math.max(0, (r.toN || 1) - (r.ownInTo ? 1 : 0)); i++) colleagues.push('colleague' + i + '@firm.example');

@@ -202,6 +202,8 @@ const FlowIncomingJudge = (() => {
   // an answer-needing ask with a date. Gmail's chip path calls this too, so both mailboxes share one second read.
   // The labs readers (booking notice, task ask, payment ask) stay behind their own switches, which default OFF.
   function secondRead(i, q0) {
+    // A group mail aimed at someone else, or a broadcast that does not name the reader, gets no second read (see groupAddressing).
+    if (i.senderIsUser !== true && i.inbound !== false && groupAddressing(i, prepareForJudge(i.text)) === 'quiet') return null;
     // «Please do not reply to opposing counsel yet» reads as a hedge to the classifier, but in a mail that also asks real questions it is the person's HOLD instruction, not a cancel:
     // only the direct-ask reader (two questions, a person, To the reader) may look past that one hedge, and it keeps the hold as a task.
     if (q0 === 'hedge' && i.directAskOn === true && i.senderIsUser !== true && i.inbound !== false && i.noteToSelf !== true) {
@@ -259,6 +261,33 @@ const FlowIncomingJudge = (() => {
     const rest = m[2];
     return (/[\u0590-\u05FF]/.test(rest) ? DIRECT_Q_HE : DIRECT_Q_EN).test(rest) ? rest : x;
   }
+  // ---- group mail: who the ask is for (Direction A, 2026-11-19; docs/glance-ai/user-context-v0.md) ----
+  // A mail with four or more people on To was ignored by the direct-ask read, and the other readers offered on it whatever the words said.
+  // Now the mail's own first words decide, through FlowIntent.addressing (reader named at the head or at a line start, a vocative to someone else,
+  // a group greeting, or nobody named):
+  //   'open'  the reader is named (any size of list), or the head greets the group («היי כולם», «Hi all») on a list of at most ten: the direct-ask read may look at it
+  //   'quiet' a vocative names someone else, or a list of more than ten does not name the reader: no card (a request aimed at another person, a broadcast)
+  //   null    nobody is named on a list of four to ten: today's behavior, unchanged
+  // Only a reader on To, and only an email surface; a chat has no addresses. A Cc-only reader keeps the older Cc rules.
+  const GROUP_MIN = 4, GROUP_BROADCAST = 10;
+  function groupAddressing(i, body) {
+    if (!i || i.surface === 'chat') return null;
+    const to = (i.to || i.toRecipients || []).map((a) => String(a).toLowerCase());
+    const own = (i.ownAddresses || i.own || []).map((a) => String(a).toLowerCase());
+    if (to.length < GROUP_MIN || !own.length || !to.some((a) => own.indexOf(a) >= 0)) return null;
+    const api = typeof FlowIntent !== 'undefined' ? FlowIntent : sibling(null, './intent.js', 'FlowIntent');
+    if (!api || typeof api.addressing !== 'function') return null;
+    let kind = 'none';
+    try {
+      const raw = String(body || '');
+      const cut = raw.search(DIRECT_CUT);
+      kind = api.addressing(cut >= 0 ? raw.slice(0, cut) : raw, { ownNames: i.ownNames, userName: i.userName, ownAddresses: i.ownAddresses || i.own, readerEmail: i.readerEmail, to: i.to || i.toRecipients, cc: i.cc || i.ccRecipients, namesWaitDone: i.namesWaitDone === true });
+    } catch (e) { return null; }
+    if (kind === 'reader') return 'open';
+    if (kind === 'other') return 'quiet';
+    if (to.length > GROUP_BROADCAST) return 'quiet';
+    return kind === 'group' ? 'open' : null;
+  }
   function directAsk(i, body) {
     const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
     const chat = i.surface === 'chat';
@@ -269,7 +298,7 @@ const FlowIncomingJudge = (() => {
       const own = (i.ownAddresses || []).map((a) => String(a).toLowerCase());
       const to = (i.to || []).map((a) => String(a).toLowerCase());
       if (!sender || !own.length || own.indexOf(sender) >= 0) return null;
-      if (!to.some((a) => own.indexOf(a) >= 0) || to.length > 3) return null;
+      if (!to.some((a) => own.indexOf(a) >= 0) || (to.length > 3 && groupAddressing(i, body) !== 'open')) return null;
       if (DIRECT_AUTO_SUBJECT.test(String(i.subject || ''))) return null;
       if (X && typeof X.senderIsAutomated === 'function' && X.senderIsAutomated(sender, String(body || ''))) return null;
     }
@@ -410,7 +439,22 @@ const FlowIncomingJudge = (() => {
   // Off unless the host passes decomposeOn (the Labs switch DECOMPOSE, off by default). The whole-mail decision above always runs first; this only
   // runs when the mail shows or the judge found nothing, and it returns ONE card whose steps are each intention's own (intent-decompose merge).
   // Every quiet of the whole mail, phishing and the take-back clauses stand (see the module). A mail with one intention comes back unchanged.
+  // The group-mail rule's quiet half: a card that came out of a mail aimed at someone else, or out of a broadcast that does not name the reader, is dropped.
+  // A calendar-only close (an invitation to an event) is not a request aimed at a person, so it is left to its own rules.
+  function groupQuieted(i, res) {
+    if (!res || res.show !== true || i.senderIsUser === true || i.inbound === false) return res;
+    const steps = (res.process && res.process.steps) || [];
+    if (steps.length && steps.every((s) => /calendar|Event|Meet/i.test(String(s.kind || '')))) return res;
+    if (groupAddressing(i, prepareForJudge(i.text)) !== 'quiet') return res;
+    return { show: false, reason: 'quiet:group-not-addressed', intent: res.intent || null };
+  }
+
   function judge(input, deps) {
+    const i = input || {};
+    return groupQuieted(i, judgeInner(i, deps));
+  }
+
+  function judgeInner(input, deps) {
     const i = input || {};
     const whole = judgeOnce(i, deps);
     if (i.decomposeOn !== true) return whole;
@@ -1205,7 +1249,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id));
   }
 
-  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, namedQuietOf, contactsAsk, secondRead, doItOverride, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
+  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, namedQuietOf, contactsAsk, secondRead, groupAddressing, doItOverride, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };
