@@ -126,9 +126,9 @@ for (const row of fix.conflicts) {
 }
 
 const team = both(fix.team.text);
-check('a team meeting noun the base does not know stays quiet',
-  team.g && team.g.show === false && team.o && team.o.show === false &&
-  team.g.reason === 'intent-null' && team.o.reason === 'intent-null',
+// ישיבה and דיון joined the meeting nouns (calendar-verb round, 2026-11-18): a team meeting with a date and a clock may be a hold on Gmail; Outlook stays quiet (no draft, no task).
+check('a team meeting noun with a date and a clock: Outlook stays quiet, Gmail may hold',
+  team.o && team.o.show === false && team.o.reason === 'no-draft-close',
   { reason: [team.g && team.g.reason, team.o && team.o.reason] });
 
 for (const row of fix.plans) {

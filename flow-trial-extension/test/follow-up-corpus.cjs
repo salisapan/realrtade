@@ -298,5 +298,106 @@ check('"it arrived, please check back in a few days" waits, never closes', cr('T
 check('a real confirmation still closes («הפרופיל הוסר»)', cr('הבקשה טופלה. הפרופיל הוסר והמסמך נמחק.', replyW).outcome === 'closed');
 check('a plain yes with "please let me know if anything else" still closes', cr('Approved. Please let me know if you need anything else.', replyW).outcome === 'closed', cr('Approved. Please let me know if you need anything else.', replyW));
 
+console.log('\n--- formal Hebrew asks of an office (found on a real professional sent box, 2026-11-18; written for this file, no real text) ---\n');
+for (const [name, text] of [
+  ['«ממתין ממך ל<מסמך>»', 'סיימתי את הסקירה, מצורף הסיכום.\nממתין ממך לחוזה המעודכן שעליו אחתום, ולכל דבר נוסף שיידרש.\nבברכה,'],
+  ['«ממתינים לתשובתכם»', 'שלום רב,\nבהמשך לפנייתנו מהשבוע שעבר אנו ממתינים לתשובתכם בנושא הנספחים.\nבברכה,'],
+  ['«יש להעביר סכום לחשבון»', 'שלום רב,\nבהמשך שיחתנו, לצורך קבלת האישור יש להעביר 150 ₪ לחשבון המצורף.\nנטפל בכך בהקדם.\nבברכה,'],
+  ['«יש להמציא את המסמכים»', 'שלום,\nלצורך המשך הטיפול יש להמציא את המסמכים החתומים.\nתודה מראש,'],
+]) {
+  const a = classify(text);
+  check('a formal Hebrew ask opens a loop: ' + name, a && (a.kind === 'reply' || (a.kind === 'payment' && /₪/.test(text))), a && a.kind);
+}
+for (const [name, text] of [
+  ['«אודה לסיוע» on a line of its own', 'שלום רב, חיפשתי כמה פעמים את הטופס באתר אך העמוד אינו נטען כלל.\nאודה לסיוע.'],
+  ['a clock put as a question («אפשרי היום ב14:30?»)', 'היי [NAME]!\nאפשרי היום ב14:30?'],
+]) {
+  const a = classify(text);
+  check('a short formal Hebrew ask opens a loop: ' + name, a && a.kind === 'reply', a && a.kind);
+}
+{
+  const rights = classify('שלום,\nלצורך סגירת התיק יש להשלים קודם את הליך העברת הבעלות.\nאנא עדכן אם כבר הוגשה בקשה להעברת הבעלות לפי ההנחיות.');
+  check('«העברת הזכויות» (transfer of rights) is a reply loop, not a payment', rights && rights.kind === 'reply', rights && rights.kind);
+  const money = classify('שלום,\nלצורך קבלת האישור יש להעביר 150 ₪ לחשבון המצורף עד יום חמישי.\nבברכה,');
+  check('a transfer with an amount is still a payment loop', money && money.kind === 'payment', money && money.kind);
+  const remind = classify('שלום,\nנזכיר בהזדמנות זו כי טרם התקבלו המסמכים החתומים.\nבברכה,');
+  check('«נזכיר כי טרם התקבלו ...» (a chase) opens a loop', remind && remind.kind === 'reply', remind && remind.kind);
+  const still = classify('שלום,\nעדיין ממתינים לקבל את הטופס המאושר.\nבברכה,');
+  check('«עדיין ממתינים לקבל ...» opens a loop', still && still.kind === 'reply', still && still.kind);
+  check('«אל תעבירי עדיין ... עד שנסיים» (a hold instruction to a colleague) opens no loop', classify('תשאירי את זה אצלך ואל תעבירי עדיין ללקוח עד שלא נסיים את הבדיקה הסופית.') === null);
+}
+for (const [name, text] of [
+  ['a statement that has «יש» but asks nothing', 'שלום,\nבהתאם לבדיקה, יש בידינו את כל המסמכים והם תויקו במערכת. הכל תקין.\nבברכה,'],
+  ['a receipt', 'תוייק.\nבברכה,'],
+]) {
+  check('no loop: ' + name, classify(text) === null);
+}
+
+console.log('\n--- replies to a formal Hebrew ask of an office (real professional threads, 2026-11-18; written for this file) ---\n');
+{
+  const mk = (text, id) => F.buildWatch({ threadId: id, messageId: id, subject: 'x', counterpart: { email: 'p@o.example', name: 'P' }, ask: classify(text), now: NOW - 3 * 86400000 });
+  const listAsk = 'היי,\nנא להעביר אלינו עד סוף השבוע את אישורי הרישום של מחסנים 5, 8, 12 ו-14.\nתודה,';
+  const lw = mk(listAsk, 'l1');
+  const one = F.applyReply(lw, cr('מצ״ב אישור רישום למחסן 14', lw), NOW, 'מצ״ב אישור רישום למחסן 14');
+  check('an ask that lists four numbered items is not closed by a reply that brings one', one.partial === true && !one.close, one);
+  const all = F.applyReply(lw, cr('מצ״ב אישורי הרישום של מחסנים 5, 8, 12 ו-14', lw), NOW, 'מצ״ב אישורי הרישום של מחסנים 5, 8, 12 ו-14');
+  check('a reply that names all four items closes it', !all.partial, all);
+  const yearAsk = mk('שלום,\nאודה לקבל את הדוח השנתי לשנת 2025 ואת דוחות 2024 ו-2023.\nתודה,', 'l2');
+  check('years are not items (no parts are made from them)', !yearAsk || !Array.isArray(yearAsk.parts) || yearAsk.parts.length < 2, yearAsk && yearAsk.parts);
+  const pw = mk('שלום רב,\nבהמשך לשיחה, לצורך הנפקת התעודה יש להעביר 90 ₪ לחשבון המצורף.\nבברכה,', 'pay1');
+  check('«אסמכתא על תשלום ...» is a claim of payment on a payment loop', cr('אסמכתא על תשלום מצורפת להודעה זו.', pw).outcome === 'paid', cr('אסמכתא על תשלום מצורפת להודעה זו.', pw));
+  check('«ביצעתי את התשלום» is a claim of payment', cr('ביצעתי את התשלום.', pw).outcome === 'paid');
+}
+
+console.log('\n--- a formal «נודה למענה / לטיפולכם» closes a mail as a chase (law-firm mailbox, 2026-11-18) ---');
+{
+  const yes = classify('שלום,\nמצ"ב חשבונית על שכר העבודה.\nנודה למענה על שאר הסעיפים עד מחר.\nבברכה,');
+  check('«נודה למענה על שאר הסעיפים עד מחר» opens a reply loop', !!yes && yes.kind === 'reply', yes && yes.kind);
+  const no = classify('שלום,\nמצ"ב חשבונית על שכר העבודה.\nבברכה,');
+  check('a mail that only attaches the invoice opens no loop', !no, no && no.kind);
+}
+
+console.log('\n--- word boundaries in the Hebrew ask frames (law-firm mailbox sent pass 4, 2026-11-18) ---');
+{
+  for (const t of ['שלום רב,\nמצ"ב אישור זכויות.\nהחשבונית תישלח אליכם בהקדם.\nבברכה,', 'מצ"ב אישור.\nההסכם יישלח אליכם בקרוב.\nבברכה,', 'מצ"ב אישור.\nנעדכן אותך בהקדם כשיהיה חדש.\nבברכה,', 'מצ"ב אישור.\nאעדכן אותך כשיתקבל חדש.\nבברכה,']) {
+    const r = classify(t); check('the sender\'s own promise opens no loop: ' + t.split('\n')[1].slice(0, 36), !r, r && r.kind);
+  }
+  for (const t of ['שלום,\nמה נשמע?\nעדכן אותי איך להמשיך בעניין.\nבברכה,', 'שלום,\nתשלח לי בבקשה את המסמך החתום עד מחר.\nבברכה,']) {
+    const r = classify(t); check('an ask to be told or sent still opens a loop: ' + t.split('\n')[2].slice(0, 36), !!r, r && r.kind);
+  }
+}
+
+console.log('\n--- short asks: availability and a clarifying question (law-firm mailbox, sent pass 5) ---');
+{
+  for (const x of ['מה קורה [NAME]? אתה זמין?', 'האם הכוונה לתעודת הביטוח?']) { const r = classify(x); check('short ask opens a loop: ' + x, !!r, r && r.kind); }
+  for (const x of ['אתה זמין מחר, תודה.', 'הכוונה לאישור זכויות.']) { const r = classify(x); check('a statement opens none: ' + x, !r, r && r.kind); }
+}
+
+console.log('\n--- thanks and done-reports are not asks (law-firm mailbox, sent pass 6) ---');
+{
+  for (const x of ['שלום,\nתודה על שליחת הטפסים.\nהעניין בטיפולנו ונחזור אליך.\nבברכה,', 'תוקן חוץ מהבקשה להוסיף לוגו לכותרת, אין אפשרות כזו.\nמצ"ב הדוח כפי שסוכם.\nבברכה,']) { const r = classify(x); check('opens no loop: ' + x.split('\n')[x[0] === 'ת' && x[1] === 'ו' && x[2] === 'ק' ? 0 : 1].slice(0, 36), !r, r && r.what); }
+  for (const x of ['שלום,\nתודה על העברת המסמכים.\nאודה שתשלח לי את החוזה החתום עד יום חמישי.\nבברכה,']) { const r = classify(x); check('thanks + a real ask still opens a loop', !!r, r && r.kind); }
+}
+
+{
+  const r = classify('היי מה נשמע?\nאבקש את עזרתכן בסידור דחוף של החדר להיום.\nתודה רבה!'); check('«אבקש את עזרתכן ב…» opens a loop', !!r, r && r.kind);
+}
+
+{
+  for (const x of ['היי [NAME], לא מצאתי. אודה לקבלת הנמען.\nבברכה,', 'היי [NAME], מצ"ב הסט לאישורך.\nבברכה,']) { const r = classify(x); check('short formal ask opens a loop: ' + x.split('\n')[0].slice(0, 36), !!r, r && r.kind); }
+  for (const x of ['שלום,\nאישורך התקבל, תודה.\nבברכה,']) { const r = classify(x); check('«אישורך» without the «ל» opens none', !r, r && r.kind); }
+}
+
+console.log('\n--- real-mail dev set grammar (2026-11-18): bare Hebrew amount, short «לאישורך», delivery lines, third-party source ---');
+{
+  const pay = classify('שלום,\nבהמשך להסכם אודה להסדרת הסעיפים הבאים:\n1. תשלום עבור הייעוץ ע"ס 2,350 כולל מע"מ לחשבוננו.\nבברכה,'); check('a Hebrew amount with «ע"ס» and no sign is a payment chase', !!pay && pay.kind === 'payment', pay && pay.kind);
+  for (const x of ['מצ"ב תעודת ביטוח, לאישורך.\nבברכה,', 'טיוטת מכתב לאישורך.', 'שלום [NAME], מקפיץ את המייל כי עדיין אין לי תשובה בעניין הבדיקה.\nבברכה,']) { const r = classify(x); check('formal ask opens a loop: ' + x.slice(0, 30).replace(/\n/g, ' '), !!r, r && r.kind); }
+  for (const x of ['מצ"ב אישור פתיחת כרטיס לתשלום הדמים.', 'כתבתי כמה פעמים למתווך וגם בוואטסאפ, ממתין לתשובה ממנו.', 'מצ"ב הסכם שכירות חתום.\nבברכה,']) { const r = classify(x); check('opens none: ' + x.slice(0, 30), !r, r && r.kind); }
+}
+
+// A fee chase with no figure is a payment chase; a chase about something else stays a reply (invented sentences, 2026-11-18).
+for (const t of ['היי,\nנודה למענה שלכם על סגירת הסעיפים, ובפרט על עדכון תשלום הדמי קדימה.\nבברכה,', 'נהדר, תודה!\nממתינים לעדכון בנוגע לשכר טרחה.\nבברכה', 'היי, העבירו לנו בבקשה את אישור התשלום.']) { const r = classify(t); check('fee chase is a payment: ' + t.slice(0, 24), r && r.kind === 'payment', r && r.kind); }
+for (const t of ['היי,\nנודה למענה שלכם על סגירת הסעיפים.\nבברכה,', 'שלום, אשמח שתעדכנו אותי לגבי מועד הישיבה.']) { const r = classify(t); check('non-fee chase stays a reply: ' + t.slice(0, 24), !r || r.kind === 'reply', r && r.kind); }
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

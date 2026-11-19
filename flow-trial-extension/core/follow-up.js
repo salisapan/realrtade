@@ -83,8 +83,26 @@ const FlowFollowUp = (() => {
   ];
   const ASK_HE = [
     /(?:תוכל(?:ו|י)?|אפשר|ניתן) (?:בבקשה )?(?:לשלוח|לאשר|להשיב|לחתום|להעביר|לעדכן|לבדוק|לשלם|לחזור)/,
-    /(?:תשלח(?:ו|י)?|שלח(?:ו|י)?|אשר(?:ו|י)?|תאשר(?:ו|י)?|חתום|תחתום|עדכן|תעדכן|תחזור|תחזרו|תחזרי|העבר(?:ו|י)?|תעביר(?:ו|י)?) (?:לי|לנו|אלי|בבקשה|את|עד|מיד)/,
+    // A word of its own on both sides: «יישלח אליכם בהקדם» (it will be sent to you soon) is the sender's promise, not «שלח אלי».
+    /(?<![\u0590-\u05FF])(?:תשלח(?:ו|י)?|שלח(?:ו|י)?|אשר(?:ו|י)?|תאשר(?:ו|י)?|חתום|תחתום|עדכן|תעדכן|תחזור|תחזרו|תחזרי|העבר(?:ו|י)?|תעביר(?:ו|י)?) (?:לי|לנו|אלי|בבקשה|את|עד|מיד)(?![\u0590-\u05FF])/,
     /(?:נא|בבקשה) (?:לשלוח|לאשר|להשיב|לחתום|להעביר|לעדכן|לשלם)/,
+    // «עדכן אותי מה לעשות», «תעדכנו אותי»: the person asks to be told. «נעדכן אותך» / «אעדכן אותך» (the sender's own promise) have a letter in front and do not match.
+    /(?<![\u0590-\u05FF])ת?עדכ(?:ן|ני|נו)\s+(?:אותי|אותנו)(?![\u0590-\u05FF])/,
+    /(?<![\u0590-\u05FF])(?:אתה|את|אתם|אתן)\s+זמי[ןנ](?:ה|ים|ות)?\s*\?/,
+    /(?<![\u0590-\u05FF])(?:אבקש|נבקש|אבקשך)\s+(?:את\s+)?עזרת(?:ך|כם|כן)(?![\u0590-\u05FF])/,
+    // «מצ"ב הסט לאישורך» / «לאישורכם»: the document is attached for approval, the reply is the approval.
+    /(?<![\u0590-\u05FF])לאישור(?:ך|כם)(?![\u0590-\u05FF])/,
+    /(?:אודה|נודה)\s+מראש\s+ל\S+|(?:אודה|נודה)\s+ל(?:השלמ(?:ה|ת)|הסדר(?:ה|ת)|טיפול)(?![\u0590-\u05FF])/,
+    /מקפי[צץ](?:ה|ים)?\s+את\s+(?:המייל|השרשור|הפנייה)/,
+    // Formal Hebrew of an office: «ממתין ממך לתצהיר», «ממתינים לתשובתכם», «יש להעביר 100 ₪ לחשבון», «יש להמציא את המסמכים» (found on the owner's own professional sent mail, 2026-11-18).
+    // «אודה לסיוע» / «נודה לעדכון» / «אשמח לקבל» (the polite formal request, outgoing).
+    /(?:אודה|נודה|אשמח|נשמח) (?:לך |לכם )?(?:מאוד )?ל(?:סיוע|עזרה|קבלת|עדכון|תשובה|אישור|ציון|קבל|דעת|בירור|מענה|טיפול(?:ך|כם)?|התייחס(?:ות)?(?:ך|כם)?|תגובה|תגובת(?:ך|כם))/,
+    // A chase that says nothing is yet received: «נזכיר כי טרם התקבלו המסמכים», «עדיין ממתינים לקבל את ...».
+    /(?:נזכיר|מזכירים|אזכיר)(?: לך| לכם)?[^.!?]{0,30}(?:כי |ש)?טרם התקבל/,
+    /עדיין (?:ממתין|ממתינה|ממתינים|מחכה|מחכים) ל(?:קבל|תשובה|אישור|מסמכ|חתימ)/,
+    /(?:ממתין|ממתינה|ממתינים|מחכה|מחכים) (?:לקבל )?(?:ממך|ממכם|מכם|ממנה|ממנו) ל\S+/,
+    /(?:ממתין|ממתינה|ממתינים|מחכה|מחכים) ל(?:תשובתך|תשובתכם|תגובתך|תגובתכם|אישורך|אישורכם|עדכונך|עדכונכם|מסמכים|קבלת)/,
+    /(?:^|[\s,.])יש (?:ל)?(?:העביר|שלוח|המציא|הגיש|מלא|חתום|שלם|אשר|הסדיר|צרף)(?:\s|$)/,
     /(?:ממתין|ממתינה|מחכה|מחכים|ממתינים) (?:ל|לתשובה|לאישור|לחתימה|לתשלום)/,
     /אשמח (?:אם|ש)(?:תשלח|תוכל|תאשר|תחזור|תעדכן|נקבל)/,
     // The way a person really asks in a business mail (owner's real threads, 2026-11-12): "we would be glad to set up a short meeting",
@@ -94,14 +112,29 @@ const FlowFollowUp = (() => {
   ];
 
   // ---- payment --------------------------------------------------------------
+  const FEE_CHASE_HE = /(?:שכ"ט|שכ״ט|שכר\s+טרחה|תשלומי|תשלום\s+ה|אישור\s+(?:ה)?תשלום|עדכון\s+(?:ה)?תשלום|תשלום\s+שובר|שובר(?:ים)?\s+ה?(?:ראשון|שני|שלישי)|(?:על|בנוגע\s+ל|לגבי)\s+תשלום)/;
   const PAY_WORD = /\b(?:invoice|payment|balance|amount due|outstanding|remit(?:tance)?|please pay|pay(?:able)?|wire|settle|owed|overdue|due on|due by)\b|(?:חשבונית|תשלום|יתרה|לשלם|העברה בנקאית|חוב|לתשלום)/i;
   const RECEIPT = /\b(?:payment (?:received|confirmed|made|sent|processed)|has been paid|paid in full|thank you for (?:your )?payment|receipt (?:attached|enclosed)|we(?:'ve| have) (?:received|sent) (?:the )?payment)\b|(?:התשלום (?:התקבל|בוצע|נשלח)|שולם|קבלה מצורפת)/i;
 
   function words(text) { return (String(text || '').match(/\S+/g) || []).length; }
 
+  // The last sentence that is not a sign-off: «מצ"ב תעודת ביטוח, לאישורך.\nבברכה,» ends in «לאישורך», not in «בברכה».
+  function lastAskSentence(text) {
+    const SIGNOFF = /^(?:בברכה|בכבוד\s+רב|תודה(?:\s+רבה)?(?:\s+מראש)?|best(?:\s+regards)?|regards|thanks)[,.!\s]*$/i;
+    const lines = String(text || '').split(/\n/).map((x) => x.trim()).filter(Boolean);
+    while (lines.length > 1 && SIGNOFF.test(lines[lines.length - 1])) lines.pop();
+    return (lines.pop() || '').split(/(?<=[?!.])\s+/).pop().trim();
+  }
   // A scheduling question too short for the four-word line filter, and nothing else.
   function isShortScheduleAsk(s) {
-    return /^(?:מתי (?:נוח|מתאים) (?:לך|לכם|לי|לכן)|when (?:is|would be) (?:a )?good time)\s*\??$/i.test(String(s || '').trim());
+    const t = String(s || '').trim();
+    // «לאישורך.» / «לאישרוך» / «טיוטת מכתב לאישורך.»: attached for approval, the reply is the approval.
+    if (/(?:^|\s)(?:לאישור(?:ך|כם)|לאישרוך)[.!]*$/.test(t)) return true;
+    // A clock put as a question with no verb («אפשרי היום ב14:30?», «15:00 אפשרי?», «מתאים מחר ב-10:00?») is a request for a time in a real office thread.
+    if (/^(?:אפשרי|מתאים|נוח|פנוי|פנויה)\s+(?:(?:היום|מחר|מחרתיים|ביום\s+\S+)\s+)?(?:ב-?\s*)?\d{1,2}[:.]\d{2}\s*\?$/.test(t) || /^\d{1,2}[:.]\d{2}\s+(?:אפשרי|מתאים|נוח)\s*\?$/.test(t)) return true;
+    // «אתה זמין?» / «את זמינה?» and a short clarifying question («האם הכוונה לאישור זכויות?») are asks too short for the four-word filter (law-firm mailbox, 2026-11-18).
+    if (/^(?:האם\s+)?(?:אתה|את|אתם|אתן)\s+זמי[ןנ](?:ה|ים|ות)?\s*\?$/.test(t) || /^האם\s+הכוונה\s+ל\S+(?:\s+\S+){0,2}\s*\?$/.test(t)) return true;
+    return /^(?:מתי (?:נוח|מתאים) (?:לך|לכם|לי|לכן)|when (?:is|would be) (?:a )?good time)\s*\??$/i.test(t);
   }
   // A suggestion to talk, with no delivery in it, is not the answer to the open ask.
   const TALK_SUGGESTION = /(?:כדאי (?:שנדבר|לדבר|לשוחח)|בוא(?:ו|י)? נדבר|בואי נדבר)|\b(?:we should|let's|lets) (?:talk|discuss|speak|chat)\b|\bworth (?:a|us) (?:call|chat|talk)\b/i;
@@ -210,7 +243,7 @@ const FlowFollowUp = (() => {
     const types = c.types || requestTypes;
     if (!types || !types.detectShortAsk) return null;
     const bare = body.replace(/^\s*(?:hi|hello|hey|היי|שלום)[^\n,!?]{0,20}[,!:]\s*/i, '').trim();
-    const req = types.detectShortAsk(bare);
+    const req = types.detectShortAsk(bare) || (isShortScheduleAsk(lastAskSentence(bare)) ? { action: 'reply', type: 'schedule', label: 'Time to meet', days: null } : null);
     if (!req) return null;
     const kind = req.action === 'pay' ? KINDS.PAYMENT : KINDS.REPLY;
     return {
@@ -232,12 +265,22 @@ const FlowFollowUp = (() => {
     if (RECEIPT.test(body)) return null;
 
     const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);
-    const money = ex && ex.parseMoney ? ex.parseMoney(body) : null;
+    // «תשלום עבור הייעוץ ע"ס 2,350 כולל מע"מ» / «בסך 900»: a Hebrew amount with no currency sign is shekels when the same text speaks of a payment.
+    let money = ex && ex.parseMoney ? ex.parseMoney(body) : null;
+    if (!money && PAY_WORD.test(body)) {
+      const bare = /(?:ע"ס|ע״ס|בסך(?:\s+של)?|על\s+סך(?:\s+של)?)\s+(\d[\d,]*(?:\.\d{1,2})?)/.exec(body);
+      if (bare && parseFloat(bare[1].replace(/,/g, '')) > 0) money = { raw: bare[0], value: parseFloat(bare[1].replace(/,/g, '')), currency: 'ILS', index: bare.index };
+    }
     const date = ex && ex.parseDate ? ex.parseDate(body, new Date(typeof c.now === 'number' ? c.now : Date.now())) : null;
     const deadlineIso = date && date.iso ? date.iso : null;
 
     const lines = sentences(body);
-    const candidates = lines.filter((s) => !COURTESY.test(s) && (words(s) >= 4 || isShortScheduleAsk(s)));
+    // «תודה על העברת המסמכים.» is thanks, and «תוקן מלבד הבקשה לרשום…» / «טופל.» reports work done: neither is an ask, whatever noun the lexicon finds in it.
+    const THANKS_OR_DONE_HE = /^\s*(?:תודה(?:\s+רבה)?\s+(?:על|ל)(?![\u0590-\u05FF])|(?:תוקן|בוצע|טופל|עודכן|נשלח|נבדק|הועבר|הוסדר)(?![\u0590-\u05FF]))/;
+    const DELIVERY_ONLY_HE = /^\s*מצ"ב(?![\u0590-\u05FF])/;
+    const ASK_WORD_HE = /(?:אודה|נודה|אשמח|נשמח|אבקש|נבקש|נא\s|אנא|בבקשה|לאישור(?:ך|כם)|להשלמ|להסדר|עד\s+(?:יום|מחר|ה-?\d))/;
+    const THIRD_PARTY_SOURCE_HE = /(?:ממתינ(?:ה|ים|ות)?\s+(?:לקבל\s+)?(?:\S+\s+){0,3}?(?:ממנו|ממנה|מהם|מהן)|(?:ממנו|ממנה|מהם|מהן)\s*[.!]?$)/;
+    const candidates = lines.filter((s) => !COURTESY.test(s) && !THANKS_OR_DONE_HE.test(s) && !(DELIVERY_ONLY_HE.test(s) && !ASK_WORD_HE.test(s)) && !(THIRD_PARTY_SOURCE_HE.test(s) && !/(?:ממך|ממכם|מכם|מכן|ממך)/.test(s)) && !/(?:^|\s)אל\s+ת[\u05D0-\u05EA]/.test(s) && (words(s) >= 4 || isShortScheduleAsk(s) || /^(?:אודה|נודה|אשמח|נשמח)\s+ל\S+(?:\s+\S+){0,2}[.!]?$/.test(s.trim()) || /(?:^|\s)לאישור(?:ך|כם)[.!]?$/.test(s.trim())));
     if (!candidates.length) return null;
 
     const he = hasHebrew(body);
@@ -273,11 +316,12 @@ const FlowFollowUp = (() => {
     if (askLine && vetoed === askLine && !(typed && typed.line === askLine)) askLine = null;
 
     // Payment: a payment word AND a figure AND some instruction or due date.
-    const payLine = money ? candidates.find((s) => PAY_WORD.test(s)) : null;
+    const payLine = money ? candidates.find((s) => PAY_WORD.test(s) || /(?:^|\s)ל?(?:העביר|הפקיד)(?![\u05D0-\u05EA])/.test(s)) : null; // with a figure on the line, «יש להעביר 150 ₪» is a payment
     const dueCue = /\b(?:due|by|before|within|no later than|please|kindly|overdue|outstanding)\b|(?:עד|לפני|בתוך|נא|בבקשה|באיחור)/i;
     const isPayment = Boolean(payLine && (dueCue.test(payLine) || deadlineIso || askLine));
     // "Please pay the invoice" with no figure is still a payment being chased.
-    const payAsk = !isPayment && typed && typed.req.action === 'pay' ? typed : null;
+    // «העברת הזכויות» (transfer of rights) and «תעביר» (pass it on) are not money: the request type reads them as a payment verb, so the payment label needs a payment word or a figure on the line too.
+    const payAsk = !isPayment && typed && typed.req.action === 'pay' && (money || PAY_WORD.test(typed.line)) ? typed : null;
 
     if (!askLine && !isPayment) return null;
 
@@ -285,7 +329,9 @@ const FlowFollowUp = (() => {
     const chosen = isPayment ? payLine : askLine;
     if (HEDGE.test(chosen) && !deadlineIso && !isPayment) return null;
 
-    const kind = isPayment || payAsk ? KINDS.PAYMENT : KINDS.REPLY;
+    // A chase whose own ask line is about a fee or a payment («ממתינים לעדכון בנוגע לשכ"ט», «נודה למענה… ובפרט על עדכון תשלום הדמי קדימה», «אשמח לברר אם התקבלו תשלומי…», «העבירו את אישור התשלום») is a payment chase even with no figure (real-mail dev set, 2026-11-18).
+    const feeChase = !isPayment && !payAsk && askLine && FEE_CHASE_HE.test(askLine);
+    const kind = isPayment || payAsk || feeChase ? KINDS.PAYMENT : KINDS.REPLY;
     const req = typed && (typed.line === chosen || !isPayment) ? typed.req : null;
     // Does this intention carry enough weight to deserve a loop? (A soft "let me
     // know what you think" with no money, date or concrete action does not.)
@@ -334,7 +380,15 @@ const FlowFollowUp = (() => {
   function partsOf(text) {
     const body = String(text || '').replace(/^\s*(?:hi|hello|dear|שלום|היי)[^\n]{0,30}\n/i, '');
     const asks = sentences(body).map((x) => x.replace(/^(?:\d{1,2}[.)]|[-*•])\s*/, '').trim()).filter(isAskSentence);
-    if (asks.length < 2) return null;
+    if (asks.length < 2) {
+      // One ask that lists items by number («אשמח אם תעביר את אישורי הרישום של מחסנים 5, 8, 12 ו-14», «please send the certificates for rooms 5, 8, 12 and 14») is several things asked:
+      // a reply that brings one of them leaves the rest open. Small whole numbers only (a year or an amount is not an item); three or more.
+      const line = sentences(body).find((x) => isAskSentence(x) && /\d{1,3}(?:\s*,\s*\d{1,3}){1,5}\s*(?:,|ו-?|and|&)\s*\d{1,3}(?!\d)/i.test(x));
+      if (!line) return null;
+      const nums = Array.from(new Set((line.match(/(?<![\d.,])\d{1,3}(?![\d.,]\d)/g) || []))).slice(0, 8);
+      if (nums.length < 3) return null;
+      return nums.map((n) => ({ key: 'n' + n, text: clip('#' + n + ': ' + line, 120), kind: 'request', num: n, status: 'open' }));
+    }
     // A lead-in before a colon ("to make the demo real, we would like to know: which process?") is not the part: the part is what follows it.
     const own = asks.map((t) => { const k = t.lastIndexOf(':'); return k > 0 && words(t.slice(k + 1)) >= 3 ? t.slice(k + 1).trim() : t; });
     return own.slice(0, 6).map((t, i) => ({ key: 'p' + (i + 1), text: clip(t, 120), kind: /\?\s*$/.test(t) ? 'question' : 'request', status: 'open' }));
@@ -346,6 +400,7 @@ const FlowFollowUp = (() => {
   // thing a wrong "answered" does is give back today's behaviour (the reply closes the loop); a wrong "open" would hold a loop that is done.
   function sameStem(a, b) { return a === b || (a.length >= 5 && b.length >= 5 && a.slice(0, 4) === b.slice(0, 4)); }
   function partAnswered(part, reply) {
+    if (part.num) return new RegExp('(?<![\\d.,])' + part.num + '(?![\\d]|[.,]\\d)').test(String(reply || ''));
     const pt = partTokens(part.text); const rt = partTokens(reply);
     if (pt.some((w) => rt.some((r) => sameStem(w, r)))) return true;
     return LINK_PART.test(part.text) && HAS_LINK.test(reply);
@@ -604,7 +659,7 @@ const FlowFollowUp = (() => {
 
   // An out-of-office or automatic reply is not an answer. Treating it as one
   // would close a follow-up the person is still waiting on.
-  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|מענה אוטומטי|בחופשה עד|בחופשה|אעדר|(?:לא|אינני|איני) נמצא(?:ת)? במשרד|(?:אני|אנחנו|אנו) לא במשרד|המסירה לנמענים|לא ניתן למסירה)/i;
+  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|מענה אוטומטי|בחופשה עד|בחופשה|אעדר|(?:לא|אינני|איני) נמצא(?:ת)? במשרד|(?:אני|אנחנו|אנו) לא במשרד|המסירה לנמענים|לא ניתן למסירה|^\s*לא\s+במשרד\b|לא\s+במשרד\s+ו?לא\s+זמינ|מיום\s+חזרתי\s+(?:לפעילות|למשרד))/i;
 
   // A delivery failure: the mail the person sent never reached the other side. It is not a reply FROM them and it says nothing about the ask,
   // so it never closes a loop and never counts as an answer, and chasing the same address again would bounce the same way
@@ -665,7 +720,7 @@ const FlowFollowUp = (() => {
   // "I paid" / "payment was sent" — and the sentence-level guards that turn it
   // into a hypothetical or a negative ("not paid", "once it is paid").
   const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|^(?:paid|transferred|wired)\b|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been |just |already )?(?:sent|made|done|completed|processed|released|initiated|went out|has gone out)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
-  const PAID_HE = /(?:העברה בוצעה|שילמתי|שילמנו|העברתי|העברנו|שולם|התשלום (?:בוצע|הועבר|נשלח)|בוצעה העברה|הועבר)/;
+  const PAID_HE = /(?:אסמכתא (?:על |ל)(?:ה)?תשלום|אישור (?:ה)?תשלום|הוכחת תשלום|ביצע(?:תי|נו) (?:את )?(?:ה)?(?:תשלום|העברה)|העברה בוצעה|שילמתי|שילמנו|העברתי|העברנו|שולם|התשלום (?:בוצע|הועבר|נשלח)|בוצעה העברה|הועבר)/;
   const GUARD_EN = /\b(?:not|never|once|if|when|unless|until)\b|n't\b/i;
   const GUARD_HE = /(?:^|\s)(?:לא|טרם|אם|כש\S*|ברגע)(?=\s|$)/;
   // Greetings are not content: "Hi Dana, got it" is an acknowledgement.

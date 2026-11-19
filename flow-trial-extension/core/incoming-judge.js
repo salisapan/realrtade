@@ -202,6 +202,8 @@ const FlowIncomingJudge = (() => {
   // an answer-needing ask with a date. Gmail's chip path calls this too, so both mailboxes share one second read.
   // The labs readers (booking notice, task ask, payment ask) stay behind their own switches, which default OFF.
   function secondRead(i, q0) {
+    // A group mail aimed at someone else, or a broadcast that does not name the reader, gets no second read (see groupAddressing).
+    if (i.senderIsUser !== true && i.inbound !== false && groupAddressing(i, prepareForJudge(i.text)) === 'quiet') return null;
     // «Please do not reply to opposing counsel yet» reads as a hedge to the classifier, but in a mail that also asks real questions it is the person's HOLD instruction, not a cancel:
     // only the direct-ask reader (two questions, a person, To the reader) may look past that one hedge, and it keeps the hold as a task.
     if (q0 === 'hedge' && i.directAskOn === true && i.senderIsUser !== true && i.inbound !== false && i.noteToSelf !== true) {
@@ -234,8 +236,25 @@ const FlowIncomingJudge = (() => {
   const DIRECT_Q_HE = /^(?:ו)?(?:מה|מהו|מהי|מהם|מהן|מיהו|מיהי|למה|מדוע|איך|כיצד|האם|מתי|איפה|היכן|כמה|מי|איזה|איזו|אילו|יש|אנחנו יכולים|נוכל|אם אני מבין)(?![\u0590-\u05FF])/;
   // A lead-in clause before the question («בהתבסס על מה שכתבתם, התביעה וחוו"ד מומחה, מה גובה ...?», «כ"כ, אם אני מבין נכון ...?») is not part of it: it is cut before the opener is read.
   const DIRECT_LEADIN_HE = /^(?:(?:בהתבסס|בהסתמך|בהמשך|בהתאם|לפי|על סמך)\s+[^,?]{0,100},\s*|(?:כ"כ|כמו כן|בנוסף|ובנוסף|אז)[,\s]+)/;
+  // «Please advise on the last date and the remaining amount.»: an ask for information with no question mark. Only the verbs that ask for information (advise, clarify) with what they ask about; «please confirm» stays with the reply-ask reader.
+  const ADVISE_EN = /^(?:please|kindly)\s+(?:advise|clarify)\s+(?:on|about|regarding|whether|what|which|when|who|how)\b/i;
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
-  const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני)(?![\u0590-\u05FF])/;
+  const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני|תעבור|תעברי|תכתוב|תכתבי|תנסח|תנסחי|תסכם|תסכמי|תאתר|תאתרי|תרכז|תרכזי|תוודא|תוודאי|ודא|וודא|תתקן|תתקני|תקן|תוסיף|תוסיפי|תוסיפו|הוסף|הוסיפי|תמצא|תמצאי|תצור\s+קשר|צור\s+קשר|צרי\s+קשר|תנסה|תנסי|דבר|דברי|דברו|תדבר|תדברי|תדברו|תעשו|תחתמו|חתמו|תטפל|תטפלי|טפל|טפלי|תטפלו|טפלו|תארגן|תארגני|בדקו|תבדקו|תוודאו|ודאו|וודאו|תתקנו|תקנו|תכינו|הכינו|תבצע|תבצעי|בצע|בצעי|תשלים|תשלימי|תשלימו|השלימו|תרשמו|רשמו|תרשום|רשום|תתיק|תתיקי|תיקו|תתיקו|הוסיפו)(?![\u0590-\u05FF])/;
+  const POLITE_FRAME_HE = /^(?:(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA]))|(?:בבקשה|נא)\s+(?=ת[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF]))|נא\s+(?=(?:עדכנ[וי]|שלח[וי]|אשר[וי]|השיב[וי]|החזיר[וי]|העביר[וי]|צרפ[וי])(?![\u0590-\u05FF])))/;
+  const POLITE_NOMINAL_HE = /^(?:אודה|נודה|אשמח|נשמח|נא|אנא)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)|(?:ל(?:המשך\s+)?(?:דבר\s+)?|(?<=(?:נא|אנא)\s+))(טיפולך|טיפולכם|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
+  const NOMINAL_WORK_HE = /^(?:טיפולך|טיפולכם|הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
+  const NOMINAL_BACK_HE = /^(?:שליחת|העברת|החזרת|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם)$/;
+  const DIRECT_IMP_SEND_HE = /^(?:שלח|שלחי|תגיב|תגיבי|תענה|תעני|תשיב|תשיבי|תחזור|תחזרי|תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני|עדכנו|עדכני|שלחו|שלחי|אשרו|אשרי|השיבו|השיבי|החזירו|החזירי|העבירו|העבירי|צרפו|צרפי)(?![\u0590-\u05FF])/;
+  // «תוכל להשיב?», «תוכלו לענות בבקשה ל…», «[NAME], תוכל להגיב?»: the modal ask for an answer; «טרם קיבלנו מענה / תשובה / התייחסות», «למה אתה לא עונה?»: a chase. No day needed (real-mail dev set, 2026-11-18).
+  // «[OWNER], תוכל להעביר לו את הנוהל?» / «תוכלו לבדוק מול…?»: the modal ask with a work verb is a task, with a send verb a reply (real-mail dev set, 2026-11-19).
+  const MODAL_WORK_HE = /^(?:כן,?\s*)?(?:[\u05D0-\u05EA\[\]A-Z\u2013-]{2,12}\s*[,\u2013-]\s*)?(?:תוכל(?:י|ו)?|אפשר\s+ש?(?:ת|ל)|ניתן\s+ל)\s*(?:בבקשה\s+)?(?:ל?(?:בדוק|הכין|טפל|הוסיף|תקן|חתום|בצע|השלים|ארגן|וודא|לוודא|ודא|לרשום|להתיק|לתייק|להשלים|לדבר|לבדוק|לטפל|להכין|להוסיף|לתקן|לחתום|לבצע|לארגן))(?![\u0590-\u05FF])/;
+  // «תדפיס בבקשה…», «תקפוץ אליי בבקשה…»: a sentence that opens with a masculine future-form imperative (ת + a 3-to-5 letter stem) and carries «בבקשה». Nouns that start with ת («תודה», «תוכנית», «תביעה», «תשובה»…) end in ות / ית / ים / ין / ון / ה or are listed.
+  const GEN_IMP_HE = /^ת[\u05D0-\u05EA]{2,5}(?![\u0590-\u05FF])/;
+  const GEN_IMP_NOT_HE = /^(?:תודה|תוכנית|תוכניות|תביעה|תביעות|תשובה|תשובות|תאריך|תקנה|תקנות|תוצאה|תוצאות|תקופה|תנאי|תנאים|תמונה|תצהיר|תשלום|תעודה|תוספת|תקציב|תפקיד|תלונה|תרגום|תחילה|תיק|תיקים|תמורה|תקלה|תכנית|תכניות|תחתית|תלות|תחנה|תוכן|תכלית|תחום|תהליך|תוקף|תנועה|תפוז|תבנית|תבניות|תכולה|תפיסה|תחזית|תעריף|תעריפים|תוצר|תוצרים|תרומה|תכשיט|תפריט|תקן|תקשורת)(?![\u0590-\u05FF])/;
+  const MODAL_SEND_HE = /^(?:כן,?\s*)?(?:[\u05D0-\u05EA\[\]A-Z\u2013-]{2,12}\s*[,\u2013-]\s*)?(?:תוכל(?:י|ו)?)\s+(?:בבקשה\s+)?(?:להעביר|לשלוח|לצרף|להחזיר|לאשר|להעביר)(?![\u0590-\u05FF])/;
+  // «לטיפולכם דחוף» alone on a line: «for your handling» is the whole ask when the mail names the work above it.
+  const HANDLING_ONLY_HE = /^(?:דחוף\s+)?לטיפול(?:ך|כם|כן)(?:\s+(?:הדחוף|המיידי|בהקדם|דחוף))?[.!]*$/;
+  const MODAL_REPLY_HE = /^(?:כן,?\s*)?(?:[\u05D0-\u05EA\[\]A-Z\u2013-]{2,12}\s*[,\u2013-]\s*)?(?:תוכל(?:י|ו)?)\s+(?:בבקשה\s+)?(?:להשיב|לענות|להגיב|לחזור|לעדכן)(?![\u0590-\u05FF])(?!\s+ל(?!י(?![\u0590-\u05FF])|נו(?![\u0590-\u05FF])|גבי|פני|הצע|מייל|שאל|בקש|מענה)[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF]))|^(?:טרם|עדיין\s+לא)\s+(?:קיבלנו|קיבלתי)\s+(?:מענה|תשובה|התייחסות|עדכון)|(?:למה|מדוע)\s+(?:אתה|את|אתם|אתן)\s+לא\s+(?:עונה|עונים|עונות|משיב|משיבה|משיבים|מגיב|מגיבה)/;
   const DIRECT_IMP_BACK_HE = /^(?:שלם|שלמי|תשלם|תשלמי|החזר|החזירי|תחזיר|תחזירי)(?![\u0590-\u05FF])/;
   // A chat (WhatsApp, Messenger, Instagram, Teams) has no addresses: the host asserts the message is an inbound one-to-one one
   // (`oneToOne === true`; src/chat-task-card.js already drops groups, the person's own messages and quoted text before it asks the judge).
@@ -250,6 +269,33 @@ const FlowIncomingJudge = (() => {
     const rest = m[2];
     return (/[\u0590-\u05FF]/.test(rest) ? DIRECT_Q_HE : DIRECT_Q_EN).test(rest) ? rest : x;
   }
+  // ---- group mail: who the ask is for (Direction A, 2026-11-19; docs/glance-ai/user-context-v0.md) ----
+  // A mail with four or more people on To was ignored by the direct-ask read, and the other readers offered on it whatever the words said.
+  // Now the mail's own first words decide, through FlowIntent.addressing (reader named at the head or at a line start, a vocative to someone else,
+  // a group greeting, or nobody named):
+  //   'open'  the reader is named (any size of list), or the head greets the group («היי כולם», «Hi all») on a list of at most ten: the direct-ask read may look at it
+  //   'quiet' a vocative names someone else, or a list of more than ten does not name the reader: no card (a request aimed at another person, a broadcast)
+  //   null    nobody is named on a list of four to ten: today's behavior, unchanged
+  // Only a reader on To, and only an email surface; a chat has no addresses. A Cc-only reader keeps the older Cc rules.
+  const GROUP_MIN = 4, GROUP_BROADCAST = 10;
+  function groupAddressing(i, body) {
+    if (!i || i.surface === 'chat') return null;
+    const to = (i.to || i.toRecipients || []).map((a) => String(a).toLowerCase());
+    const own = (i.ownAddresses || i.own || []).map((a) => String(a).toLowerCase());
+    if (to.length < GROUP_MIN || !own.length || !to.some((a) => own.indexOf(a) >= 0)) return null;
+    const api = typeof FlowIntent !== 'undefined' ? FlowIntent : sibling(null, './intent.js', 'FlowIntent');
+    if (!api || typeof api.addressing !== 'function') return null;
+    let kind = 'none';
+    try {
+      const raw = String(body || '');
+      const cut = raw.search(DIRECT_CUT);
+      kind = api.addressing(cut >= 0 ? raw.slice(0, cut) : raw, { ownNames: i.ownNames, userName: i.userName, ownAddresses: i.ownAddresses || i.own, readerEmail: i.readerEmail, to: i.to || i.toRecipients, cc: i.cc || i.ccRecipients, namesWaitDone: i.namesWaitDone === true });
+    } catch (e) { return null; }
+    if (kind === 'reader') return 'open';
+    if (kind === 'other') return 'quiet';
+    if (to.length > GROUP_BROADCAST) return 'quiet';
+    return kind === 'group' ? 'open' : null;
+  }
   function directAsk(i, body) {
     const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
     const chat = i.surface === 'chat';
@@ -260,7 +306,7 @@ const FlowIncomingJudge = (() => {
       const own = (i.ownAddresses || []).map((a) => String(a).toLowerCase());
       const to = (i.to || []).map((a) => String(a).toLowerCase());
       if (!sender || !own.length || own.indexOf(sender) >= 0) return null;
-      if (!to.some((a) => own.indexOf(a) >= 0) || to.length > 3) return null;
+      if (!to.some((a) => own.indexOf(a) >= 0) || (to.length > 3 && groupAddressing(i, body) !== 'open')) return null;
       if (DIRECT_AUTO_SUBJECT.test(String(i.subject || ''))) return null;
       if (X && typeof X.senderIsAutomated === 'function' && X.senderIsAutomated(sender, String(body || ''))) return null;
     }
@@ -273,26 +319,40 @@ const FlowIncomingJudge = (() => {
     const head = ownText.slice(0, 60).toLowerCase();
     const greetsReader = names.some((n) => head.indexOf(n) >= 0);
     const skip = (x, he) => (he ? ANSWER_NO_HE.test(x) : ANSWER_NO_EN.test(x)) || DIRECT_Q_NO.test(x);
+    // «היי דנה,» / «דנה שלום,» at the head names someone else: a framed ask below is theirs, not the reader's (the same rule the classifier applies).
+    const greetM = /^\s*(?:(?:שלום|היי|הי|בוקר טוב|ערב טוב)\s+([\u05D0-\u05EA]{2,14})|([\u05D0-\u05EA]{2,14})\s+(?:שלום|היקר|היקרה))\s*[,:]/.exec(ownText.slice(0, 60));
+    const greetName = greetM ? String(greetM[1] || greetM[2]).toLowerCase() : '';
+    const greetsOther = !!greetName && !/^(?:כולם|כולן|צוות|חברים|חברות|חבר'ה|שלום|היי|הי|עו"ד|עורכי|רב|רבה|רבות|וברכה|לכולם|לכם|לכן|עורכת|עורך)$/.test(greetName) && !names.some((n) => n.indexOf(greetName) >= 0 || greetName.indexOf(n) >= 0);
     // 2. a Hebrew bare imperative with its day (email surfaces only; a chat has its own reader)
     for (const x0 of (chat ? [] : sents)) {
-      const x = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
-      if (!/[\u0590-\u05FF]/.test(x) || skip(x, true) || /(?:^|\s)(?:אל|לא)\s/.test(x)) continue;
-      const work = DIRECT_IMP_WORK_HE.test(x), back = DIRECT_IMP_BACK_HE.test(x);
+      // The reader named in front of the ask («סאלי - נא טיפולכם», «Sali: ...») is the same vocative as a greeting: it is cut before the verb is read.
+      const x1 = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '').replace(/^([A-Za-z\u0590-\u05FF'’]{2,20})\s*[-\u2013\u2014:]\s+(?=\S)/, (m0, nm) => (names.indexOf(String(nm).toLowerCase()) >= 0 ? '' : m0));
+      if (!/[\u0590-\u05FF]/.test(x1) || skip(x1, true) || /(?:^|\s)(?:אל|לא)\s/.test(x1)) continue;
+      // A polite frame in front of the verb («אשמח שתעביר לי…», «אודה אם תכין…», «אבקש שתשלח…») or a nominal («אודה על הכנת נספח…») is an explicit ask: it needs no day. A bare imperative still does.
+      const pleaseIn = /(?:^|\s)בבקשה(?:\s|[,.]|$)/.test(x1);
+      const genImp = pleaseIn && GEN_IMP_HE.test(x1) && !GEN_IMP_NOT_HE.test(x1) && !/(?:ות|ית|ים|ין|ון)$/.test(x1.split(/[\s,.!?]/)[0]);
+      const modalWork = MODAL_WORK_HE.test(x1) || /^(?:אתה|את|אתם|אתן)\s+(?:יכול|יכולה|יכולים|יכולות)\s+(?:בבקשה\s+)?ל(?:בדוק|הכין|טפל|הוסיף|תקן|חתום|בצע|השלים|ארגן|וודא|רשום|תייק|דבר)/.test(x1), modalSend = MODAL_SEND_HE.test(x1), handling = HANDLING_ONLY_HE.test(x1);
+      const modal = MODAL_REPLY_HE.test(x1) || modalSend;
+      const framed = POLITE_FRAME_HE.test(x1) || modal || modalWork || handling || genImp || (pleaseIn && (DIRECT_IMP_WORK_HE.test(x1) || DIRECT_IMP_SEND_HE.test(x1))), nominal = !POLITE_FRAME_HE.test(x1) && !framed && POLITE_NOMINAL_HE.exec(x1);
+      if ((framed || nominal) && greetsOther) continue;
+      const x = framed ? x1.replace(POLITE_FRAME_HE, '') : x1;
+      const work = modalWork || handling || (genImp && !DIRECT_IMP_BACK_HE.test(x) && !DIRECT_IMP_SEND_HE.test(x)) || (nominal ? NOMINAL_WORK_HE.test(nominal[1] || nominal[2]) : DIRECT_IMP_WORK_HE.test(x));
+      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)) || modal);
       if (!work && !back) continue;
-      const d = dayOf(x, now0).date;
-      if (!d || d < ymdOf(now0)) continue;
+      const d = dayOf(x1, now0).date;
+      if (d ? d < ymdOf(now0) : !(framed || nominal)) continue;
       return { kind: work ? 'task' : 'reply', what: x.slice(0, 200), title: x.replace(/[.!?\s]+$/, '').slice(0, 80), dateIso: d, lang: 'he' };
     }
     // 1. plain information questions
     // A chat opens on the same line as its first question ("היי, מה המחיר...?"): the greeting is not part of the question.
-    const qs = sents.filter((x) => /\?\s*$/.test(x)).map((x) => x.replace(/\s+\?\s*$/, '?').replace(/^(?:שלום|היי|הי|בוקר טוב|ערב טוב|hi|hello|hey)(?=[\s,!])[^,?!]{0,20}[,!]\s*/i, '')).map(vocativeCut).filter((x) => {
+    const qs = sents.filter((x) => /\?\s*$/.test(x) || (!chat && ADVISE_EN.test(x))).map((x) => x.replace(/\s+\?\s*$/, '?').replace(/^(?:שלום|היי|הי|בוקר טוב|ערב טוב|hi|hello|hey)(?=[\s,!])[^,?!]{0,20}[,!]\s*/i, '')).map(vocativeCut).filter((x) => {
       const he = /[\u0590-\u05FF]/.test(x);
       // A question that names a clock is a meeting proposal: the hold readers and the calendar path own it, not a reply.
       const opener = chat ? (he ? DIRECT_Q_HE_CHAT : DIRECT_Q_EN_CHAT) : (he ? DIRECT_Q_HE : DIRECT_Q_EN);
       // A lead-in that lists things before the question («בהתבסס על מה שכתבתם, התביעה וחוו"ד מומחה, מה גובה ...?») ends at the comma before the interrogative.
       let head = he ? x.replace(DIRECT_LEADIN_HE, '').replace(DIRECT_LEADIN_HE, '') : x;
       if (he && /^(?:בהתבסס|בהסתמך|בהמשך|בהתאם|לפי|על סמך)\s/.test(x)) { const cut = x.slice(0, 160).search(/,\s*(?:ו)?(?:מה|מהו|מהי|מהם|מהן|מתי|כמה|האם|איך|כיצד|מדוע|למה)(?![\u0590-\u05FF])/); if (cut > 0) head = x.slice(cut).replace(/^,\s*/, ''); }
-      return (opener.test(x) || (he && !chat && opener.test(head))) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
+      return (opener.test(x) || (!chat && ADVISE_EN.test(x)) || (he && !chat && opener.test(head))) && !skip(x, he) && !dayOf(x, now0).time && (!chat || x.split(/\s+/).length >= 4);
     });
     // A chat needs at least two such questions: one question in a chat is conversation, not a loop.
     // One question put to a group by name stays quiet (the two-question floor): the cut vocative made it a question, and a group greeting is not a personal ask.
@@ -302,9 +362,9 @@ const FlowIncomingJudge = (() => {
     return null;
   }
   // ---- what else a mail of questions carries (2026-11-16, a real legal-and-business Hebrew mail) -------------------------------------------
-  // The questions are the ask, but the same mail may also (1) ask for a date that has to be found («מהו המועד האחרון למתן תשובה», "what is the last date to respond"), (2) tell the
-  // person to HOLD an answer to someone («אני מבקש כרגע לא להחזיר תשובה לב"כ התובעים», "do not reply to opposing counsel yet"), and (3) quote figures that add up («27,400 ... 19 מיליון ...
-  // 18,972,600»). Glance writes none of the answers. It keeps the hold where the person can see it (a task with no day), makes the date question a task of its own, and puts the
+  // The questions are the ask, but the same mail may also (1) ask for a date that has to be found («מהו המועד האחרון לקבלת ההחלטה», "what is the last date to decide"), (2) tell the
+  // person to HOLD an answer to someone («אני מבקש בשלב זה לא לשלוח תשובה לסוכנות הגיוס», "do not reply to the agency yet"), and (3) quote figures that add up («9,500 ... 3 מיליון ...
+  // 2,990,500»). Glance writes none of the answers. It keeps the hold where the person can see it (a task with no day), makes the date question a task of its own, and puts the
   // arithmetic of the mail's own figures under the draft as a check for the person, never as an answer.
   const DEADLINE_Q_HE = /(?:ה?מועד|ה?תאריך|ה?יום)\s+האחרון|עד\s+מתי|האם\s+יש\s+מועד\s+אחרון/;
   const DEADLINE_Q_EN = /\b(?:last|latest|final)\s+(?:date|day|time)\b|\bby\s+when\b|\bdeadline\b/i;
@@ -390,7 +450,22 @@ const FlowIncomingJudge = (() => {
   // Off unless the host passes decomposeOn (the Labs switch DECOMPOSE, off by default). The whole-mail decision above always runs first; this only
   // runs when the mail shows or the judge found nothing, and it returns ONE card whose steps are each intention's own (intent-decompose merge).
   // Every quiet of the whole mail, phishing and the take-back clauses stand (see the module). A mail with one intention comes back unchanged.
+  // The group-mail rule's quiet half: a card that came out of a mail aimed at someone else, or out of a broadcast that does not name the reader, is dropped.
+  // A calendar-only close (an invitation to an event) is not a request aimed at a person, so it is left to its own rules.
+  function groupQuieted(i, res) {
+    if (!res || res.show !== true || i.senderIsUser === true || i.inbound === false) return res;
+    const steps = (res.process && res.process.steps) || [];
+    if (steps.length && steps.every((s) => /calendar|Event|Meet/i.test(String(s.kind || '')))) return res;
+    if (groupAddressing(i, prepareForJudge(i.text)) !== 'quiet') return res;
+    return { show: false, reason: 'quiet:group-not-addressed', intent: res.intent || null };
+  }
+
   function judge(input, deps) {
+    const i = input || {};
+    return groupQuieted(i, judgeInner(i, deps));
+  }
+
+  function judgeInner(input, deps) {
     const i = input || {};
     const whole = judgeOnce(i, deps);
     if (i.decomposeOn !== true) return whole;
@@ -514,6 +589,8 @@ const FlowIncomingJudge = (() => {
     if (buriedRememberRelayQuiet(text)) {
       return { show: false, reason: 'quiet:relay', intent: intent || null };
     }
+    // «נא לא לשלוח…», «בבקשה לא להעביר…»: a please-do-not is a prohibition, not a request (the same as «אל תשלח…», which already stays quiet).
+    if (intent && intent.type && /(?:^|[\s,.;:!])(?:נא|אנא|בבקשה)\s+לא\s+(?!לשכוח|לפספס|לאחר|להתעכב)[\u05D0-\u05EA]/.test(String(text || ''))) return { show: false, reason: 'quiet:prohibition', intent };
     if (!intent || !intent.type) {
       // The general classifier found nothing, or only a notice sender. The structural readers the chat card uses run
       // second, each strict about its own shape: a booking told to the person, a pickup with a last day, a reminder or a
@@ -690,7 +767,7 @@ const FlowIncomingJudge = (() => {
   // answer, a look back, a hedge or a promise never matches. Returns { title, dateIso, lang } or null.
   const DOIT_EN = '(?:fill\\s+(?:in|out|up)|upload|renew|submit|complete|register\\s+for|sign\\s+up\\s+for|apply\\s+(?:for|to))';
   const DOIT_HE = '(?:תחדש(?:י|ו)?|לחדש|תעלה|תעלי|תעלו|להעלות|תמלא|תמלאי|תמלאו|למלא|תגיש|תגישי|תגישו|להגיש|תשלים|תשלימי|להשלים|תירשם|תירשמי|להירשם)';
-  const DOIT_NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|forgot|already|never\s*mind|forget\s+it|i'?ll|i\s+will|maybe|might|if\s+you\s+want|cancel(?:l?ed)?|let\s+me\s+know|reply|get\s+back\s+to\s+me|tell\s+me|send\s+me|confirm|whether)\b/i;
+  const DOIT_NO_EN = /\b(?:yesterday|last\s+(?:week|night|time)|forgot|already|never\s*mind|forget\s+it|i'?ll|i\s+will|we'?ll|we\s+will|we\s+are\s+going\s+to|maybe|might|if\s+you\s+want|cancel(?:l?ed)?|let\s+me\s+know|reply|get\s+back\s+to\s+me|tell\s+me|send\s+me|confirm|whether)\b/i;
   const DOIT_NO_HE = /(?:אתמול|שבוע שעבר|שכחתי|כבר\s|אולי|בוטל|לבטל|תגיד לי|תודיע לי|תחזור אלי|תשיב|תאשר|תשלח לי|האם)/;
   function doItTitle(obj) {
     return String(obj || '')
@@ -706,7 +783,7 @@ const FlowIncomingJudge = (() => {
     const reEn = new RegExp(lead + '(?:please\\s+|kindly\\s+)?(?:(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?|you\\s+(?:need|have)\\s+to\\s+|(?:please\\s+)?(?:don\'?t\\s+forget|remember)\\s+to\\s+)?(' + DOIT_EN + '\\b.+)$', 'i');
     // A bare "don't forget to <anything>" is the TASK_ASK reader (labs, off by default); only a named do-it verb is read here.
     const reWait = /\b(?:i(?:'|’)?m|we(?:'|’)?re|i\s+am|we\s+are)\s+waiting\s+for\s+(?:an?\s+|the\s+)?(.+?)\s+from\s+you\b/i;
-    const reHe = new RegExp('^(?:[\\u0590-\\u05FF]{2,12},\\s*)?(?:נא\\s+|אנא\\s+|בבקשה\\s+)?(?:תוכל(?:י|ו)?\\s+)?(' + DOIT_HE + '(?![\\u0590-\\u05FF])(?:\\s+בבקשה)?\\s+\\S.*)$');
+    const reHe = new RegExp('^(?:[\\u0590-\\u05FF]{2,12},\\s*)?(?:תזכורת\\s*[:\\-–]\\s*)?(?:נא\\s+|אנא\\s+|בבקשה\\s+|יש\\s+|עליך\\s+|עליכם\\s+|חובה\\s+)?(?:תוכל(?:י|ו)?\\s+)?(' + DOIT_HE + '(?![\\u0590-\\u05FF])(?:\\s+בבקשה)?\\s+\\S.*)$');
     const reWaitHe = /מחכה\s+ל([\u0590-\u05FF][^\n.!?]*?)\s+ממך(?![\u0590-\u05FF])/;
     for (let k = 0; k < sentences.length; k++) {
       const sent = sentences[k];
@@ -1183,7 +1260,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id));
   }
 
-  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, namedQuietOf, contactsAsk, secondRead, doItOverride, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
+  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, namedQuietOf, contactsAsk, secondRead, groupAddressing, doItOverride, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };

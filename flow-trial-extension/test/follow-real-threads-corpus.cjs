@@ -49,7 +49,7 @@ check('"remove the second clause from the contract" in a real answer is not an o
 
 console.log('\n--- a bounce: the ask never arrived ---\n');
 const BOUNCE_HE = 'המסירה לנמענים או לקבוצות אלו נכשלה: dana@acme.io. כתובת הדואר האלקטרוני שהזנת לא נמצאה. בדוק את הכתובת ונסה לשלוח שוב.';
-const BOUNCE_EN = 'Delivery Status Notification (Failure)\n\nYour message wasn\'t delivered to dana@acme.io because the address couldn\'t be found, or is unable to receive mail.';
+const BOUNCE_EN = 'Delivery Status Notification (Failure)\n\nThis message could not be delivered to dana@acme.io: no such address was found at that domain.';
 for (const [name, text, from] of [['Hebrew', BOUNCE_HE, 'postmaster@acme.io'], ['English', BOUNCE_EN, 'mailer-daemon@googlemail.com'], ['Hebrew, an ordinary sender address', BOUNCE_HE, 'it@acme.io']]) {
   const w = loop(OUT); const rep = F.classifyReply(text, w, { now: NOW, email: from }); const ap = F.applyReply(w, rep, NOW);
   check('a ' + name + ' bounce is its own outcome, not an answer and not an auto-reply', rep.outcome === 'bounced' && ap.bounced === true && !ap.close, [rep.outcome, ap]);

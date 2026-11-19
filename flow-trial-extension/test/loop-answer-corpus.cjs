@@ -14,6 +14,11 @@ const sb = { module: undefined, console };
 vm.createContext(sb);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'loop-answer.js'), 'utf8'), sb, { filename: 'loop-answer.js' });
 const A = vm.runInContext('FlowLoopAnswer', sb);
+// The same reader with core/name-sound.js loaded (one person in two scripts). The first sandbox above has no name-sound: it is "before".
+const sb2 = { module: undefined, console };
+vm.createContext(sb2);
+for (const f of ['name-sound.js', 'loop-answer.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sb2, { filename: f });
+const A2 = vm.runInContext('FlowLoopAnswer', sb2);
 const ON = { aiAskV1: true };
 const TODAY = '2026-10-07'; // a Wednesday; the week runs to Saturday 10 October
 const CTX = { today: TODAY, now: Date.parse('2026-10-07T09:00:00') };
@@ -105,11 +110,9 @@ const REFUSE = [
   'What is my password?',
   'Translate this to French',
   'כמה עולה טיסה לאילת?',
-  'מה עם החשבונית של אבי?', // the same Latin-letter contact, asked in Hebrew
   'How much did I spend last month?',
   'Remind me to call mom',
   'מתי יום ההולדת של דנה?',
-  'מה אבי חייב לי?', // a Hebrew name for a contact written in Latin letters is not matched: refused, not guessed
   ''
 ];
 
@@ -166,6 +169,114 @@ console.log('\n--- a model may read the question, never write the answer ---\n')
   check('a model that throws: refused, never a crash', thrower.refused === true);
   const lies = A.answer(ON, q, LOOPS, Object.assign({}, CTX, { deps: { parse: () => ({ ask: 'owed', person: 'Avi', items: [{ id: 'made-up', line: 'Avi owes you 1,000,000' }], text: 'Avi owes you a million' }) } }));
   check('whatever else the model returns is ignored: the lines come from the loops', ids(lies) === 'inv' && !/million/.test(lies.text), lies.text);
+}
+
+console.log('\n--- one person, two scripts (core/name-sound.js) ---\n');
+{
+  // Hebrew questions about contacts saved in Latin letters, and English questions about contacts saved in Hebrew.
+  const CROSS = [
+    ['מה אבי חייב לי?', 'inv'],
+    ['מה עם החשבונית של אבי?', 'inv'],
+    ['מה אני חייב לאבי?', 'quote'],
+    ['מה אני חייב לדנה?', 'lease'],
+    ['מה דנה חייבת לי?', 'deck'],
+    ['האם נועה אישרה את התו?', 'permit'],
+    ['על מה אני מחכה מיוסי?', 'photos'],
+    ['What do I owe Ronit?', 'hebrew'],
+    ['What does Shai owe me?', 'keys'],
+    ['Is Shai waiting on me?', ''],
+    ['מה פתוח עם לוי?', 'inv,quote']
+  ];
+  let before = 0, after = 0, stray = 0;
+  for (const [q, gold] of CROSS) {
+    const b = A.answer(ON, q, LOOPS, CTX), r = A2.answer(ON, q, LOOPS, CTX);
+    if (!b.refused && ids(b) === gold) before++;
+    if (!r.refused && ids(r) === gold) after++;
+    const g = gold ? gold.split(',') : [];
+    stray += (r.items || []).filter((x) => !g.includes(x.id)).length;
+    check(q + ' -> ' + (gold || 'nothing open'), !r.refused && ids(r) === gold, { got: ids(r), refused: r.refused, reason: r.reason, text: r.text });
+  }
+  console.log(`  cross-script questions answered right: before ${before}/${CROSS.length}, after ${after}/${CROSS.length}; lines outside the gold ${stray}`);
+  check('every cross-script question answered, no stray line', after === CROSS.length && stray === 0, { after, stray });
+  // Two people who sound alike in the other script: a refusal, never a guess.
+  const twins = LOOPS.concat([L('s1', { direction: 'theirs', counterpart: { name: 'Sarah Klein', email: 'sarah@k.com' }, what: 'The floor plan' }),
+    L('s2', { direction: 'theirs', counterpart: { name: 'Shira Gold', email: 'shira@g.com' }, what: 'The guest list' })]);
+  const tw = A2.answer(ON, 'מה שרה חייבת לי?', twins, CTX);
+  check('«שרה» with both a Sarah and a Shira: refused as two people', tw.refused === true && tw.reason === 'ambiguous-person', { reason: tw.reason, ids: ids(tw) });
+  const one = A2.answer(ON, 'מה שרה חייבת לי?', LOOPS.concat([twins[twins.length - 2]]), CTX);
+  check('...with only Sarah: answered', !one.refused && ids(one) === 's1', ids(one));
+  const nobody = A2.answer(ON, 'What does Moshe owe me?', LOOPS, CTX);
+  check('a name no loop knows in either script is still refused', nobody.refused === true, nobody.reason);
+}
+
+console.log('\n--- how much, and when ---\n');
+{
+  // First set: written before the code, yesterday's code scored 5/17 (one of the misses a wrong answer: "How much does Avi owe me?"
+  // read "much" as a topic and said nothing was open with Avi). Second set: written after the first passed, run once: 12/14 with one
+  // line outside the gold («מתי דנה תשלח» gave both of Dana's loops). Both kept here after the fixes. 'REF' = must be refused.
+  const HM = [
+    ['How much does Avi owe me?', 'inv'],
+    ['How much am I owed?', 'inv'],
+    ['How much money is open?', 'inv'],
+    ['כמה אבי חייב לי?', 'inv'],
+    ['כמה כסף מגיע לי?', 'inv'],
+    ['How much do I owe?', ''],
+    ['How much does Dana owe me?', ''],
+    ['When is the lease due?', 'lease'],
+    ['When do I need to send the quote?', 'quote'],
+    ['When did Dana promise the deck?', 'deck'],
+    ['When is the parking permit due?', 'permit'],
+    ['מתי צריך לשלוח את הצעת המחיר?', 'hebrew'],
+    ['עד מתי אני צריך לענות לדנה?', 'lease'],
+    ['When will Yossi send the photos?', 'photos'],
+    ['מתי צריך לשלוח את החוזה?', 'REF'],
+    ['How much is a flight to Rome?', 'REF'],
+    ['מה עם התו?', 'REF'],
+    ['How much is still owed to me?', 'inv'],
+    ["What's the total I'm owed?", "inv"],
+    ['כמה מגיע לי מאבי?', 'inv'],
+    ['How much does Yossi owe me?', ''],
+    ["When's the lease due?", "lease"],
+    ['By when do I have to answer Ronit?', 'hebrew'],
+    ['When should Noa approve the permit?', 'permit'],
+    ['מתי דנה תשלח את המצגת?', 'deck'],
+    ['מתי אני צריך לשלוח לאבי את ההצעה?', 'quote'],
+    ['When is the invoice due?', 'inv'],
+    ['When is my dentist appointment?', 'REF'],
+    ['כמה עולה החשמל?', 'REF'],
+    ['How much did I spend on lunch?', 'REF'],
+    ['When does the store close?', 'REF']
+  ];
+  let right = 0, stray = 0;
+  for (const [q, gold] of HM) {
+    const r = A2.answer(ON, q, LOOPS, CTX);
+    const got = ids(r);
+    const ok = gold === 'REF' ? r.refused === true : (!r.refused && got === gold);
+    if (ok) right++;
+    const g = gold === 'REF' || !gold ? [] : gold.split(',');
+    stray += (r.items || []).filter((x) => !g.includes(x.id)).length;
+    check(q + ' -> ' + (gold === 'REF' ? 'refused' : gold || 'nothing open'), ok, { got, refused: r.refused, reason: r.reason, text: r.text });
+  }
+  console.log(`  how much / when: ${right}/${HM.length} right; lines outside the gold ${stray}`);
+  check('no line outside the gold', stray === 0, stray);
+  const avi = A2.answer(ON, 'How much does Avi owe me?', LOOPS, CTX);
+  check('the total is the loop\'s own figure, per currency', avi.totals && avi.totals.length === 1 && avi.totals[0].currency === 'ILS' && avi.totals[0].value === 4200 && /Total: 4,200 ILS$/.test(avi.text), avi);
+  const he = A2.answer(ON, 'כמה כסף מגיע לי?', LOOPS, CTX);
+  check('Hebrew total', /סך הכל: 4,200 ILS$/.test(he.text), he.text);
+  const money = [
+    L('m1', { direction: 'theirs', kind: 'payment', amount: { value: 1000, currency: 'ILS' }, counterpart: { name: 'A' }, what: 'Rent' }),
+    L('m2', { direction: 'theirs', kind: 'payment', amount: { value: 250.5, currency: 'ILS' }, counterpart: { name: 'B' }, what: 'Deposit' }),
+    L('m3', { direction: 'theirs', kind: 'payment', amount: { value: 300, currency: 'usd' }, counterpart: { name: 'C' }, what: 'Consulting' }),
+    L('m4', { direction: 'theirs', kind: 'payment', amount: null, counterpart: { name: 'D' }, what: 'The repair payment' }),
+    L('m5', { direction: 'theirs', kind: 'payment', amount: { value: 10, currency: 'ILS' }, counterpart: { name: 'E' }, what: 'Coffee' }),
+    L('m6', { direction: 'theirs', kind: 'payment', amount: { value: 20, currency: 'ILS' }, counterpart: { name: 'F' }, what: 'Parking' }),
+    L('m7', { direction: 'theirs', kind: 'payment', amount: { value: 5000, currency: 'ILS' }, counterpart: { name: 'G' }, what: 'Old invoice', status: 'resolved', closedAs: 'paid' })
+  ];
+  const t = A2.answer(ON, 'How much am I owed?', money, CTX);
+  check('two currencies stay apart, a closed loop is not counted, a loop with no figure is named, every fitting loop counts (not only the five shown)',
+    t.items.length === 5 && t.more === 1 && JSON.stringify(t.totals) === JSON.stringify([{ currency: 'ILS', value: 1280.5 }, { currency: 'USD', value: 300 }]) && /Total: 1,280.5 ILS \+ 300 USD\n1 without a figure\.$/.test(t.text), { totals: t.totals, text: t.text });
+  const nodate = A2.answer(ON, 'When will Yossi send the photos?', LOOPS, CTX);
+  check('a loop with no date says so, never a guessed date', /\(no date set\)$/.test(nodate.text), nodate.text);
 }
 
 console.log('\n--- the switch ---\n');
