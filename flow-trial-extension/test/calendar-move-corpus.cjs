@@ -64,7 +64,7 @@ const ev = (extra) => Object.assign({
   id: 'ev1', etag: '"e1"', status: 'confirmed', summary: 'Sync with Dana',
   start: { dateTime: '2026-09-18T15:00:00+03:00', timeZone: TZ },
   end: { dateTime: '2026-09-18T15:45:00+03:00', timeZone: TZ },
-  organizer: { email: 'sali@realtrade.co.il', self: true }
+  organizer: { email: 'sali@example.com', self: true }
 }, extra || {});
 const intent = moves[0];
 const p = (events, extra) => M.plan(Object.assign({ flags: ON, intent, events, now: NOW_MS }, extra || {}));
@@ -79,8 +79,8 @@ check('Hebrew line', /^הזזת ביומן: /.test(M.plan({ flags: ON, intent: m
 check('no event at the old clock: silence', p([ev({ start: { dateTime: '2026-09-18T14:00:00+03:00', timeZone: TZ } })]).reason === 'no-event');
 check('two events at the old clock: silence', p([ev(), ev({ id: 'ev2', etag: '"e2"' })]).reason === 'several-events');
 check('a cancelled event does not count', p([ev(), ev({ id: 'ev2', status: 'cancelled' })]).action === 'move');
-check('guests: silence (moving would send them an update)', p([ev({ attendees: [{ email: 'sali@realtrade.co.il', self: true }, { email: 'dana@meridian.com' }] })]).reason === 'has-guests');
-check('only me and a room: moves', p([ev({ attendees: [{ email: 'sali@realtrade.co.il', self: true }, { email: 'room@resource.calendar.google.com', resource: true }] })]).action === 'move');
+check('guests: silence (moving would send them an update)', p([ev({ attendees: [{ email: 'sali@example.com', self: true }, { email: 'dana@meridian.com' }] })]).reason === 'has-guests');
+check('only me and a room: moves', p([ev({ attendees: [{ email: 'sali@example.com', self: true }, { email: 'room@resource.calendar.google.com', resource: true }] })]).action === 'move');
 check('someone else organizes it: silence', p([ev({ organizer: { email: 'dana@meridian.com', self: false } })]).reason === 'not-organizer');
 check('recurring: silence', p([ev({ recurringEventId: 'series1' })]).reason === 'recurring');
 check('no etag: silence', p([ev({ etag: undefined })]).reason === 'no-event-id');

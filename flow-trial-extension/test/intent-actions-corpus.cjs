@@ -365,13 +365,13 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('HE: commitment to send a receipt, no anchor -> COMMITMENT_OF_READER', heNoAnchorCommit.type === FlowIntent.TYPES.COMMITMENT_OF_READER, heNoAnchorCommit.type);
   check('HE: no-anchor commitment gets medium confidence', heNoAnchorCommit.confidence === 'medium', heNoAnchorCommit.confidence);
 
-  // The polite Hebrew request put as a question («האם ניתן ל<פועל> ... עד <יום>?») and «אשמח אם תשלח ...» (found on a real professional inbox, 2026-11-18; written for this file).
-  for (const t of ['האם ניתן לשלוח לי את הדוח המעודכן עד יום חמישי?', 'האם ניתן לשלוח לי את הדוח הרבעוני עד מחר?']) {
+  // The polite Hebrew request put as a question («האם ניתן ל<פועל> ... עד <יום>?») and «אשמח אם תשלח ...» (invented wording for this file).
+  for (const t of ['האם ניתן לשלוח לי את הטיוטה האחרונה עד יום רביעי?', 'האם ניתן לשלוח לי את הדוח הרבעוני עד מחר?']) {
     const c = classify(t);
     check('HE: «האם ניתן ל<פועל> ... עד <יום>?» is a request: ' + t.slice(0, 26), c.type === FlowIntent.TYPES.REQUEST, c.type);
   }
   check('HE: «האם ניתן לראות איך זה נראה?» (no action on a deliverable, no day) stays quiet', classify('האם ניתן לראות איך זה נראה?').type === null);
-  // «כדי שתוכלו לבוא ... ולשלם» is a purpose clause («so that you can»), not «תוכלו» as a request (found on a real professional inbox, 2026-11-18).
+  // «כדי שתוכלו לבוא ... ולשלם» is a purpose clause («so that you can»), not «תוכלו» as a request (invented wording for this file).
   check('HE: «כדי שתוכלו לבוא לקחת אותם ובאותו זמן לשלם» is not a request', classify('החוזים נשלחו לדפוס. אעדכן כשהעותקים יגיעו אליי כדי שתוכלו לבוא לקחת אותם ובאותו זמן לשלם על ההדפסה.').type === null);
   check('HE: «תוכלו לשלוח לי את המסמך עד מחר?» is still a request', classify('תוכלו לשלוח לי את המסמך עד מחר?').type === FlowIntent.TYPES.REQUEST);
   check('HE: «אנא עדכנו שבוצע עד מחר» is a request', classify('אנא עדכנו שבוצע עד מחר.').type === FlowIntent.TYPES.REQUEST);

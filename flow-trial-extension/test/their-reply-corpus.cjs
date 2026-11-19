@@ -61,7 +61,7 @@ console.log('\n--- only their own reply, in that thread, after you asked ---\n')
 check('switch off: off', T.plan({ loop: loop(), thread: thread(msg('m1', 'Approved.')) }).action === 'off');
 check('switch "true": off', T.plan({ flags: { THEIR_REPLY_PROOF: 'true' }, loop: loop(), thread: thread(msg('m1', 'Approved.')) }).action === 'off');
 check('someone else: no reply', p(loop(), thread(msg('m1', 'Approved.', { from: 'eve@other.co' }))).reason === 'no-reply');
-check('the person themselves: no reply', p(loop(), thread(msg('m1', 'Approved.', { from: 'sali@realtrade.co.il' }))).reason === 'no-reply');
+check('the person themselves: no reply', p(loop(), thread(msg('m1', 'Approved.', { from: 'sali@example.com' }))).reason === 'no-reply');
 check('another thread: no reply', p(loop(), thread(msg('m1', 'Approved.', { threadId: 'th2' }))).reason === 'no-reply');
 check('before the ask: no reply', p(loop(), thread(msg('m1', 'Approved.', { dateMs: T0 - MIN }))).reason === 'no-reply');
 check('their draft: no reply', p(loop(), thread(msg('m1', 'Approved.', { labelIds: ['DRAFT'] }))).reason === 'no-reply');

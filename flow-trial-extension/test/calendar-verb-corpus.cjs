@@ -21,7 +21,7 @@ const J = vm.runInContext('FlowIncomingJudge', sb);
 const X = vm.runInContext('FlowExtract', sb);
 const DEPS = { intent: vm.runInContext('FlowIntent', sb), actions: vm.runInContext('FlowActions', sb), factReply: vm.runInContext('FlowFactReply', sb), fileAttach: vm.runInContext('FlowFileAttach', sb),
   resolution: vm.runInContext('FlowResolution', sb), quietMetrics: vm.runInContext('FlowQuietMetrics', sb) };
-const OWN = 'ai.local.flow@gmail.com';
+const OWN = 'owner@example.com';
 function judge(text, extra) {
   return J.judge(Object.assign({ text, subject: 'Quote', sender: { name: 'Dana Levi', email: 'dana@acme.io' }, now: new Date(NOW), threadUrl: 'https://mail.google.com/x', hasThreadAttachment: false,
     attachmentCount: 0, surface: 'gmail', to: [OWN], cc: [], ownAddresses: [OWN], ownNames: ['Sali', 'Sali Sapan', 'סאלי'], userName: 'Sali', direction: 'inbound', inbound: true, namesWaitDone: true, directAskOn: true }, extra || {}), DEPS);

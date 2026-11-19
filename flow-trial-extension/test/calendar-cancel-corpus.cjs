@@ -62,7 +62,7 @@ const ev = (extra) => Object.assign({
   id: 'ev1', etag: '"e1"', status: 'confirmed', summary: 'Sync with Dana',
   start: { dateTime: '2026-09-18T15:00:00+03:00', timeZone: TZ },
   end: { dateTime: '2026-09-18T15:45:00+03:00', timeZone: TZ },
-  organizer: { email: 'sali@realtrade.co.il', self: true }
+  organizer: { email: 'sali@example.com', self: true }
 }, extra || {});
 const intent = cancels[0];
 const p = (events, extra) => C.plan(Object.assign({ flags: ON, intent, events, now: NOW_MS }, extra || {}));
@@ -74,8 +74,8 @@ check('English line', good.line === 'Cancel on your calendar: Sync with Dana on 
 check('Hebrew line', /^ביטול ביומן: /.test(p([ev()], { lang: 'he' }).line));
 check('no event at that clock: silence', p([ev({ start: { dateTime: '2026-09-18T14:00:00+03:00' } })]).reason === 'no-event');
 check('two events: silence', p([ev(), ev({ id: 'ev2', etag: '"e2"' })]).reason === 'several-events');
-check('guests: silence (would send a cancellation)', p([ev({ attendees: [{ email: 'sali@realtrade.co.il', self: true }, { email: 'dana@meridian.com' }] })]).reason === 'has-guests');
-check('only me and a room: cancel', p([ev({ attendees: [{ self: true, email: 'sali@realtrade.co.il' }, { email: 'room@resource.calendar.google.com', resource: true }] })]).action === 'cancel');
+check('guests: silence (would send a cancellation)', p([ev({ attendees: [{ email: 'sali@example.com', self: true }, { email: 'dana@meridian.com' }] })]).reason === 'has-guests');
+check('only me and a room: cancel', p([ev({ attendees: [{ self: true, email: 'sali@example.com' }, { email: 'room@resource.calendar.google.com', resource: true }] })]).action === 'cancel');
 check('someone else organizes it: silence', p([ev({ organizer: { email: 'dana@meridian.com', self: false } })]).reason === 'not-organizer');
 check('recurring: silence', p([ev({ recurringEventId: 's1' })]).reason === 'recurring');
 check('past: silence', C.plan({ flags: ON, intent, events: [ev()], now: Date.parse('2026-10-01T00:00:00Z') }).reason === 'past');

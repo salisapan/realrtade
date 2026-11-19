@@ -298,7 +298,7 @@ check('"it arrived, please check back in a few days" waits, never closes', cr('T
 check('a real confirmation still closes («הפרופיל הוסר»)', cr('הבקשה טופלה. הפרופיל הוסר והמסמך נמחק.', replyW).outcome === 'closed');
 check('a plain yes with "please let me know if anything else" still closes', cr('Approved. Please let me know if you need anything else.', replyW).outcome === 'closed', cr('Approved. Please let me know if you need anything else.', replyW));
 
-console.log('\n--- formal Hebrew asks of an office (found on a real professional sent box, 2026-11-18; written for this file, no real text) ---\n');
+console.log('\n--- formal Hebrew asks of an office (invented wording for this file) ---\n');
 for (const [name, text] of [
   ['«ממתין ממך ל<מסמך>»', 'סיימתי את הסקירה, מצורף הסיכום.\nממתין ממך לחוזה המעודכן שעליו אחתום, ולכל דבר נוסף שיידרש.\nבברכה,'],
   ['«ממתינים לתשובתכם»', 'שלום רב,\nבהמשך לפנייתנו מהשבוע שעבר אנו ממתינים לתשובתכם בנושא הנספחים.\nבברכה,'],
