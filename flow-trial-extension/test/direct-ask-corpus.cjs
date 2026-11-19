@@ -208,6 +208,13 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   for (const t of ['שלום,\n\nהוא שלח לי את הנתונים המעודכנים.\n\nבברכה', 'שלום,\n\nטרם קיבלנו את המשלוח מהספק.\n\nבברכה', 'היי,\n\nתוכל להשיב לדנה אם נוח לה, אנחנו רק מעדכנים.']) {
     const r = judge(t); check('round-2 contrast stays quiet: ' + t.split('\n').filter(Boolean).slice(-1)[0].slice(0, 28), !r.show, kinds(r));
   }
+  // Round 4 (real-mail dev set, 2026-11-19; invented sentences): modal ask with a work or send verb, plain imperatives with «בבקשה», «לטיפולכם» alone under the named work.
+  for (const t of ['היי סאלי,\n\nתוכל לבדוק מול הספק אם הגיע האישור?\n\nתודה', 'סאלי שלום,\n\nתוכל בבקשה להעביר אליו את הטפסים?\n\nתודה', 'שלום,\n\nבבקשה תדבר איתו על התיאום.\n\nתודה', 'שלום,\n\nבבקשה תרשמו את ההערה בתיק.\n\nבברכה']) {
+    const r = judge(t); check('round-4 ask offers: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const t of ['שלום,\n\nהוא יכול לבדוק מול הספק אם הגיע האישור.\n\nבברכה', 'שלום,\n\nהם דיברו איתו על התיאום בבוקר.\n\nבברכה']) {
+    const r = judge(t); check('round-4 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
 }
 
 console.log('\nTOTAL FAILURES:', failures);
