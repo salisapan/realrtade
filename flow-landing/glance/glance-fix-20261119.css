@@ -1,0 +1,157 @@
+/* Glance local fix 2026-11-19. Loaded last on glance.html and glance-en.html.
+   1. Hide the floating hero step pill; drop blue row fills; keep Flow-like Do It / done states.
+   2. Tighter “A day with Glance” heading and phone card scale.
+   3. Flow B3 black→blue headlines in reading direction (90deg LTR, 270deg RTL). */
+
+/* ---- 1 · remove the floating step bar entirely (all languages, all widths) ---- */
+.h21-steps{display:none!important}
+@media (max-width:760px){
+  .h21-cap{display:none!important}
+}
+
+/* ---- 1 · no blue highlight fills or underline bars on hero tool rows ---- */
+.h21-card .act .act-row::after,
+.h21-card[data-state="working"] .act .act-row::after,
+.h21-card .act:not(.act-close) .act-row::after{
+  content:none!important;
+  display:none!important;
+  opacity:0!important;
+  background:none!important;
+  width:0!important;
+}
+.act.is-active .act-row,
+html[data-theme="dark"] .act.is-active .act-row{
+  background:transparent!important;
+}
+
+/* ---- 3 · Flow H1 gradient (tokens from assets/flow-review-fixes.css .fx-gw) ---- */
+html body .h21-h1 em,
+html body .cta21-h em,
+html body .ints-h em,
+html body .creed-h em,
+html body .s21-h em,
+html body .mj-h em,
+html body .day21-h em,
+html body .bn21-h em,
+html body .h21-end-h em,
+html body .h21-h1 .h1-echo em{
+  font-style:italic;
+  font-weight:600!important;
+  background-image:linear-gradient(90deg,#1d2433 0%,#1F46D6 62%,#2D5EFF 100%)!important;
+  background-size:100% 100%!important;
+  background-repeat:no-repeat!important;
+  background-position:0 0!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  color:transparent!important;
+  -webkit-text-fill-color:transparent!important;
+  animation:none!important;
+  filter:none!important;
+  padding-inline:.04em .1em;
+  margin-inline:-.04em -.1em;
+  -webkit-box-decoration-break:clone;
+  box-decoration-break:clone;
+}
+html[lang="he"] body .h21-h1 em,
+html[lang="he"] body .cta21-h em,
+html[lang="he"] body .ints-h em,
+html[lang="he"] body .creed-h em,
+html[lang="he"] body .s21-h em,
+html[lang="he"] body .mj-h em,
+html[lang="he"] body .day21-h em,
+html[lang="he"] body .bn21-h em,
+html[lang="he"] body .h21-end-h em,
+html[lang="he"] body .h21-h1 .h1-echo em,
+html[data-ui="he"] body .h21-h1 em,
+html[data-ui="he"] body .cta21-h em,
+html[data-ui="he"] body .ints-h em,
+html[data-ui="he"] body .creed-h em,
+html[data-ui="he"] body .s21-h em,
+html[data-ui="he"] body .mj-h em,
+html[data-ui="he"] body .day21-h em,
+html[data-ui="he"] body .bn21-h em,
+html[data-ui="he"] body .h21-end-h em,
+html[data-ui="he"] body .h21-h1 .h1-echo em,
+html[dir="rtl"] body .h21-h1 em,
+html[dir="rtl"] body .cta21-h em,
+html[dir="rtl"] body .ints-h em,
+html[dir="rtl"] body .creed-h em,
+html[dir="rtl"] body .s21-h em,
+html[dir="rtl"] body .mj-h em,
+html[dir="rtl"] body .day21-h em,
+html[dir="rtl"] body .bn21-h em,
+html[dir="rtl"] body .h21-end-h em,
+html[dir="rtl"] body .h21-h1 .h1-echo em{
+  font-style:normal!important;
+  font-synthesis:none;
+}
+html[dir="rtl"]:not([data-theme="dark"]) body .h21-h1 em,
+html[dir="rtl"]:not([data-theme="dark"]) body .cta21-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .ints-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .creed-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .s21-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .mj-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .day21-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .bn21-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .h21-end-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .h21-h1 .h1-echo em{
+  background-image:linear-gradient(270deg,#1d2433 0%,#1F46D6 62%,#2D5EFF 100%)!important;
+}
+html[data-theme="dark"] body .h21-h1 em,
+html[data-theme="dark"] body .cta21-h em,
+html[data-theme="dark"] body .ints-h em,
+html[data-theme="dark"] body .creed-h em,
+html[data-theme="dark"] body .s21-h em,
+html[data-theme="dark"] body .mj-h em,
+html[data-theme="dark"] body .day21-h em,
+html[data-theme="dark"] body .bn21-h em,
+html[data-theme="dark"] body .h21-end-h em,
+html[data-theme="dark"] body .h21-h1 .h1-echo em,
+html[data-theme="dark"] body .h21-h1 .h1-echo{
+  background-image:linear-gradient(90deg,#EEF2F9 0%,#5B8CFF 62%,#2D5EFF 100%)!important;
+  filter:none!important;
+}
+html[dir="rtl"][data-theme="dark"] body .h21-h1 em,
+html[dir="rtl"][data-theme="dark"] body .cta21-h em,
+html[dir="rtl"][data-theme="dark"] body .ints-h em,
+html[dir="rtl"][data-theme="dark"] body .creed-h em,
+html[dir="rtl"][data-theme="dark"] body .s21-h em,
+html[dir="rtl"][data-theme="dark"] body .mj-h em,
+html[dir="rtl"][data-theme="dark"] body .day21-h em,
+html[dir="rtl"][data-theme="dark"] body .bn21-h em,
+html[dir="rtl"][data-theme="dark"] body .h21-end-h em,
+html[dir="rtl"][data-theme="dark"] body .h21-h1 .h1-echo em,
+html[dir="rtl"][data-theme="dark"] body .h21-h1 .h1-echo{
+  background-image:linear-gradient(270deg,#EEF2F9 0%,#5B8CFF 62%,#2D5EFF 100%)!important;
+}
+
+/* ---- 2 · tighter day section, especially on the phone ---- */
+.day21-h{font-size:clamp(28px,3.6vw,48px)}
+.day21-sub{font-size:15px;margin-top:6px;max-width:28em}
+@media (max-width:760px){
+  .day21{padding:56px 0 56px}
+  .day21-head{margin-bottom:16px;align-items:flex-start}
+  .day21-h{font-size:26px;line-height:1.12;letter-spacing:-.02em}
+  .he .day21-h{letter-spacing:-.015em}
+  .day21-sub{font-size:14px;line-height:1.35;margin-top:6px}
+  .day21-card{
+    flex-basis:min(340px,86vw);
+    padding:16px 16px 14px;
+    gap:10px;
+    border-radius:20px;
+  }
+  .day21-card time{font-size:22px}
+  .day21-ask{font-size:17px;line-height:1.28}
+  .day21-acts li{min-height:36px;padding:7px 10px;font-size:12.5px;gap:8px}
+  .day24-av{width:28px;height:28px;font-size:10px}
+  .day24-mark{width:18px;height:18px}
+  .day24-mark svg{width:16px;height:16px}
+  .day21-rcpt{font-size:12px;padding-top:2px}
+  .day21-track{--pad:16px;gap:10px;padding-block:4px 18px}
+}
+@media (max-width:359px){
+  html:is([lang="de"],[lang="fr"],[lang="es"]) .day21-h{font-size:22px}
+  .day21-h{font-size:24px}
+  .day21-card{flex-basis:88vw;padding:14px 14px 12px}
+  .day21-ask{font-size:16px}
+}

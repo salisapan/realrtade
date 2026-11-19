@@ -1,0 +1,24 @@
+/* Glance hero scroll port 2026-11-19 (local). Loaded after glance-fix-20261119.css.
+   Pin length per beat matched to Flow's home hero (#hero --len, ScrollTrigger scrub .35, Lenis lerp .1 on desktop).
+   Old: 325vh desktop / 300vh phone. Reduced motion keeps the static hero (html.h21-static). */
+html:not(.h21-static) .h21{height:360vh}
+@media (max-width:760px){html:not(.h21-static) .h21{height:340vh}}
+.h21-win{transform-origin:50% 0}
+/* Lenis (same base rules as Flow) */
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-smooth [data-lenis-prevent]{overscroll-behavior:contain}
+.lenis.lenis-stopped{overflow:hidden}
+/* 19.11 r2: phones scale the hero card from its top edge (fit-to-screen camera in glance-all-scroll-20261119.js) */
+@media (max-width:760px){
+  .h21-card,[dir="rtl"] .h21-card{transform-origin:50% 0}
+}
+/* short phones (e.g. 320x568, 375x667): a slightly tighter card so less scaling is needed */
+@media (max-width:760px) and (max-height:700px){
+  .h21-card .glance-surface{padding:10px 10px 8px}
+  .h21-card .gs-intent{margin:0 0 6px}
+  .h21-card .acts-head{margin-bottom:6px}
+  .h21-card ol.acts{gap:4px;margin-bottom:8px}
+  .h21-card .act-row{padding:6px 8px;column-gap:9px}
+  .h21-card .chip{padding:7px 9px;margin:8px 0 4px}
+}

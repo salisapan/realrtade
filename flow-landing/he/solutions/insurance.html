@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+
+<html class="i18n-he" data-page-lang="he" data-ui="he" dir="rtl" lang="he">
+<head><base href="/solutions/"/>
+
+<meta charset="utf-8"/>
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest"><link href="https://theflow-ai.com/he/solutions/insurance" rel="canonical"/><link href="https://theflow-ai.com/solutions/insurance" hreflang="en" rel="alternate"/><link href="https://theflow-ai.com/he/solutions/insurance" hreflang="he" rel="alternate"/><link href="https://theflow-ai.com/solutions/insurance?lang=de" hreflang="de" rel="alternate"/><link href="https://theflow-ai.com/solutions/insurance?lang=fr" hreflang="fr" rel="alternate"/><link href="https://theflow-ai.com/solutions/insurance?lang=es" hreflang="es" rel="alternate"/><link href="https://theflow-ai.com/solutions/insurance" hreflang="x-default" rel="alternate"/><meta content="he_IL" property="og:locale"/><meta content="en_US" property="og:locale:alternate"/>
+<meta content="light dark" name="color-scheme"/>
+<meta content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5" name="viewport"/>
+<meta content="AI לסוכני ביטוח: Flow מכינה קליטת לקוחות, חידושים ועדכוני מערכות מתוך המייל של הסוכנות, והסוכן מאשר כל צעד. ענן ממוסך, Flow-Edge או Flow-Onprem." name="description"/>
+<meta content="#07090F" name="theme-color"/>
+<title>AI לסוכני ביטוח: אוטומציה שהסוכן מאשר | Flow</title>
+<meta content="website" property="og:type"/>
+<meta content="AI לסוכני ביטוח: אוטומציה שהסוכן מאשר | Flow" property="og:title"/>
+<meta content="AI לסוכני ביטוח: Flow מכינה קליטת לקוחות, חידושים ועדכוני מערכות מתוך המייל של הסוכנות, והסוכן מאשר כל צעד. ענן ממוסך, Flow-Edge או Flow-Onprem." property="og:description"/>
+<meta content="https://theflow-ai.com/he/solutions/insurance" property="og:url"/>
+<meta content="https://theflow-ai.com/og.jpg" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="AI לסוכני ביטוח: אוטומציה שהסוכן מאשר | Flow" name="twitter:title"/>
+<meta content="AI לסוכני ביטוח: Flow מכינה קליטת לקוחות, חידושים ועדכוני מערכות מתוך המייל של הסוכנות, והסוכן מאשר כל צעד. ענן ממוסך, Flow-Edge או Flow-Onprem." name="twitter:description"/>
+<meta content="https://theflow-ai.com/og.jpg" name="twitter:image"/>
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat — which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+</style>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var go=function(h,c){var a=document.querySelector('link[rel="alternate"][hreflang="'+h+'"]');if(!a)return false;try{localStorage.setItem('flow.lang',c)}catch(e){}q.delete('lang');var p=new URL(a.href).pathname,qs=q.toString();location.replace(p+(qs?'?'+qs:'')+location.hash);return true};var l=q.get('lang');if(l&&l!=='he'&&L.indexOf(l)>=0&&go('en',l))return;l='he';d.dataset.ui=l;var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<link as="font" crossorigin="" href="../assets/fonts/intertight-latin.woff2" rel="preload" type="font/woff2"/><link rel="preload" href="../assets/fonts/heebo-hebrew.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="../assets/fonts/heebo-num.woff2" as="font" type="font/woff2" crossorigin><link href="../assets/flow-header.css" rel="stylesheet"/>
+<link href="../assets/flow-booking.css" rel="stylesheet"/>
+<link href="../assets/flow-inner.css" rel="stylesheet"/>
+<link href="../assets/flow-review-fixes.css?b=1" rel="stylesheet"/>
+<link href="../assets/flow-rich.css" rel="stylesheet"/>
+<link href="../samples/hero-samples.css" rel="stylesheet"/>
+<link href="../samples/v3.css" rel="stylesheet"/>
+<link href="../samples/v5.css" rel="stylesheet"/><link href="../assets/flow-sol-v3.css" rel="stylesheet"/><link href="../assets/flow-sol-v4.css" rel="stylesheet"/><link href="../assets/flow-orbit-v7.css" rel="stylesheet"/><link href="../assets/flow-sol-v9-pages.css?b=19" rel="stylesheet"/><link href="../assets/r15/dep-home.css?b=1" rel="stylesheet"/><link href="../assets/r15/dep-phone.css?b=1" rel="stylesheet"/><link href="../assets/r15/r15.css?b=1" rel="stylesheet"/><link href="../assets/r15/r14s.css?b=1" rel="stylesheet"/><link href="../assets/r15/stack.css?b=1" rel="stylesheet"/><link href="../assets/r15/procnav.css?b=1" rel="stylesheet"/><link href="../assets/r15/r15-dark.css?b=1" rel="stylesheet"/>
+<link href="../assets/r15/r15-contrast.css?b=3" rel="stylesheet"/><link href="../assets/r15/prof.css?b=1" rel="stylesheet"/>
+<noscript><style>.rich .rv{opacity:1!important;transform:none!important}.rich .w>span{transform:none!important}.rich .tier{opacity:1!important;transform:none!important}.rich .sf .sw{opacity:1}</style></noscript>
+<script>document.documentElement.classList.add("rich")</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/", "logo": "https://theflow-ai.com/logo.png"}</script><script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"דף הבית","item":"https://theflow-ai.com/he/"},{"@type":"ListItem","position":2,"name":"פתרונות","item":"https://theflow-ai.com/he/solutions"},{"@type":"ListItem","position":3,"name":"סוכני ביטוח","item":"https://theflow-ai.com/he/solutions/insurance"}]}</script><style id="perf1112">.rich .rv{transition-duration:.5s,.55s}.rich .rv:not(.in){transform:translateY(14px)}#r14s#r14s .stk>.sc[style*="opacity: 0;"]{animation:none!important}</style>
+<link href="../assets/r15/prof-320.css?b=1" rel="stylesheet"/>
+<link href="../assets/r15/doit-match.css?b=2" rel="stylesheet"/>
+<script defer src="/assets/flow-consent.js"></script></head>
+<body>
+<a class="skip-link" href="/he/solutions/insurance#main">דלג לתוכן</a>
+<div class="ctl" id="ctl">
+<div class="lang">
+<button aria-controls="langMenu" aria-expanded="false" aria-haspopup="menu" aria-label="שפה" id="langBtn" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" viewbox="0 0 16 16"><circle cx="8" cy="8" r="6.4"></circle><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"></path></svg>
+<span class="sr-only" id="langName">עברית</span>
+</button>
+<div aria-labelledby="langBtn" class="menu" id="langMenu" role="menu"></div>
+</div>
+<button aria-label="מצב לילה" aria-pressed="false" class="theme" id="themeBtn" type="button">
+<svg aria-hidden="true" class="sun" fill="none" stroke="currentColor" stroke-width="1.3" viewbox="0 0 16 16"><circle cx="8" cy="8" r="3"></circle><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"></path></svg>
+<svg aria-hidden="true" class="moon" fill="none" stroke="currentColor" stroke-width="1.3" viewbox="0 0 16 16"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"></path></svg>
+</button>
+</div>
+<flow-header data-base="../"></flow-header>
+<main class="rc hs v3 x3m x4m x9m x4-prof x4-ins" dir="rtl" id="main" lang="he"><section class="r15-hero" aria-labelledby="r15h1"><div class="r15-in"><h1 class="r15-h1" id="r15h1" data-he="&lt;b&gt;כל מה שסביב הפוליסה מוכן,&lt;/b&gt; &lt;span class=&quot;fx-gw&quot;&gt;אתם רק מאשרים&lt;/span&gt;"><b>כל מה שסביב הפוליסה מוכן,</b> <span class="fx-gw">אתם רק מאשרים</span></h1><p class="r15-sub" data-he="Flow עובדת לצד המערכות שכבר יש לכם">Flow עובדת לצד המערכות שכבר יש לכם</p><a class="doit r15-cta" data-book="" data-ga="sol_insurance_hero" href="/he/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-he="קבעו שיחה">קבעו שיחה</span></a></div><div id="r14s" class="r15-stage"><script>(function(w){var q=new URLSearchParams(location.search),f=q.get("f"),v=q.get("v"),ai=q.get("ai"),rm=matchMedia("(prefers-reduced-motion: reduce)").matches;w.dataset.f=f||(rm?"3":"0");if(v)w.dataset.v=v;w.dataset.ai=ai==="2"?"2":"1";if(rm)w.classList.add("rm");if(q.get("state")==="done")w.dataset.state="done"})(document.getElementById("r14s"))</script><section class="r14" id="r14" aria-roledescription="carousel">
+<div class="track">
+<div class="slide is-active" data-m="1" aria-label="ביטול פוליסה">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">ביטוח בריאות · דוגמה</p>
+        <h2 class="h1">עוד 21 יום לביטול הפוליסה</h2>
+      </div>
+      <p class="lead">הוראת הקבע לא נפרעה, ו־Flow הכינה את ההמשך</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> קראה, בדקה והכינה, ואתם מאשרים בלחיצה אחת</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/surense.webp" width="18" height="18" decoding="async"/> שורנס<span class="ord" aria-hidden="true">3</span></div><p class="k">תיק לקוח</p><p class="t">יואב ברק</p><ul class="lw-fields"><li class="lw-f"><span class="k">פוליסה</span><span class="v">ביטוח בריאות</span></li><li class="lw-f"><span class="k">סטטוס</span><span class="v">הוראת קבע לא נפרעה</span></li><li class="lw-pair"><span class="lw-f"><span class="k">ביטול</span><span class="v"><span class="num">1.12.2026</span></span></span><span class="lw-f"><span class="k">סימון</span><span class="v"><span class="lw-status">דחוף</span></span></span></li></ul><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">נוסף על ידי <span dir="ltr">Flow · 08:14</span></span></p></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-mail"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">1</span></div><h3>הודעה לפני ביטול פוליסה</h3><p class="from"><b>מחלקת הגבייה</b><span class="num"><span class="num">10.11.2026 08:12</span></span></p><p class="meta">חברת הביטוח · יואב ברק</p><div class="att"><span class="fi pdf" aria-hidden="true">PDF</span><b class="rtl">הודעת ביטול · יואב ברק</b><small dir="ltr">186 KB</small></div><blockquote class="ol-quote">הוראת הקבע לא נפרעה. הפוליסה תבוטל ב־<u><span class="num">1.12.2026</span></u>.</blockquote></div><div class="tile tile-draft"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">3</span></div><p class="draft-pill">טיוטה · לא נשלח</p><p class="draft-to"><span class="k">אל</span><b>מחלקת הגבייה</b></p><p class="draft-subj">יואב ברק · בקשה לעצור את הביטול</p><p class="draft-body">נבקש לעצור את הביטול ולבצע חיוב חוזר</p><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">נוסף על ידי <span dir="ltr">Flow · 08:14</span></span></p></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>מחלקת גבייה</b><span class="num">08:12</span></p>
+              <h3 class="ph-mail-subj">הודעה לפני ביטול פוליסה</h3>
+              <p class="ph-mail-meta">יואב ברק · ביטוח בריאות</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> בדקה<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>קראה את ההודעה</b><span>הוראת הקבע לא נפרעה, ביטול ב־<span class="num">1.12.2026</span></span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>בדקה את התיק בשורנס</b><span>יואב ברק · ביטוח בריאות</span></div></li></ol>
+          <p class="fl-src">נבדק מול: ההודעה · שורנס</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> מציעה 4 פעולות</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>סימון דחוף בתיק</b><span>שורנס · ביטול ב־<span class="num">1.12</span></span></div></li><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>בקשה לעצור את הביטול</b><span>אל מחלקת הגבייה</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/docusign.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>הוראת חיוב חדשה</b><span>לחתימה של יואב</span></div></li><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>הסבר ליואב</b><span>«הכול בטיפול, רק לחתום»</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · רק באישור שלכם</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">בוצע · <span class="num">4</span> פעולות</p><span class="cue"><span dir="ltr">Undo</span> · רק באישור שלכם</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen tile-ds"><div class="mark lw"><img alt="" src="../assets/lg/docusign.webp" width="18" height="18" decoding="async"/> Docusign<span class="ord" aria-hidden="true">3</span></div><p class="k">מעטפה לחתימה</p><div class="ds-doc"><p class="ds-h">הוראת חיוב חדשה</p><p class="ds-s">ביטוח בריאות · יואב ברק</p><span class="ds-ln"></span><span class="ds-ln"></span><span class="ds-ln s"></span><div class="ds-sig"><span>חתימה</span></div></div><p class="ds-to">נשלח ליואב ברק לחתימה</p><span class="lw-status">ממתין לאישור</span><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">נשלח על ידי <span dir="ltr">Flow · 08:15</span></span></p></div>
+          </div>
+          <div class="app app-law app-gen outer app-olm"><div class="mark lw"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">3</span></div><p class="k">טיוטה · לא נשלח</p><p class="t">אל יואב ברק</p><ul class="lw-fields"><li class="lw-f"><span class="k">נושא</span><span class="v">ביטוח הבריאות שלך</span></li><li class="lw-f"><span class="k">תוכן</span><span class="v">הכול בטיפול, רק לחתום על הטופס שנשלח אליך ב־Docusign</span></li></ul><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">נוסף על ידי <span dir="ltr">Flow · 08:15</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">הגיע ב־Outlook</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><b>Outlook</b><span class="smp">דוגמה</span></p>
+          <p class="mail-m"><span>מאת</span><b>חברת הביטוח · מחלקת גבייה</b></p>
+          <p class="mail-s">הודעה לפני ביטול פוליסה <span class="att-i">PDF</span></p>
+          <p class="mail-b">הוראת הקבע לא נפרעה · <em>ביטול ב־1.12.2026</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">מה Flow עשתה</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><p>קראה את ההודעה: ביטול בעוד 21 יום</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="22" height="22" decoding="async"/></span><p>בדקה בשורנס את הפוליסה של יואב</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">מה Flow מציעה</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="24" height="24" decoding="async"/></span><p class="card-t">הפוליסה מסומנת דחוף בתיק</p><p class="card-s">שורנס · ביטול ב־1.12</p></article><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">בקשה לחברה לעצור את הביטול</p><p class="card-s">Outlook · אל הגבייה, לחיוב חוזר</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/docusign.webp" width="24" height="24" decoding="async"/></span><p class="card-t">הוראת חיוב חדשה</p><p class="card-s">Docusign · מוכנה לחתימה של יואב</p></article><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">הסבר ליואב, עם הטופס</p><p class="card-s">Outlook · «הכול בטיפול, רק לחתום»</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">רק באישור שלכם · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="2" aria-label="תביעה">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">תביעות · דוגמה</p>
+        <h2 class="h1">התביעה נעצרה, חסרים מסמכים</h2>
+      </div>
+      <p class="lead">Flow ריכזה מה חסר, והכינה טיוטה לדנה</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> קראה את המייל של דנה ובדקה בשורנס מה חברת הביטוח ביקשה</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/surense.webp" width="18" height="18" decoding="async"/> שורנס<span class="ord" aria-hidden="true">3</span></div><p class="k">תביעה</p><p class="t">אברהם כהן</p><ul class="lw-fields"><li class="lw-f"><span class="k">סוג</span><span class="v">תביעת בריאות</span></li><li class="lw-f"><span class="k">סטטוס</span><span class="v">ממתין למסמכים</span></li><li class="lw-pair"><span class="lw-f"><span class="k">דרישת מסמכים</span><span class="v"><span class="num">3</span> פריטים</span></span><span class="lw-f"><span class="k">איש קשר</span><span class="v">דנה כהן</span></span></li></ul><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">עודכן על ידי <span dir="ltr">Flow · 09:02</span></span></p></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-mail tile-mail-solo"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">1</span></div><h3>מסמכים לתביעה של אבא</h3><p class="from"><b>דנה כהן</b><span class="num"><span class="num">8.11.2026 21:40</span></span></p><p class="meta">תביעת בריאות · אברהם כהן</p><blockquote class="ol-quote">ביקשו עוד מסמכים לתביעה של אבא. מה בדיוק הם רוצים?</blockquote></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>דנה כהן</b><span class="num">8.11</span></p>
+              <h3 class="ph-mail-subj">מסמכים לתביעה של אבא</h3>
+              <p class="ph-mail-meta">ביקשו עוד מסמכים</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> בדקה<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>קראה את המייל של דנה</b><span>«מה בדיוק הם רוצים?»</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>בדקה את התביעה בשורנס</b><span>תביעת בריאות · אברהם כהן · 3 מסמכים</span></div></li></ol>
+          <p class="fl-src">נבדק מול: המייל · שורנס</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> מציעה 3 פעולות</p>
+          <ol class="props"><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>טיוטה לדנה</b><span>מה חסר לתביעה של אבא</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>עדכון סטטוס בתיק</b><span>דרישת מסמכים, 3 פריטים</span></div></li><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>מעקב ביומן</b><span>בדיקת סטטוס ב־<span class="num">24.11</span></span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · רק באישור שלכם</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">בוצע · <span class="num">3</span> פעולות</p><span class="cue"><span dir="ltr">Undo</span> · רק באישור שלכם</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-cal"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">3</span></div><p class="cal-range">שבוע <span class="num">22-28.11.2026</span></p><ol class="cal-days"><li><b class="dow">א׳</b><span>22</span></li><li><b class="dow">ב׳</b><span>23</span></li><li class="on"><b class="dow">ג׳</b><span>24</span></li><li><b class="dow">ד׳</b><span>25</span></li><li><b class="dow">ה׳</b><span>26</span></li><li><b class="dow">ו׳</b><span>27</span></li><li><b class="dow">ש׳</b><span>28</span></li></ol><p class="cal-dayhead">יום ג׳, <span class="num">24.11</span></p><ol class="cal-agenda"><li class="slot"><time><span class="num">08:00</span></time></li><li class="ev"><time><span class="num">09:00</span></time><div class="ag-b"><b>פגישת צוות</b><span>30 דק׳</span></div></li><li class="ev on"><time><span class="num">10:00</span></time><div class="ag-b"><b>בדיקת סטטוס התביעה</b><span>אברהם כהן · מול חברת הביטוח</span><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">נוסף על ידי <span dir="ltr">Flow · 09:02</span></span></p></div></li><li class="slot"><time><span class="num">12:00</span></time></li><li class="slot"><time><span class="num">14:00</span></time></li><li class="slot"><time><span class="num">16:00</span></time></li></ol></div>
+          </div>
+          <div class="app app-law app-gen outer app-olm"><div class="mark lw"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">3</span></div><p class="k">טיוטה · לא נשלח</p><p class="t">אל דנה כהן</p><ul class="lw-fields"><li class="lw-f"><span class="k">נושא</span><span class="v">מה חסר לתביעה של אבא</span></li><li class="lw-f"><span class="k">תוכן</span><span class="v">שלום דנה, לתביעה של אבא חסרים עוד מסמכים. כאן רשום מה צריך.</span></li></ul><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">נוסף על ידי <span dir="ltr">Flow · 09:02</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">הגיע ב־Outlook</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><b>Outlook</b><span class="smp">דוגמה</span></p>
+          <p class="mail-m"><span>מאת</span><b>דנה כהן</b></p>
+          <p class="mail-s">מסמכים לתביעה של אבא</p>
+          <p class="mail-b">ביקשו עוד מסמכים. <em>מה בדיוק הם רוצים?</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">מה Flow עשתה</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><p>קראה את המייל של דנה</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="22" height="22" decoding="async"/></span><p>בדקה בשורנס מה חברת הביטוח ביקשה</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">מה Flow מציעה</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">טיוטה לדנה: מה חסר לתביעה</p><p class="card-s">Outlook · לא נשלח</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="24" height="24" decoding="async"/></span><p class="card-t">סטטוס התביעה מעודכן בתיק</p><p class="card-s">שורנס · דרישת מסמכים, 3 פריטים</p></article><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">מעקב מול חברת הביטוח</p><p class="card-s">יומן Outlook · בדיקת סטטוס ב־24.11</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">רק באישור שלכם · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="3" aria-label="חידוש">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">חידושים · דוגמה</p>
+        <h2 class="h1">את פוליסת הדירה שוכחים</h2>
+      </div>
+      <p class="lead">Flow ראתה חידוש דירה ליד תביעה פתוחה</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> עברה על התיק בשורנס והכינה משימת חידוש, ליד התביעה הפתוחה</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/surense.webp" width="18" height="18" decoding="async"/> שורנס<span class="ord" aria-hidden="true">1</span></div><p class="k">משה לוי · 3 פוליסות</p><p class="t">פוליסות פעילות</p><ul class="lw-fields"><li class="lw-f"><span class="k">רכב</span><span class="v">מסתיימת <span class="num">30.11.2026</span></span></li><li class="lw-f"><span class="k">דירה</span><span class="v">מסתיימת <span class="num">14.12.2026</span></span></li><li class="lw-f"><span class="k">תביעה פתוחה</span><span class="v">רכב · בבדיקת השמאי</span></li></ul></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/surense.webp" width="18" height="18" decoding="async"/> שורנס<span class="ord" aria-hidden="true">3</span></div><p class="k">משימות בתיק</p><ul class="lw-list"><li><p class="lw-l1"><b>משימת חידוש</b><span>דירה</span></p><p class="lw-l2">לפני <span class="num">14.12.2026</span> · ליד תביעת הרכב</p><span class="lw-status">ממתין לאישור</span></li></ul><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">נוסף על ידי <span dir="ltr">Flow · 08:32</span></span></p></div><div class="tile tile-draft"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">3</span></div><p class="draft-pill">טיוטה · לא נשלח</p><p class="draft-to"><span class="k">אל</span><b>מחלקת תביעות רכב</b></p><p class="draft-subj">תביעה <span class="num">4471/26</span> · בקשה לעדכון סטטוס</p><p class="draft-body">שלום, השמאי ביקר ב־<span class="num">02.11</span>. אפשר לעדכן מה הסטטוס ומה עוד חסר מהמבוטח?</p><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">נוסף על ידי <span dir="ltr">Flow · 08:32</span></span></p></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>שורנס</b><span class="num">08:30</span></p>
+              <h3 class="ph-mail-subj">משה לוי · 3 פוליסות</h3>
+              <p class="ph-mail-meta">דירה מסתיימת ב־<span class="num">14.12.2026</span></p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> בדקה<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>בדקה את הפוליסות</b><span>רכב עד <span class="num">30.11</span> · דירה עד <span class="num">14.12</span></span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>מצאה תביעה פתוחה</b><span>רכב · בבדיקת השמאי</span></div></li></ol>
+          <p class="fl-src">נבדק מול: התיק בשורנס</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> מציעה 3 פעולות</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>משימת חידוש לדירה</b><span>ליד התביעה הפתוחה</span></div></li><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>פנייה למחלקת תביעות רכב</b><span>בקשה לעדכון סטטוס</span></div></li><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>תזכורת חידוש ביומן</b><span><span class="num">7.12</span> · שבוע לפני הסיום</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · רק באישור שלכם</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">בוצע · <span class="num">3</span> פעולות</p><span class="cue"><span dir="ltr">Undo</span> · רק באישור שלכם</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-cal"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">3</span></div><p class="cal-range">שבוע <span class="num">6-12.12.2026</span></p><ol class="cal-days"><li><b class="dow">א׳</b><span>6</span></li><li class="on"><b class="dow">ב׳</b><span>7</span></li><li><b class="dow">ג׳</b><span>8</span></li><li><b class="dow">ד׳</b><span>9</span></li><li><b class="dow">ה׳</b><span>10</span></li><li><b class="dow">ו׳</b><span>11</span></li><li><b class="dow">ש׳</b><span>12</span></li></ol><p class="cal-dayhead">יום ב׳, <span class="num">7.12</span></p><ol class="cal-agenda"><li class="slot"><time><span class="num">08:00</span></time></li><li class="ev on"><time><span class="num">09:00</span></time><div class="ag-b"><b>חידוש פוליסת הדירה</b><span>משה לוי · מסתיימת <span class="num">14.12</span></span><p class="flow-attr"><span class="attr-prep">מוכן על ידי Flow</span><span class="attr-done">נוסף על ידי <span dir="ltr">Flow · 08:33</span></span></p></div></li><li class="slot"><time><span class="num">10:00</span></time></li><li class="ev"><time><span class="num">11:00</span></time><div class="ag-b"><b>פגישת צוות</b><span>30 דק׳</span></div></li><li class="slot"><time><span class="num">12:00</span></time></li><li class="slot"><time><span class="num">14:00</span></time></li></ol></div>
+          </div>
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/surense.webp" width="18" height="18" decoding="async"/> שורנס<span class="ord" aria-hidden="true">3</span></div><p class="k">תביעה</p><p class="t">משה לוי</p><ul class="lw-fields"><li class="lw-f"><span class="k">סוג</span><span class="v">תביעת רכב</span></li><li class="lw-f"><span class="k">סטטוס</span><span class="v">בבדיקת השמאי</span></li><li class="lw-pair"><span class="lw-f"><span class="k">ביקור שמאי</span><span class="v"><span class="num">02.11.2026</span></span></span><span class="lw-f"><span class="k">מספר</span><span class="v"><span class="num">4471/26</span></span></span></li></ul></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">נמצא בשורנס</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="22" height="22" decoding="async"/></span><b>שורנס</b><span class="smp">דוגמה</span></p>
+          <p class="mail-m"><span>בתיק של</span><b>משה לוי</b></p>
+          <p class="mail-s">דירה לחידוש, ותביעת רכב פתוחה</p>
+          <p class="mail-b">הדירה מסתיימת ב־<em>14.12.2026</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">מה Flow עשתה</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="22" height="22" decoding="async"/></span><p>בדקה את התיק: רכב עד 30.11, דירה עד 14.12</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="22" height="22" decoding="async"/></span><p>מצאה תביעת רכב פתוחה, בבדיקת השמאי</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">מה Flow מציעה</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/surense.webp" width="24" height="24" decoding="async"/></span><p class="card-t">משימת חידוש לדירה</p><p class="card-s">שורנס · ליד התביעה הפתוחה</p></article><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">פנייה לעדכון סטטוס התביעה</p><p class="card-s">Outlook · אל מחלקת תביעות רכב</p></article><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">תזכורת חידוש ביומן</p><p class="card-s">Outlook · <span class="num">7.12</span>, שבוע לפני הסיום</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">רק באישור שלכם · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dots named" role="group" aria-label="תהליכים">
+  <button class="dot" type="button" data-i="0" aria-current="true"><span>ביטול פוליסה</span></button>
+  <button class="dot" type="button" data-i="1"><span>תביעה</span></button>
+  <button class="dot" type="button" data-i="2"><span>חידוש</span></button>
+</div>
+</section></div></section><section class="x4 x4-g o20sec x7-tools"><div class="x4-in"><div class="x7-th"><h2 class="x4-h2 rv" data-he='Flow מכינה את העבודה &lt;span class="g"&gt;בתוך המערכות של הסוכנות&lt;/span&gt;'>Flow מכינה את העבודה <span class="g">בתוך המערכות של הסוכנות</span></h2><p class="x4-sub rv" data-he="שורנס, Jamm, עתיד ועוד, או מערכת הניהול שכבר יש לסוכנות.">שורנס, Jamm, עתיד ועוד, או מערכת הניהול שכבר יש לסוכנות.</p></div><div class="o20" data-orbit20=""><div aria-hidden="true" class="o20-plate o20-plate-out"></div><div aria-hidden="true" class="o20-plate o20-plate-in"></div><svg aria-hidden="true" class="o20-tracks"></svg><div class="o20-ring" data-ring="in" data-speed="7.5"><button aria-label="Gmail" class="o20-orb" data-he-label="Gmail" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/gmail.webp" width="23"/><span class="o20-tip" data-he="Gmail">Gmail</span></button><button aria-label="שורנס" class="o20-orb" data-he-label="שורנס" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/surense.webp" width="23"/><span class="o20-tip" data-he="שורנס">שורנס</span></button><button aria-label="Outlook" class="o20-orb" data-he-label="Outlook" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/outlook.webp" width="23"/><span class="o20-tip" data-he="Outlook">Outlook</span></button><button aria-label="Jamm" class="o20-orb" data-he-label="Jamm" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/jamm.webp" width="23"/><span class="o20-tip" data-he="Jamm">Jamm</span></button><button aria-label="Docusign" class="o20-orb" data-he-label="Docusign" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/docusign.webp" width="23"/><span class="o20-tip" data-he="Docusign">Docusign</span></button></div><div class="o20-ring" data-ring="out" data-speed="-4.8"><button aria-label="עתיד" class="o20-orb" data-he-label="עתיד" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/atid.webp" width="23"/><span class="o20-tip" data-he="עתיד">עתיד</span></button><button aria-label="Roeto" class="o20-orb" data-he-label="Roeto" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/roeto.webp" width="23"/><span class="o20-tip" data-he="Roeto">Roeto</span></button><button aria-label="באפי" class="o20-orb" data-he-label="באפי" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/bafi.webp" width="23"/><span class="o20-tip" data-he="באפי">באפי</span></button><button aria-label="Excel" class="o20-orb" data-he-label="Excel" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/excel.webp" width="23"/><span class="o20-tip" data-he="Excel">Excel</span></button><button aria-label="Financi" class="o20-orb" data-he-label="Financi" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/financi.webp" width="23"/><span class="o20-tip" data-he="Financi">Financi</span></button><button aria-label="פיירברי" class="o20-orb" data-he-label="פיירברי" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/fireberry.webp" width="23"/><span class="o20-tip" data-he="פיירברי">פיירברי</span></button></div><div class="o20-core"><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><div class="o20-disc"><img alt="Flow" class="o20-wm" height="31" src="../assets/flow-logo-400.webp" width="70"/></div></div></div></div></section><section class="r15-tr" aria-labelledby="r15trh"><div class="r15-in"><header class="r15-th"><h2 class="r15-h2" id="r15trh" data-he="שום דבר לא זז בלי האישור שלכם">שום דבר לא זז בלי האישור שלכם</h2><p class="r15-sub2" data-he="Flow עובדת בתוך המערכות של הסוכנות, והצהרות בריאות, תעודות זהות ותביעות לא עוברות דרך חלון צ׳אט. כל פעולה מחכה ל־Do It, נרשמת ביומן, ואפשר לבטל אותה.">Flow עובדת בתוך המערכות של הסוכנות, והצהרות בריאות, תעודות זהות ותביעות לא עוברות דרך חלון צ׳אט. כל פעולה מחכה ל־Do It, נרשמת ביומן, ואפשר לבטל אותה.</p></header><div class="r15-fan" aria-hidden="true"><figure class="r15-col r15-c1"><div class="r15-cd r15-ap"><div class="r15-ch"><img class="r15-flw" src="../assets/flow-logo-400.webp" width="400" height="176" alt="" decoding="async"/><small>דוגמה</small></div><p class="r15-q">לסמן את הפוליסה של יואב דחוף ולשמור את הבקשה לגבייה בטיוטות?</p><ul class="r15-st"><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>סימון דחוף בתיק</b><small>שורנס</small></span></li><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>בקשה לעצור את הביטול</b><small>Outlook</small></span></li></ul><div class="r15-cf"><span class="doit r15-di"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><small>ממתין לאישור שלכם</small></div></div><figcaption><b>Flow מכינה, אתם מאשרים</b><span>כל פעולה מחכה ל־Do It שלכם</span></figcaption></figure><figure class="r15-col r15-c2"><div class="r15-cd r15-log"><div class="r15-lh"><span><b>יומן פעולות</b><small>ביטוח בריאות · יואב ברק</small></span><small class="r15-smp">דוגמה</small></div><ol class="r15-le"><li><time>08:12</time><span class="r15-lg"><img src="../assets/orb/outlook.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>נקראה הודעת הביטול</b><small>מקור: מייל ממחלקת הגבייה, 08:12</small></span><span class="r15-who is-f">Flow</span></li><li><time>08:14</time><span class="r15-lg"><img src="../assets/orb/surense.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>הפוליסה של יואב סומנה דחוף</b><small>מקור: התיק בשורנס</small></span><span class="r15-who">שירה אישרה</span></li><li><time>08:14</time><span class="r15-lg"><img src="../assets/orb/outlook.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>הבקשה לגבייה נשמרה בטיוטות</b><small>מקור: הודעת הביטול</small></span><span class="r15-who">שירה אישרה</span></li><li class="r15-x"><time>08:15</time><span class="r15-lg"><img src="../assets/orb/docusign.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>טופס החיוב נשלח ליואב לחתימה</b><small>מקור: הוראת חיוב חדשה</small></span><span class="r15-who">שירה אישרה</span></li><li class="r15-x"><time>08:15</time><span class="r15-lg"><img src="../assets/orb/outlook.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>ההסבר ליואב נשמר בטיוטות</b><small>מקור: הודעת הביטול</small></span><span class="r15-who">שירה אישרה</span></li></ol></div><figcaption><b>כל פעולה נרשמת ביומן</b><span>עם השעה, המקור ומי אישר</span></figcaption></figure><figure class="r15-col r15-c3"><div class="r15-cd r15-un"><div class="r15-ch"><span class="r15-lg"><img src="../assets/orb/surense.webp" width="40" height="40" alt="" decoding="async"/></span><b>תיק יואב ברק</b><span class="r15-done"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg>בוצע</span></div><dl class="r15-row"><div><dt>מבוטח</dt><dd>יואב ברק</dd></div><div><dt>פוליסה</dt><dd>ביטוח בריאות</dd></div><div><dt>סימון</dt><dd>דחוף</dd></div></dl><div class="r15-cf"><span class="r15-undo"><svg viewBox="0 0 24 24"><path d="M9.8 6 4.5 11.3l5.3 5.3"/><path d="M4.8 11.3h9.2a5.5 5.5 0 0 1 5.5 5.5v1.7"/></svg>Undo</span><small>עודכן ב־08:14</small></div></div><figcaption><b>ואפשר לבטל</b><span>פעולה שבוצעה מתבטלת ב־Undo</span></figcaption></figure></div></div></section><div id="lgdep" class="r15-dp"><section class="dgv-sec sx-dep" id="depsec" data-zone-scope><div class="sx-in"><h2 class="dp-h" id="dpTitle">איפה Flow רצה</h2><p class="dp-sub">הענן המאובטח של Flow, המחשב של העובד, או שרת ברשת הסוכנות. הסוכנות בוחרת, ושלוש האפשרויות זמינות היום.</p><div class="dep dep2" role="group" aria-label="איפה Flow רצה"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div><section class="op-sec sx-op" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section></div><section class="r15-ct" aria-labelledby="r15cth"><div class="r15-in"><div class="r15-ctc"><h2 class="r15-h2" id="r15cth" data-he="קבעו שיחה קצרה, וקבלו תוכנית פריסה לסוכנות">קבעו שיחה קצרה, וקבלו תוכנית פריסה לסוכנות</h2><ol class="r15-steps"><li><span class="r15-n">1</span><b data-he="שיחת היכרות">שיחת היכרות</b><span data-he="ממפים איפה הצוות עובד היום">ממפים איפה הצוות עובד היום</span></li><li><span class="r15-n">2</span><b data-he="בוחרים איפה Flow רצה">בוחרים איפה Flow רצה</b><span data-he="ענן, Edge או On-Prem">ענן, Edge או On-Prem</span></li><li><span class="r15-n">3</span><b data-he="פיילוט עם צוות אחד">פיילוט עם צוות אחד</b><span data-he="כל פעולה ממתינה לאישור שלכם">כל פעולה ממתינה לאישור שלכם</span></li></ol><a class="doit r15-cta" data-book="" data-ga="sol_insurance_waitlist" href="/he/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-he="קבעו שיחה">קבעו שיחה</span></a></div></div></section></main>
+<footer class="site-foot" dir="rtl" id="footer" lang="he">
+<div class="foot-in">
+<div class="foot-cols">
+<div class="foot-col foot-brand">
+<img alt="Flow" height="28" loading="lazy" src="../assets/flow-logo-200.webp" width="64"/>
+<a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+</div>
+<nav aria-label="Product" class="foot-col">
+<h3 data-k="ft.hFlow">מוצר</h3>
+<a data-k="ft.glance" href="/glance">Glance</a>
+<a data-k="ft.flow" href="/he/#product">Flow</a>
+<a data-k="ft.sec" href="/he/security">אבטחה</a>
+<a data-k="ft.pricing" href="/he/pricing">תמחור</a>
+<a data-k="ft.solutions" href="/he/solutions">פתרונות</a>
+</nav>
+<nav aria-label="Company" class="foot-col">
+<h3 data-k="ft.hCo">חברה</h3>
+<a data-k="ft.about" href="/he/about">אודות</a>
+<a data-k="ft.blog" href="/articles">תובנות</a>
+<a data-k="ft.contact" href="/he/contact">צור קשר</a>
+</nav>
+</div>
+<div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav aria-label="Legal" class="foot-legal"><a data-k="ft.privacy" href="/he/privacy">פרטיות</a><a data-k="ft.terms" href="/he/terms">תנאים</a></nav></div>
+</div>
+</footer>
+<script src="../assets/flow-header.js"></script><script defer src="../assets/flow-booking.js"></script>
+<script src="../assets/flow-inner.js"></script>
+<script src="../samples/vendor/lenis.min.js"></script>
+<script src="../samples/flow-rich-v5.js?b=2"></script>
+<script src="../samples/v3.js"></script>
+<script src="../assets/flow-orbit-v7.js"></script><script src="../assets/r15/r14s.js?b=1"></script><script src="../assets/r15/stack-ins.js?b=1"></script><script src="../assets/r15/dep2-ins.js?b=1"></script><script src="../assets/r15/onprem-ins.js?b=1"></script><script src="../assets/r15/dg.js?b=1"></script><script src="../assets/r15/idle-pause.js?b=1"></script><script src="../assets/offscreen-pause.js?b=1"></script><script>(function(){function fit(){var op=document.getElementById("onprem");if(!op)return;var inn=op.parentElement,cs=getComputedStyle(inn),w=inn.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);op.style.setProperty("--dk",Math.min(1.5,Math.max(1,w/1120)).toFixed(3))}fit();addEventListener("resize",fit);addEventListener("load",fit)})();</script><script id="perf1112-dgjs">(function(){
+/* perf1112 glow: the Do It "breathe" ring redone on the compositor (opacity + transform only), same keyframes, offsets, easing and timing as stk-breathe in stack.css */
+var B='#r14s#r14s .stk:not(.used) .sh .doit',T='2.8s ease-in-out .8s infinite';
+function css(w,h){var D=h+18,k0=h/D,k5=(h+10)/D,cx=w-10,r=h/2;
+ function kf(n,f){return '@keyframes '+n+'{0%,64%,100%{'+f(0)+'}76%{'+f(5)+'}88%{'+f(9)+'}}';}
+ return 'html '+B+'{animation-name:stk-breathe-t!important}'+
+ '@keyframes stk-breathe-t{0%,64%,100%{transform:scale(1)}76%{transform:scale(1.05)}88%{transform:scale(1)}}'+
+ kf('dg-o',function(s){return 'opacity:'+(s==5?.14:0)})+
+ kf('dg-s',function(s){return 'transform:scale('+((h+2*s)/D)+')'})+
+ kf('dg-y',function(s){return 'transform:scaleY('+((h+2*s)/D)+')'})+
+ '#r14s#r14s .doit>.dg{position:absolute;inset:-10px;z-index:-3;pointer-events:none;opacity:0;'+
+ '-webkit-mask:none;mask-image:linear-gradient(#000 0 0),linear-gradient(#000 0 0),radial-gradient(circle at '+(10+r)+'px '+(10+r)+'px,#000 '+(r-.5)+'px,#0000 '+(r+.5)+'px),radial-gradient(circle at '+cx+'px '+(10+r)+'px,#000 '+(r-.5)+'px,#0000 '+(r+.5)+'px);'+
+ 'mask-size:100% 100%,'+(w-h)+'px '+h+'px,100% 100%,100% 100%;mask-position:0 0,'+(10+r)+'px 10px,0 0,0 0;mask-repeat:no-repeat;mask-composite:subtract,add,add,add}'+
+ '#r14s#r14s .doit>.dg>i{position:absolute;top:1px;height:'+D+'px;background:rgb(45,94,255)!important}'+
+ '#r14s#r14s .doit>.dg>i.l,#r14s#r14s .doit>.dg>i.r{width:'+D+'px;border-radius:50%;transform:scale('+k0+')}'+
+ '#r14s#r14s .doit>.dg>i.l{left:1px}#r14s#r14s .doit>.dg>i.r{left:'+(cx-r-9)+'px}'+
+ '#r14s#r14s .doit>.dg>i.m{left:'+(10+r)+'px;width:'+(w-h)+'px;transform:scaleY('+k0+')}'+
+ B+'>.dg{animation:dg-o '+T+'!important}'+B+'>.dg>i.l,'+B+'>.dg>i.r{animation:dg-s '+T+'!important}'+B+'>.dg>i.m{animation:dg-y '+T+'!important}'+
+ '@media (max-width:759px) and (prefers-reduced-motion:reduce){html '+B+'>.dg,html '+B+'>.dg>i.l,html '+B+'>.dg>i.m,html '+B+'>.dg>i.r{animation:none!important}}';}
+function run(){var bs=document.querySelectorAll('#r14s .stk .sh .doit');if(!bs.length)return;
+ var b0=bs[0],cs=getComputedStyle(b0),w=parseFloat(cs.width),h=parseFloat(cs.height);if(!(w>0&&h>0))return;
+ var st=document.getElementById('perf1112-dg')||document.head.appendChild(Object.assign(document.createElement('style'),{id:'perf1112-dg'}));
+ st.textContent=css(w,h);
+ bs.forEach(function(b){if(b.querySelector(':scope>.dg'))return;var g=document.createElement('span');g.className='dg';g.setAttribute('aria-hidden','true');g.innerHTML='<i class="l"></i><i class="m"></i><i class="r"></i>';b.insertBefore(g,b.firstChild);});
+ bs.forEach(function(b){sync(b,0)});}
+/* the ring pieces run on the button's clock: copy its stk-breathe-t start time (again whenever either one (re)starts, e.g. a slide shown again) */
+function sync(b,k){requestAnimationFrame(function(){var a=b.getAnimations().filter(function(x){return x.animationName=='stk-breathe-t'})[0];if(!a)return;
+  if(a.startTime==null){if(k<20)sync(b,k+1);return}
+  b.querySelectorAll(':scope>.dg,:scope>.dg>i').forEach(function(e){e.getAnimations().forEach(function(x){if(x.startTime!==a.startTime)x.startTime=a.startTime})})})}
+addEventListener('animationstart',function(e){if(!/^(stk-breathe-t|dg-[osy])$/.test(e.animationName))return;var b=e.target.closest&&e.target.closest('.doit');if(b)sync(b,0)},true);
+if(document.readyState=='complete')run();else addEventListener('load',run);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(run);
+/* stack.js rebuilds the decks when the viewport crosses 760px (teardown/build): give new Do It buttons their ring too */
+var q=0;function need(){return [].some.call(document.querySelectorAll('#r14s .stk .sh .doit'),function(b){return !b.querySelector(':scope>.dg')})}
+function watch(){var r=document.getElementById('r14s');if(!r||!window.MutationObserver)return;new MutationObserver(function(){if(q)return;q=requestAnimationFrame(function(){q=0;if(need())run()})}).observe(r,{childList:true,subtree:true})}
+if(document.readyState=='loading')addEventListener('DOMContentLoaded',watch);else watch();
+})();</script>
+<link rel="stylesheet" href="../assets/ux-review-20261119.css?b=1"><script src="../assets/ux-review-20261119.js?b=1" defer></script>
+</body></html>

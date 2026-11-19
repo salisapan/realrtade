@@ -1,0 +1,39 @@
+/* 19.11 · Glance wordmark in the shared header (same 28px slot as the Flow logo, 24px on phone).
+   Same chrome grey as the Glance mark in the hero. No colour accent. */
+flow-header .fh-brand .gx-hbrand{display:block;font:500 25px/1 "Inter Tight",system-ui,sans-serif;letter-spacing:-.035em;padding:0 0 .06em;
+  background:linear-gradient(180deg,#c9ccd3 0%,#9a9fa8 38%,#6c717b 62%,#aeb2ba 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+html[data-theme=dark] flow-header .fh-brand .gx-hbrand{background:linear-gradient(180deg,#f3f4f7 0%,#c4c8d0 42%,#8b909a 64%,#dfe2e7 100%);-webkit-background-clip:text;background-clip:text}
+@media (max-width:759px){flow-header .fh-brand .gx-hbrand{font-size:22px}}
+
+/* 19.11 · Glance end headline: the last words carry the blue, at the end of the sentence in reading direction (same as Flow's «מה הלאה»). */
+.gx-end .gx-blue{background:linear-gradient(90deg,#1d2433 0%,#0062c4 62%,#0071e3 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;font-style:normal}
+html[dir=rtl] .gx-end .gx-blue{background-image:linear-gradient(270deg,#1d2433 0%,#0062c4 62%,#0071e3 100%)}
+html[data-theme=dark] .gx-end .gx-blue{background-image:linear-gradient(90deg,#EEF2F9 0%,#4aa3ff 62%,#0a84ff 100%)}
+html[dir=rtl][data-theme=dark] .gx-end .gx-blue{background-image:linear-gradient(270deg,#EEF2F9 0%,#4aa3ff 62%,#0a84ff 100%)}
+
+/* Glance pages: the header name already says Glance, so the inline nav item "Glance" is hidden (the full menu keeps it) */
+flow-header .fh-links a[data-nav="glance"]{display:none}
+
+/* 19.11 · Option E approved by Sali (22:42 IL): titanium wordmark after Apple's PRO.
+   Metal with a horizon line (ice blue above, warm amber below), medium halo. At rest it is still.
+   The light pass plays only at the right moments (Sali 22:43 IL): once on entry, on hover or focus, on tap,
+   and when the tab comes back. Trigger and 8s cooldown live in glance-header-brand-20261119.js (class .gx-pass).
+   Inter Tight 540. Light mode uses a darker steel so the word holds on white. Reduced motion: no pass. */
+flow-header .fh-brand{overflow:visible}
+flow-header .fh-brand .gx-hbrand{
+  --gx-metal:linear-gradient(180deg,#636a73 0%,#41464e 32%,#5a7088 44%,#aab2bc 51%,#7d766c 58%,#33373e 70%,#5b6169 86%,#7b818a 100%);
+  --gx-sheen:linear-gradient(104deg,transparent 0 41%,rgba(90,140,200,0) 43%,rgba(110,160,220,.45) 46.5%,rgba(225,232,240,.6) 50%,rgba(190,160,120,.4) 53.5%,transparent 57% 100%);
+  font-weight:540;
+  background:var(--gx-sheen),var(--gx-metal);background-size:300% 100%,100% 150%;background-repeat:no-repeat;background-position:100% 0,0 50%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 .3em rgba(0,113,227,.08)) drop-shadow(0 1px 0 rgba(255,255,255,.85)) drop-shadow(0 .6px 1.2px rgba(10,16,28,.2))}
+html[data-theme=dark] flow-header .fh-brand .gx-hbrand{
+  --gx-metal:linear-gradient(180deg,#eef0f3 0%,#c5cad1 30%,#9fb4c9 44%,#fbfcfd 51%,#d6c9b6 58%,#8a9099 70%,#b4b9c1 86%,#e4e7eb 100%);
+  --gx-sheen:linear-gradient(104deg,transparent 0 41%,rgba(140,190,255,0) 43%,rgba(160,205,255,.6) 46.5%,rgba(255,255,255,1) 50%,rgba(255,214,165,.55) 53.5%,transparent 57% 100%);
+  background:var(--gx-sheen),var(--gx-metal);background-size:300% 100%,100% 150%;background-repeat:no-repeat;background-position:100% 0,0 50%;
+  -webkit-background-clip:text;background-clip:text;
+  filter:drop-shadow(0 0 .42em rgba(225,236,255,.24)) drop-shadow(0 0 1px rgba(255,255,255,.3))}
+flow-header .fh-brand .gx-hbrand.gx-pass{animation:gxPass 2.6s cubic-bezier(.45,0,.25,1) 1 both}
+/* one pass: the light crosses the letters left to right while the horizon line lifts a little and settles back */
+@keyframes gxPass{0%{background-position:100% 0,0 50%}45%{background-position:50% 0,0 38%}100%{background-position:0% 0,0 50%}}
+@media (prefers-reduced-motion:reduce){flow-header .fh-brand .gx-hbrand,flow-header .fh-brand .gx-hbrand.gx-pass{animation:none;background-position:100% 0,0 50%}}

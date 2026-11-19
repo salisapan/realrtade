@@ -1,44 +1,48 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html data-page-lang="en" lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Intended architecture for how Flow handles data. Deployment models, Flow-Edge, and the append-only audit log are a deployment offer (roadmap), not live toggles today.">
-<meta name="theme-color" content="#07090F">
-<link rel="canonical" href="https://theflow-ai.com/security.html">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="canonical" href="https://theflow-ai.com/security">
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<title>Security &amp; Architecture — Flow</title>
+<link rel="alternate" hreflang="en" href="https://theflow-ai.com/security">
+<link rel="alternate" hreflang="he" href="https://theflow-ai.com/he/security">
+<link rel="alternate" hreflang="x-default" href="https://theflow-ai.com/security"><link rel="alternate" hreflang="de" href="https://theflow-ai.com/security?lang=de"><link rel="alternate" hreflang="fr" href="https://theflow-ai.com/security?lang=fr"><link rel="alternate" hreflang="es" href="https://theflow-ai.com/security?lang=es">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="he_IL">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Security","item":"https://theflow-ai.com/security"}]}</script>
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" data-he-content="הארכיטקטורה המיועדת לאופן שבו Flow מטפלת במידע. המשרד בוחר בין הענן המאובטח הייעודי של Flow עם הסתרת מידע, Flow-Edge ו-Flow-Onprem." data-de-content="Die vorgesehene Architektur für den Umgang von Flow mit Daten. Das Büro wählt zwischen der eigenen sicheren Flow-Cloud mit Maskierung, Flow-Edge und Flow-Onprem." data-fr-content="L’architecture prévue pour le traitement des données par Flow. Le cabinet choisit entre le cloud sécurisé dédié de Flow avec masquage, Flow-Edge et Flow-Onprem." data-es-content="La arquitectura prevista para el tratamiento de datos en Flow. La oficina elige entre la nube segura y dedicada de Flow con enmascaramiento, Flow-Edge y Flow-Onprem." content="Intended architecture for how Flow handles data. The office chooses between Flow&#x27;s dedicated secure cloud with masking, Flow-Edge, and Flow-Onprem.">
+<meta name="theme-color" content="#07090F">
+<title data-he="אבטחה וארכיטקטורה | Flow" data-de="Sicherheit &amp; Architektur | Flow" data-fr="Sécurité &amp; architecture | Flow" data-es="Seguridad y arquitectura | Flow">Security &amp; Architecture | Flow</title>
 <meta property="og:type" content="website">
-<meta property="og:title" content="Security &amp; Architecture — Flow">
-<meta property="og:description" content="Intended architecture for how Flow handles data. Deployment models, Flow-Edge, and the append-only audit log are a deployment offer (roadmap), not live toggles today.">
-<meta property="og:url" content="https://theflow-ai.com/security.html">
+<meta property="og:title" data-he-content="אבטחה וארכיטקטורה | Flow" data-de-content="Sicherheit &amp; Architektur | Flow" data-fr-content="Sécurité &amp; architecture | Flow" data-es-content="Seguridad y arquitectura | Flow" content="Security &amp; Architecture | Flow">
+<meta property="og:description" data-he-content="הארכיטקטורה המיועדת לאופן שבו Flow מטפלת במידע. המשרד בוחר בין הענן המאובטח הייעודי של Flow עם הסתרת מידע, Flow-Edge ו-Flow-Onprem." data-de-content="Die vorgesehene Architektur für den Umgang von Flow mit Daten. Das Büro wählt zwischen der eigenen sicheren Flow-Cloud mit Maskierung, Flow-Edge und Flow-Onprem." data-fr-content="L’architecture prévue pour le traitement des données par Flow. Le cabinet choisit entre le cloud sécurisé dédié de Flow avec masquage, Flow-Edge et Flow-Onprem." data-es-content="La arquitectura prevista para el tratamiento de datos en Flow. La oficina elige entre la nube segura y dedicada de Flow con enmascaramiento, Flow-Edge y Flow-Onprem." content="Intended architecture for how Flow handles data. The office chooses between Flow&#x27;s dedicated secure cloud with masking, Flow-Edge, and Flow-Onprem.">
+<meta property="og:url" content="https://theflow-ai.com/security">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Security &amp; Architecture — Flow">
-<meta name="twitter:description" content="Intended architecture for how Flow handles data. Deployment models, Flow-Edge, and the append-only audit log are a deployment offer (roadmap), not live toggles today.">
+<meta name="twitter:title" data-he-content="אבטחה וארכיטקטורה | Flow" data-de-content="Sicherheit &amp; Architektur | Flow" data-fr-content="Sécurité &amp; architecture | Flow" data-es-content="Seguridad y arquitectura | Flow" content="Security &amp; Architecture | Flow">
+<meta name="twitter:description" data-he-content="הארכיטקטורה המיועדת לאופן שבו Flow מטפלת במידע. המשרד בוחר בין הענן המאובטח הייעודי של Flow עם הסתרת מידע, Flow-Edge ו-Flow-Onprem." data-de-content="Die vorgesehene Architektur für den Umgang von Flow mit Daten. Das Büro wählt zwischen der eigenen sicheren Flow-Cloud mit Maskierung, Flow-Edge und Flow-Onprem." data-fr-content="L’architecture prévue pour le traitement des données par Flow. Le cabinet choisit entre le cloud sécurisé dédié de Flow avec masquage, Flow-Edge et Flow-Onprem." data-es-content="La arquitectura prevista para el tratamiento de datos en Flow. La oficina elige entre la nube segura y dedicada de Flow con enmascaramiento, Flow-Edge y Flow-Onprem." content="Intended architecture for how Flow handles data. The office chooses between Flow&#x27;s dedicated secure cloud with masking, Flow-Edge, and Flow-Onprem.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Security &amp; Architecture","item":"https://theflow-ai.com/security.html"}]}</script>
-<link rel="stylesheet" href="/assets/fonts.css">
 <style>
 
 :root{
   --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
-  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3568E5;
-  --navy:#07090F; --cat:#1A4EF5;
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
   --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
 }
 :root[data-theme="dark"]{
-  --cat:#6E9BFF;
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
   --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
-  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
 }
 *{box-sizing:border-box}
 /* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
@@ -63,7 +67,7 @@ header.site nav a:hover{color:#fff}
 :root[data-theme="light"] .theme-btn .sun{display:block}
 :root[data-theme="light"] .theme-btn .moon{display:none}
 main{padding:56px 0 20px}
-.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
 h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
 .updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
 article p{margin:0 0 18px}
@@ -75,16 +79,16 @@ footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family
 footer.site a{color:var(--muted)}
 
 /* A focus affordance has to be unmistakable in both themes, so it carries
-   its own pair rather than riding --cat — which is tuned for TEXT colour
+   its own pair rather than riding --cat, which is tuned for TEXT colour
    and, once given a readable dark-theme value, left white-on-blue here at
    2.69:1. This pair measures 8.1:1 either way. */
-.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1741C4; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
 .lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
 .cards{display:grid; gap:16px; margin:26px 0 32px}
 @media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
 .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
-.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat); margin:0 0 8px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 8px}
 .card p{margin:0; font-size:1rem}
 .cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
 .cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
@@ -105,159 +109,170 @@ footer.site a{color:var(--muted)}
 .mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
 .mobile-nav a:hover{color:var(--accent-2,var(--cat))}
 </style>
-<link rel="stylesheet" href="/assets/flow-premium.css">
-<script>
-(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
-</script>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var go=function(h,c){var a=document.querySelector('link[rel="alternate"][hreflang="'+h+'"]');if(!a)return false;try{localStorage.setItem('flow.lang',c)}catch(e){}q.delete('lang');var p=new URL(a.href).pathname,qs=q.toString();location.replace(p+(qs?'?'+qs:'')+location.hash);return true};var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';if(l==='he'&&go('he','he'))return;d.dataset.ui=l;var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
 <!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
-  window.addEventListener('load', function () {
-    var load = function () {
-      var s = document.createElement('script');
-      s.async = true;
-      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
-      document.head.appendChild(s);
-    };
-    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
-    else setTimeout(load, 1);
-  });
-</script>
-<link rel="stylesheet" href="/assets/site-nav.css">
-</head>
+<link rel="preload" href="assets/fonts/heebo-hebrew.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/heebo-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/intertight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/flow-header.css">
+<link rel="stylesheet" href="assets/flow-booking.css">
+<link rel="stylesheet" href="assets/flow-inner.css">
+<link rel="stylesheet" href="assets/flow-rich.css">
+<link rel="stylesheet" href="samples/hero-samples.css">
+<link rel="stylesheet" href="samples/v3.css">
+<link rel="stylesheet" href="samples/v4.css">
+<link rel="stylesheet" href="samples/v5.css">
+<link rel="stylesheet" href="samples/home-dep.css">
+<link rel="stylesheet" href="assets/sec-dep-phone.css?b=1">
+<link rel="stylesheet" href="samples/home-dg-v11.css">
+<link rel="stylesheet" href="samples/sx.css">
+<link rel="stylesheet" href="samples/sxh.css">
+<link rel="stylesheet" href="samples/sxh-b4.css">
+<link rel="stylesheet" href="samples/sr2.css">
+<link rel="stylesheet" href="assets/flow-contrast.css?b=3">
+<noscript><style>.rich .rv{opacity:1!important;transform:none!important}.rich .w>span{transform:none!important}.rich .tier{opacity:1!important;transform:none!important}.rich .sf .sw{opacity:1}</style></noscript>
+
+<script>document.documentElement.classList.add("rich")</script>
+<script>/* 13.11: canonical/og:url follow ?lang=de|fr|es */(function(){var l=new URLSearchParams(location.search).get('lang');if(['de','fr','es'].indexOf(l)<0)return;var u='https://theflow-ai.com/security?lang='+l;var c=document.querySelector('link[rel=canonical]');if(c)c.href=u;var o=document.querySelector('meta[property="og:url"]');if(o)o.content=u;})();</script><link href="assets/flow-review-fixes.css?b=1" rel="stylesheet"/>
+<link rel="stylesheet" href="assets/rtl-gradient-20261119.css">
+<script defer src="/assets/flow-consent.js"></script><style id="sx-b4-perf">/* 20.11 perf: same plate shadows as flow-review-fixes 020, minus the filter steps that are identity while --lb/--ab are unset (blur(0), saturate(1), contrast(1), a 0-alpha shadow). Same pixels, about half the raster work while the stack moves */html:not([data-theme="dark"]) .sx-hx[data-v="B4"][data-open]:not(.hx-static) .hs-c6 .hs-pl[style] .b{filter:drop-shadow(0 0 calc(1px * var(--bs)) rgba(24,28,44,.16)) drop-shadow(calc(var(--sy) * -.967) var(--sy) var(--sb) rgba(22,28,48,calc(.13 * (1 - .25 * (1 - min(1, var(--k)))))))}html[data-theme="dark"] .sx-hx[data-v="B4"][data-open]:not(.hx-static) .hs-pl[style] .b{filter:drop-shadow(calc(var(--sy) * -.967) var(--sy) var(--sb) rgba(0,0,0,calc(.3 * (1 - .15 * (1 - min(1, var(--k)))))))}</style></head>
 <body>
-<a class="skip-link" href="#main">Skip to content</a>
-<header class="site">
-  <div class="wrap">
-    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async"></a>
-    <nav class="site-bar">
-      <div class="site-links">
-        <a href="/trial.html" data-nav="glance">Glance</a>
-        <a href="/#organization" data-nav="flow">Flow</a>
-        <a href="/pricing.html" data-nav="pricing">Pricing</a>
-        <a href="/security.html" data-nav="security">Security</a>
-        <a href="/contact.html" data-nav="contact">Contact</a>
+<a class="skip-link" href="#main" data-he="דלג לתוכן" data-de="Zum Inhalt springen" data-fr="Aller au contenu" data-es="Saltar al contenido">Skip to content</a>
+<div class="ctl" id="ctl">
+  <div class="lang">
+    <button type="button" id="langBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu" aria-label="Language">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"/></svg>
+      <span class="sr-only" id="langName">English</span>
+    </button>
+    <div class="menu" id="langMenu" role="menu" aria-labelledby="langBtn"></div>
+  </div>
+  <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Night mode">
+    <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"/></svg>
+    <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
+  </button>
+</div>
+<flow-header data-base=""></flow-header>
+<main id="main" class="rc hs v3"><script>(function(){var m=document.getElementById("main"),he=document.documentElement.dataset.ui==="he";m.lang=he?"he":"en";m.dir=he?"rtl":"ltr"})()</script><section class="rc-ch sx sx-hx" data-bg="g" data-v="B4" data-open="1" aria-label="Security and Architecture: four layers, Encryption, Masking, Permissions, Audit"><div class="hx-track"><div class="hx-pin"><div class="hx-top"><span class="hx-eb" data-he="אבטחה וארכיטקטורה" data-de="Sicherheit &amp;amp; Architektur" data-fr="Sécurité &amp;amp; architecture" data-es="Seguridad y arquitectura">Security &amp; Architecture</span><h1 class="rc-h2 fx-security-h1" data-he="<span class=&quot;ln&quot;>ממוסך לפני עיבוד</span><span class=&quot;ln&quot;>מאושר לפני ביצוע</span><span class=&quot;ln fx-gw&quot;>מתועד אחרי</span>" data-de="<span class=&quot;ln&quot;>Maskiert vor der Verarbeitung</span><span class=&quot;ln&quot;>Freigegeben vor der Ausführung</span><span class=&quot;ln fx-gw&quot;>Protokolliert danach</span>" data-fr="<span class=&quot;ln&quot;>Masqué avant le traitement</span><span class=&quot;ln&quot;>Validé avant l’exécution</span><span class=&quot;ln fx-gw&quot;>Consigné ensuite</span>" data-es="<span class=&quot;ln&quot;>Enmascarado antes de procesar</span><span class=&quot;ln&quot;>Aprobado antes de ejecutar</span><span class=&quot;ln fx-gw&quot;>Registrado después</span>"><span class="ln">Masked before processing</span><span class="ln">Approved before execution</span><span class="ln fx-gw">Recorded after</span></h1></div><div class="hx-tile"><div class="hs-tile hs-c2 hs-c3 hs-c5 hs-c6 hs-c8"><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="hx-sw" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="70" y2="70" gradientTransform="translate(-90,-90)"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><mask id="hx-m" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200"><rect x="0" y="0" width="200" height="200" fill="url(#hx-sw)"/></mask><pattern id="hx-hb" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V12" fill="none" stroke-width="1.5" stroke="#2D5EFE"/></pattern><radialGradient id="hx-sd" gradientUnits="userSpaceOnUse" cx="116" cy="124" r="142"><stop offset="0" stop-color="#0e1838" stop-opacity=".46"/><stop offset=".6" stop-color="#0e1838" stop-opacity=".24"/><stop offset="1" stop-color="#0c1432" stop-opacity="0"/></radialGradient><radialGradient id="hx-sd-d" gradientUnits="userSpaceOnUse" cx="116" cy="124" r="132"><stop offset="0" stop-color="#000" stop-opacity=".62"/><stop offset=".55" stop-color="#000" stop-opacity=".32"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient><linearGradient id="hx-edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".98"/><stop offset=".5" stop-color="#d4d7df" stop-opacity=".85"/><stop offset="1" stop-color="#a9aebb" stop-opacity=".75"/></linearGradient><linearGradient id="hx-edge-d" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#cfd5e6" stop-opacity=".3"/><stop offset="1" stop-color="#cfd5e6" stop-opacity=".16"/></linearGradient><linearGradient id="hs-gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset=".45" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><pattern id="hs-h" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V12" fill="none" stroke-width="1" style="stroke:var(--hs-fine)"/></pattern><pattern id="hs-d" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="7" cy="7" r="1.1" style="fill:var(--hs-fine)"/></pattern><linearGradient id="hs-gl2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".96"/><stop offset=".5" stop-color="#eef3ff" stop-opacity=".5"/><stop offset="1" stop-color="#c9dbff" stop-opacity=".42"/></linearGradient><linearGradient id="hs-ed" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4F7DFE"/><stop offset="1" stop-color="#1F46D6"/></linearGradient><linearGradient id="hs-gl3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".45" stop-color="#f3f7ff" stop-opacity=".42"/><stop offset="1" stop-color="#eaf1ff" stop-opacity=".5"/></linearGradient><linearGradient id="hs-gl5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset=".38" stop-color="#fff" stop-opacity=".16"/><stop offset=".62" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".22"/></linearGradient><linearGradient id="hs-ed5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2D5EFE"/><stop offset=".5" stop-color="#6E9BFE" stop-opacity=".7"/><stop offset="1" stop-color="#1F46D6"/></linearGradient><linearGradient id="hs-gl8" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".4" stop-color="#fff" stop-opacity=".4"/><stop offset=".66" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#4F7DFE" stop-opacity=".3"/></linearGradient><linearGradient id="hs-rb" x1="0" y1="0" x2="1" y2="1"><stop offset=".34" stop-color="#fff" stop-opacity="0"/><stop offset=".46" stop-color="#fff" stop-opacity=".85"/><stop offset=".53" stop-color="#fff" stop-opacity=".12"/><stop offset=".62" stop-color="#fff" stop-opacity="0"/></linearGradient><linearGradient id="hs-ed8" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6E9BFE" stop-opacity=".55"/><stop offset=".55" stop-color="#3F6FFE" stop-opacity=".85"/><stop offset="1" stop-color="#1F46D6"/></linearGradient></defs></svg><div class="hs-stage"><div class="hs-ground"></div><div class="hs-obj" role="img" aria-label="Four protection layers: Encryption, Masking, Permissions, Audit"><div class="hs-pl" style="--k:0"><svg viewBox="0 0 200 200" aria-hidden="true"><rect class="b" x="2" y="2" width="196" height="196" rx="14"/><rect class="sp" x="5" y="5" width="190" height="190" rx="11"/><rect class="gl" x="2" y="2" width="196" height="196" rx="14"/><rect class="rb" x="2" y="2" width="196" height="196" rx="14"/><rect class="sd" x="2" y="2" width="196" height="196" rx="14"/><rect x="2" y="2" width="196" height="196" rx="14" fill="url(#hs-h)"/><rect class="enc" x="2" y="2" width="196" height="196" rx="14" fill="url(#hx-hb)" mask="url(#hx-m)"/><rect class="f fr" x="30" y="30" width="140" height="140" rx="6"/><path class="l" d="M14 26V14h12M174 14h12v12M186 174v12h-12M26 186H14v-12" opacity=".9"/></svg></div><div class="hs-pl" style="--k:1"><svg viewBox="0 0 200 200" aria-hidden="true"><rect class="b" x="2" y="2" width="196" height="196" rx="14"/><rect class="sp" x="5" y="5" width="190" height="190" rx="11"/><rect class="gl" x="2" y="2" width="196" height="196" rx="14"/><rect class="rb" x="2" y="2" width="196" height="196" rx="14"/><rect class="sd" x="2" y="2" width="196" height="196" rx="14"/><rect x="2" y="2" width="196" height="196" rx="14" fill="url(#hs-d)"/><rect class="r r0" x="40" y="72" width="104" height="11" rx="5.5"/><rect class="r r1" x="40" y="94" width="72" height="11" rx="5.5"/><rect class="r r2" x="40" y="116" width="120" height="11" rx="5.5"/><path class="l" d="M14 26V14h12M174 14h12v12M186 174v12h-12M26 186H14v-12" opacity=".9"/></svg></div><div class="hs-pl" style="--k:2"><svg viewBox="0 0 200 200" aria-hidden="true"><rect class="b" x="2" y="2" width="196" height="196" rx="14"/><rect class="sp" x="5" y="5" width="190" height="190" rx="11"/><rect class="gl" x="2" y="2" width="196" height="196" rx="14"/><rect class="rb" x="2" y="2" width="196" height="196" rx="14"/><rect class="sd" x="2" y="2" width="196" height="196" rx="14"/><rect class="f cb c0" x="40" y="56" width="11" height="11" rx="2.5"/><path class="ck k0" d="M42.6 61.8l2.7 2.9 5-5.7" pathLength="1"/><path class="l w w0" d="M64 62 H143" opacity=".75"/><circle class="n o o0" cx="152" cy="62" r="5.5"/><rect class="f cb c1" x="40" y="94" width="11" height="11" rx="2.5"/><path class="ck k1" d="M42.6 99.8l2.7 2.9 5-5.7" pathLength="1"/><path class="l w w1" d="M64 100 H143" opacity=".75"/><circle class="s o o1" cx="152" cy="100" r="5.5"/><rect class="f cb c2" x="40" y="132" width="11" height="11" rx="2.5"/><path class="ck k2" d="M42.6 137.8l2.7 2.9 5-5.7" pathLength="1"/><path class="l w w2" d="M64 138 H143" opacity=".75"/><circle class="n o o2" cx="152" cy="138" r="5.5"/><path class="f" d="M40 86H160M40 124H160"/><path class="l" d="M14 26V14h12M174 14h12v12M186 174v12h-12M26 186H14v-12" opacity=".9"/></svg></div><div class="hs-pl top" style="--k:3"><svg viewBox="0 0 200 200" aria-hidden="true"><rect class="b" x="2" y="2" width="196" height="196" rx="14"/><rect class="sp" x="5" y="5" width="190" height="190" rx="11"/><rect class="gl" x="2" y="2" width="196" height="196" rx="14"/><rect class="rb" x="2" y="2" width="196" height="196" rx="14"/><path class="f" d="M56 48V152" stroke-dasharray="2 4"/><circle class="n" cx="56" cy="48" r="5.5"/><path class="l" d="M72 48 H150" opacity=".75"/><circle class="n" cx="56" cy="82" r="5.5"/><path class="l" d="M72 82 H128" opacity=".75"/><circle class="n" cx="56" cy="116" r="5.5"/><path class="l" d="M72 116 H158" opacity=".75"/><circle class="s rd" cx="56" cy="152" r="5.5"/><path class="l rl" d="M72 152 H110" opacity=".75"/><path class="l" d="M14 26V14h12M174 14h12v12M186 174v12h-12M26 186H14v-12" opacity=".9"/></svg></div></div></div><ul class="hs-spec"><li data-he="הצפנה" data-de="Verschlüsselung" data-fr="Chiffrement" data-es="Cifrado">Encryption</li><li data-he="מיסוך" data-de="Maskierung" data-fr="Masquage" data-es="Enmascaramiento">Masking</li><li data-he="הרשאות" data-de="Berechtigungen" data-fr="Autorisations" data-es="Permisos">Permissions</li><li data-he="תיעוד" data-de="Protokoll" data-fr="Audit" data-es="Auditoría">Audit</li></ul></div></div><div class="hx-caps"><div class="hx-cap" style="--i:0"><span class="k" aria-hidden="true"><span class="n">01</span><i class="tk"><b class="on"></b><b></b><b></b><b></b></i></span><h3 data-he="הצפנה" data-de="Verschlüsselung" data-fr="Chiffrement" data-es="Cifrado">Encryption</h3><p data-he="כל התעבורה ב-HTTPS עם HSTS." data-de="Der gesamte Verkehr läuft über HTTPS mit HSTS." data-fr="Tout le trafic passe par HTTPS avec HSTS." data-es="Todo el tráfico va por HTTPS con HSTS.">All traffic over HTTPS with HSTS.</p></div><div class="hx-cap" style="--i:1"><span class="k" aria-hidden="true"><span class="n">02</span><i class="tk"><b class="on"></b><b class="on"></b><b></b><b></b></i></span><h3 data-he="מיסוך" data-de="Maskierung" data-fr="Masquage" data-es="Enmascaramiento">Masking</h3><p data-he="שדות רגישים מוחלפים בסימונים לפני העיבוד." data-de="Sensible Felder werden vor der Verarbeitung durch Platzhalter ersetzt." data-fr="Les champs sensibles sont remplacés par des marqueurs avant le traitement." data-es="Los campos sensibles se sustituyen por marcadores antes de procesarse.">Sensitive fields are replaced with placeholders before processing.</p></div><div class="hx-cap" style="--i:2"><span class="k" aria-hidden="true"><span class="n">03</span><i class="tk"><b class="on"></b><b class="on"></b><b class="on"></b><b></b></i></span><h3 data-he="הרשאות" data-de="Berechtigungen" data-fr="Autorisations" data-es="Permisos">Permissions</h3><p data-he="האוטונומיה מוגבלת במדיניות שאתם מגדירים." data-de="Die Autonomie folgt den Regeln, die Sie festlegen." data-fr="L’autonomie est encadrée par les règles que vous définissez." data-es="La autonomía está limitada por las reglas que usted define.">Autonomy is bounded by policy you define.</p></div><div class="hx-cap" style="--i:3"><span class="k" aria-hidden="true"><span class="n">04</span><i class="tk"><b class="on"></b><b class="on"></b><b class="on"></b><b class="on"></b></i></span><h3 data-he="תיעוד" data-de="Protokoll" data-fr="Audit" data-es="Auditoría">Audit</h3><p data-he="מה נצפה, הוצע, אושר ובוצע." data-de="Was beobachtet, vorgeschlagen, freigegeben und ausgeführt wurde." data-fr="Ce qui a été observé, proposé, validé et exécuté." data-es="Qué se observó, se propuso, se aprobó y se ejecutó.">What was observed, proposed, approved and executed.</p></div><div class="hx-cap hold" aria-hidden="true"><h3 data-he="ארבע שכבות בין המידע שלכם לכל השאר" data-de="Vier Schichten zwischen Ihren Daten und allem anderen" data-fr="Quatre couches entre vos données et tout le reste" data-es="Cuatro capas entre sus datos y todo lo demás">Four layers between your data and everything else</h3></div></div></div></div></section><svg class="sx-svg" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M3 12s3.5-6.5 9-6.5S21 12 21 12s-3.5 6.5-9 6.5S3 12 3 12z"/><circle cx="12" cy="12" r="2.6"/><path d="M4 4l16 16"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3.5"/><path d="M10.5 12.5L20 3M16 7l3 3"/></symbol>
+<symbol id="i-chipoff" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4M4 4l16 16"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12h5M9.5 16h5"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+<symbol id="i-browser" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9.5h18"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.5 7.5l8.5 6 8.5-6"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.4v.1"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></symbol>
+<symbol id="i-sendoff" viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/><path d="M4 4l16 16"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 9h6v6H9z"/></symbol>
+<symbol id="i-case" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M3 12s3.5-6.5 9-6.5S21 12 21 12s-3.5 6.5-9 6.5S3 12 3 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+</defs></svg><section class="rc-ch v3-intro r3-intro" data-bg="w"><div class="rc-in n r3-in">
+<p class="r3-pull rv"><span data-he="Flow נבנה לארגונים שאינם יכולים לשלוח מידע רגיש גולמי למודל של צד שלישי" data-de="Flow ist für Organisationen gebaut, die sensible Rohdaten nicht an ein fremdes Modell senden dürfen" data-fr="Flow est conçu pour les organisations qui ne peuvent pas envoyer de données sensibles brutes à un modèle tiers" data-es="Flow está hecho para organizaciones que no pueden enviar datos sensibles sin procesar a un modelo de terceros">Flow is built for organizations that cannot send raw sensitive data to a third-party model</span></p>
+<ul class="r3-sec rv" aria-label="Professions"><li><span data-he="עורכי דין" data-de="Kanzleien" data-fr="Avocats" data-es="Abogados">Lawyers</span></li><li><span data-he="סוכני ביטוח" data-de="Versicherungsagenturen" data-fr="Courtiers en assurance" data-es="Corredores de seguros">Insurance agents</span></li><li><span data-he="רואי חשבון" data-de="Steuerkanzleien" data-fr="Experts-comptables" data-es="Asesores">Accountants</span></li></ul>
+<p class="r3-after rv"><span data-he="הדף הזה מתאר איך המערכת מתוכננת, כדי שצוות האבטחה שלכם יוכל להעריך אותה בלי שיחה." data-de="Diese Seite beschreibt, wie das System aufgebaut ist, damit Ihr Sicherheitsteam es ohne Gespräch bewerten kann." data-fr="Cette page décrit la conception du système, pour que votre équipe sécurité puisse l’évaluer sans rendez-vous." data-es="Esta página describe cómo está diseñado el sistema, para que su equipo de seguridad pueda evaluarlo sin una llamada.">This page describes how the system is designed, so your security team can evaluate it without a call.</span></p>
+</div></section><section id="secdep" class="rc-ch sx sx-sec sx-dep" data-bg="w" data-zone-scope><div class="sx-in"><h2 class="rc-h2 rv" data-he="מודלי פריסה" data-de="Bereitstellungsmodelle" data-fr="Modes de déploiement" data-es="Modelos de despliegue">Deployment Models</h2><p class="sx-lead rv" data-he="איפה מתבצע העיבוד? המשרד בוחר אחת משלוש אפשרויות." data-de="Wo findet die Verarbeitung statt? Das Büro wählt eine von drei Varianten." data-fr="Où se fait le traitement ? Le cabinet choisit l’un des trois modes." data-es="¿Dónde se procesa? El despacho elige uno de tres modelos.">Where does processing happen? The office chooses one of three setups.</p><div class="rv"><div class="dep dep2" role="group" aria-label="Flow deployment setups"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div></div><section class="op-sec sx-op rv" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section><!-- 19.11: r2-path and r2-seq replaced by the approved A2r2b + B2r2 sections (old markup in bak/pre-final-package-20261119) -->
+<section class="sa2" id="secA" aria-labelledby="secAh">
+<div class="scene st1" id="mask2"><div class="stage">
+ <div class="txt">
+  <header class="sa-head"><p class="eb"><span data-he="המסלול של מסמך" data-de="Der Weg eines Dokuments" data-fr="Le parcours d’un document" data-es="El recorrido de un documento">The path of a document</span></p><h2 class="h2" id="secAh"><span data-he="המודל לא רואה" data-de="Das Modell sieht nie" data-fr="Le modèle ne voit jamais" data-es="El modelo nunca ve">The model never sees</span><span class="gw" data-he="את הערכים האמיתיים" data-de="die echten Werte" data-fr="les vraies valeurs" data-es="los valores reales">the real values</span></h2></header>
+  <div class="cap" aria-live="polite">
+   <div><b data-he="הלקוח, כמו שהוא אצלכם" data-de="Der Kunde, wie er bei Ihnen steht" data-fr="Le client, tel qu’il est chez vous" data-es="El cliente, tal como lo tiene usted">The client, as you hold it</b><p data-he="הרשומה המלאה נשארת במערכות שלכם" data-de="Der vollständige Datensatz bleibt in Ihren Systemen" data-fr="Le dossier complet reste dans vos systèmes" data-es="El registro completo se queda en sus sistemas">The full record stays in your systems</p></div>
+   <div><b data-he="מה שהמודל מקבל" data-de="Was das Modell erhält" data-fr="Ce que reçoit le modèle" data-es="Lo que recibe el modelo">What the model receives</b><p data-he="&lt;bdi&gt;Flow&lt;/bdi&gt; מחליפה כל פרט מזהה בסימון, והמפתח לא יוצא מהארגון" data-de="&lt;bdi&gt;Flow&lt;/bdi&gt; ersetzt jedes identifizierende Detail durch einen Platzhalter, und der Schlüssel verlässt Ihre Organisation nie" data-fr="&lt;bdi&gt;Flow&lt;/bdi&gt; remplace chaque donnée identifiante par un marqueur, et la clé ne quitte jamais votre organisation" data-es="&lt;bdi&gt;Flow&lt;/bdi&gt; sustituye cada dato identificativo por un marcador, y la clave nunca sale de su organización"><bdi>Flow</bdi> swaps every identifying detail for a placeholder, and the key never leaves your organization</p></div>
+   <div><b data-he="חוזר אליכם מלא" data-de="Vollständig zurück bei Ihnen" data-fr="De retour chez vous, complet" data-es="De vuelta a usted, completo">Back to you, complete</b><p data-he="התשובה חוזרת עם הפרטים האמיתיים. דבר לא נשמר לאימון" data-de="Die Antwort kommt mit den echten Angaben zurück. Nichts wird für Training gespeichert" data-fr="La réponse revient avec les vraies données. Rien n’est conservé pour l’entraînement" data-es="La respuesta vuelve con los datos reales. Nada se guarda para entrenamiento">The reply comes back with the real details. Nothing is kept for training</p></div>
+  </div>
+ </div>
+ <div class="obj" aria-hidden="true">
+  <div class="sa-card">
+   <div class="face front">
+    <div class="ch"><span class="who"><b><span data-he="תיק לקוח" data-de="Kundenakte" data-fr="Dossier client" data-es="Expediente">Client file</span> <span class="ltr" style="font-weight:500;color:var(--lab)">2026-0418</span></b></span><span data-he="אצלכם" data-de="Bei Ihnen" data-fr="Chez vous" data-es="De su lado">On your side</span></div>
+    <div class="rows"><div class="r"><span class="l" data-he="שם" data-de="Name" data-fr="Nom" data-es="Nombre">Name</span><span class="v" data-he="דנה לוי" data-de="Anna Schmidt" data-fr="Claire Martin" data-es="Lucía García">Sarah Miller</span></div><div class="r"><span class="l" data-he="טלפון" data-de="Telefon" data-fr="Téléphone" data-es="Teléfono">Phone</span><span class="v n" data-he="050-000-0000" data-de="030 1234567" data-fr="06 12 34 56 78" data-es="612 345 678">555-010-0000</span></div><div class="r"><span class="l" data-he="ת״ז" data-de="Ausweis-Nr." data-fr="N° d’identité" data-es="DNI">ID no.</span><span class="v n" data-he="012345674" data-de="L01X00T47" data-fr="X4RTBPFW4" data-es="12345678Z">X4827153</span></div><div class="r"><span class="l" data-he="כתובת" data-de="Adresse" data-fr="Adresse" data-es="Dirección">Address</span><span class="v" data-he="הרצל 12, חיפה" data-de="Hauptstr. 12, Berlin" data-fr="12 rue de la Paix, Lyon" data-es="Calle Mayor 12, Madrid">12 Harbor St, Boston</span></div></div>
+    <div class="reply"><div class="ask"><small><span data-he="הבקשה" data-de="Die Anfrage" data-fr="La demande" data-es="La solicitud">The request</span></small><p data-he="לענות ללקוחה שהמסמכים התקבלו" data-de="Der Kundin mitteilen, dass ihre Unterlagen eingegangen sind" data-fr="Dire à la cliente que ses documents sont arrivés" data-es="Avisar a la clienta de que sus documentos han llegado">Tell the client her documents have arrived</p></div>
+     <div class="ans"><small><span data-he="התשובה שחזרה" data-de="Die Antwort, die zurückkam" data-fr="La réponse revenue" data-es="La respuesta que volvió">The reply that came back</span></small><p data-he="שלום &lt;span class=&quot;sa-rv&quot;&gt;דנה לוי&lt;/span&gt;, המסמכים לתיק התקבלו" data-de="Hallo &lt;span class=&quot;sa-rv&quot;&gt;Anna Schmidt&lt;/span&gt;, die Unterlagen für Ihre Akte sind eingegangen" data-fr="Bonjour &lt;span class=&quot;sa-rv&quot;&gt;Claire Martin&lt;/span&gt;, les documents de votre dossier sont arrivés" data-es="Hola &lt;span class=&quot;sa-rv&quot;&gt;Lucía García&lt;/span&gt;, los documentos de su expediente han llegado">Hi <span class="sa-rv">Sarah Miller</span>, the documents for your file have arrived</p></div></div>
+   </div>
+   <div class="face back">
+    <div class="ch"><span class="who"><b data-he="מה שהמודל רואה" data-de="Was das Modell sieht" data-fr="Ce que voit le modèle" data-es="Lo que ve el modelo">What the model sees</b></span><span><i></i><span data-he="ממוסך" data-de="Maskiert" data-fr="Masqué" data-es="Enmascarado">Masked</span></span></div>
+    <div class="rows"><div class="r"><span class="l" data-he="שם" data-de="Name" data-fr="Nom" data-es="Nombre">Name</span><span class="v">Name_1</span></div><div class="r"><span class="l" data-he="טלפון" data-de="Telefon" data-fr="Téléphone" data-es="Teléfono">Phone</span><span class="v">Phone_1</span></div><div class="r"><span class="l" data-he="ת״ז" data-de="Ausweis-Nr." data-fr="N° d’identité" data-es="DNI">ID no.</span><span class="v">ID_1</span></div><div class="r"><span class="l" data-he="כתובת" data-de="Adresse" data-fr="Adresse" data-es="Dirección">Address</span><span class="v">Address_1</span></div></div>
+    <div class="reply"><small><span data-he="הטיוטה של המודל" data-de="Der Entwurf des Modells" data-fr="Le brouillon du modèle" data-es="El borrador del modelo">The model’s draft</span></small><p data-he="שלום &lt;span class=&quot;tk&quot;&gt;Name_1&lt;/span&gt;, המסמכים לתיק התקבלו" data-de="Hallo &lt;span class=&quot;tk&quot;&gt;Name_1&lt;/span&gt;, die Unterlagen für Ihre Akte sind eingegangen" data-fr="Bonjour &lt;span class=&quot;tk&quot;&gt;Name_1&lt;/span&gt;, les documents de votre dossier sont arrivés" data-es="Hola &lt;span class=&quot;tk&quot;&gt;Name_1&lt;/span&gt;, los documentos de su expediente han llegado">Hi <span class="tk">Name_1</span>, the documents for your file have arrived</p></div>
+   </div>
+  </div>
+  <div class="floor"></div>
+ </div>
+ <div class="prog" aria-hidden="true"><i></i><i></i><i></i></div>
+</div></div>
+<div class="foot" style="background:var(--sec);padding:0 20px 96px;text-align:center"><p class="sa-note" style="max-width:30em;margin:0 auto"><span data-he="מיסוך מפחית סיכון ואינו תחליף לארכיטקטורה. כשהמידע חייב להישאר בבניין, משתמשים ב-&lt;bdi&gt;Flow-Edge&lt;/bdi&gt; או ב-&lt;bdi&gt;Flow-Onprem&lt;/bdi&gt;." data-de="Maskierung senkt das Risiko, ersetzt aber keine Architektur. Wenn Daten im Haus bleiben müssen, nutzen Sie &lt;bdi&gt;Flow-Edge&lt;/bdi&gt; oder &lt;bdi&gt;Flow-Onprem&lt;/bdi&gt;." data-fr="Le masquage réduit le risque, il ne remplace pas l’architecture. Quand les données doivent rester sur place, utilisez &lt;bdi&gt;Flow-Edge&lt;/bdi&gt; ou &lt;bdi&gt;Flow-Onprem&lt;/bdi&gt;." data-es="El enmascaramiento reduce el riesgo, pero no sustituye a la arquitectura. Cuando los datos deben quedarse en casa, use &lt;bdi&gt;Flow-Edge&lt;/bdi&gt; o &lt;bdi&gt;Flow-Onprem&lt;/bdi&gt;.">Masking reduces risk; it does not replace architecture. When data must stay in the building, use <bdi>Flow-Edge</bdi> or <bdi>Flow-Onprem</bdi>.</span></p></div>
+</section>
+<section class="sb2" id="secB" aria-labelledby="secBh">
+<div class="sec" id="approve2"><div class="sa-wrap">
+ <header class="sa-head"><p class="eb"><span data-he="אישור ותיעוד" data-de="Freigabe und Protokoll" data-fr="Validation et audit" data-es="Aprobación y auditoría">Approval and audit</span></p><h2 class="h2" id="secBh"><span data-he="שום דבר לא יוצא&lt;br&gt;בשמכם" data-de="Nichts geht in Ihrem Namen hinaus," data-fr="Rien ne part en votre nom" data-es="Nada sale en su nombre">Nothing goes out in your name</span> <span class="gw il" data-he="עד שתאשרו" data-de="bevor Sie freigeben" data-fr="avant votre validation" data-es="hasta que usted lo aprueba">until you approve</span></h2>
+  <p class="sub" data-he="האוטונומיה נקבעת במדיניות שלכם, לא לפי הביטחון של המודל" data-de="Die Autonomie bestimmt Ihre Richtlinie, nicht das Selbstvertrauen des Modells" data-fr="L’autonomie dépend de votre politique, pas de la confiance du modèle" data-es="La autonomía la fija su política, no la confianza del modelo">Autonomy is set by your policy, not by the model’s confidence</p></header>
+ <div class="obj" id="hg">
+  <div class="pair">
+   <div class="side before"><p class="k" data-he="&lt;b class=&quot;ltr&quot;&gt;Flow&lt;/b&gt;מציעה" data-de="&lt;b class=&quot;ltr&quot;&gt;Flow&lt;/b&gt; schlägt vor" data-fr="&lt;b class=&quot;ltr&quot;&gt;Flow&lt;/b&gt; propose" data-es="&lt;b class=&quot;ltr&quot;&gt;Flow&lt;/b&gt; propone"><b class="ltr">Flow</b> proposes</p><p class="t" data-he="לשלוח ללקוח את טיוטת התשובה?" data-de="Den Antwortentwurf an den Kunden senden?" data-fr="Envoyer le brouillon de réponse au client ?" data-es="¿Enviar al cliente el borrador de respuesta?">Send the draft reply to the client?</p><p class="d" data-he="על סמך המייל שלו מהבוקר והתיק במערכת" data-de="Auf Basis seiner E-Mail von heute Morgen und der Akte im System" data-fr="D’après son e-mail de ce matin et le dossier dans le système" data-es="Según su correo de esta mañana y el expediente en el sistema">Based on his email this morning and the file in your system</p><p class="stt"><i></i><span data-he="ממתינה לאישור שלכם" data-de="Wartet auf Ihre Freigabe" data-fr="En attente de votre validation" data-es="Esperando su aprobación">Waiting for your approval</span></p></div>
+   <div class="seam"><span class="well"><span class="doit" role="button" tabindex="0" id="go"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span></span></div>
+   <div class="side after"><p class="wait" aria-hidden="true" data-he="קורה רק אחרי האישור" data-de="Passiert erst nach der Freigabe" data-fr="Seulement après validation" data-es="Solo ocurre tras la aprobación">Happens only after approval</p>
+    <div class="res"><p class="k"><span class="chk"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span data-he="אחרי האישור" data-de="Nach der Freigabe" data-fr="Après validation" data-es="Tras la aprobación">After approval</span></p><p class="t" data-he="הטיוטה נשלחה ללקוח" data-de="Der Entwurf wurde an den Kunden gesendet" data-fr="Le brouillon a été envoyé au client" data-es="El borrador se envió al cliente">The draft was sent to the client</p><p class="meta" data-he="&lt;b&gt;דנה לוי&lt;/b&gt; אישרה ב־09:42, והפעולה נרשמה ביומן" data-de="&lt;b&gt;Anna Schmidt&lt;/b&gt; hat um 09:42 freigegeben, und die Aktion wurde protokolliert" data-fr="&lt;b&gt;Claire Martin&lt;/b&gt; a validé à 09:42, et l’action a été consignée" data-es="&lt;b&gt;Lucía García&lt;/b&gt; aprobó a las 09:42, y la acción quedó registrada"><b>Sarah Miller</b> approved at 09:42, and the action was logged</p></div></div>
+  </div>
+  <div class="ask"><div class="pill"><svg viewBox="0 0 18 18"><circle cx="7.5" cy="7.5" r="5.2"/><path d="M11.4 11.4L16 16"/></svg><span data-he="למה המערכת פעלה כך?" data-de="Warum hat das System so gehandelt?" data-fr="Pourquoi le système a-t-il agi ainsi ?" data-es="¿Por qué actuó así el sistema?">Why did the system act that way?</span></div>
+   <p class="ans"><span class="a2"><span class="aw" data-he="התשובה תופיע אחרי האישור" data-de="Die Antwort erscheint nach der Freigabe" data-fr="La réponse apparaît après validation" data-es="La respuesta aparece tras la aprobación">The answer appears after approval</span><span class="ar" data-he="כי דנה לוי אישרה את הטיוטה ב־09:42" data-de="Weil Anna Schmidt den Entwurf um 09:42 freigegeben hat" data-fr="Parce que Claire Martin a validé le brouillon à 09:42" data-es="Porque Lucía García aprobó el borrador a las 09:42">Because Sarah Miller approved the draft at 09:42</span></span><span class="q2" data-he="משוחזר מרשומות, לא מזיכרון · היקף היומן מוסכם עם צוות האבטחה שלכם · המחשה" data-de="Aus Aufzeichnungen rekonstruiert, nicht aus dem Gedächtnis · Protokollumfang mit Ihrem Sicherheitsteam abgestimmt · Illustration" data-fr="Reconstitué à partir des enregistrements, pas de mémoire · Périmètre du journal convenu avec votre équipe sécurité · Illustration" data-es="Reconstruido a partir de registros, no de memoria · Alcance del registro acordado con su equipo de seguridad · Ilustración">Reconstructed from records, not from memory · Log scope agreed with your security team · Illustration</span></p></div>
+ </div>
+</div></div>
+</section><section class="rc-ch sx sx-sec r2 r2-comp" data-bg="g"><div class="sx-in">
+<div class="r3-cert rv">
+<div class="r3-cin">
+<span class="r3-ck"><span data-he="עמדת תאימות" data-de="Compliance" data-fr="Conformité" data-es="Cumplimiento">Compliance posture</span></span>
+<span class="r3-rule" aria-hidden="true"></span>
+<p class="r3-cb"><span data-he="הארכיטקטורה מתוכננת לתמוך בפריסה תחת דרישות כמו &lt;bdi&gt;&lt;b&gt;GDPR&lt;/b&gt;&lt;/bdi&gt; ו־&lt;bdi&gt;&lt;b&gt;SOC 2&lt;/b&gt;&lt;/bdi&gt;" data-de="Die Architektur ist darauf ausgelegt, den Einsatz unter Anforderungen wie &lt;bdi&gt;&lt;b&gt;DSGVO&lt;/b&gt;&lt;/bdi&gt; und &lt;bdi&gt;&lt;b&gt;SOC 2&lt;/b&gt;&lt;/bdi&gt; zu unterstützen" data-fr="L’architecture est conçue pour permettre un déploiement sous des exigences comme le &lt;bdi&gt;&lt;b&gt;RGPD&lt;/b&gt;&lt;/bdi&gt; et &lt;bdi&gt;&lt;b&gt;SOC 2&lt;/b&gt;&lt;/bdi&gt;" data-es="La arquitectura está diseñada para permitir el despliegue bajo requisitos como el &lt;bdi&gt;&lt;b&gt;RGPD&lt;/b&gt;&lt;/bdi&gt; y &lt;bdi&gt;&lt;b&gt;SOC 2&lt;/b&gt;&lt;/bdi&gt;">The architecture is designed to support deployment under requirements such as <bdi><b>GDPR</b></bdi> and <bdi><b>SOC 2</b></bdi></span></p>
+<p class="r3-cn"><span data-he="זו התאמת תכנון, לא הסמכה" data-de="Das ist eine Ausrichtung im Design, keine Zertifizierung" data-fr="Il s’agit d’un alignement de conception, pas d’une certification" data-es="Es una alineación de diseño, no una certificación">This is design alignment, not certification</span></p>
+<span class="r3-rule r3-rule2" aria-hidden="true"></span>
+<p class="r3-cw"><span data-he="יש לכם שאלון אבטחה או תאימות? שלחו אותו ונענה בכתב: &lt;a href=&quot;mailto:info@theflow-ai.com?subject=Security%20questionnaire&quot;&gt;info@theflow-ai.com&lt;/a&gt;" data-de="Sie haben einen Sicherheits- oder Compliance-Fragebogen? Schicken Sie ihn uns, wir antworten schriftlich: &lt;a href=&quot;mailto:info@theflow-ai.com?subject=Security%20questionnaire&quot;&gt;info@theflow-ai.com&lt;/a&gt;" data-fr="Vous avez un questionnaire de sécurité ou de conformité ? Envoyez-le-nous, nous répondrons par écrit : &lt;a href=&quot;mailto:info@theflow-ai.com?subject=Security%20questionnaire&quot;&gt;info@theflow-ai.com&lt;/a&gt;" data-es="¿Tiene un cuestionario de seguridad o cumplimiento? Envíenoslo y le responderemos por escrito: &lt;a href=&quot;mailto:info@theflow-ai.com?subject=Security%20questionnaire&quot;&gt;info@theflow-ai.com&lt;/a&gt;">Have a security or compliance questionnaire? Send it over and we will answer in writing: <a href="mailto:info@theflow-ai.com?subject=Security%20questionnaire">info@theflow-ai.com</a></span></p>
+</div></div>
+</div></section><section class="rc-ch sx sx-sec sx-cta" data-bg="g"><div class="sx-in"><div class="sx-ctab rv"><h2 class="rc-h2" data-he="בוחנים את Flow לסביבה מוסדרת?" data-de="Sie prüfen Flow für ein reguliertes Umfeld?" data-fr="Vous évaluez Flow pour un environnement réglementé ?" data-es="¿Evalúa Flow para un entorno regulado?">Evaluating Flow for a regulated environment?</h2><p class="sx-lead" data-he="ספרו לנו אילו דרישות חלות עליכם, ונתחיל בפרטי הארכיטקטורה הרלוונטיים." data-de="Sagen Sie uns, welche Anforderungen für Sie gelten, und wir beginnen mit den passenden Architekturdetails." data-fr="Dites-nous quelles exigences s’appliquent à vous et nous commencerons par les détails d’architecture qui les concernent." data-es="Díganos qué requisitos le aplican y empezaremos por los detalles de arquitectura relevantes.">Tell us which requirements apply to you and we will lead with the relevant architecture detail.</p><a class="doit" href="https://calendar.app.google/FLWjDDQWAiM3bHvc9" target="_blank" rel="noopener" data-ga="security_book_call"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-he="קביעת שיחה" data-de="Gespräch vereinbaren" data-fr="Réserver un appel" data-es="Reservar una llamada">Book a call</span></a></div></div></section></main><script>(function(){var m=document.getElementById("main");if(document.documentElement.dataset.ui!=="he")return;m.querySelectorAll("[data-he]").forEach(function(el){if(el._en==null)el._en=el.innerHTML;el.innerHTML=el.getAttribute("data-he")})})()</script>
+<footer class="site-foot" id="footer" lang="en" dir="ltr">
+  <div class="foot-in">
+    <div class="foot-cols">
+      <div class="foot-col foot-brand">
+        <img loading="lazy" src="assets/flow-logo-200.webp" alt="Flow" width="64" height="28">
+        <a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
       </div>
-      <a class="doit sm nav-get" href="/trial.html" data-ga="nav_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-nav="cta">Get Glance</span></a>
-      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
-        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
-      </button>
-      
-      <button class="lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
-      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
-        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
-      </button>
-    </nav>
-  </div>
-</header>
-<div class="mobile-nav" id="mobileNav" hidden>
-  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
-  <a href="/solutions/">Solutions</a>
-  <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
-</div>
-<main id="main">
-  <div class="wrap">
-    <span class="eyebrow">Trust</span>
-    <h1 class="title">Security &amp; Architecture</h1>
-    <div class="updated">Last updated: September 30, 2026</div>
-    <article>
-<p class="note">Flow is in pre-release. This page describes intended architecture. SSO, the audit log, and Flow-Edge are part of the deployment offer (roadmap) &mdash; not capabilities marked live in the product today. For current status in writing: <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
-<p class="lead">Flow is built for organizations that cannot send raw sensitive data to a third-party model &mdash; legal, healthcare, finance, insurance, and government. This page describes how the system is designed, so your security team can evaluate it without a call.</p>
-
-<h2>1. Planned Deployment Models</h2>
-<p>The most important security decision is where processing happens. Flow is planned for two deployment models, per engagement &mdash; not as live product toggles today:</p>
-<div class="cards two">
-  <div class="card">
-    <h3>Masked Secure Cloud</h3>
-    <p>Processing is designed for a managed environment, with personally identifiable and confidential fields masked <b>before</b> processing. That is the architecture; deployment status is closed in the project, not a live toggle today.</p>
-  </div>
-  <div class="card">
-    <h3>Flow-Edge (Fully Local) &mdash; roadmap</h3>
-    <p>When policy requires that data not leave the network, this is the deployment path designed into the engagement &mdash; not a cloud configuration with a flag, and not a live product toggle today.</p>
-  </div>
-</div>
-<p>If your obligations make cloud processing untenable &mdash; export-controlled manufacturing data, NERC CIP-scoped operational systems, classified or CUI-adjacent government work &mdash; Flow-Edge (roadmap) is the deployment path designed into the engagement, not a configuration flag on a cloud product.</p>
-
-<h2>2. Data Masking</h2>
-<p>In the masked-cloud model, sensitive fields are designed to be identified and replaced with structure-preserving placeholders before processing. The model is designed to operate on the masked representation, with the mapping back to real values staying under your control, so a prompt, a log, or a model provider is not meant to receive the underlying identifier. Deployment status is closed in the engagement &mdash; not a live product toggle today.</p>
-<p>Masking is a mitigation, not a substitute for architecture. Where the requirement is "this data must not leave the building," the deployment path designed into the engagement is Flow-Edge (roadmap). We will say that directly rather than offer a cloud deployment with extra controls as if it were the same thing.</p>
-
-<h2>3. Zero-Retention Processing</h2>
-<p>Flow is designed so that content processed through the engine is not retained for model training and is not persisted beyond the life of the task that required it. "Zero-retention" is a claim worth verifying with any vendor &mdash; including us. We wrote a guide on <a href="/blog/zero-retention-ai-architecture.html">how to verify a vendor's zero-retention claim</a>, and we expect you to apply it to Flow.</p>
-
-<h2>4. Audit Logging &amp; Provenance</h2>
-<p><b>Immutable audit trail &mdash; roadmap.</b> For regulated deployments, an append-only log is planned: what was observed, what was proposed, who approved it, and what was executed. This is not a live product toggle today; it is closed in the engagement and the deployment. When it ships with a regulated rollout, the purpose is defensibility &mdash; when a regulator, auditor, or opposing counsel asks why a system did something eighteen months ago, the answer must be reconstructible from records rather than from memory.</p>
-<p>Related reading: <a href="/blog/auditability-by-design-ai-systems.html">Auditability by Design</a> and <a href="/blog/ai-observability-tracing-debugging.html">Tracing a workflow decision back to its source</a>.</p>
-
-<h2>5. Human Approval Gates</h2>
-<p>High-risk actions require explicit human approval before execution. The engine surfaces the proposed action with its supporting context; a person accepts or rejects it. Autonomy is bounded by policy you define, not by the model's confidence in itself.</p>
-
-<h2>6. Deterministic Execution</h2>
-<p>Workflow execution runs under a strict runtime rather than free-form model output. The distinction matters for regulated use: a system that "usually" files the document correctly is not deployable in an environment where the failure mode is a reportable incident.</p>
-
-<h2>7. Transport &amp; Application Security</h2>
-<ul>
-<li><b>Transport.</b> All traffic to theflow-ai.com and to Flow services is served over HTTPS with HSTS enforced.</li>
-<li><b>Browser hardening.</b> The site is served with a strict Content-Security-Policy, <code>X-Frame-Options: DENY</code>, <code>X-Content-Type-Options: nosniff</code>, and a restrictive Permissions-Policy.</li>
-<li><b>Waitlist data.</b> Signups are confirmed by email double opt-in, so an address cannot be added by someone who does not control it.</li>
-</ul>
-
-<h2>8. Threat Model</h2>
-<p>We treat prompt injection and data exfiltration through model outputs as first-class threats rather than edge cases, because an automation engine with real system access has a materially larger blast radius than a chat interface. Our analysis is public: <a href="/blog/prompt-injection-ai-threat-modeling.html">Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation</a>.</p>
-
-<h2>9. Compliance Posture</h2>
-<p>Flow is currently in pre-release. The architecture above is designed to support deployment under HIPAA, GDPR, SOC 2, and sector-specific frameworks including 21 CFR Part 11, NERC CIP, CJIS, and FedRAMP-aligned government requirements.</p>
-<p><b>If you are running a formal vendor assessment</b>, contact us at <a href="mailto:hello@theflow-ai.com?subject=Security%20review">hello@theflow-ai.com</a> for the current status of individual certifications and audit reports, along with the deployment model that fits your control environment. We would rather give you an accurate answer in writing than have you infer a certification status from a badge.</p>
-
-<h2>10. Reporting a Vulnerability</h2>
-<p>If you believe you have found a security issue in Flow or in this site, email <a href="mailto:hello@theflow-ai.com?subject=Security%20vulnerability%20report">hello@theflow-ai.com</a> with the subject line "Security vulnerability report". Please include enough detail to reproduce the issue. We will acknowledge your report and will not pursue action against good-faith research that avoids privacy violations, service disruption, and data destruction.</p>
-
-<div class="cta">
-  <h2>Evaluating Flow for a regulated environment?</h2>
-  <p>Tell us which framework applies to you and we will lead with the relevant architecture detail.</p>
-  <a class="doit" href="/contact.html" data-ga="security_contact"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Do It</a>
-</div>
-    </article>
-  </div>
-</main>
-<footer class="site">
-  <div class="wrap">
-    <div class="pagenav">
-      <a href="/about.html">About</a><a href="/security.html">Security</a><a href="/trial.html">Glance</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a><a href="/blog/">Insights</a>
+      <nav class="foot-col" aria-label="Product">
+        <h3 data-k="ft.hFlow">Product</h3>
+        <a data-k='ft.glance' href='/glance'>Glance</a>
+        <a data-k='ft.flow' href='/#product'>Flow</a>
+        <a data-k='ft.sec' href='/security'>Security</a>
+        <a data-k='ft.pricing' href='/pricing'>Pricing</a>
+        <a data-k='ft.solutions' href='/solutions'>Solutions</a>
+      </nav>
+      <nav class="foot-col" aria-label="Company">
+        <h3 data-k="ft.hCo">Company</h3>
+        <a data-k='ft.about' href='/about'>About</a>
+        <a data-k='ft.blog' href='/articles'>Insights</a>
+        <a data-k='ft.contact' href='/contact'>Contact</a>
+      </nav>
     </div>
-    &copy; 2026 Flow. <a href="/">theflow-ai.com</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/blog/rss.xml">RSS</a>
+    <div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav class="foot-legal" aria-label="Legal"><a data-k='ft.privacy' href='/privacy'>Privacy</a><a data-k='ft.terms' href='/terms'>Terms</a></nav></div>
   </div>
 </footer>
-<script>
-
-(function(){
-  var tb = document.getElementById('themeBtn');
-  tb.addEventListener('click', function(){
-    var cur = document.documentElement.getAttribute('data-theme') || 'light';
-    var next = cur === 'light' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', next);
-    try{localStorage.setItem('flow_theme', next);}catch(e){}
-  });
-})();
-
-</script>
-<script>
-(function(){
-  var mb=document.getElementById('menuBtn'), mn=document.getElementById('mobileNav');
-  if(!mb||!mn) return;
-  function close(){ mn.classList.remove('open'); mb.setAttribute('aria-expanded','false'); setTimeout(function(){ mn.hidden=true; },250); }
-  function open(){ mn.hidden=false; requestAnimationFrame(function(){ mn.classList.add('open'); }); mb.setAttribute('aria-expanded','true'); }
-  mb.addEventListener('click',function(){ mn.hidden ? open() : close(); });
-  mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
-  mn.addEventListener('click',function(e){ if(e.target===mn) close(); });
-  document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && !mn.hidden) close(); });
-})();
-</script>
-<script src="/assets/flow-premium.js" defer></script>
-<script src="/assets/site-nav.js" defer></script>
-</body>
-</html>
+<script src="assets/flow-header.js"></script><script defer src="assets/flow-booking.js"></script>
+<script src="assets/flow-inner.js"></script>
+<script src="samples/vendor/lenis.min.js"></script>
+<script src="samples/flow-rich-v5.js?b=2"></script>
+<script src="samples/hero-tile.js"></script>
+<script src="samples/v3.js"></script>
+<script src="samples/v4.js"></script>
+<script src="samples/v5.js"></script>
+<script src="samples/home-dep2.js"></script>
+<script src="samples/sec-dep-onprem.js"></script>
+<script src="samples/sec-dep-dg.js"></script>
+<script src="samples/sx.js"></script>
+<script src="samples/sxh-b4.js"></script>
+<script src="samples/sr2.js"></script>
+<script src="assets/flow-i18n.js" data-light></script>
+<link rel="stylesheet" href="assets/ux-review-20261119.css?b=1">
+<link rel="stylesheet" href="assets/sec-a2b2-20261119.css">
+<script defer src="assets/sec-a2b2-20261119.js"></script><script src="assets/ux-review-20261119.js?b=1" defer></script>
+</body></html>

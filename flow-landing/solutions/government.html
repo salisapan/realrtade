@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+
+<html data-page-lang="en" data-ui="en" dir="ltr" lang="en">
+<head><base href="/solutions/"/>
+
+<meta charset="utf-8"/>
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest"><link href="https://theflow-ai.com/solutions/government" rel="canonical"/><link href="https://theflow-ai.com/solutions/government" hreflang="en" rel="alternate"/><link href="https://theflow-ai.com/he/solutions/government" hreflang="he" rel="alternate"/><link href="https://theflow-ai.com/solutions/government?lang=de" hreflang="de" rel="alternate"/><link href="https://theflow-ai.com/solutions/government?lang=fr" hreflang="fr" rel="alternate"/><link href="https://theflow-ai.com/solutions/government?lang=es" hreflang="es" rel="alternate"/><link href="https://theflow-ai.com/solutions/government" hreflang="x-default" rel="alternate"/><meta content="en_US" property="og:locale"/><meta content="he_IL" property="og:locale:alternate"/>
+<meta content="light dark" name="color-scheme"/>
+<meta content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5" name="viewport"/>
+<meta content="AI for government-owned companies: Flow prepares maintenance orders for field faults, new employee onboarding and replies to customer inquiries from the company’s systems, and a team member approves every step. The data stays inside the organization: masked cloud, Flow-Edge or Flow-Onprem." name="description"/>
+<meta content="#07090F" name="theme-color"/>
+<title>AI for government-owned companies: everything around operations, ready to approve | Flow</title>
+<meta content="website" property="og:type"/>
+<meta content="AI for government-owned companies: everything around operations, ready to approve | Flow" property="og:title"/>
+<meta content="AI for government-owned companies: Flow prepares maintenance orders for field faults, new employee onboarding and replies to customer inquiries from the company’s systems, and a team member approves every step. The data stays inside the organization: masked cloud, Flow-Edge or Flow-Onprem." property="og:description"/>
+<meta content="https://theflow-ai.com/solutions/government" property="og:url"/>
+<meta content="https://theflow-ai.com/og.jpg" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="AI for government-owned companies: everything around operations, ready to approve | Flow" name="twitter:title"/>
+<meta content="AI for government-owned companies: Flow prepares maintenance orders for field faults, new employee onboarding and replies to customer inquiries from the company’s systems, and a team member approves every step. The data stays inside the organization: masked cloud, Flow-Edge or Flow-Onprem." name="twitter:description"/>
+<meta content="https://theflow-ai.com/og.jpg" name="twitter:image"/>
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat — which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+</style>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var go=function(h,c){var a=document.querySelector('link[rel="alternate"][hreflang="'+h+'"]');if(!a)return false;try{localStorage.setItem('flow.lang',c)}catch(e){}q.delete('lang');var p=new URL(a.href).pathname,qs=q.toString();location.replace(p+(qs?'?'+qs:'')+location.hash);return true};var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';if(l==='he'&&go('he','he'))return;if(q.get('lang')){try{localStorage.setItem('flow.lang',l)}catch(e){}}d.dataset.ui=l;if(l!=='en'){d.lang=l;d.setAttribute('data-r15-lang',l)}var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<link as="font" crossorigin="" href="../assets/fonts/intertight-latin.woff2" rel="preload" type="font/woff2"/><link href="../assets/flow-header.css" rel="stylesheet"/>
+<link href="../assets/flow-booking.css" rel="stylesheet"/>
+<link href="../assets/flow-inner.css" rel="stylesheet"/>
+<link href="../assets/flow-review-fixes.css?b=1" rel="stylesheet"/>
+<link href="../assets/flow-rich.css" rel="stylesheet"/>
+<link href="../samples/hero-samples.css" rel="stylesheet"/>
+<link href="../samples/v3.css" rel="stylesheet"/>
+<link href="../samples/v5.css" rel="stylesheet"/><link href="../assets/flow-sol-v3.css" rel="stylesheet"/><link href="../assets/flow-sol-v4.css" rel="stylesheet"/><link href="../assets/flow-orbit-v7.css" rel="stylesheet"/><link href="../assets/flow-sol-v9-pages.css?b=19" rel="stylesheet"/><link href="../assets/r15/dep-home.css?b=1" rel="stylesheet"/><link href="../assets/r15/dep-phone.css?b=1" rel="stylesheet"/><link href="../assets/r15/r15.css?b=1" rel="stylesheet"/><link href="../assets/r15/r14s.css?b=1" rel="stylesheet"/><link href="../assets/r15/stack.css?b=1" rel="stylesheet"/><link href="../assets/r15/procnav.css?b=1" rel="stylesheet"/><link href="../assets/r15/r15-i18n.css?b=1" rel="stylesheet"/><link href="../assets/r15/r15-dark.css?b=1" rel="stylesheet"/><link href="../assets/r15/prof.css?b=1" rel="stylesheet"/>
+<link href="../assets/r15/r15-contrast.css?b=3" rel="stylesheet"/>
+<noscript><style>.rich .rv{opacity:1!important;transform:none!important}.rich .w>span{transform:none!important}.rich .tier{opacity:1!important;transform:none!important}.rich .sf .sw{opacity:1}</style></noscript>
+<script>document.documentElement.classList.add("rich")</script>
+<style id="perf1112">.rich .rv{transition-duration:.5s,.55s}.rich .rv:not(.in){transform:translateY(14px)}#r14s#r14s .stk>.sc[style*="opacity: 0;"]{animation:none!important}</style>
+<link href="../assets/r15/prof-320.css?b=1" rel="stylesheet"/>
+<link href="../assets/r15/doit-match.css?b=2" rel="stylesheet"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://theflow-ai.com/solutions"},{"@type":"ListItem","position":3,"name":"Government-owned companies","item":"https://theflow-ai.com/solutions/government"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Service","name":"AI workflow automation for government-owned companies","serviceType":"AI workflow automation for government-owned companies","provider":{"@type":"Organization","@id":"https://theflow-ai.com/#org","name":"Flow","url":"https://theflow-ai.com/"},"url":"https://theflow-ai.com/solutions/government","inLanguage":"en","audience":{"@type":"BusinessAudience","name":"Government-owned companies, ministries and public bodies"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/", "logo": "https://theflow-ai.com/logo.png"}</script>
+<script defer src="/assets/flow-consent.js"></script></head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="ctl" id="ctl">
+<div class="lang">
+<button aria-controls="langMenu" aria-expanded="false" aria-haspopup="menu" aria-label="Language" id="langBtn" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" viewbox="0 0 16 16"><circle cx="8" cy="8" r="6.4"></circle><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"></path></svg>
+<span class="sr-only" id="langName">English</span>
+</button>
+<div aria-labelledby="langBtn" class="menu" id="langMenu" role="menu"></div>
+</div>
+<button aria-label="Night mode" aria-pressed="false" class="theme" id="themeBtn" type="button">
+<svg aria-hidden="true" class="sun" fill="none" stroke="currentColor" stroke-width="1.3" viewbox="0 0 16 16"><circle cx="8" cy="8" r="3"></circle><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"></path></svg>
+<svg aria-hidden="true" class="moon" fill="none" stroke="currentColor" stroke-width="1.3" viewbox="0 0 16 16"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"></path></svg>
+</button>
+</div>
+<flow-header data-base="../"></flow-header>
+<main class="rc hs v3 x3m x4m x9m x4-prof x4-gov" dir="ltr" id="main" lang="en"><section class="r15-hero" aria-labelledby="r15h1"><div class="r15-in"><h1 class="r15-h1" id="r15h1"><b>Everything around operations is ready,</b> <span class="fx-gw">you just approve</span></h1><p class="r15-sub">Flow works alongside the systems you already have</p><a class="doit r15-cta" data-book="" data-ga="sol_government_hero" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Book a call</span></a></div><div id="r14s" class="r15-stage"><script>(function(w){var q=new URLSearchParams(location.search),f=q.get("f"),v=q.get("v"),ai=q.get("ai"),rm=matchMedia("(prefers-reduced-motion: reduce)").matches;w.dataset.f=f||(rm?"3":"0");if(v)w.dataset.v=v;w.dataset.ai=ai==="2"?"2":"1";if(rm)w.classList.add("rm");if(q.get("state")==="done")w.dataset.state="done"})(document.getElementById("r14s"))</script><section class="r14" id="r14" aria-roledescription="carousel">
+<div class="track">
+<div class="slide is-active" data-m="1" aria-label="Faults">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Infrastructure maintenance · example</p>
+        <h2 class="h1">Pressure drop at a pumping station, a crew is needed</h2>
+      </div>
+      <p class="lead">Flow found the fault and prepared a maintenance order</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> located the asset and the part and prepared the on-call dispatch, and you approve in one click</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/arcgis.webp" width="18" height="18" decoding="async"/> ArcGIS<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Pumping station · North district</p><table class="tb"><thead><tr><th>Component</th><th>Diameter mm</th><th>Status</th></tr></thead><tbody><tr class="on"><td>Suction valve</td><td><span class="num">600</span></td><td>To isolate</td></tr><tr><td>Discharge valve</td><td><span class="num">500</span></td><td>To isolate</td></tr><tr><td>Bypass line</td><td><span class="num">300</span></td><td>Open</td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">1</span></div><p class="k">Malfunction notifications · North district</p><ul class="lw-list"><li><p class="lw-l1"><b>Pump <span class="num">2</span></b><span>Suction pressure drop</span></p><p class="lw-l2">Control center · <span class="num">11/14/2026 6:40 AM</span></p><span class="lw-status">New</span></li><li><p class="lw-l1"><b>Flow meter</b><span>Abnormal reading</span></p><p class="lw-l2">In progress</p></li><li><p class="lw-l1"><b>Emergency generator</b><span>Periodic inspection</span></p><p class="lw-l2">Closed</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · malfunction notification</b><span class="num">6:40 AM</span></p>
+              <h3 class="ph-mail-subj">Pump <span class="num">2</span> · pressure drop</h3>
+              <p class="ph-mail-meta">Control center · North district</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> checked<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/arcgis.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Located the asset</b><span><span class="num">2</span> valves to isolate</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Found the part</b><span>Mechanical seal · <span class="num">3</span> in stock</span></div></li></ol>
+          <p class="fl-src">Checked against: the asset map · warehouse stock</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> suggests 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Maintenance order</b><span>District crew · with reservation</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/field.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>On-call dispatch</b><span>On the field handheld</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Done · <span class="num">2</span> actions</p><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><p class="k">Stock · district warehouse</p><ul class="lw-list"><li><p class="lw-l1"><b>Mechanical seal for the pump</b><span><span class="num">3</span> in stock</span></p><p class="lw-l2">Fits the pump model</p><span class="lw-status">To reserve</span></li><li><p class="lw-l1"><b>Bearing</b><span><span class="num">6</span> in stock</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Flange gasket</b><span><span class="num">40</span> in stock</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Prepared by Flow</span><span class="attr-done">Added by <span dir="ltr">Flow · 6:44 AM</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Maintenance order</p><p class="pdf-s">Corrective maintenance · <span class="num">11/14/2026</span></p><dl class="pdf-f"><div><dt>Equipment</dt><dd>Pump <span class="num">2</span></dd></div><div><dt>Crew</dt><dd><mark>North maintenance crew</mark></dd></div><div><dt>Part</dt><dd>Mechanical seal</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Arrived from SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Example</span></p>
+          <p class="mail-m"><span>Malfunction notification</span><b>Control center · North district</b></p>
+          <p class="mail-s">Pump <span class="num">2</span> · suction pressure drop</p>
+          <p class="mail-b">Opened from a control-center alert · <em>Priority <span class="num">1</span></em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">What Flow did</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/arcgis.webp" width="22" height="22" decoding="async"/></span><p>Located the station and the valves to isolate</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Replacement mechanical seal in the district warehouse</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">What Flow suggests</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Maintenance order for the district crew</p><p class="card-s">SAP · including the seal reservation</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/field.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Dispatch to the district on-call crew</p><p class="card-s">Field handheld · not sent</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Only with your approval · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="2" aria-label="Employees">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Employee onboarding · example</p>
+        <h2 class="h1">A new employee starts on 1 December</h2>
+      </div>
+      <p class="lead">Flow checked what is missing in onboarding and prepared the next steps</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> checked the employee file and the certifications, and you approve in one click</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">2</span></div><p class="k">Employee file</p><p class="t">Adam Cole</p><ul class="lw-fields"><li class="lw-f"><span class="k">Role</span><span class="v">Electrician</span></li><li class="lw-f"><span class="k">Unit</span><span class="v">Generation division</span></li><li class="lw-pair"><span class="lw-f"><span class="k">Start date</span><span class="v"><span class="num">12/1/2026</span></span></span><span class="lw-f"><span class="k">Security clearance</span><span class="v">Approved</span></span></li></ul></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/successfactors.webp" width="18" height="18" decoding="async"/> SuccessFactors<span class="ord" aria-hidden="true">1</span></div><p class="k">mandatory certifications</p><ul class="lw-list"><li><p class="lw-l1"><b>Electrical safety</b><span>Not completed</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Work at height</b><span>Not completed</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Information security</b><span>Completed</span></p><p class="lw-l2"></p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · employee file</b><span class="num">9:10 AM</span></p>
+              <h3 class="ph-mail-subj">New employee</h3>
+              <p class="ph-mail-meta">Adam Cole · Generation division</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> checked<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Checked the employee file</b><span>Security clearance approved</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Checked certifications</b><span><span class="num">2</span> Missing</span></div></li></ol>
+          <p class="fl-src">Checked against: the employee file · the certifications</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> suggests 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Schedule the certifications</b><span>The first week</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>W-4</b><span>For the employee to sign</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Done · <span class="num">2</span> actions</p><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/workday.webp" width="18" height="18" decoding="async"/> Workday<span class="ord" aria-hidden="true">3</span></div><p class="k">Forms for new hires</p><ul class="lw-list"><li><p class="lw-l1"><b>Adam Cole</b><span>W-4</span></p><p class="lw-l2">For the employee to sign</p><span class="lw-status">Not sent</span></li><li><p class="lw-l1"><b>Hannah Dean</b><span>W-4</span></p><p class="lw-l2">Signed</p></li></ul><p class="flow-attr"><span class="attr-prep">Prepared by Flow</span><span class="attr-done">Added by <span dir="ltr">Flow · 9:12 AM</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/orb/successfactors.webp" width="18" height="18" decoding="async"/> SuccessFactors<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Schedule the certifications</p><p class="pdf-s">Adam Cole · <span class="num">12/1/2026</span></p><dl class="pdf-f"><div><dt>Electrical safety</dt><dd><mark><span class="num">12/2</span></mark></dd></div><div><dt>Work at height</dt><dd><span class="num">12/3</span></dd></div><div><dt>Instructor</dt><dd>Safety officer</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Arrived from SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Example</span></p>
+          <p class="mail-m"><span>Employee file</span><b>Adam Cole · electrician</b></p>
+          <p class="mail-s">Onboarding · Generation division</p>
+          <p class="mail-b">Starts <span class="num">12/1</span> · <em>certifications missing</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">What Flow did</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Security clearance approved</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="22" height="22" decoding="async"/></span><p>Missing <span class="num">2</span> mandatory certifications</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">What Flow suggests</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Schedule the certifications</p><p class="card-s">SuccessFactors · the first week</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Tax form for the employee</p><p class="card-s">Workday · not sent</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Only with your approval · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="3" aria-label="Inquiries">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Customer service · example</p>
+        <h2 class="h1">An international parcel has not arrived, the customer wrote in</h2>
+      </div>
+      <p class="lead">Flow checked the shipment and prepared an inquiry and a reply</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> checked the shipment against inbound customs records, and you approve in one click</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Shipment <span class="num">CP304128569DE</span></p><table class="tb"><thead><tr><th>Date</th><th>Event</th><th>Place</th></tr></thead><tbody><tr><td><span class="num">10/29</span></td><td>Accepted for shipping</td><td>Origin country</td></tr><tr><td><span class="num">11/5</span></td><td>Left the origin country</td><td>Export sorting</td></tr><tr class="on"><td></td><td>No scan in the country</td><td></td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">1</span></div><p class="k">Open inquiries</p><ul class="lw-list"><li><p class="lw-l1"><b>Nora Blake</b><span>International parcel</span></p><p class="lw-l2">Service center · <span class="num">11/14/2026 10:05 AM</span></p><span class="lw-status">New</span></li><li><p class="lw-l1"><b>Alan Sage</b><span>Registered letter</span></p><p class="lw-l2">In progress</p></li><li><p class="lw-l1"><b>Dana Perry</b><span>Queue at a post office</span></p><p class="lw-l2">Closed</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Nora Blake</b><span class="num">10:05 AM</span></p>
+              <h3 class="ph-mail-subj">International parcel</h3>
+              <p class="ph-mail-meta">No update since <span class="num">11/5</span></p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> checked<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Checked the shipment</b><span>Last scan 11/5</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/gate.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Checked the customs system</b><span>Not received in the country</span></div></li></ol>
+          <p class="fl-src">Checked against: shipment history · customs system</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> suggests 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>International inquiry</b><span>With the origin country</span></div></li><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Reply to the customer</b><span>The inquiry and the date</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Done · <span class="num">2</span> actions</p><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/gate.webp" width="18" height="18" decoding="async"/> Customs system<span class="ord" aria-hidden="true">3</span></div><p class="k">Inbound international mail</p><ul class="lw-list"><li><p class="lw-l1"><b>CP304128569DE</b><span>Not received</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>CP301977450DE</b><span>Received · airport</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>RR998104223FR</b><span>Released to sorting</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Prepared by Flow</span><span class="attr-done">Added by <span dir="ltr">Flow · 10:08 AM</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">International inquiry</p><p class="pdf-s">Shipment <span class="num">CP304128569DE</span></p><dl class="pdf-f"><div><dt>Origin country</dt><dd>Per the shipment</dd></div><div><dt>Last scan</dt><dd><mark><span class="num">11/5</span></mark></dd></div><div><dt>Customer</dt><dd>Nora Blake</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Arrived from Salesforce</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><b>Salesforce</b><span class="smp">Example</span></p>
+          <p class="mail-m"><span>Inquiry</span><b>Nora Blake · customer</b></p>
+          <p class="mail-s">International parcel · <span class="num">CP304128569DE</span></p>
+          <p class="mail-b">Opened at the service center · <em>No update since 11/5</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">What Flow did</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><p>No scan of the shipment since 11/5</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/gate.webp" width="22" height="22" decoding="async"/></span><p>The parcel has not cleared inbound customs</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">What Flow suggests</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Inquiry with the origin country</p><p class="card-s">Salesforce · ready to send</p></article><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Reply to Nora Blake</p><p class="card-s">Outlook · not sent</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Only with your approval · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dots named" role="group" aria-label="Processes">
+  <button class="dot" type="button" data-i="0" aria-current="true"><span>Faults</span></button>
+  <button class="dot" type="button" data-i="1"><span>Employees</span></button>
+  <button class="dot" type="button" data-i="2"><span>Inquiries</span></button>
+</div>
+</section></div></section><section class="x4 x4-g o20sec x7-tools"><div class="x4-in"><div class="x7-th"><h2 class="x4-h2 rv">Flow prepares the work <span class="g">inside your organization’s systems</span></h2><p class="x4-sub rv">Flow works alongside the systems you already have. The data stays inside the organization.</p></div><div class="o20" data-orbit20=""><div aria-hidden="true" class="o20-plate o20-plate-out"></div><div aria-hidden="true" class="o20-plate o20-plate-in"></div><svg aria-hidden="true" class="o20-tracks"></svg><div class="o20-ring" data-ring="in" data-speed="7.5"><button aria-label="Outlook" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/outlook.webp" width="23"/><span class="o20-tip">Outlook</span></button><button aria-label="Excel" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/excel.webp" width="23"/><span class="o20-tip">Excel</span></button><button aria-label="SAP" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sap.webp" style="width:62%;height:62%" width="23"/><span class="o20-tip">SAP</span></button><button aria-label="Word" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/word.webp" width="23"/><span class="o20-tip">Word</span></button><button aria-label="Power BI" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerbi.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power BI</span></button><button aria-label="SharePoint" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sharepoint.webp" width="23"/><span class="o20-tip">SharePoint</span></button></div><div class="o20-ring" data-ring="out" data-speed="-4.8"><button aria-label="Salesforce" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/salesforce.webp" style="width:64%;height:64%" width="23"/><span class="o20-tip">Salesforce</span></button><button aria-label="Workday" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/workday.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Workday</span></button><button aria-label="ServiceNow" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/servicenow.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">ServiceNow</span></button><button aria-label="ArcGIS" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/arcgis.webp" style="width:56%;height:56%" width="23"/><span class="o20-tip">ArcGIS</span></button><button aria-label="Qlik" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qlik.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Qlik</span></button><button aria-label="IBM Maximo" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/ibm.webp" style="width:60%;height:60%" width="23"/><span class="o20-tip">IBM Maximo</span></button><button aria-label="SuccessFactors" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/successfactors.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">SuccessFactors</span></button></div><div class="o20-core"><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><div class="o20-disc"><img alt="Flow" class="o20-wm" height="31" src="../assets/flow-logo-400.webp" width="70"/></div></div></div></div></section><section class="r15-tr" aria-labelledby="r15trh"><div class="r15-in"><header class="r15-th"><h2 class="r15-h2" id="r15trh">Nothing moves without your approval</h2><p class="r15-sub2">Flow works inside your organization’s systems, and the information does not go through a chat window. Every action waits for Do It, is written to the log, and can be undone.</p></header><div class="r15-fan" aria-hidden="true"><figure class="r15-col r15-c1"><div class="r15-cd r15-ap"><div class="r15-ch"><img class="r15-flw" src="../assets/flow-logo-400.webp" width="400" height="176" alt="" decoding="async"/><small>Example</small></div><p class="r15-q">Release the maintenance order to the north crew and reserve the seal?</p><ul class="r15-st"><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Maintenance order for the district crew</b><small>SAP</small></span></li><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Dispatch to the district on-call crew</b><small>Field handheld</small></span></li></ul><div class="r15-cf"><span class="doit r15-di"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><small>Waiting for your approval</small></div></div><figcaption><b>Flow prepares, you approve</b><span>Every action waits for your Do It</span></figcaption></figure><figure class="r15-col r15-c2"><div class="r15-cd r15-log"><div class="r15-lh"><span><b>Activity log</b><small>Fault · pumping station, North district</small></span><small class="r15-smp">Example</small></div><ol class="r15-le"><li><time>6:40 AM</time><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Malfunction notification read</b><small>Source: the control center</small></span><span class="r15-who is-f">Flow</span></li><li><time>6:41 AM</time><span class="r15-lg"><img src="../assets/orb/arcgis.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Asset and valves located</b><small>Source: the asset map</small></span><span class="r15-who is-f">Flow</span></li><li><time>6:44 AM</time><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Maintenance order released, seal reserved</b><small>Source: the malfunction notification</small></span><span class="r15-who">Helen approved</span></li><li class="r15-x"><time>6:44 AM</time><span class="r15-lg"><img src="../assets/orb/field.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>On-call crew dispatched</b><small>Source: the maintenance order</small></span><span class="r15-who">Helen approved</span></li></ol></div><figcaption><b>Every action is logged</b><span>With the time, the source and who approved</span></figcaption></figure><figure class="r15-col r15-c3"><div class="r15-cd r15-un"><div class="r15-ch"><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><b>Maintenance order · pump 2</b><span class="r15-done"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg>Done</span></div><dl class="r15-row"><div><dt>Asset</dt><dd>Pump 2</dd></div><div><dt>Crew</dt><dd>North maintenance</dd></div><div><dt>Status</dt><dd>Released</dd></div></dl><div class="r15-cf"><span class="r15-undo"><svg viewBox="0 0 24 24"><path d="M9.8 6 4.5 11.3l5.3 5.3"/><path d="M4.8 11.3h9.2a5.5 5.5 0 0 1 5.5 5.5v1.7"/></svg>Undo</span><small>Updated at 6:44 AM</small></div></div><figcaption><b>And it can be undone</b><span>A completed action is reversed with Undo</span></figcaption></figure></div></div></section><div id="lgdep" class="r15-dp"><section class="dgv-sec sx-dep" id="depsec" data-zone-scope><div class="sx-in"><h2 class="dp-h" id="dpTitle">Where Flow runs</h2><p class="dp-sub">Flow’s secure cloud, the employee’s computer, or a server on the organization’s network. The organization chooses, and all three are available today.</p><div class="dep dep2" role="group" aria-label="Where Flow runs"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div><section class="op-sec sx-op" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section></div><section class="r15-ct" aria-labelledby="r15cth"><div class="r15-in"><div class="r15-ctc"><h2 class="r15-h2" id="r15cth">Book a short call and get a rollout plan for your organization</h2><ol class="r15-steps"><li><span class="r15-n">1</span><b>Intro call</b><span>We map where your team works today</span></li><li><span class="r15-n">2</span><b>You choose where Flow runs</b><span>Cloud, Edge or On-Prem</span></li><li><span class="r15-n">3</span><b>A pilot with one team</b><span>Every action waits for your approval</span></li></ol><a class="doit r15-cta" data-book="" data-ga="sol_government_waitlist" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Book a call</span></a></div></div></section></main>
+<template id="r15-de"><section class="r15-hero" aria-labelledby="r15h1"><div class="r15-in"><h1 class="r15-h1" id="r15h1"><b>Alles rund um den Betrieb ist bereit,</b> <span class="fx-gw">Sie geben nur frei</span></h1><p class="r15-sub">Flow arbeitet neben den Systemen, die Sie bereits haben</p><a class="doit r15-cta" data-book="" data-ga="sol_government_hero" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Gespräch vereinbaren</span></a></div><div id="r14s" class="r15-stage"><script>(function(w){var q=new URLSearchParams(location.search),f=q.get("f"),v=q.get("v"),ai=q.get("ai"),rm=matchMedia("(prefers-reduced-motion: reduce)").matches;w.dataset.f=f||(rm?"3":"0");if(v)w.dataset.v=v;w.dataset.ai=ai==="2"?"2":"1";if(rm)w.classList.add("rm");if(q.get("state")==="done")w.dataset.state="done"})(document.getElementById("r14s"))</script><section class="r14" id="r14" aria-roledescription="carousel">
+<div class="track">
+<div class="slide is-active" data-m="1" aria-label="Störungen">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Instandhaltung · Beispiel</p>
+        <h2 class="h1">Druckabfall im Pumpwerk, eine Kolonne wird gebraucht</h2>
+      </div>
+      <p class="lead">Flow hat die Störung gefunden und den Auftrag vorbereitet</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> hat Anlage und Teil gefunden und den Bereitschaftsruf vorbereitet, und Sie geben mit einem Klick frei</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/arcgis.webp" width="18" height="18" decoding="async"/> ArcGIS<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Pumpwerk · Bezirk Nord</p><table class="tb"><thead><tr><th>Bauteil</th><th>Durchmesser mm</th><th>Status</th></tr></thead><tbody><tr class="on"><td>Saugschieber</td><td><span class="num">600</span></td><td>Zum Absperren</td></tr><tr><td>Druckschieber</td><td><span class="num">500</span></td><td>Zum Absperren</td></tr><tr><td>Umgehungsleitung</td><td><span class="num">300</span></td><td>Offen</td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">1</span></div><p class="k">Störmeldungen · Bezirk Nord</p><ul class="lw-list"><li><p class="lw-l1"><b>Pumpe <span class="num">2</span></b><span>Druckabfall an der Saugseite</span></p><p class="lw-l2">Leitstelle · <span class="num">14.11.2026 06:40</span></p><span class="lw-status">Neu</span></li><li><p class="lw-l1"><b>Durchflussmesser</b><span>Abweichende Anzeige</span></p><p class="lw-l2">In Bearbeitung</p></li><li><p class="lw-l1"><b>Notstromaggregat</b><span>Wiederkehrende Prüfung</span></p><p class="lw-l2">Geschlossen</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · Störmeldung</b><span class="num">06:40</span></p>
+              <h3 class="ph-mail-subj">Pumpe <span class="num">2</span> · Druckabfall</h3>
+              <p class="ph-mail-meta">Leitstelle · Bezirk Nord</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> hat geprüft<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/arcgis.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Hat die Anlage geortet</b><span><span class="num">2</span> Schieber zum Absperren</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Hat das Teil gefunden</b><span>Gleitringdichtung · <span class="num">3</span> auf Lager</span></div></li></ol>
+          <p class="fl-src">Geprüft gegen: Anlagenkarte · Lagerbestand</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> schlägt 2 Schritte vor</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Instandhaltungsauftrag</b><span>Bezirkskolonne · mit Reservierung</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/field.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Bereitschaftsruf</b><span>Auf dem Feldgerät</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Erledigt · <span class="num">2</span> Schritte</p><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><p class="k">Bestand · Bezirkslager</p><ul class="lw-list"><li><p class="lw-l1"><b>Gleitringdichtung für die Pumpe</b><span><span class="num">3</span> auf Lager</span></p><p class="lw-l2">Passend zum Pumpenmodell</p><span class="lw-status">Reservieren</span></li><li><p class="lw-l1"><b>Lager</b><span><span class="num">6</span> auf Lager</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Flanschdichtung</b><span><span class="num">40</span> auf Lager</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Vorbereitet von Flow</span><span class="attr-done">Hinzugefügt von <span dir="ltr">Flow · 06:44</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Instandhaltungsauftrag</p><p class="pdf-s">Instandsetzung · <span class="num">14.11.2026</span></p><dl class="pdf-f"><div><dt>Gerät</dt><dd>Pumpe <span class="num">2</span></dd></div><div><dt>Team</dt><dd><mark>Instandhaltung Nord</mark></dd></div><div><dt>Teil</dt><dd>Gleitringdichtung</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Kam aus SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Beispiel</span></p>
+          <p class="mail-m"><span>Störmeldung</span><b>Leitstelle · Bezirk Nord</b></p>
+          <p class="mail-s">Pumpe <span class="num">2</span> · Druckabfall an der Saugseite</p>
+          <p class="mail-b">Aus einer Meldung der Leitstelle angelegt · <em>Priorität <span class="num">1</span></em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Was Flow getan hat</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/arcgis.webp" width="22" height="22" decoding="async"/></span><p>Pumpwerk und Absperrschieber geortet</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Ersatz-Gleitringdichtung im Bezirkslager</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Was Flow vorschlägt</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Instandhaltungsauftrag für die Bezirkskolonne</p><p class="card-s">SAP · inkl. Reservierung der Dichtung</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/field.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Ruf an die Bezirksbereitschaft</p><p class="card-s">Feldgerät · nicht gesendet</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Nur mit Ihrer Freigabe · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="2" aria-label="Personal">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Onboarding · Beispiel</p>
+        <h2 class="h1">Eine neue Person beginnt am 1. Dezember</h2>
+      </div>
+      <p class="lead">Flow hat das Onboarding geprüft und den Rest vorbereitet</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> hat die Personalakte und die Qualifikationen geprüft, und Sie geben mit einem Klick frei</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">2</span></div><p class="k">Personalakte</p><p class="t">Jonas Keller</p><ul class="lw-fields"><li class="lw-f"><span class="k">Rolle</span><span class="v">Elektrotechniker</span></li><li class="lw-f"><span class="k">Stelle</span><span class="v">Erzeugungssparte</span></li><li class="lw-pair"><span class="lw-f"><span class="k">Beginn</span><span class="v"><span class="num">01.12.2026</span></span></span><span class="lw-f"><span class="k">Sicherheitsüberprüfung</span><span class="v">Freigegeben</span></span></li></ul></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/successfactors.webp" width="18" height="18" decoding="async"/> SuccessFactors<span class="ord" aria-hidden="true">1</span></div><p class="k">Pflichtqualifikationen</p><ul class="lw-list"><li><p class="lw-l1"><b>Elektrosicherheit</b><span>Nicht abgeschlossen</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Arbeiten in der Höhe</b><span>Nicht abgeschlossen</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Informationssicherheit</b><span>Abgeschlossen</span></p><p class="lw-l2"></p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · Personalakte</b><span class="num">09:10</span></p>
+              <h3 class="ph-mail-subj">Neue Person</h3>
+              <p class="ph-mail-meta">Jonas Keller · Erzeugungssparte</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> hat geprüft<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Hat die Personalakte geprüft</b><span>Sicherheitsüberprüfung genehmigt</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Hat die Qualifikationen geprüft</b><span><span class="num">2</span> Es fehlen</span></div></li></ol>
+          <p class="fl-src">Geprüft gegen: Personalakte · Qualifikationen</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> schlägt 2 Schritte vor</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Qualifikationen einplanen</b><span>Die erste Woche</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Personalfragebogen</b><span>Zur Unterschrift der Person</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Erledigt · <span class="num">2</span> Schritte</p><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/workday.webp" width="18" height="18" decoding="async"/> Workday<span class="ord" aria-hidden="true">3</span></div><p class="k">Formulare für Neueinstellungen</p><ul class="lw-list"><li><p class="lw-l1"><b>Jonas Keller</b><span>Personalfragebogen</span></p><p class="lw-l2">Zur Unterschrift der Person</p><span class="lw-status">Nicht gesendet</span></li><li><p class="lw-l1"><b>Laura Hahn</b><span>Personalfragebogen</span></p><p class="lw-l2">Unterschrieben</p></li></ul><p class="flow-attr"><span class="attr-prep">Vorbereitet von Flow</span><span class="attr-done">Hinzugefügt von <span dir="ltr">Flow · 09:12</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/orb/successfactors.webp" width="18" height="18" decoding="async"/> SuccessFactors<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Qualifikationen einplanen</p><p class="pdf-s">Jonas Keller · <span class="num">01.12.2026</span></p><dl class="pdf-f"><div><dt>Elektrosicherheit</dt><dd><mark><span class="num">2.12.</span></mark></dd></div><div><dt>Arbeiten in der Höhe</dt><dd><span class="num">3.12.</span></dd></div><div><dt>Ausbilder</dt><dd>Sicherheitsbeauftragter</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Kam aus SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Beispiel</span></p>
+          <p class="mail-m"><span>Personalakte</span><b>Jonas Keller · Elektrotechniker</b></p>
+          <p class="mail-s">Onboarding · Erzeugungssparte</p>
+          <p class="mail-b">Beginn am <span class="num">1.12.</span> · <em>Qualifikationen fehlen</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Was Flow getan hat</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Sicherheitsüberprüfung genehmigt</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="22" height="22" decoding="async"/></span><p>Es fehlen <span class="num">2</span> Pflichtqualifikationen</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Was Flow vorschlägt</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Qualifikationen einplanen</p><p class="card-s">SuccessFactors · die erste Woche</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Steuerformular für die Person</p><p class="card-s">Workday · nicht gesendet</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Nur mit Ihrer Freigabe · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="3" aria-label="Anfragen">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Kundenservice · Beispiel</p>
+        <h2 class="h1">Auslandspaket fehlt, die Kundin hat geschrieben</h2>
+      </div>
+      <p class="lead">Flow hat die Sendung geprüft und die Nachforschung vorbereitet</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> hat die Sendung mit dem Zolleingang abgeglichen, und Sie geben mit einem Klick frei</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Sendung <span class="num">CP304128569DE</span></p><table class="tb"><thead><tr><th>Datum</th><th>Ereignis</th><th>Ort</th></tr></thead><tbody><tr><td><span class="num">29.10.</span></td><td>Zur Beförderung angenommen</td><td>Herkunftsland</td></tr><tr><td><span class="num">5.11.</span></td><td>Das Herkunftsland verlassen</td><td>Exportstelle</td></tr><tr class="on"><td></td><td>Kein Scan im Inland</td><td></td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">1</span></div><p class="k">Offene Anfragen</p><ul class="lw-list"><li><p class="lw-l1"><b>Nina Berger</b><span>Auslandspaket</span></p><p class="lw-l2">Kundenservice · <span class="num">14.11.2026 10:05</span></p><span class="lw-status">Neu</span></li><li><p class="lw-l1"><b>Anton Stein</b><span>Einschreiben</span></p><p class="lw-l2">In Bearbeitung</p></li><li><p class="lw-l1"><b>Diana Peters</b><span>Wartezeit in der Filiale</span></p><p class="lw-l2">Geschlossen</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Nina Berger</b><span class="num">10:05</span></p>
+              <h3 class="ph-mail-subj">Auslandspaket</h3>
+              <p class="ph-mail-meta">Kein Update seit <span class="num">5.11.</span></p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> hat geprüft<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Hat die Sendung geprüft</b><span>Letzter Scan 5.11.</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/gate.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Hat das Zollsystem geprüft</b><span>Im Inland nicht erfasst</span></div></li></ol>
+          <p class="fl-src">Geprüft gegen: Sendungsverlauf · Zollsystem</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> schlägt 2 Schritte vor</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Internationale Nachforschung</b><span>Beim Herkunftsland</span></div></li><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Antwort an die Kundin</b><span>Die Nachforschung und das Datum</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Erledigt · <span class="num">2</span> Schritte</p><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/gate.webp" width="18" height="18" decoding="async"/> Zollsystem<span class="ord" aria-hidden="true">3</span></div><p class="k">Eingehende Auslandspost</p><ul class="lw-list"><li><p class="lw-l1"><b>CP304128569DE</b><span>Nicht erfasst</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>CP301977450DE</b><span>Erfasst · Flughafen</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>RR998104223FR</b><span>Zur Sortierung freigegeben</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Vorbereitet von Flow</span><span class="attr-done">Hinzugefügt von <span dir="ltr">Flow · 10:08</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Internationale Nachforschung</p><p class="pdf-s">Sendung <span class="num">CP304128569DE</span></p><dl class="pdf-f"><div><dt>Herkunftsland</dt><dd>Laut Sendung</dd></div><div><dt>Letzter Scan</dt><dd><mark><span class="num">5.11.</span></mark></dd></div><div><dt>Kundin</dt><dd>Nina Berger</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Kam aus Salesforce</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><b>Salesforce</b><span class="smp">Beispiel</span></p>
+          <p class="mail-m"><span>Anfrage</span><b>Nina Berger · Kundin</b></p>
+          <p class="mail-s">Auslandspaket · <span class="num">CP304128569DE</span></p>
+          <p class="mail-b">Im Kundenservice eröffnet · <em>Kein Update seit dem 5. November</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Was Flow getan hat</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><p>Kein Scan der Sendung seit dem 5. November</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/gate.webp" width="22" height="22" decoding="async"/></span><p>Das Paket ist nicht im Zolleingang erfasst</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Was Flow vorschlägt</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Nachforschung beim Herkunftsland</p><p class="card-s">Salesforce · bereit zum Senden</p></article><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Antwort an Nina Berger</p><p class="card-s">Outlook · nicht gesendet</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Nur mit Ihrer Freigabe · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dots named" role="group" aria-label="Abläufe">
+  <button class="dot" type="button" data-i="0" aria-current="true"><span>Störungen</span></button>
+  <button class="dot" type="button" data-i="1"><span>Personal</span></button>
+  <button class="dot" type="button" data-i="2"><span>Anfragen</span></button>
+</div>
+</section></div></section><section class="x4 x4-g o20sec x7-tools"><div class="x4-in"><div class="x7-th"><h2 class="x4-h2 rv">Flow bereitet die Arbeit vor <span class="g">in den Systemen Ihrer Organisation</span></h2><p class="x4-sub rv">Flow arbeitet neben den Systemen, die Sie bereits haben. Die Daten bleiben in der Organisation.</p></div><div class="o20" data-orbit20=""><div aria-hidden="true" class="o20-plate o20-plate-out"></div><div aria-hidden="true" class="o20-plate o20-plate-in"></div><svg aria-hidden="true" class="o20-tracks"></svg><div class="o20-ring" data-ring="in" data-speed="7.5"><button aria-label="Outlook" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/outlook.webp" width="23"/><span class="o20-tip">Outlook</span></button><button aria-label="Excel" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/excel.webp" width="23"/><span class="o20-tip">Excel</span></button><button aria-label="SAP" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sap.webp" style="width:62%;height:62%" width="23"/><span class="o20-tip">SAP</span></button><button aria-label="Word" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/word.webp" width="23"/><span class="o20-tip">Word</span></button><button aria-label="Power BI" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerbi.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power BI</span></button><button aria-label="SharePoint" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sharepoint.webp" width="23"/><span class="o20-tip">SharePoint</span></button></div><div class="o20-ring" data-ring="out" data-speed="-4.8"><button aria-label="Salesforce" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/salesforce.webp" style="width:64%;height:64%" width="23"/><span class="o20-tip">Salesforce</span></button><button aria-label="Workday" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/workday.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Workday</span></button><button aria-label="ServiceNow" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/servicenow.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">ServiceNow</span></button><button aria-label="ArcGIS" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/arcgis.webp" style="width:56%;height:56%" width="23"/><span class="o20-tip">ArcGIS</span></button><button aria-label="Qlik" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qlik.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Qlik</span></button><button aria-label="IBM Maximo" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/ibm.webp" style="width:60%;height:60%" width="23"/><span class="o20-tip">IBM Maximo</span></button><button aria-label="SuccessFactors" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/successfactors.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">SuccessFactors</span></button></div><div class="o20-core"><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><div class="o20-disc"><img alt="Flow" class="o20-wm" height="31" src="../assets/flow-logo-400.webp" width="70"/></div></div></div></div></section><section class="r15-tr" aria-labelledby="r15trh"><div class="r15-in"><header class="r15-th"><h2 class="r15-h2" id="r15trh">Ohne Ihre Freigabe bewegt sich nichts</h2><p class="r15-sub2">Flow arbeitet in den Systemen Ihrer Organisation, und die Informationen laufen nicht durch ein Chat-Fenster. Jede Aktion wartet auf Do It, wird im Protokoll festgehalten und kann rückgängig gemacht werden.</p></header><div class="r15-fan" aria-hidden="true"><figure class="r15-col r15-c1"><div class="r15-cd r15-ap"><div class="r15-ch"><img class="r15-flw" src="../assets/flow-logo-400.webp" width="400" height="176" alt="" decoding="async"/><small>Beispiel</small></div><p class="r15-q">Instandhaltungsauftrag an die Kolonne Nord freigeben und die Dichtung reservieren?</p><ul class="r15-st"><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Instandhaltungsauftrag für die Bezirkskolonne</b><small>SAP</small></span></li><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Ruf an die Bezirksbereitschaft</b><small>Feldgerät</small></span></li></ul><div class="r15-cf"><span class="doit r15-di"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><small>Wartet auf Ihre Freigabe</small></div></div><figcaption><b>Flow bereitet vor, Sie geben frei</b><span>Jeder Schritt wartet auf Ihr Do It</span></figcaption></figure><figure class="r15-col r15-c2"><div class="r15-cd r15-log"><div class="r15-lh"><span><b>Protokoll</b><small>Störung · Pumpwerk, Bezirk Nord</small></span><small class="r15-smp">Beispiel</small></div><ol class="r15-le"><li><time>06:40</time><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Störmeldung gelesen</b><small>Quelle: die Leitstelle</small></span><span class="r15-who is-f">Flow</span></li><li><time>06:41</time><span class="r15-lg"><img src="../assets/orb/arcgis.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Anlage und Schieber geortet</b><small>Quelle: Anlagenkarte</small></span><span class="r15-who is-f">Flow</span></li><li><time>06:44</time><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Auftrag freigegeben, Dichtung reserviert</b><small>Quelle: die Störmeldung</small></span><span class="r15-who">Nina hat freigegeben</span></li><li class="r15-x"><time>06:44</time><span class="r15-lg"><img src="../assets/orb/field.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Bereitschaft alarmiert</b><small>Quelle: der Instandhaltungsauftrag</small></span><span class="r15-who">Nina hat freigegeben</span></li></ol></div><figcaption><b>Jeder Schritt wird protokolliert</b><span>Mit Uhrzeit, Quelle und Freigabe</span></figcaption></figure><figure class="r15-col r15-c3"><div class="r15-cd r15-un"><div class="r15-ch"><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><b>Instandhaltungsauftrag · Pumpe 2</b><span class="r15-done"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg>Erledigt</span></div><dl class="r15-row"><div><dt>Anlage</dt><dd>Pumpe 2</dd></div><div><dt>Team</dt><dd>Instandhaltung Nord</dd></div><div><dt>Status</dt><dd>Freigegeben</dd></div></dl><div class="r15-cf"><span class="r15-undo"><svg viewBox="0 0 24 24"><path d="M9.8 6 4.5 11.3l5.3 5.3"/><path d="M4.8 11.3h9.2a5.5 5.5 0 0 1 5.5 5.5v1.7"/></svg>Undo</span><small>Aktualisiert um 06:44</small></div></div><figcaption><b>Und rückgängig machbar</b><span>Ein erledigter Schritt wird mit Undo zurückgenommen</span></figcaption></figure></div></div></section><div id="lgdep" class="r15-dp"><section class="dgv-sec sx-dep" id="depsec" data-zone-scope><div class="sx-in"><h2 class="dp-h" id="dpTitle">Wo Flow läuft</h2><p class="dp-sub">Die sichere Flow-Cloud, der Rechner der Mitarbeitenden oder ein Server im Netz der Organisation. Die Organisation entscheidet, alle drei Optionen sind heute verfügbar.</p><div class="dep dep2" role="group" aria-label="Wo Flow läuft"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div><section class="op-sec sx-op" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section></div><section class="r15-ct" aria-labelledby="r15cth"><div class="r15-in"><div class="r15-ctc"><h2 class="r15-h2" id="r15cth">Vereinbaren Sie ein kurzes Gespräch und erhalten Sie einen Einführungsplan für Ihre Organisation</h2><ol class="r15-steps"><li><span class="r15-n">1</span><b>Erstgespräch</b><span>Wir erfassen, wo Ihr Team heute arbeitet</span></li><li><span class="r15-n">2</span><b>Sie wählen, wo Flow läuft</b><span>Cloud, Edge oder On-Prem</span></li><li><span class="r15-n">3</span><b>Pilot mit einem Team</b><span>Jeder Schritt wartet auf Ihre Freigabe</span></li></ol><a class="doit r15-cta" data-book="" data-ga="sol_government_waitlist" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Gespräch vereinbaren</span></a></div></div></section></template>
+<template id="r15-fr"><section class="r15-hero" aria-labelledby="r15h1"><div class="r15-in"><h1 class="r15-h1" id="r15h1"><b>Tout ce qui entoure l’exploitation est prêt,</b> <span class="fx-gw">vous n’avez qu’à valider</span></h1><p class="r15-sub">Flow travaille aux côtés des systèmes que vous avez déjà</p><a class="doit r15-cta" data-book="" data-ga="sol_government_hero" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Réserver un appel</span></a></div><div id="r14s" class="r15-stage"><script>(function(w){var q=new URLSearchParams(location.search),f=q.get("f"),v=q.get("v"),ai=q.get("ai"),rm=matchMedia("(prefers-reduced-motion: reduce)").matches;w.dataset.f=f||(rm?"3":"0");if(v)w.dataset.v=v;w.dataset.ai=ai==="2"?"2":"1";if(rm)w.classList.add("rm");if(q.get("state")==="done")w.dataset.state="done"})(document.getElementById("r14s"))</script><section class="r14" id="r14" aria-roledescription="carousel">
+<div class="track">
+<div class="slide is-active" data-m="1" aria-label="Pannes">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Maintenance des réseaux · exemple</p>
+        <h2 class="h1">Chute de pression au pompage, une équipe est requise</h2>
+      </div>
+      <p class="lead">Flow a trouvé la panne et préparé l’ordre</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> a localisé l’installation et la pièce et préparé l’appel d’astreinte, et vous validez en un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/arcgis.webp" width="18" height="18" decoding="async"/> ArcGIS<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Station de pompage · secteur nord</p><table class="tb"><thead><tr><th>Composant</th><th>Diamètre mm</th><th>État</th></tr></thead><tbody><tr class="on"><td>Vanne d’aspiration</td><td><span class="num">600</span></td><td>À isoler</td></tr><tr><td>Vanne de refoulement</td><td><span class="num">500</span></td><td>À isoler</td></tr><tr><td>Conduite de by-pass</td><td><span class="num">300</span></td><td>Ouverte</td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">1</span></div><p class="k">Avis de panne · secteur nord</p><ul class="lw-list"><li><p class="lw-l1"><b>Pompe <span class="num">2</span></b><span>Chute de pression à l’aspiration</span></p><p class="lw-l2">Centre de contrôle · <span class="num">14/11/2026 06:40</span></p><span class="lw-status">Nouveau</span></li><li><p class="lw-l1"><b>Débitmètre</b><span>Relevé anormal</span></p><p class="lw-l2">En cours</p></li><li><p class="lw-l1"><b>Groupe électrogène</b><span>Contrôle périodique</span></p><p class="lw-l2">Clôturé</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · avis de panne</b><span class="num">06:40</span></p>
+              <h3 class="ph-mail-subj">Pompe <span class="num">2</span> · chute de pression</h3>
+              <p class="ph-mail-meta">Centre de contrôle · secteur nord</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> a vérifié<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/arcgis.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>A localisé l’installation</b><span><span class="num">2</span> vannes à isoler</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>A trouvé la pièce</b><span>Joint mécanique · <span class="num">3</span> en stock</span></div></li></ol>
+          <p class="fl-src">Vérifié avec : la carte des actifs · le stock du dépôt</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propose 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Ordre de maintenance</b><span>Équipe du secteur · avec réservation</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/field.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Appel d’astreinte</b><span>Sur le terminal terrain</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Fait · <span class="num">2</span> actions</p><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><p class="k">Stock · dépôt du secteur</p><ul class="lw-list"><li><p class="lw-l1"><b>Joint mécanique pour la pompe</b><span><span class="num">3</span> en stock</span></p><p class="lw-l2">Compatible avec le modèle de pompe</p><span class="lw-status">À réserver</span></li><li><p class="lw-l1"><b>Roulement</b><span><span class="num">6</span> en stock</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Joint de bride</b><span><span class="num">40</span> en stock</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Préparé par Flow</span><span class="attr-done">Ajouté par <span dir="ltr">Flow · 06:44</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Ordre de maintenance</p><p class="pdf-s">Maintenance corrective · <span class="num">14/11/2026</span></p><dl class="pdf-f"><div><dt>Équipement</dt><dd>Pompe <span class="num">2</span></dd></div><div><dt>Équipe</dt><dd><mark>Équipe de maintenance nord</mark></dd></div><div><dt>Pièce</dt><dd>Joint mécanique</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Arrivé depuis SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Exemple</span></p>
+          <p class="mail-m"><span>Avis de panne</span><b>Centre de contrôle · secteur nord</b></p>
+          <p class="mail-s">Pompe <span class="num">2</span> · chute de pression à l’aspiration</p>
+          <p class="mail-b">Ouvert depuis une alerte du centre de contrôle · <em>Priorité <span class="num">1</span></em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Ce que Flow a fait</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/arcgis.webp" width="22" height="22" decoding="async"/></span><p>A localisé la station et les vannes</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Joint mécanique de rechange au dépôt</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Ce que Flow propose</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Ordre de maintenance pour l’équipe</p><p class="card-s">SAP · avec réservation du joint</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/field.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Appel à l’astreinte du secteur</p><p class="card-s">Terminal terrain · non envoyé</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Uniquement avec votre accord · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="2" aria-label="Salariés">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Intégration · exemple</p>
+        <h2 class="h1">Un nouveau salarié commence le 1er décembre</h2>
+      </div>
+      <p class="lead">Flow a vérifié l’intégration et préparé la suite</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> a vérifié le dossier du salarié et les habilitations, et vous validez en un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">2</span></div><p class="k">Dossier du salarié</p><p class="t">Antoine Mercier</p><ul class="lw-fields"><li class="lw-f"><span class="k">Poste</span><span class="v">Électricien</span></li><li class="lw-f"><span class="k">Unité</span><span class="v">Division production</span></li><li class="lw-pair"><span class="lw-f"><span class="k">Arrivée</span><span class="v"><span class="num">01/12/2026</span></span></span><span class="lw-f"><span class="k">Habilitation de sécurité</span><span class="v">Validé</span></span></li></ul></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/successfactors.webp" width="18" height="18" decoding="async"/> SuccessFactors<span class="ord" aria-hidden="true">1</span></div><p class="k">habilitations obligatoires</p><ul class="lw-list"><li><p class="lw-l1"><b>Sécurité électrique</b><span>Non terminée</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Travail en hauteur</b><span>Non terminée</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Sécurité de l’information</b><span>Terminée</span></p><p class="lw-l2"></p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · dossier du salarié</b><span class="num">09:10</span></p>
+              <h3 class="ph-mail-subj">Nouveau salarié</h3>
+              <p class="ph-mail-meta">Antoine Mercier · division production</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> a vérifié<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>A vérifié le dossier du salarié</b><span>Habilitation de sécurité approuvée</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>A vérifié les habilitations</b><span><span class="num">2</span> Il manque</span></div></li></ol>
+          <p class="fl-src">Vérifié avec : le dossier du salarié · les habilitations</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propose 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Planifier les habilitations</b><span>La première semaine</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>RIB</b><span>À signer par le salarié</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Fait · <span class="num">2</span> actions</p><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/workday.webp" width="18" height="18" decoding="async"/> Workday<span class="ord" aria-hidden="true">3</span></div><p class="k">Formulaires des nouvelles recrues</p><ul class="lw-list"><li><p class="lw-l1"><b>Antoine Mercier</b><span>RIB</span></p><p class="lw-l2">À signer par le salarié</p><span class="lw-status">Non envoyé</span></li><li><p class="lw-l1"><b>Chloé Dumas</b><span>RIB</span></p><p class="lw-l2">Signé</p></li></ul><p class="flow-attr"><span class="attr-prep">Préparé par Flow</span><span class="attr-done">Ajouté par <span dir="ltr">Flow · 09:12</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/orb/successfactors.webp" width="18" height="18" decoding="async"/> SuccessFactors<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Planifier les habilitations</p><p class="pdf-s">Antoine Mercier · <span class="num">01/12/2026</span></p><dl class="pdf-f"><div><dt>Sécurité électrique</dt><dd><mark><span class="num">02/12</span></mark></dd></div><div><dt>Travail en hauteur</dt><dd><span class="num">03/12</span></dd></div><div><dt>Formateur</dt><dd>Responsable sécurité</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Arrivé depuis SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Exemple</span></p>
+          <p class="mail-m"><span>Dossier du salarié</span><b>Antoine Mercier · électricien</b></p>
+          <p class="mail-s">Intégration · division production</p>
+          <p class="mail-b">Arrivée le <span class="num">01/12</span> · <em>habilitations manquantes</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Ce que Flow a fait</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Habilitation de sécurité approuvée</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="22" height="22" decoding="async"/></span><p>Il manque <span class="num">2</span> habilitations obligatoires</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Ce que Flow propose</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Planifier les habilitations</p><p class="card-s">SuccessFactors · la première semaine</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Formulaire fiscal pour le salarié</p><p class="card-s">Workday · non envoyé</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Uniquement avec votre accord · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="3" aria-label="Demandes">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Service client · exemple</p>
+        <h2 class="h1">Un colis de l’étranger n’est pas arrivé, la cliente a écrit</h2>
+      </div>
+      <p class="lead">Flow a vérifié l’envoi et préparé l’enquête</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> a vérifié l’envoi à l’entrée en douane, et vous validez en un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Envoi <span class="num">CP304128569DE</span></p><table class="tb"><thead><tr><th>Date</th><th>Événement</th><th>Lieu</th></tr></thead><tbody><tr><td><span class="num">29/10</span></td><td>Pris en charge</td><td>Pays d’origine</td></tr><tr><td><span class="num">05/11</span></td><td>Sorti du pays d’origine</td><td>Tri d’exportation</td></tr><tr class="on"><td></td><td>Aucun scan dans le pays</td><td></td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">1</span></div><p class="k">Demandes ouvertes</p><ul class="lw-list"><li><p class="lw-l1"><b>Nina Bernard</b><span>Colis de l’étranger</span></p><p class="lw-l2">Centre de service · <span class="num">14/11/2026 10:05</span></p><span class="lw-status">Nouveau</span></li><li><p class="lw-l1"><b>Olivier Girard</b><span>Recommandé</span></p><p class="lw-l2">En cours</p></li><li><p class="lw-l1"><b>Claire Perret</b><span>Attente au bureau de poste</span></p><p class="lw-l2">Clôturé</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Nina Bernard</b><span class="num">10:05</span></p>
+              <h3 class="ph-mail-subj">Colis de l’étranger</h3>
+              <p class="ph-mail-meta">Aucune mise à jour depuis le <span class="num">05/11</span></p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> a vérifié<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>A vérifié l’envoi</b><span>Dernier scan 05/11</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/gate.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>A vérifié le système douanier</b><span>Non reçu dans le pays</span></div></li></ol>
+          <p class="fl-src">Vérifié avec : historique de l’envoi · douane</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propose 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Enquête internationale</b><span>Auprès du pays d’origine</span></div></li><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Réponse à la cliente</b><span>L’enquête et la date</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Fait · <span class="num">2</span> actions</p><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/gate.webp" width="18" height="18" decoding="async"/> Système douanier<span class="ord" aria-hidden="true">3</span></div><p class="k">Courrier international entrant</p><ul class="lw-list"><li><p class="lw-l1"><b>CP304128569DE</b><span>Non reçu</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>CP301977450DE</b><span>Reçu · aéroport</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>RR998104223FR</b><span>Libéré pour le tri</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Préparé par Flow</span><span class="attr-done">Ajouté par <span dir="ltr">Flow · 10:08</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Enquête internationale</p><p class="pdf-s">Envoi <span class="num">CP304128569DE</span></p><dl class="pdf-f"><div><dt>Pays d’origine</dt><dd>Selon l’envoi</dd></div><div><dt>Dernier scan</dt><dd><mark><span class="num">05/11</span></mark></dd></div><div><dt>Cliente</dt><dd>Nina Bernard</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Arrivé depuis Salesforce</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><b>Salesforce</b><span class="smp">Exemple</span></p>
+          <p class="mail-m"><span>Demande</span><b>Nina Bernard · cliente</b></p>
+          <p class="mail-s">Colis de l’étranger · <span class="num">CP304128569DE</span></p>
+          <p class="mail-b">Ouverte au centre de service · <em>Aucune mise à jour depuis le 05/11</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Ce que Flow a fait</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><p>Aucun scan de l’envoi depuis le 05/11</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/gate.webp" width="22" height="22" decoding="async"/></span><p>Le colis n’est pas enregistré en douane</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Ce que Flow propose</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Enquête auprès du pays d’origine</p><p class="card-s">Salesforce · prêt à envoyer</p></article><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Réponse à Nina Bernard</p><p class="card-s">Outlook · non envoyé</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Uniquement avec votre accord · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dots named" role="group" aria-label="Processus">
+  <button class="dot" type="button" data-i="0" aria-current="true"><span>Pannes</span></button>
+  <button class="dot" type="button" data-i="1"><span>Salariés</span></button>
+  <button class="dot" type="button" data-i="2"><span>Demandes</span></button>
+</div>
+</section></div></section><section class="x4 x4-g o20sec x7-tools"><div class="x4-in"><div class="x7-th"><h2 class="x4-h2 rv">Flow prépare le travail <span class="g">dans les systèmes de votre organisation</span></h2><p class="x4-sub rv">Flow travaille aux côtés des systèmes que vous avez déjà. Les données restent dans l’organisation.</p></div><div class="o20" data-orbit20=""><div aria-hidden="true" class="o20-plate o20-plate-out"></div><div aria-hidden="true" class="o20-plate o20-plate-in"></div><svg aria-hidden="true" class="o20-tracks"></svg><div class="o20-ring" data-ring="in" data-speed="7.5"><button aria-label="Outlook" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/outlook.webp" width="23"/><span class="o20-tip">Outlook</span></button><button aria-label="Excel" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/excel.webp" width="23"/><span class="o20-tip">Excel</span></button><button aria-label="SAP" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sap.webp" style="width:62%;height:62%" width="23"/><span class="o20-tip">SAP</span></button><button aria-label="Word" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/word.webp" width="23"/><span class="o20-tip">Word</span></button><button aria-label="Power BI" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerbi.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power BI</span></button><button aria-label="SharePoint" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sharepoint.webp" width="23"/><span class="o20-tip">SharePoint</span></button></div><div class="o20-ring" data-ring="out" data-speed="-4.8"><button aria-label="Salesforce" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/salesforce.webp" style="width:64%;height:64%" width="23"/><span class="o20-tip">Salesforce</span></button><button aria-label="Workday" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/workday.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Workday</span></button><button aria-label="ServiceNow" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/servicenow.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">ServiceNow</span></button><button aria-label="ArcGIS" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/arcgis.webp" style="width:56%;height:56%" width="23"/><span class="o20-tip">ArcGIS</span></button><button aria-label="Qlik" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qlik.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Qlik</span></button><button aria-label="IBM Maximo" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/ibm.webp" style="width:60%;height:60%" width="23"/><span class="o20-tip">IBM Maximo</span></button><button aria-label="SuccessFactors" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/successfactors.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">SuccessFactors</span></button></div><div class="o20-core"><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><div class="o20-disc"><img alt="Flow" class="o20-wm" height="31" src="../assets/flow-logo-400.webp" width="70"/></div></div></div></div></section><section class="r15-tr" aria-labelledby="r15trh"><div class="r15-in"><header class="r15-th"><h2 class="r15-h2" id="r15trh">Rien ne part sans votre validation</h2><p class="r15-sub2">Flow travaille dans les systèmes de votre organisation, et les informations ne passent pas par une fenêtre de discussion. Chaque action attend un Do It, est inscrite au journal, et peut être annulée.</p></header><div class="r15-fan" aria-hidden="true"><figure class="r15-col r15-c1"><div class="r15-cd r15-ap"><div class="r15-ch"><img class="r15-flw" src="../assets/flow-logo-400.webp" width="400" height="176" alt="" decoding="async"/><small>Exemple</small></div><p class="r15-q">Libérer l’ordre de maintenance pour l’équipe nord et réserver le joint ?</p><ul class="r15-st"><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Ordre de maintenance pour l’équipe</b><small>SAP</small></span></li><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Appel à l’astreinte du secteur</b><small>Terminal terrain</small></span></li></ul><div class="r15-cf"><span class="doit r15-di"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><small>En attente de votre validation</small></div></div><figcaption><b>Flow prépare, vous validez</b><span>Chaque action attend votre Do It</span></figcaption></figure><figure class="r15-col r15-c2"><div class="r15-cd r15-log"><div class="r15-lh"><span><b>Journal d’activité</b><small>Panne · station de pompage, secteur nord</small></span><small class="r15-smp">Exemple</small></div><ol class="r15-le"><li><time>06:40</time><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Avis de panne lu</b><small>Source : le centre de contrôle</small></span><span class="r15-who is-f">Flow</span></li><li><time>06:41</time><span class="r15-lg"><img src="../assets/orb/arcgis.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Installation et vannes localisées</b><small>Source : la carte des actifs</small></span><span class="r15-who is-f">Flow</span></li><li><time>06:44</time><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Ordre libéré, joint réservé</b><small>Source : l’avis de panne</small></span><span class="r15-who">Élise a validé</span></li><li class="r15-x"><time>06:44</time><span class="r15-lg"><img src="../assets/orb/field.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Astreinte appelée</b><small>Source : l’ordre de maintenance</small></span><span class="r15-who">Élise a validé</span></li></ol></div><figcaption><b>Chaque action est consignée</b><span>Avec l’heure, la source et qui a validé</span></figcaption></figure><figure class="r15-col r15-c3"><div class="r15-cd r15-un"><div class="r15-ch"><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><b>Ordre de maintenance · pompe 2</b><span class="r15-done"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg>Fait</span></div><dl class="r15-row"><div><dt>Installation</dt><dd>Pompe 2</dd></div><div><dt>Équipe</dt><dd>Maintenance nord</dd></div><div><dt>Statut</dt><dd>Libéré</dd></div></dl><div class="r15-cf"><span class="r15-undo"><svg viewBox="0 0 24 24"><path d="M9.8 6 4.5 11.3l5.3 5.3"/><path d="M4.8 11.3h9.2a5.5 5.5 0 0 1 5.5 5.5v1.7"/></svg>Undo</span><small>Mis à jour à 06:44</small></div></div><figcaption><b>Et tout s’annule</b><span>Une action effectuée s’annule avec Undo</span></figcaption></figure></div></div></section><div id="lgdep" class="r15-dp"><section class="dgv-sec sx-dep" id="depsec" data-zone-scope><div class="sx-in"><h2 class="dp-h" id="dpTitle">Où Flow s’exécute</h2><p class="dp-sub">Le cloud sécurisé de Flow, l’ordinateur du collaborateur ou un serveur sur le réseau de l’organisation. L’organisation choisit, et les trois options sont disponibles dès aujourd’hui.</p><div class="dep dep2" role="group" aria-label="Où Flow s’exécute"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div><section class="op-sec sx-op" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section></div><section class="r15-ct" aria-labelledby="r15cth"><div class="r15-in"><div class="r15-ctc"><h2 class="r15-h2" id="r15cth">Réservez un court appel et recevez un plan de déploiement pour votre organisation</h2><ol class="r15-steps"><li><span class="r15-n">1</span><b>Appel de découverte</b><span>Nous repérons où travaille votre équipe aujourd’hui</span></li><li><span class="r15-n">2</span><b>Vous choisissez où Flow s’exécute</b><span>Cloud, Edge ou On-Prem</span></li><li><span class="r15-n">3</span><b>Un pilote avec une équipe</b><span>Chaque action attend votre validation</span></li></ol><a class="doit r15-cta" data-book="" data-ga="sol_government_waitlist" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Réserver un appel</span></a></div></div></section></template>
+<template id="r15-es"><section class="r15-hero" aria-labelledby="r15h1"><div class="r15-in"><h1 class="r15-h1" id="r15h1"><b>Todo lo que rodea la operación está listo,</b> <span class="fx-gw">usted solo aprueba</span></h1><p class="r15-sub">Flow trabaja junto a los sistemas que ya tienen</p><a class="doit r15-cta" data-book="" data-ga="sol_government_hero" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Reservar una llamada</span></a></div><div id="r14s" class="r15-stage"><script>(function(w){var q=new URLSearchParams(location.search),f=q.get("f"),v=q.get("v"),ai=q.get("ai"),rm=matchMedia("(prefers-reduced-motion: reduce)").matches;w.dataset.f=f||(rm?"3":"0");if(v)w.dataset.v=v;w.dataset.ai=ai==="2"?"2":"1";if(rm)w.classList.add("rm");if(q.get("state")==="done")w.dataset.state="done"})(document.getElementById("r14s"))</script><section class="r14" id="r14" aria-roledescription="carousel">
+<div class="track">
+<div class="slide is-active" data-m="1" aria-label="Averías">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Mantenimiento de redes · ejemplo</p>
+        <h2 class="h1">Caída de presión en un bombeo, se necesita un equipo</h2>
+      </div>
+      <p class="lead">Flow encontró la avería y preparó la orden</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> localizó la instalación y la pieza y preparó el aviso de guardia, y ustedes aprueban en un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/arcgis.webp" width="18" height="18" decoding="async"/> ArcGIS<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Estación de bombeo · distrito norte</p><table class="tb"><thead><tr><th>Componente</th><th>Diámetro mm</th><th>Estado</th></tr></thead><tbody><tr class="on"><td>Válvula de succión</td><td><span class="num">600</span></td><td>Para aislar</td></tr><tr><td>Válvula de impulsión</td><td><span class="num">500</span></td><td>Para aislar</td></tr><tr><td>Línea de bypass</td><td><span class="num">300</span></td><td>Abierta</td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">1</span></div><p class="k">Avisos de avería · distrito norte</p><ul class="lw-list"><li><p class="lw-l1"><b>Bomba <span class="num">2</span></b><span>Caída de presión en la succión</span></p><p class="lw-l2">Centro de control · <span class="num">14/11/2026 06:40</span></p><span class="lw-status">Nueva</span></li><li><p class="lw-l1"><b>Caudalímetro</b><span>Lectura anómala</span></p><p class="lw-l2">En curso</p></li><li><p class="lw-l1"><b>Generador de emergencia</b><span>Inspección periódica</span></p><p class="lw-l2">Cerrado</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · aviso de avería</b><span class="num">06:40</span></p>
+              <h3 class="ph-mail-subj">Bomba <span class="num">2</span> · caída de presión</h3>
+              <p class="ph-mail-meta">Centro de control · distrito norte</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> revisó<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/arcgis.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Localizó la instalación</b><span><span class="num">2</span> válvulas a aislar</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Encontró la pieza</b><span>Sello mecánico · <span class="num">3</span> en stock</span></div></li></ol>
+          <p class="fl-src">Comprobado con: el mapa de activos · el stock del almacén</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propone 2 acciones</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Orden de mantenimiento</b><span>Equipo del distrito · con reserva</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/field.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Aviso de guardia</b><span>En el terminal de campo</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Hecho · <span class="num">2</span> acciones</p><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><p class="k">Existencias · almacén del distrito</p><ul class="lw-list"><li><p class="lw-l1"><b>Sello mecánico para la bomba</b><span><span class="num">3</span> en stock</span></p><p class="lw-l2">Compatible con el modelo de bomba</p><span class="lw-status">Reservar</span></li><li><p class="lw-l1"><b>Rodamiento</b><span><span class="num">6</span> en stock</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Junta de brida</b><span><span class="num">40</span> en stock</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Preparado por Flow</span><span class="attr-done">Añadido por <span dir="ltr">Flow · 06:44</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Orden de mantenimiento</p><p class="pdf-s">Mantenimiento correctivo · <span class="num">14/11/2026</span></p><dl class="pdf-f"><div><dt>Equipo</dt><dd>Bomba <span class="num">2</span></dd></div><div><dt>Equipo</dt><dd><mark>Equipo de mantenimiento norte</mark></dd></div><div><dt>Repuesto</dt><dd>Sello mecánico</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Llegó desde SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Ejemplo</span></p>
+          <p class="mail-m"><span>Aviso de avería</span><b>Centro de control · distrito norte</b></p>
+          <p class="mail-s">Bomba <span class="num">2</span> · caída de presión en la succión</p>
+          <p class="mail-b">Abierto desde una alerta del centro de control · <em>Prioridad <span class="num">1</span></em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Lo que hizo Flow</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/arcgis.webp" width="22" height="22" decoding="async"/></span><p>Localizó la estación y las válvulas</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Sello mecánico de recambio en el almacén</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Lo que propone Flow</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Orden de mantenimiento para el equipo</p><p class="card-s">SAP · con reserva del sello</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/field.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Aviso a la guardia del distrito</p><p class="card-s">Terminal de campo · no enviado</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Solo con su aprobación · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="2" aria-label="Personal">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Incorporación · ejemplo</p>
+        <h2 class="h1">Un nuevo empleado empieza el 1 de diciembre</h2>
+      </div>
+      <p class="lead">Flow comprobó la incorporación y preparó la continuación</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> revisó el expediente y las habilitaciones, y ustedes aprueban en un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">2</span></div><p class="k">Expediente del empleado</p><p class="t">Diego Navarro</p><ul class="lw-fields"><li class="lw-f"><span class="k">Puesto</span><span class="v">Electricista</span></li><li class="lw-f"><span class="k">Unidad</span><span class="v">División de generación</span></li><li class="lw-pair"><span class="lw-f"><span class="k">Inicio</span><span class="v"><span class="num">01/12/2026</span></span></span><span class="lw-f"><span class="k">Habilitación de seguridad</span><span class="v">Aprobado</span></span></li></ul></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/successfactors.webp" width="18" height="18" decoding="async"/> SuccessFactors<span class="ord" aria-hidden="true">1</span></div><p class="k">habilitaciones obligatorias</p><ul class="lw-list"><li><p class="lw-l1"><b>Seguridad eléctrica</b><span>No completada</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Trabajo en altura</b><span>No completada</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Seguridad de la información</b><span>Completada</span></p><p class="lw-l2"></p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · expediente del empleado</b><span class="num">09:10</span></p>
+              <h3 class="ph-mail-subj">Nuevo empleado</h3>
+              <p class="ph-mail-meta">Diego Navarro · división de generación</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> revisó<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Revisó el expediente</b><span>Habilitación de seguridad aprobada</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Revisó las habilitaciones</b><span><span class="num">2</span> Faltan</span></div></li></ol>
+          <p class="fl-src">Comprobado con: el expediente · las habilitaciones</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propone 2 acciones</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Programar las habilitaciones</b><span>La primera semana</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>modelo 145</b><span>Para la firma de la persona</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Hecho · <span class="num">2</span> acciones</p><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/workday.webp" width="18" height="18" decoding="async"/> Workday<span class="ord" aria-hidden="true">3</span></div><p class="k">Formularios para nuevas contrataciones</p><ul class="lw-list"><li><p class="lw-l1"><b>Diego Navarro</b><span>modelo 145</span></p><p class="lw-l2">Para la firma de la persona</p><span class="lw-status">No enviado</span></li><li><p class="lw-l1"><b>Sara Dueñas</b><span>modelo 145</span></p><p class="lw-l2">Firmado</p></li></ul><p class="flow-attr"><span class="attr-prep">Preparado por Flow</span><span class="attr-done">Añadido por <span dir="ltr">Flow · 09:12</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/orb/successfactors.webp" width="18" height="18" decoding="async"/> SuccessFactors<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Programar las habilitaciones</p><p class="pdf-s">Diego Navarro · <span class="num">01/12/2026</span></p><dl class="pdf-f"><div><dt>Seguridad eléctrica</dt><dd><mark><span class="num">02/12</span></mark></dd></div><div><dt>Trabajo en altura</dt><dd><span class="num">03/12</span></dd></div><div><dt>Instructor</dt><dd>Responsable de seguridad</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Llegó desde SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Ejemplo</span></p>
+          <p class="mail-m"><span>Expediente del empleado</span><b>Diego Navarro · electricista</b></p>
+          <p class="mail-s">Incorporación · división de generación</p>
+          <p class="mail-b">Empieza el <span class="num">01/12</span> · <em>faltan habilitaciones</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Lo que hizo Flow</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Habilitación de seguridad aprobada</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="22" height="22" decoding="async"/></span><p>Faltan <span class="num">2</span> habilitaciones obligatorias</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Lo que propone Flow</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/successfactors.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Programar las habilitaciones</p><p class="card-s">SuccessFactors · la primera semana</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Formulario fiscal para la persona</p><p class="card-s">Workday · no enviado</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Solo con su aprobación · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="3" aria-label="Consultas">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Atención al cliente · ejemplo</p>
+        <h2 class="h1">Un paquete del extranjero no llegó, la clienta escribió</h2>
+      </div>
+      <p class="lead">Flow revisó el envío y preparó la investigación</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> revisó el envío en la entrada de aduanas, y ustedes aprueban en un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Envío <span class="num">CP304128569DE</span></p><table class="tb"><thead><tr><th>Fecha</th><th>Evento</th><th>Lugar</th></tr></thead><tbody><tr><td><span class="num">29/10</span></td><td>Admitido para el envío</td><td>País de origen</td></tr><tr><td><span class="num">05/11</span></td><td>Salió del país de origen</td><td>Clasificación de exportación</td></tr><tr class="on"><td></td><td>Sin escaneo en el país</td><td></td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">1</span></div><p class="k">Consultas abiertas</p><ul class="lw-list"><li><p class="lw-l1"><b>Noa Blanco</b><span>Paquete del extranjero</span></p><p class="lw-l2">Centro de atención · <span class="num">14/11/2026 10:05</span></p><span class="lw-status">Nueva</span></li><li><p class="lw-l1"><b>Álvaro Sanz</b><span>Carta certificada</span></p><p class="lw-l2">En curso</p></li><li><p class="lw-l1"><b>Diana Pérez</b><span>Cola en una oficina de correos</span></p><p class="lw-l2">Cerrado</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Noa Blanco</b><span class="num">10:05</span></p>
+              <h3 class="ph-mail-subj">Paquete del extranjero</h3>
+              <p class="ph-mail-meta">Sin actualización desde el <span class="num">05/11</span></p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> revisó<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Revisó el envío</b><span>Último escaneo 05/11</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/gate.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Revisó el sistema de aduanas</b><span>No recibido en el país</span></div></li></ol>
+          <p class="fl-src">Comprobado con: historial del envío · aduanas</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propone 2 acciones</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Investigación internacional</b><span>Con el país de origen</span></div></li><li class="prop"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Respuesta a la clienta</b><span>La investigación y la fecha</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Hecho · <span class="num">2</span> acciones</p><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/gate.webp" width="18" height="18" decoding="async"/> Sistema de aduanas<span class="ord" aria-hidden="true">3</span></div><p class="k">Correo internacional entrante</p><ul class="lw-list"><li><p class="lw-l1"><b>CP304128569DE</b><span>No recibido</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>CP301977450DE</b><span>Recibido · aeropuerto</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>RR998104223FR</b><span>Liberado a clasificación</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Preparado por Flow</span><span class="attr-done">Añadido por <span dir="ltr">Flow · 10:08</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Investigación internacional</p><p class="pdf-s">Envío <span class="num">CP304128569DE</span></p><dl class="pdf-f"><div><dt>País de origen</dt><dd>Según el envío</dd></div><div><dt>Último escaneo</dt><dd><mark><span class="num">05/11</span></mark></dd></div><div><dt>Clienta</dt><dd>Noa Blanco</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Llegó desde Salesforce</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><b>Salesforce</b><span class="smp">Ejemplo</span></p>
+          <p class="mail-m"><span>Consulta</span><b>Noa Blanco · clienta</b></p>
+          <p class="mail-s">Paquete del extranjero · <span class="num">CP304128569DE</span></p>
+          <p class="mail-b">Abierta en el centro de atención · <em>Sin actualización desde el 05/11</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Lo que hizo Flow</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><p>Sin escaneo del envío desde el 05/11</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/gate.webp" width="22" height="22" decoding="async"/></span><p>El paquete no consta en aduanas</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Lo que propone Flow</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Investigación con el país de origen</p><p class="card-s">Salesforce · listo para enviar</p></article><article class="card"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Respuesta a Noa Blanco</p><p class="card-s">Outlook · no enviado</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Solo con su aprobación · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dots named" role="group" aria-label="Procesos">
+  <button class="dot" type="button" data-i="0" aria-current="true"><span>Averías</span></button>
+  <button class="dot" type="button" data-i="1"><span>Personal</span></button>
+  <button class="dot" type="button" data-i="2"><span>Consultas</span></button>
+</div>
+</section></div></section><section class="x4 x4-g o20sec x7-tools"><div class="x4-in"><div class="x7-th"><h2 class="x4-h2 rv">Flow prepara el trabajo <span class="g">en los sistemas de su organización</span></h2><p class="x4-sub rv">Flow trabaja junto a los sistemas que ya tienen. Los datos se quedan dentro de la organización.</p></div><div class="o20" data-orbit20=""><div aria-hidden="true" class="o20-plate o20-plate-out"></div><div aria-hidden="true" class="o20-plate o20-plate-in"></div><svg aria-hidden="true" class="o20-tracks"></svg><div class="o20-ring" data-ring="in" data-speed="7.5"><button aria-label="Outlook" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/outlook.webp" width="23"/><span class="o20-tip">Outlook</span></button><button aria-label="Excel" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/excel.webp" width="23"/><span class="o20-tip">Excel</span></button><button aria-label="SAP" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sap.webp" style="width:62%;height:62%" width="23"/><span class="o20-tip">SAP</span></button><button aria-label="Word" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/word.webp" width="23"/><span class="o20-tip">Word</span></button><button aria-label="Power BI" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerbi.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power BI</span></button><button aria-label="SharePoint" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sharepoint.webp" width="23"/><span class="o20-tip">SharePoint</span></button></div><div class="o20-ring" data-ring="out" data-speed="-4.8"><button aria-label="Salesforce" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/salesforce.webp" style="width:64%;height:64%" width="23"/><span class="o20-tip">Salesforce</span></button><button aria-label="Workday" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/workday.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Workday</span></button><button aria-label="ServiceNow" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/servicenow.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">ServiceNow</span></button><button aria-label="ArcGIS" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/arcgis.webp" style="width:56%;height:56%" width="23"/><span class="o20-tip">ArcGIS</span></button><button aria-label="Qlik" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qlik.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Qlik</span></button><button aria-label="IBM Maximo" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/ibm.webp" style="width:60%;height:60%" width="23"/><span class="o20-tip">IBM Maximo</span></button><button aria-label="SuccessFactors" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/successfactors.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">SuccessFactors</span></button></div><div class="o20-core"><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><div class="o20-disc"><img alt="Flow" class="o20-wm" height="31" src="../assets/flow-logo-400.webp" width="70"/></div></div></div></div></section><section class="r15-tr" aria-labelledby="r15trh"><div class="r15-in"><header class="r15-th"><h2 class="r15-h2" id="r15trh">Nada se mueve sin su aprobación</h2><p class="r15-sub2">Flow trabaja dentro de los sistemas de su organización, y la información no pasa por una ventana de chat. Cada acción espera un Do It, queda registrada en el diario y se puede deshacer.</p></header><div class="r15-fan" aria-hidden="true"><figure class="r15-col r15-c1"><div class="r15-cd r15-ap"><div class="r15-ch"><img class="r15-flw" src="../assets/flow-logo-400.webp" width="400" height="176" alt="" decoding="async"/><small>Ejemplo</small></div><p class="r15-q">¿Liberar la orden de mantenimiento al equipo norte y reservar el sello?</p><ul class="r15-st"><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Orden de mantenimiento para el equipo</b><small>SAP</small></span></li><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Aviso a la guardia del distrito</b><small>Terminal de campo</small></span></li></ul><div class="r15-cf"><span class="doit r15-di"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><small>Pendiente de su aprobación</small></div></div><figcaption><b>Flow prepara, usted aprueba</b><span>Cada acción espera su Do It</span></figcaption></figure><figure class="r15-col r15-c2"><div class="r15-cd r15-log"><div class="r15-lh"><span><b>Registro de actividad</b><small>Avería · estación de bombeo, distrito norte</small></span><small class="r15-smp">Ejemplo</small></div><ol class="r15-le"><li><time>06:40</time><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Aviso de avería leído</b><small>Fuente: el centro de control</small></span><span class="r15-who is-f">Flow</span></li><li><time>06:41</time><span class="r15-lg"><img src="../assets/orb/arcgis.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Instalación y válvulas localizadas</b><small>Fuente: el mapa de activos</small></span><span class="r15-who is-f">Flow</span></li><li><time>06:44</time><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Orden liberada, sello reservado</b><small>Fuente: el aviso de avería</small></span><span class="r15-who">Ana aprobó</span></li><li class="r15-x"><time>06:44</time><span class="r15-lg"><img src="../assets/orb/field.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Guardia avisada</b><small>Fuente: la orden de mantenimiento</small></span><span class="r15-who">Ana aprobó</span></li></ol></div><figcaption><b>Cada acción queda registrada</b><span>Con la hora, el origen y quién aprobó</span></figcaption></figure><figure class="r15-col r15-c3"><div class="r15-cd r15-un"><div class="r15-ch"><span class="r15-lg"><img src="../assets/orb/sap.webp" width="40" height="40" alt="" decoding="async"/></span><b>Orden de mantenimiento · bomba 2</b><span class="r15-done"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg>Hecho</span></div><dl class="r15-row"><div><dt>Instalación</dt><dd>Bomba 2</dd></div><div><dt>Equipo</dt><dd>Mantenimiento norte</dd></div><div><dt>Estado</dt><dd>Liberada</dd></div></dl><div class="r15-cf"><span class="r15-undo"><svg viewBox="0 0 24 24"><path d="M9.8 6 4.5 11.3l5.3 5.3"/><path d="M4.8 11.3h9.2a5.5 5.5 0 0 1 5.5 5.5v1.7"/></svg>Undo</span><small>Actualizado a las 06:44</small></div></div><figcaption><b>Y se puede deshacer</b><span>Una acción hecha se deshace con Undo</span></figcaption></figure></div></div></section><div id="lgdep" class="r15-dp"><section class="dgv-sec sx-dep" id="depsec" data-zone-scope><div class="sx-in"><h2 class="dp-h" id="dpTitle">Dónde se ejecuta Flow</h2><p class="dp-sub">La nube segura de Flow, el ordenador del empleado o un servidor en la red de la organización. La organización elige, y las tres opciones están disponibles hoy.</p><div class="dep dep2" role="group" aria-label="Dónde se ejecuta Flow"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div><section class="op-sec sx-op" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section></div><section class="r15-ct" aria-labelledby="r15cth"><div class="r15-in"><div class="r15-ctc"><h2 class="r15-h2" id="r15cth">Reserve una llamada breve y reciba un plan de implantación para su organización</h2><ol class="r15-steps"><li><span class="r15-n">1</span><b>Llamada inicial</b><span>Vemos dónde trabaja hoy su equipo</span></li><li><span class="r15-n">2</span><b>Usted elige dónde se ejecuta Flow</b><span>Nube, Edge u On-Prem</span></li><li><span class="r15-n">3</span><b>Piloto con un equipo</b><span>Cada acción espera su aprobación</span></li></ol><a class="doit r15-cta" data-book="" data-ga="sol_government_waitlist" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Reservar una llamada</span></a></div></div></section></template>
+<script>(function(){var d=document.documentElement,l=d.dataset.ui,t=document.getElementById('r15-'+l),m=document.getElementById('main');if(!t||!m)return;m.innerHTML='';m.appendChild(t.content.cloneNode(true));m.lang=l;d.lang=l;document.title={"de": "KI für öffentliche Unternehmen: alles rund um den Betrieb, bereit zur Freigabe | Flow", "fr": "IA pour les entreprises publiques : tout ce qui entoure l’exploitation, prêt à valider | Flow", "es": "IA para empresas públicas: todo lo que rodea la operación, listo para aprobar | Flow"}[l];var ds={"de": "KI für öffentliche Unternehmen: Flow bereitet Instandhaltungsaufträge bei Störungen, das Onboarding neuer Mitarbeitender und Antworten auf Kundenanfragen aus den Systemen des Unternehmens vor, und jemand aus dem Team gibt jeden Schritt frei. Die Daten bleiben in der Organisation: maskierte Cloud, Flow-Edge oder Flow-Onprem.", "fr": "IA pour les entreprises publiques : Flow prépare les ordres de maintenance sur panne, l’intégration des nouveaux salariés et les réponses aux clients à partir des systèmes de l’entreprise, et un membre de l’équipe valide chaque étape. Les données restent dans l’organisation : cloud masqué, Flow-Edge ou Flow-Onprem.", "es": "IA para empresas públicas: Flow prepara órdenes de mantenimiento por averías, la incorporación de nuevos empleados y respuestas a clientes a partir de los sistemas de la empresa, y alguien del equipo aprueba cada paso. Los datos se quedan dentro de la organización: nube enmascarada, Flow-Edge o Flow-Onprem."}[l];if(ds)document.querySelectorAll('meta[name=description],meta[property="og:description"],meta[name="twitter:description"]').forEach(function(x){x.content=ds})})();</script>
+
+<footer class="site-foot" dir="ltr" id="footer" lang="en">
+<div class="foot-in">
+<div class="foot-cols">
+<div class="foot-col foot-brand">
+<img alt="Flow" height="28" loading="lazy" src="../assets/flow-logo-200.webp" width="64"/>
+<a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+</div>
+<nav aria-label="Product" class="foot-col">
+<h3 data-k="ft.hFlow">Product</h3>
+<a data-k='ft.glance' href='/glance'>Glance</a>
+<a data-k='ft.flow' href='/#product'>Flow</a>
+<a data-k='ft.sec' href='/security'>Security</a>
+<a data-k='ft.pricing' href='/pricing'>Pricing</a>
+<a data-k='ft.solutions' href='/solutions'>Solutions</a>
+</nav>
+<nav aria-label="Company" class="foot-col">
+<h3 data-k="ft.hCo">Company</h3>
+<a data-k='ft.about' href='/about'>About</a>
+<a data-k='ft.blog' href='/articles'>Insights</a>
+<a data-k='ft.contact' href='/contact'>Contact</a>
+</nav>
+</div>
+<div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav aria-label="Legal" class="foot-legal"><a data-k='ft.privacy' href='/privacy'>Privacy</a><a data-k='ft.terms' href='/terms'>Terms</a></nav></div>
+</div>
+</footer>
+
+<script src="../assets/flow-header.js"></script><script defer src="../assets/flow-booking.js"></script>
+<script src="../assets/flow-inner.js"></script>
+<script src="../samples/vendor/lenis.min.js"></script>
+<script src="../samples/flow-rich-v5.js?b=2"></script>
+<script src="../samples/v3.js"></script>
+<script src="../assets/flow-orbit-v7.js"></script><script src="../assets/r15/r14s.js?b=1"></script><script>document.write('<script src="../assets/r15/i18n/stack-gov.'+({de:1,fr:1,es:1}[document.documentElement.dataset.ui]?document.documentElement.dataset.ui:'en')+'.js?b=1"><\/script>')</script><script src="../assets/r15/i18n/dep2-gov.js?b=1"></script><script src="../assets/r15/i18n/onprem-gov.js?b=1"></script><script src="../assets/r15/i18n/dg-gov.js?b=1"></script><script src="../assets/r15/idle-pause.js?b=1"></script><script src="../assets/offscreen-pause.js?b=1"></script><script>(function(){function fit(){var op=document.getElementById("onprem");if(!op)return;var inn=op.parentElement,cs=getComputedStyle(inn),w=inn.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);op.style.setProperty("--dk",Math.min(1.5,Math.max(1,w/1120)).toFixed(3))}fit();addEventListener("resize",fit);addEventListener("load",fit)})();</script><script id="perf1112-dgjs">(function(){
+/* perf1112 glow: the Do It "breathe" ring redone on the compositor (opacity + transform only), same keyframes, offsets, easing and timing as stk-breathe in stack.css */
+var B='#r14s#r14s .stk:not(.used) .sh .doit',T='2.8s ease-in-out .8s infinite';
+function css(w,h){var D=h+18,k0=h/D,k5=(h+10)/D,cx=w-10,r=h/2;
+ function kf(n,f){return '@keyframes '+n+'{0%,64%,100%{'+f(0)+'}76%{'+f(5)+'}88%{'+f(9)+'}}';}
+ return 'html '+B+'{animation-name:stk-breathe-t!important}'+
+ '@keyframes stk-breathe-t{0%,64%,100%{transform:scale(1)}76%{transform:scale(1.05)}88%{transform:scale(1)}}'+
+ kf('dg-o',function(s){return 'opacity:'+(s==5?.14:0)})+
+ kf('dg-s',function(s){return 'transform:scale('+((h+2*s)/D)+')'})+
+ kf('dg-y',function(s){return 'transform:scaleY('+((h+2*s)/D)+')'})+
+ '#r14s#r14s .doit>.dg{position:absolute;inset:-10px;z-index:-3;pointer-events:none;opacity:0;'+
+ '-webkit-mask:none;mask-image:linear-gradient(#000 0 0),linear-gradient(#000 0 0),radial-gradient(circle at '+(10+r)+'px '+(10+r)+'px,#000 '+(r-.5)+'px,#0000 '+(r+.5)+'px),radial-gradient(circle at '+cx+'px '+(10+r)+'px,#000 '+(r-.5)+'px,#0000 '+(r+.5)+'px);'+
+ 'mask-size:100% 100%,'+(w-h)+'px '+h+'px,100% 100%,100% 100%;mask-position:0 0,'+(10+r)+'px 10px,0 0,0 0;mask-repeat:no-repeat;mask-composite:subtract,add,add,add}'+
+ '#r14s#r14s .doit>.dg>i{position:absolute;top:1px;height:'+D+'px;background:rgb(45,94,255)!important}'+
+ '#r14s#r14s .doit>.dg>i.l,#r14s#r14s .doit>.dg>i.r{width:'+D+'px;border-radius:50%;transform:scale('+k0+')}'+
+ '#r14s#r14s .doit>.dg>i.l{left:1px}#r14s#r14s .doit>.dg>i.r{left:'+(cx-r-9)+'px}'+
+ '#r14s#r14s .doit>.dg>i.m{left:'+(10+r)+'px;width:'+(w-h)+'px;transform:scaleY('+k0+')}'+
+ B+'>.dg{animation:dg-o '+T+'!important}'+B+'>.dg>i.l,'+B+'>.dg>i.r{animation:dg-s '+T+'!important}'+B+'>.dg>i.m{animation:dg-y '+T+'!important}'+
+ '@media (max-width:759px) and (prefers-reduced-motion:reduce){html '+B+'>.dg,html '+B+'>.dg>i.l,html '+B+'>.dg>i.m,html '+B+'>.dg>i.r{animation:none!important}}';}
+function run(){var bs=document.querySelectorAll('#r14s .stk .sh .doit');if(!bs.length)return;
+ var b0=bs[0],cs=getComputedStyle(b0),w=parseFloat(cs.width),h=parseFloat(cs.height);if(!(w>0&&h>0))return;
+ var st=document.getElementById('perf1112-dg')||document.head.appendChild(Object.assign(document.createElement('style'),{id:'perf1112-dg'}));
+ st.textContent=css(w,h);
+ bs.forEach(function(b){if(b.querySelector(':scope>.dg'))return;var g=document.createElement('span');g.className='dg';g.setAttribute('aria-hidden','true');g.innerHTML='<i class="l"></i><i class="m"></i><i class="r"></i>';b.insertBefore(g,b.firstChild);});
+ bs.forEach(function(b){sync(b,0)});}
+/* the ring pieces run on the button's clock: copy its stk-breathe-t start time (again whenever either one (re)starts, e.g. a slide shown again) */
+function sync(b,k){requestAnimationFrame(function(){var a=b.getAnimations().filter(function(x){return x.animationName=='stk-breathe-t'})[0];if(!a)return;
+  if(a.startTime==null){if(k<20)sync(b,k+1);return}
+  b.querySelectorAll(':scope>.dg,:scope>.dg>i').forEach(function(e){e.getAnimations().forEach(function(x){if(x.startTime!==a.startTime)x.startTime=a.startTime})})})}
+addEventListener('animationstart',function(e){if(!/^(stk-breathe-t|dg-[osy])$/.test(e.animationName))return;var b=e.target.closest&&e.target.closest('.doit');if(b)sync(b,0)},true);
+if(document.readyState=='complete')run();else addEventListener('load',run);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(run);
+/* stack.js rebuilds the decks when the viewport crosses 760px (teardown/build): give new Do It buttons their ring too */
+var q=0;function need(){return [].some.call(document.querySelectorAll('#r14s .stk .sh .doit'),function(b){return !b.querySelector(':scope>.dg')})}
+function watch(){var r=document.getElementById('r14s');if(!r||!window.MutationObserver)return;new MutationObserver(function(){if(q)return;q=requestAnimationFrame(function(){q=0;if(need())run()})}).observe(r,{childList:true,subtree:true})}
+if(document.readyState=='loading')addEventListener('DOMContentLoaded',watch);else watch();
+})();</script>
+<script src="../assets/r15/r15-i18n.js?b=5"></script>
+<link rel="stylesheet" href="../assets/ux-review-20261119.css?b=1"><script src="../assets/ux-review-20261119.js?b=1" defer></script>
+</body></html>

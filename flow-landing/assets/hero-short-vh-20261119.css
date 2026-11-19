@@ -1,0 +1,32 @@
+/* 19.11 · short phones (iPhone SE 320x568 and similar): the hero card (#addin) ran past the bottom edge,
+   cutting the last step and the Do It button. Same card, tighter vertical rhythm only. Flow + Glance clone. */
+@media (max-width:899px) and (max-height:640px){
+  #hero #addin header{padding-bottom:6px!important}
+  #hero #addin header .slot-ico{width:26px;height:26px}
+  #hero #addin .intent-box{margin-top:6px!important;padding:7px 10px 8px!important}
+  #hero #addin .intent-s{font-size:14px;line-height:1.32}
+  #hero #addin .plbl{margin:6px 0 0!important}
+  #hero #addin .steps li{padding-top:1px!important;padding-bottom:1px!important}
+  #hero #addin .steps li .tx b{line-height:1.2}
+  #hero #addin .steps li .tx small{line-height:1.15}
+  #hero #addin .foot{padding-top:2px!important}
+  #hero #addin{padding-top:10px!important;padding-bottom:8px!important}
+  #hero #addin header .ttl{gap:0!important}
+  #hero #addin .intent-s{line-height:1.26}
+  #hero #addin .steps li{padding-top:0!important;padding-bottom:0!important}
+  #hero #addin .steps li .tx b{line-height:15px}
+  #hero #addin .steps li .tx small{line-height:13px}
+}
+/* 19.11 r2 · 320x568 in EN/DE/FR/ES: step titles wrap to two lines, so the card ran ~65px past the screen
+   and the closing caption sat on its last row. Smaller type on the narrowest short phones only. */
+@media (max-width:360px) and (max-height:640px){
+  #hero #addin .steps li .tx b{font-size:13px!important;line-height:15px!important;letter-spacing:-.01em}
+  #hero #addin .steps li .tx small{font-size:11px!important;line-height:12px!important}
+  #hero #addin .intent-s{font-size:13.5px!important;line-height:1.22!important}
+}
+@media (max-width:360px) and (max-height:640px){
+  /* the header already says "5 steps from …", so the repeated label goes on the smallest screens */
+  #hero #addin .plbl{display:none!important}
+  /* individual transform properties stack on top of the hero engine's inline transform */
+  #hero #addin{translate:0 -24px;scale:.94;transform-origin:50% 0}
+}

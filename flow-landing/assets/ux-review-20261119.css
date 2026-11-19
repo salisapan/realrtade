@@ -1,0 +1,54 @@
+/* UX review fixes 19.11 (local, Sali approved 13:03). Override only; locked files untouched.
+   3) anchors and tab landings stop below the fixed header.  1) quiet caption under the hero Do It. */
+html{scroll-padding-top:calc(var(--fh-h,52px) + 16px)}
+.d2-seg,[id]{scroll-margin-top:calc(var(--fh-h,52px) + 16px)}
+
+/* 1 · hero caption: sits under the Do It slot, absolute, so the approved composition does not move */
+#hero .slot{position:relative}
+#hero .ux-hint{position:absolute;left:50%;top:calc(100% + 40px*var(--z,1));width:max-content;max-width:calc(100vw - 48px);
+  transform:translateX(-50%);margin:0;pointer-events:none;text-align:center;
+  font:400 max(12.5px,calc(14px*var(--z,1)))/1.35 "Heebo",var(--disp,system-ui),sans-serif;letter-spacing:.005em;
+  color:color-mix(in srgb,var(--ink,#1d1d1f) 52%,transparent)}
+#hero .ux-hint>span{display:block;will-change:opacity,transform;opacity:0;animation:uxHintIn .7s cubic-bezier(.22,1,.36,1) 1.9s forwards}
+html:not(.intro) #hero .ux-hint>span{animation-delay:.25s}
+html.rm #hero .ux-hint>span{animation:none;opacity:1}
+@keyframes uxHintIn{from{opacity:0;translate:0 4px}to{opacity:1;translate:0 0}}
+html[data-theme="dark"] #hero .ux-hint{color:color-mix(in srgb,#f5f5f7 58%,transparent)}
+
+/* 3 · home: the setup CTA steps back once the closing booking card takes over the screen */
+.su-cta.ux-fade{will-change:opacity}
+.su-cta.ux-off{pointer-events:none}
+
+/* 4 · page length (Sali approved all four, 19.11 14:20 IL). Local homepage only.
+   1 is CONFIG.scrollVh 304 in index.html (20% shorter, same beats, end gap 0).
+   3 is the setup CTA removed from the HTML.
+   4 is #setup and #book moved to immediately after #trust-creed. */
+
+/* 2 · phone only: the three principles become a horizontal swipe row */
+@media (max-width: 760px) {
+  #trust-creed .creed-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    grid-template-columns: none !important;
+    max-width: none !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    gap: 12px !important;
+    padding: 6px 20px 18px !important;
+    margin-inline: -20px !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-inline: 20px;
+  }
+  #trust-creed .creed-grid::-webkit-scrollbar { display: none; }
+  #trust-creed .creed-grid > .pillar {
+    flex: 0 0 82% !important;
+    scroll-snap-align: center;
+    margin: 0 !important;
+  }
+}
+
+/* 3 · belt: hide the duplicate setup CTA if a cached copy still has the markup */
+#setup .su-cta { display: none !important; }
