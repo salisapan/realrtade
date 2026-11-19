@@ -5916,6 +5916,52 @@ const FlowIntent = (() => {
     }
     return sawOther && !sawReader;
   }
+  // Who a mail is for, read from its own first words (the group-mail rule, docs/glance-ai/user-context-v0.md):
+  //   'reader' the reader is named at the head («Sali, ...», «היי סאלי ו-דנה,», «סאלי - נא טיפולכם», a thanks to them) or at the start of a line with a dash, colon or comma
+  //   'other'  a vocative names someone else and not the reader («דנה שלום, ...», «Tom - please send ...»)
+  //   'group'  the head greets the group («היי כולם», «Hi all», «שלום לכולם»): the reader is one of them
+  //   'none'   no one is named (or the reader's names are not known yet): the mail says nothing about who it is for
+  // Only a positive 'reader' or 'group' widens anything; 'none' keeps today's behavior.
+  function readerToken(tok, ctx) {
+    const t = String(tok || '');
+    if (!t) return false;
+    if (nameIsReader(t, ctx)) return true;
+    return /^[\u05D5]/.test(t) && t.length > 3 && nameIsReader(t.slice(1), ctx);
+  }
+  const NAME_LEAD_PREP = /^(?:עם|את|של|from|with|by|to|cc|about|regarding|via)$/i;
+  function addressing(text, ctx) {
+    const c = ctx || {};
+    if (!readerNameList(c).length) return 'none';
+    const lines = String(text || '').replace(/^\uFEFF/, '').split(/\n+/).map((x) => x.replace(/^[\s\u00a0\u202f\u200e\u200f]+/, '').trim()).filter(Boolean).slice(0, 8);
+    if (!lines.length) return 'none';
+    const toks = lines[0].split(/[\s,،:;!.?\-\u2013\u2014()"]+/).filter(Boolean).slice(0, 7);
+    for (let k = 0; k < toks.length; k++) {
+      if (k > 0 && NAME_LEAD_PREP.test(toks[k - 1])) continue;
+      if (readerToken(toks[k], c)) return 'reader';
+    }
+    for (let k = 1; k < lines.length; k++) {
+      const m = /^@?([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’]{1,30})\s*(?:[-\u2013\u2014:,،]\s*\S|\s+(?:תוכל|תוכלי|נא|אנא|בבקשה|please|can|could|would|will)(?![\u0590-\u05FFA-Za-z]))/i.exec(lines[k]);
+      if (m && readerToken(m[1], c)) return 'reader';
+    }
+    if (vocativeIsOther(text, c)) return 'other';
+    // «דנה- אפשר להעביר לסבב», «@דנה מחכים שתחתום»: a line that opens on someone else's name (a dash, or an @) and asks.
+    for (let k = 0; k < lines.length && k < 8; k++) {
+      const dash = /^(@?)([A-Za-z\u0590-\u05FF'’]{2,30})(?:\s*[-\u2013\u2014:]\s*(\S[^\n]*)|\s+(\S[^\n]*))?$/.exec(lines[k]);
+      if (!dash || !personToken(dash[2]) || readerToken(dash[2], c)) continue;
+      if (dash[1] === '@' || (dash[3] && restStartsAsk(dash[3]))) return 'other';
+    }
+    // A name alone on a line, with a colon or a comma, and the ask on the next line («Dana:» / «דנה,»): a vocative to someone else.
+    for (let k = 0; k < lines.length - 1 && k < 6; k++) {
+      const lone = /^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{1,30})\s*[:,،]$/.exec(lines[k]);
+      if (lone && personToken(lone[1]) && !readerToken(lone[1], c)) return 'other';
+    }
+    for (let k = 0; k < toks.length && k < 6; k++) {
+      if (/^(?:hi|hey|hello|dear|good|morning|afternoon|evening|greetings|thanks|thank|שלום|היי|הי|בוקר|ערב|טוב|רב|ו?תודה)$/i.test(toks[k])) continue;
+      if (GROUP_ADDRESSEE.test(toks[k]) || /^ל(?:כולם|כולן)$/.test(toks[k])) return 'group';
+      break;
+    }
+    return 'none';
+  }
   // The reader is only in Cc, and the mail does not greet them by name.
   // That is quiet for every kind: a file, a task, a log, a hold. A greeting
   // of their own name, while they sit on Cc, is still theirs. No To and no
@@ -8402,7 +8448,7 @@ const FlowIntent = (() => {
     return titleAfter(hit.verb, hit.match, src, subject, {});
   }
 
-  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, slotChangeSafe, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
+  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, slotChangeSafe, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar, addressing };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };
@@ -10572,6 +10618,8 @@ const FlowIncomingJudge = (() => {
   // an answer-needing ask with a date. Gmail's chip path calls this too, so both mailboxes share one second read.
   // The labs readers (booking notice, task ask, payment ask) stay behind their own switches, which default OFF.
   function secondRead(i, q0) {
+    // A group mail aimed at someone else, or a broadcast that does not name the reader, gets no second read (see groupAddressing).
+    if (i.senderIsUser !== true && i.inbound !== false && groupAddressing(i, prepareForJudge(i.text)) === 'quiet') return null;
     // «Please do not reply to opposing counsel yet» reads as a hedge to the classifier, but in a mail that also asks real questions it is the person's HOLD instruction, not a cancel:
     // only the direct-ask reader (two questions, a person, To the reader) may look past that one hedge, and it keeps the hold as a task.
     if (q0 === 'hedge' && i.directAskOn === true && i.senderIsUser !== true && i.inbound !== false && i.noteToSelf !== true) {
@@ -10609,7 +10657,7 @@ const FlowIncomingJudge = (() => {
   const DIRECT_Q_NO = /\b(?:was this you|did you (?:know|request|just)|ready to|want to|looking for|need help|have you (?:tried|heard)|why not|what'?s new|how are you|how's it going|what do you think if)\b|מה שלומ|מה נשמע|מה קורה|ידעת ש|רוצים ל|מוכנים ל/i;
   const DIRECT_IMP_WORK_HE = /^(?:מלא|מלאי|חתום|חתמי|הכן|הכיני|תכין|תכיני|בדוק|בדקי|תבדוק|תבדקי|עדכן|עדכני|קבע|קבעי|הזמן|הזמיני|תזמין|תזמיני|תעבור|תעברי|תכתוב|תכתבי|תנסח|תנסחי|תסכם|תסכמי|תאתר|תאתרי|תרכז|תרכזי|תוודא|תוודאי|ודא|וודא|תתקן|תתקני|תקן|תוסיף|תוסיפי|תוסיפו|הוסף|הוסיפי|תמצא|תמצאי|תצור\s+קשר|צור\s+קשר|צרי\s+קשר|תנסה|תנסי)(?![\u0590-\u05FF])/;
   const POLITE_FRAME_HE = /^(?:(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA]))|(?:בבקשה|נא)\s+(?=ת[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF]))|נא\s+(?=(?:עדכנ[וי]|שלח[וי]|אשר[וי]|השיב[וי]|החזיר[וי]|העביר[וי]|צרפ[וי])(?![\u0590-\u05FF])))/;
-  const POLITE_NOMINAL_HE = /^(?:אודה|נודה|אשמח|נשמח)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)|(?:ל(?:המשך\s+)?(?:דבר\s+)?)(טיפולך|טיפולכם|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
+  const POLITE_NOMINAL_HE = /^(?:אודה|נודה|אשמח|נשמח|נא|אנא)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת)|(?:ל(?:המשך\s+)?(?:דבר\s+)?|(?<=(?:נא|אנא)\s+))(טיפולך|טיפולכם|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
   const NOMINAL_WORK_HE = /^(?:טיפולך|טיפולכם|הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
   const NOMINAL_BACK_HE = /^(?:שליחת|העברת|החזרת|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם)$/;
   const DIRECT_IMP_SEND_HE = /^(?:שלח|שלחי|תגיב|תגיבי|תענה|תעני|תשיב|תשיבי|תחזור|תחזרי|תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני|עדכנו|עדכני|שלחו|שלחי|אשרו|אשרי|השיבו|השיבי|החזירו|החזירי|העבירו|העבירי|צרפו|צרפי)(?![\u0590-\u05FF])/;
@@ -10629,6 +10677,33 @@ const FlowIncomingJudge = (() => {
     const rest = m[2];
     return (/[\u0590-\u05FF]/.test(rest) ? DIRECT_Q_HE : DIRECT_Q_EN).test(rest) ? rest : x;
   }
+  // ---- group mail: who the ask is for (Direction A, 2026-11-19; docs/glance-ai/user-context-v0.md) ----
+  // A mail with four or more people on To was ignored by the direct-ask read, and the other readers offered on it whatever the words said.
+  // Now the mail's own first words decide, through FlowIntent.addressing (reader named at the head or at a line start, a vocative to someone else,
+  // a group greeting, or nobody named):
+  //   'open'  the reader is named (any size of list), or the head greets the group («היי כולם», «Hi all») on a list of at most ten: the direct-ask read may look at it
+  //   'quiet' a vocative names someone else, or a list of more than ten does not name the reader: no card (a request aimed at another person, a broadcast)
+  //   null    nobody is named on a list of four to ten: today's behavior, unchanged
+  // Only a reader on To, and only an email surface; a chat has no addresses. A Cc-only reader keeps the older Cc rules.
+  const GROUP_MIN = 4, GROUP_BROADCAST = 10;
+  function groupAddressing(i, body) {
+    if (!i || i.surface === 'chat') return null;
+    const to = (i.to || i.toRecipients || []).map((a) => String(a).toLowerCase());
+    const own = (i.ownAddresses || i.own || []).map((a) => String(a).toLowerCase());
+    if (to.length < GROUP_MIN || !own.length || !to.some((a) => own.indexOf(a) >= 0)) return null;
+    const api = typeof FlowIntent !== 'undefined' ? FlowIntent : sibling(null, './intent.js', 'FlowIntent');
+    if (!api || typeof api.addressing !== 'function') return null;
+    let kind = 'none';
+    try {
+      const raw = String(body || '');
+      const cut = raw.search(DIRECT_CUT);
+      kind = api.addressing(cut >= 0 ? raw.slice(0, cut) : raw, { ownNames: i.ownNames, userName: i.userName, ownAddresses: i.ownAddresses || i.own, readerEmail: i.readerEmail, to: i.to || i.toRecipients, cc: i.cc || i.ccRecipients, namesWaitDone: i.namesWaitDone === true });
+    } catch (e) { return null; }
+    if (kind === 'reader') return 'open';
+    if (kind === 'other') return 'quiet';
+    if (to.length > GROUP_BROADCAST) return 'quiet';
+    return kind === 'group' ? 'open' : null;
+  }
   function directAsk(i, body) {
     const X = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
     const chat = i.surface === 'chat';
@@ -10639,7 +10714,7 @@ const FlowIncomingJudge = (() => {
       const own = (i.ownAddresses || []).map((a) => String(a).toLowerCase());
       const to = (i.to || []).map((a) => String(a).toLowerCase());
       if (!sender || !own.length || own.indexOf(sender) >= 0) return null;
-      if (!to.some((a) => own.indexOf(a) >= 0) || to.length > 3) return null;
+      if (!to.some((a) => own.indexOf(a) >= 0) || (to.length > 3 && groupAddressing(i, body) !== 'open')) return null;
       if (DIRECT_AUTO_SUBJECT.test(String(i.subject || ''))) return null;
       if (X && typeof X.senderIsAutomated === 'function' && X.senderIsAutomated(sender, String(body || ''))) return null;
     }
@@ -10658,7 +10733,8 @@ const FlowIncomingJudge = (() => {
     const greetsOther = !!greetName && !/^(?:כולם|כולן|צוות|חברים|חברות|חבר'ה|שלום|היי|הי|עו"ד|עורכי|רב|רבה|רבות|וברכה|לכולם|לכם|לכן|עורכת|עורך)$/.test(greetName) && !names.some((n) => n.indexOf(greetName) >= 0 || greetName.indexOf(n) >= 0);
     // 2. a Hebrew bare imperative with its day (email surfaces only; a chat has its own reader)
     for (const x0 of (chat ? [] : sents)) {
-      const x1 = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '');
+      // The reader named in front of the ask («סאלי - נא טיפולכם», «Sali: ...») is the same vocative as a greeting: it is cut before the verb is read.
+      const x1 = x0.replace(/^(?:שלום|היי|הי)[^,]{0,20},\s*/, '').replace(/^([A-Za-z\u0590-\u05FF'’]{2,20})\s*[-\u2013\u2014:]\s+(?=\S)/, (m0, nm) => (names.indexOf(String(nm).toLowerCase()) >= 0 ? '' : m0));
       if (!/[\u0590-\u05FF]/.test(x1) || skip(x1, true) || /(?:^|\s)(?:אל|לא)\s/.test(x1)) continue;
       // A polite frame in front of the verb («אשמח שתעביר לי…», «אודה אם תכין…», «אבקש שתשלח…») or a nominal («אודה על הכנת נספח…») is an explicit ask: it needs no day. A bare imperative still does.
       const pleaseIn = /(?:^|\s)בבקשה(?:\s|[,.]|$)/.test(x1);
@@ -10780,7 +10856,22 @@ const FlowIncomingJudge = (() => {
   // Off unless the host passes decomposeOn (the Labs switch DECOMPOSE, off by default). The whole-mail decision above always runs first; this only
   // runs when the mail shows or the judge found nothing, and it returns ONE card whose steps are each intention's own (intent-decompose merge).
   // Every quiet of the whole mail, phishing and the take-back clauses stand (see the module). A mail with one intention comes back unchanged.
+  // The group-mail rule's quiet half: a card that came out of a mail aimed at someone else, or out of a broadcast that does not name the reader, is dropped.
+  // A calendar-only close (an invitation to an event) is not a request aimed at a person, so it is left to its own rules.
+  function groupQuieted(i, res) {
+    if (!res || res.show !== true || i.senderIsUser === true || i.inbound === false) return res;
+    const steps = (res.process && res.process.steps) || [];
+    if (steps.length && steps.every((s) => /calendar|Event|Meet/i.test(String(s.kind || '')))) return res;
+    if (groupAddressing(i, prepareForJudge(i.text)) !== 'quiet') return res;
+    return { show: false, reason: 'quiet:group-not-addressed', intent: res.intent || null };
+  }
+
   function judge(input, deps) {
+    const i = input || {};
+    return groupQuieted(i, judgeInner(i, deps));
+  }
+
+  function judgeInner(input, deps) {
     const i = input || {};
     const whole = judgeOnce(i, deps);
     if (i.decomposeOn !== true) return whole;
@@ -11575,7 +11666,7 @@ const FlowIncomingJudge = (() => {
     return Boolean(resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id));
   }
 
-  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, namedQuietOf, contactsAsk, secondRead, doItOverride, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
+  return { MIN_TEXT, bookingNotice, paymentAsk, taskAsk, prepareForJudge, namedQuietOf, contactsAsk, secondRead, groupAddressing, doItOverride, selfSent, textForJudge, judge, noticeIntent, noticeProcess, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText, silencesReceipt, silencesOwnedDeliverable };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };
