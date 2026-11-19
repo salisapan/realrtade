@@ -1151,6 +1151,11 @@ const FlowIntent = (() => {
       if (m && readerToken(m[1], c)) return 'reader';
     }
     if (vocativeIsOther(text, c)) return 'other';
+    // A name alone on a line, with a colon or a comma, and the ask on the next line («Dana:» / «דנה,»): a vocative to someone else.
+    for (let k = 0; k < lines.length - 1 && k < 6; k++) {
+      const lone = /^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{1,30})\s*[:,،]$/.exec(lines[k]);
+      if (lone && personToken(lone[1]) && !readerToken(lone[1], c)) return 'other';
+    }
     for (let k = 0; k < toks.length && k < 6; k++) {
       if (/^(?:hi|hey|hello|dear|good|morning|afternoon|evening|greetings|thanks|thank|שלום|היי|הי|בוקר|ערב|טוב|רב|ו?תודה)$/i.test(toks[k])) continue;
       if (GROUP_ADDRESSEE.test(toks[k]) || /^ל(?:כולם|כולן)$/.test(toks[k])) return 'group';
