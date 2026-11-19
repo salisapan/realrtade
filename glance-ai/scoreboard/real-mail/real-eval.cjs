@@ -13,7 +13,7 @@ const HELD = set === 'v2' || set === 'v2b';
 const dir = path.join(process.env.GLANCE_PRIVATE || path.join(__dirname, 'private'), set);
 const JSON_OUT = process.argv.includes('--json'), ROWS_OUT = (process.argv.find((a) => a.startsWith('--rows-out=')) || '').slice(11);
 const file = fs.readdirSync(dir).filter((f) => (set === 'v2b' ? /^v2b-.*\.jsonl$/ : /messages\.jsonl$/).test(f)).map((f) => path.join(dir, f));
-const rows = [].concat(...file.map((f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } }))).filter(Boolean);
+const rows = [].concat(...file.map((f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } }))).filter(Boolean).filter((r) => !(set === 'v2b' && r.remasked === false)); // v2b: rows whose owner marking could not be verified stay out (they remain in v2)
 const MAP = { draft: 'reply', task: 'task', pay: 'payment', calendar: 'calendar', file_save: 'document' };
 const goldKind = (r) => (r.label && r.label.has_request ? (r.label.kind || 'none') : 'none');
 // The mask replaced the owner's own name too. A first [NAME] within the first 30 characters is the vocative to the reader (these mails sit in the owner's inbox), so with GLANCE_ADDRESSEE=1 it is put back as the owner's name; the default run leaves the mask as it is.
