@@ -371,11 +371,11 @@ console.log('--- intent.js: type + entity checks ---\n');
     check('HE: «האם ניתן ל<פועל> ... עד <יום>?» is a request: ' + t.slice(0, 26), c.type === FlowIntent.TYPES.REQUEST, c.type);
   }
   check('HE: «האם ניתן לראות איך זה נראה?» (no action on a deliverable, no day) stays quiet', classify('האם ניתן לראות איך זה נראה?').type === null);
-  // «כדי שתוכלו לאסוף ... ולחתום» is a purpose clause («so that you can»), not «תוכלו» as a request (found on a real professional inbox, 2026-11-18).
-  check('HE: «כדי שתוכלו לאסוף אותם ובאותה עת לחתום בפני» is not a request', classify('המסמכים הועברו לחתימה. אעדכן כשהעותקים יגיעו אליי כדי שתוכלו לאסוף אותם ובאותה עת לחתום בפני על כתב הוראות.').type === null);
+  // «כדי שתוכלו לבוא ... ולשלם» is a purpose clause («so that you can»), not «תוכלו» as a request (found on a real professional inbox, 2026-11-18).
+  check('HE: «כדי שתוכלו לבוא לקחת אותם ובאותו זמן לשלם» is not a request', classify('החוזים נשלחו לדפוס. אעדכן כשהעותקים יגיעו אליי כדי שתוכלו לבוא לקחת אותם ובאותו זמן לשלם על ההדפסה.').type === null);
   check('HE: «תוכלו לשלוח לי את המסמך עד מחר?» is still a request', classify('תוכלו לשלוח לי את המסמך עד מחר?').type === FlowIntent.TYPES.REQUEST);
   check('HE: «אנא עדכנו שבוצע עד מחר» is a request', classify('אנא עדכנו שבוצע עד מחר.').type === FlowIntent.TYPES.REQUEST);
-  check('HE: «תבדוק בבקשה מול <שם> האם ...» (the verb first, «בבקשה» after) is a request', classify('תבדוק בבקשה מול דקל האם בעלי הקרקע הוחתמו על נספחים א וג והאם הרוכשים הוחתמו על נספח ב.').type === FlowIntent.TYPES.REQUEST);
+  check('HE: «תבדוק בבקשה מול <שם> האם ...» (the verb first, «בבקשה» after) is a request', classify('תבדוק בבקשה מול רונית האם הספקים אישרו את המחירון והאם הלקוחות אישרו את התנאים.').type === FlowIntent.TYPES.REQUEST);
   // A Hebrew commitment put as «as we agreed, you <verb> ... by <day>» (the agreement said first, the reader's own verb after it).
   for (const t of ['כפי שדיברנו, את שולחת לי את הטיוטה של ההסכם עד יום רביעי.', 'לפי מה שהוסכם, אתה מגיש את הדוח הרבעוני לרואה החשבון עד יום ראשון.']) {
     const c = classify(t);
@@ -524,7 +524,7 @@ console.log('--- intent.js: type + entity checks ---\n');
     ['HE: אם תוכל', 'אם תוכל לשלוח לי את החוזה זה יעזור מאוד.'],
     ['HE: תודה מראש על', 'תודה מראש על שליחת הקבלה.'],
     ['HE: נשמח לקבל', 'נשמח לקבל את המסמך המעודכן.'],
-    ['HE: נודה לך אם', 'נודה לך אם תוכל להעביר את הדוח.'],
+    ['HE: נודה לך אם', 'נודה לך אם תשלח לי את הסיכום.'],
     ['HE: אנא ציין', 'אנא ציין את הפרטים המעודכנים במסמך.']
   ];
   for (const [label, text] of handoffCases) {

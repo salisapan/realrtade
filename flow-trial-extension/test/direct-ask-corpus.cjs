@@ -96,12 +96,12 @@ check('chat: the Hebrew bare imperative is not read here (core/chat-deadline-ask
 
 console.log('\n--- legal and business Hebrew: «מהו», a lead-in clause, «אם אני מבין נכון» (a use case of 2026-11-16, rewritten: no real text, names or figures) ---\n');
 {
-  const LEGAL = 'רועי ולירון, נבקש לנהל דיון פנימי בנושא ולא להשיב כרגע לצד השני.\nמהו המועד האחרון למתן תשובה כאמור?\nבהתבסס על מה שכתבתם ועל חוות הדעת, מה גובה הסכום שאינו שנוי במחלוקת ומה הסכום הנותר?\nכ"כ אם אני מבין נכון, יתרת הסכום תהיה נתונה לשיקול דעת הצד השני?';
+  const LEGAL = 'רועי ולירון, נבקש לדון בכך בינינו ולא לענות כרגע לספק.\nמהו המועד האחרון לקבלת ההחלטה?\nבהתבסס על הדוגמאות ועל המשוב, מה גובה העלות הצפויה ומה היתרה?\nכ"כ אם אני מבין נכון, יתרת התקציב תהיה בסמכות המנהל?';
   const r = judge(LEGAL, { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
   check('HE: three questions, two with a lead-in clause and one fused «מהו», are one reply draft that counts them', kinds(r) === 'gmailDraft+googleTask' && r.intent.directAsk === true && r.intent.questions === 3, [kinds(r), r.intent && r.intent.questions]);
-  const one = judge('רועי, מהו המועד האחרון למתן תשובה?', { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
+  const one = judge('רועי, מהו המועד האחרון לקבלת ההחלטה?', { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
   check('HE: one «מהו» question to a group is not read (the two-question floor stands)', !one.show, kinds(one));
-  const stmt = judge('רועי ולירון, בהתבסס על מה שכתבתם, הסכום שאינו שנוי במחלוקת הוא 20,000.', { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
+  const stmt = judge('רועי ולירון, בהתבסס על הדוגמאות, העלות הצפויה היא 20,000.', { ownNames: ['רועי'], to: [OWN, 'liron@firm.co.il'], subject: 'עדכון' });
   check('HE: a statement with a lead-in clause and no question stays quiet', !stmt.show, kinds(stmt));
   check('HE: the same questions from an automated sender stay quiet', !judge(LEGAL, { ownNames: ['רועי'], to: [OWN], sender: { name: 'System', email: 'noreply@acme.io' }, subject: 'עדכון' }).show);
 }
@@ -109,19 +109,19 @@ console.log('\n--- legal and business Hebrew: «מהו», a lead-in clause, «א
 
 console.log('\n--- a mail of questions that also holds an answer, asks for a date and quotes figures (rewritten from a real use case: no real text, names or figures) ---\n');
 {
-  const MAIL = 'דנה ויואב, אנחנו מבקשים לנהל דיון פנימי בנושא, אני מבקש כרגע לא להחזיר תשובה לב"כ הצד השני.\nמהו המועד האחרון המאפשר מתן תשובה כאמור?\nבהתבסס על מה שכתבתם, כתב ההגנה וחוות הדעת, מה גובה הסכום שאינו שנוי במחלוקת ומה הסכום הנותר?\nלפי מה שאני מבין אין מחלוקת על 12,000 + מע"מ ובנוסף 8,000 + מע"מ לשיקול דעת בית המשפט, מתוך תביעה בגובה 5 מיליון.\nכ"כ אם אני מבין נכון, אנו נשא בעלות 12,000 + מע"מ והמשך התביעה בסכום 4,988,000 תהיה נתונה לשיקול דעת התובעים?';
-  const r = judge(MAIL, { ownNames: ['דנה'], to: [OWN, 'yoav@firm.co.il'], subject: 'עדכון' });
+  const MAIL = 'נועה ואיתן, אנחנו רוצים לשקול את המועמד בינינו, אני מבקש בשלב זה לא לשלוח תשובה לסוכנות הגיוס.\nמהו המועד האחרון לקבלת ההחלטה?\nבהתבסס על שני הראיונות ועל המשוב, מה טווח השכר ומה הבונוס?\nלפי מה שהבנתי המשכורת היא 9,500 + מע"מ ובנוסף 6,000 + מע"מ עבור עמלת הגיוס, מתוך תקציב של 3 מיליון.\nכ"כ אם אני מבין נכון, נשלם 9,500 + מע"מ והיתרה 2,990,500 תישאר בידינו?';
+  const r = judge(MAIL, { ownNames: ['נועה'], to: [OWN, 'etan@firm.co.il'], subject: 'עדכון' });
   const draft = r.show ? r.process.steps.find((st) => st.kind === 'gmailDraft') : null;
   const task = r.show ? r.process.steps.find((st) => st.kind === 'googleTask') : null;
   check('HE: the three questions (one fused «מהו», one behind a listing lead-in, one «אם אני מבין נכון») are all counted', r.show && r.intent.questions === 3 && draft && draft.params.questions.length === 3, [r.intent && r.intent.questions, draft && draft.params.questions]);
-  check('the instruction to hold an answer to the other side is kept as a task that names the party and the work, with no day invented', task && /המתנה: לא להשיב לב"כ הצד השני/.test(task.params.title) && /לענות ל-3 שאלות/.test(task.params.title) && task.params.dateIso === null && r.intent.holdInstruction && r.intent.holdInstruction.party === 'ב"כ הצד השני', task && task.params);
+  check('the instruction to hold an answer to a third party is kept as a task that names the party and the work, with no day invented', task && /המתנה: לא להשיב לסוכנות הגיוס/.test(task.params.title) && /לענות ל-3 שאלות/.test(task.params.title) && task.params.dateIso === null && r.intent.holdInstruction && r.intent.holdInstruction.party === 'סוכנות הגיוס', task && task.params);
   check('the question for a date is named in the task (the date is found, never guessed)', task && /כולל המועד האחרון/.test(task.params.title) && r.intent.deadlineQuestion === true);
-  check('the mail\'s own figures are added up as a check: 5,000,000 - 12,000 = 4,988,000, and also minus 8,000', draft && JSON.stringify(draft.params.checks) === JSON.stringify(['5,000,000 - 12,000 = 4,988,000 ✓', 'ובניכוי 8,000 נוסף: 5,000,000 - 12,000 - 8,000 = 4,980,000']), draft && draft.params.checks);
+  check('the mail\'s own figures are added up as a check: 3,000,000 - 9,500 = 2,990,500, and also minus 6,000', draft && JSON.stringify(draft.params.checks) === JSON.stringify(['3,000,000 - 9,500 = 2,990,500 ✓', 'ובניכוי 6,000 נוסף: 3,000,000 - 9,500 - 6,000 = 2,984,500']), draft && draft.params.checks);
   check('exactly one draft and one task: nothing is drafted to the other side', r.show && r.process.steps.filter((st) => st.kind === 'gmailDraft').length === 1 && r.process.steps.filter((st) => st.kind === 'googleTask').length === 1 && r.process.steps.length === 2, r.show && r.process.steps.map((st) => st.kind));
   const D = vm.runInContext('FlowDraftReply', sb);
   const body = D.draftBodyText({ params: draft.params, label: 'x' });
-  check('the draft is the answer frame in Hebrew with every question, a place for each answer, and the check under it (it writes no answer)', /1\. מהו המועד/.test(body) && /3\. כ"כ/.test(body) && (body.match(/\[התשובה שלך\]/g) || []).length === 3 && /5,000,000 - 12,000 = 4,988,000 ✓/.test(body) && /לא תשובה/.test(body), body);
-  const plain = judge('דנה ויואב, מהו המועד האחרון למתן תשובה? מה הסכום הנותר?', { ownNames: ['דנה'], to: [OWN, 'yoav@firm.co.il'], subject: 'עדכון' });
+  check('the draft is the answer frame in Hebrew with every question, a place for each answer, and the check under it (it writes no answer)', /1\. מהו המועד/.test(body) && /3\. כ"כ/.test(body) && (body.match(/\[התשובה שלך\]/g) || []).length === 3 && /3,000,000 - 9,500 = 2,990,500 ✓/.test(body) && /לא תשובה/.test(body), body);
+  const plain = judge('נועה ואיתן, מהו המועד האחרון לקבלת ההחלטה? מה הבונוס?', { ownNames: ['נועה'], to: [OWN, 'etan@firm.co.il'], subject: 'עדכון' });
   check('two plain questions with no hold, no date question and no figures keep the reply draft alone', plain.show && plain.process.steps.length === 1 || (plain.show && plain.process.steps.every((st) => st.kind !== 'googleTask' || /כולל המועד/.test(st.params.title))), plain.show && plain.process.steps.map((st) => st.kind));
   const EN = judge('Dana and Yoav, we would like to discuss this internally. Please do not reply to opposing counsel yet.\nWhat is the last date to respond?\nWhich amount is undisputed, and what remains of the claim?', { ownNames: ['Dana'], to: [OWN, 'yoav@firm.co.il'], subject: 'Update' });
   const enTask = EN.show ? EN.process.steps.find((st) => st.kind === 'googleTask') : null;
@@ -168,19 +168,19 @@ console.log('\n--- a Hebrew auto-reply that tells the sender to contact the offi
 
 console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a request (law-firm mailbox pass, 2026-11-18) ---\n');
 {
-  for (const t of ['אשמח שתעביר לי את הנספחים הנדרשים.', 'אשמח שתעביר לי את הנספחים עד יום שני.', 'אשמח שתכין את הנספח עד יום שני.', 'אודה על הכנת נספח שינויים לכתב התחייבות.', 'אודה על שליחת הנספחים עד יום שני.']) {
+  for (const t of ['אשמח שתעביר לי את הטפסים הנדרשים.', 'אשמח שתעביר לי את הטפסים עד יום שלישי.', 'אשמח שתכין את התקציר עד יום שלישי.', 'אודה על הכנת טבלת השוואה להצעת המחיר.', 'אודה על שליחת הטפסים עד יום שלישי.']) {
     const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('polite-framed ask is offered: ' + t.slice(0, 40), r.show, kinds(r));
   }
   for (const t of ['אשמח שתהיה איתנו בחג.', 'אשמח שתבוא לארוחה ביום שני.', 'אשמח שנעביר את זה יחד עד מחר.', 'אודה על העברת הכספים שביצעת אתמול.', 'נא לא לשלוח את הנספחים עד יום שני.', 'בבקשה לא להעביר את הכסף עד יום שני.', 'אשמח שתתעדכן בהמשך.']) {
     const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('not an ask, stays quiet: ' + t.slice(0, 40), !r.show, kinds(r));
   }
-  for (const t of ['אודה לאישורכם בקבלת המסמכים.', 'אודה לתשובתך עד מחר.', 'שלום סאלי,\n\nאודה למענה.']) { const r = judge(t.indexOf('סאלי') >= 0 ? t : 'שלום,\n\n' + t + '\n\nתודה'); check('«אודה ל…» is an explicit ask: ' + t.slice(0, 30).replace(/\n/g, ' '), r.show, kinds(r)); }
+  for (const t of ['אודה לאישורכם על קבלת הטפסים.', 'אודה לתשובתך עד מחר.', 'שלום סאלי,\n\nאודה למענה.']) { const r = judge(t.indexOf('סאלי') >= 0 ? t : 'שלום,\n\n' + t + '\n\nתודה'); check('«אודה ל…» is an explicit ask: ' + t.slice(0, 30).replace(/\n/g, ' '), r.show, kinds(r)); }
   for (const t of ['היי דנה,\n\nאשמח שתעביר לי את הנספחים.', 'דנה שלום,\n\nאודה למענה.', 'היי דנה,\n\nאודה לאישורך בקבלת המסמכים.']) { const r = judge(t); check('a framed ask that opens with another name is not the reader\'s: ' + t.slice(0, 20).replace(/\n/g, ' '), !r.show, kinds(r)); }
-  for (const t of ['שלום וברכה,\n\nאני ממתין כבר הרבה זמן.\n\nאודה למענה בהקדם.', 'שלום רב,\n\nנא עדכנו אותי אם זה מספק.']) { const r = judge(t); check('a formal greeting («שלום וברכה», «שלום רב») is not a name: ' + t.split('\n').pop().slice(0, 30), r.show, kinds(r)); }
+  for (const t of ['שלום וברכה,\n\nהמשלוח עדיין לא הגיע.\n\nאודה למענה היום.', 'שלום רב,\n\nנא עדכנו אותי אם הסידור מתאים לכם.']) { const r = judge(t); check('a formal greeting («שלום וברכה», «שלום רב») is not a name: ' + t.split('\n').pop().slice(0, 30), r.show, kinds(r)); }
   {
-    const r = judge('היי סאלי,\n\nצריכה את עזרתך בתיק.\nתעבור עליה בבקשה ותכין טבלה מסודרת של הליקויים.\n\nתודה רבה'); check('«תעבור עליה בבקשה ותכין טבלה» is offered as a task', r.show, kinds(r));
-    const q = judge('שלום וברכה,\n\nאודה לקבלת הדרישות לצורך קבלת הסכמה.\n\nבברכה,'); check('«אודה לקבלת הדרישות» is an ask', q.show, kinds(q));
-    for (const t of ['היי דנה,\n\nתעבור עליה בבקשה ותכין טבלה.', 'תעבור עליה ותכין טבלה.', 'הוא יעבור עליה בבקשה ויכין טבלה.', 'היי,\nבבקשה לא תכין טבלה.']) { const n = judge(t); check('not offered: ' + t.replace(/\n/g, ' ').slice(0, 36), !n.show, kinds(n)); }
+    const r = judge('היי סאלי,\n\nצריכה את עזרתך בפרויקט.\nתעבור על הנתונים בבקשה ותכין גרף מסודר של המכירות.\n\nתודה רבה'); check('«תעבור על הנתונים בבקשה ותכין גרף» is offered as a task', r.show, kinds(r));
+    const q = judge('שלום וברכה,\n\nאודה לקבלת הפרטים לצורך הכנת הצעה.\n\nבברכה,'); check('«אודה לקבלת הפרטים» is an ask', q.show, kinds(q));
+    for (const t of ['היי דנה,\n\nתעבור על הנתונים בבקשה ותכין גרף.', 'תעבור על הנתונים ותכין גרף.', 'הוא יעבור על הנתונים בבקשה ויכין גרף.', 'היי,\nבבקשה לא תכין גרף.']) { const n = judge(t); check('not offered: ' + t.replace(/\n/g, ' ').slice(0, 36), !n.show, kinds(n)); }
   }
   for (const t of ['יש להגיש את הבקשה לרשות עד יום חמישי.', 'עליך להגיש את הצהרת ההון עד יום ראשון.', 'חובה להעלות את האישור לפורטל עד יום שני.']) { const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('impersonal «יש / עליך / חובה» do-it is a task: ' + t.slice(0, 34), r.show && /googleTask/.test(kinds(r)), kinds(r)); }
   for (const t of ['יש להגיש את הבקשה כפי שסוכם.', 'הוא עליו להגיש את הבקשה עד יום חמישי.', 'נא לא להגיש את הבקשה עד יום חמישי.']) { const r = judge('שלום,\n\n' + t + '\n\nתודה'); check('not a task: ' + t.slice(0, 34), !(r.show && /googleTask/.test(kinds(r))), kinds(r)); }

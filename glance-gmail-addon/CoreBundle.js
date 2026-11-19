@@ -10692,9 +10692,9 @@ const FlowIncomingJudge = (() => {
     return null;
   }
   // ---- what else a mail of questions carries (2026-11-16, a real legal-and-business Hebrew mail) -------------------------------------------
-  // The questions are the ask, but the same mail may also (1) ask for a date that has to be found («מהו המועד האחרון למתן תשובה», "what is the last date to respond"), (2) tell the
-  // person to HOLD an answer to someone («אני מבקש כרגע לא להחזיר תשובה לב"כ התובעים», "do not reply to opposing counsel yet"), and (3) quote figures that add up («27,400 ... 19 מיליון ...
-  // 18,972,600»). Glance writes none of the answers. It keeps the hold where the person can see it (a task with no day), makes the date question a task of its own, and puts the
+  // The questions are the ask, but the same mail may also (1) ask for a date that has to be found («מהו המועד האחרון לקבלת ההחלטה», "what is the last date to decide"), (2) tell the
+  // person to HOLD an answer to someone («אני מבקש בשלב זה לא לשלוח תשובה לסוכנות הגיוס», "do not reply to the agency yet"), and (3) quote figures that add up («9,500 ... 3 מיליון ...
+  // 2,990,500»). Glance writes none of the answers. It keeps the hold where the person can see it (a task with no day), makes the date question a task of its own, and puts the
   // arithmetic of the mail's own figures under the draft as a check for the person, never as an answer.
   const DEADLINE_Q_HE = /(?:ה?מועד|ה?תאריך|ה?יום)\s+האחרון|עד\s+מתי|האם\s+יש\s+מועד\s+אחרון/;
   const DEADLINE_Q_EN = /\b(?:last|latest|final)\s+(?:date|day|time)\b|\bby\s+when\b|\bdeadline\b/i;

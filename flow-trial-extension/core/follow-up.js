@@ -118,7 +118,7 @@ const FlowFollowUp = (() => {
 
   function words(text) { return (String(text || '').match(/\S+/g) || []).length; }
 
-  // The last sentence that is not a sign-off: «מצ"ב אישור זכויות, לאישורך.\nבברכה,» ends in «לאישורך», not in «בברכה».
+  // The last sentence that is not a sign-off: «מצ"ב תעודת ביטוח, לאישורך.\nבברכה,» ends in «לאישורך», not in «בברכה».
   function lastAskSentence(text) {
     const SIGNOFF = /^(?:בברכה|בכבוד\s+רב|תודה(?:\s+רבה)?(?:\s+מראש)?|best(?:\s+regards)?|regards|thanks)[,.!\s]*$/i;
     const lines = String(text || '').split(/\n/).map((x) => x.trim()).filter(Boolean);
@@ -128,7 +128,7 @@ const FlowFollowUp = (() => {
   // A scheduling question too short for the four-word line filter, and nothing else.
   function isShortScheduleAsk(s) {
     const t = String(s || '').trim();
-    // «לאישורך.» / «לאישרוך» / «כתב הסכמה לאישורך.»: attached for approval, the reply is the approval.
+    // «לאישורך.» / «לאישרוך» / «טיוטת מכתב לאישורך.»: attached for approval, the reply is the approval.
     if (/(?:^|\s)(?:לאישור(?:ך|כם)|לאישרוך)[.!]*$/.test(t)) return true;
     // A clock put as a question with no verb («אפשרי היום ב14:30?», «15:00 אפשרי?», «מתאים מחר ב-10:00?») is a request for a time in a real office thread.
     if (/^(?:אפשרי|מתאים|נוח|פנוי|פנויה)\s+(?:(?:היום|מחר|מחרתיים|ביום\s+\S+)\s+)?(?:ב-?\s*)?\d{1,2}[:.]\d{2}\s*\?$/.test(t) || /^\d{1,2}[:.]\d{2}\s+(?:אפשרי|מתאים|נוח)\s*\?$/.test(t)) return true;
@@ -265,7 +265,7 @@ const FlowFollowUp = (() => {
     if (RECEIPT.test(body)) return null;
 
     const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);
-    // «תשלום שכ"ט ע"ס 6,979 כולל מע"מ» / «בסך 4,500»: a Hebrew amount with no currency sign is shekels when the same text speaks of a payment.
+    // «תשלום עבור הייעוץ ע"ס 2,350 כולל מע"מ» / «בסך 900»: a Hebrew amount with no currency sign is shekels when the same text speaks of a payment.
     let money = ex && ex.parseMoney ? ex.parseMoney(body) : null;
     if (!money && PAY_WORD.test(body)) {
       const bare = /(?:ע"ס|ע״ס|בסך(?:\s+של)?|על\s+סך(?:\s+של)?)\s+(\d[\d,]*(?:\.\d{1,2})?)/.exec(body);
@@ -329,7 +329,7 @@ const FlowFollowUp = (() => {
     const chosen = isPayment ? payLine : askLine;
     if (HEDGE.test(chosen) && !deadlineIso && !isPayment) return null;
 
-    // A chase whose own ask line is about a fee or a payment («ממתינים לעדכון בנוגע לשכ"ט», «נודה למענה… ובפרט על עדכון תשלום השובר», «אשמח לברר האם התקבלו תשלומי…», «תעבירו את אישור התשלום») is a payment chase even with no figure (real-mail dev set, 2026-11-18).
+    // A chase whose own ask line is about a fee or a payment («ממתינים לעדכון בנוגע לשכ"ט», «נודה למענה… ובפרט על עדכון תשלום הדמי קדימה», «אשמח לברר אם התקבלו תשלומי…», «העבירו את אישור התשלום») is a payment chase even with no figure (real-mail dev set, 2026-11-18).
     const feeChase = !isPayment && !payAsk && askLine && FEE_CHASE_HE.test(askLine);
     const kind = isPayment || payAsk || feeChase ? KINDS.PAYMENT : KINDS.REPLY;
     const req = typed && (typed.line === chosen || !isPayment) ? typed.req : null;
@@ -381,7 +381,7 @@ const FlowFollowUp = (() => {
     const body = String(text || '').replace(/^\s*(?:hi|hello|dear|שלום|היי)[^\n]{0,30}\n/i, '');
     const asks = sentences(body).map((x) => x.replace(/^(?:\d{1,2}[.)]|[-*•])\s*/, '').trim()).filter(isAskSentence);
     if (asks.length < 2) {
-      // One ask that lists items by number («אשמח אם תעביר את פרוטוקולי המסירה של דירות 13, 17, 19 ו-21», «please send the protocols for units 13, 17, 19 and 21») is several things asked:
+      // One ask that lists items by number («אשמח אם תעביר את אישורי הרישום של מחסנים 5, 8, 12 ו-14», «please send the certificates for rooms 5, 8, 12 and 14») is several things asked:
       // a reply that brings one of them leaves the rest open. Small whole numbers only (a year or an amount is not an item); three or more.
       const line = sentences(body).find((x) => isAskSentence(x) && /\d{1,3}(?:\s*,\s*\d{1,3}){1,5}\s*(?:,|ו-?|and|&)\s*\d{1,3}(?!\d)/i.test(x));
       if (!line) return null;
