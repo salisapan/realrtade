@@ -248,6 +248,9 @@ const FlowIncomingJudge = (() => {
   // «תוכל להשיב?», «תוכלו לענות בבקשה ל…», «[NAME], תוכל להגיב?»: the modal ask for an answer; «טרם קיבלנו מענה / תשובה / התייחסות», «למה אתה לא עונה?»: a chase. No day needed (real-mail dev set, 2026-11-18).
   // «[OWNER], תוכל להעביר לו את הנוהל?» / «תוכלו לבדוק מול…?»: the modal ask with a work verb is a task, with a send verb a reply (real-mail dev set, 2026-11-19).
   const MODAL_WORK_HE = /^(?:כן,?\s*)?(?:[\u05D0-\u05EA\[\]A-Z\u2013-]{2,12}\s*[,\u2013-]\s*)?(?:תוכל(?:י|ו)?|אפשר\s+ש?(?:ת|ל)|ניתן\s+ל)\s*(?:בבקשה\s+)?(?:ל?(?:בדוק|הכין|טפל|הוסיף|תקן|חתום|בצע|השלים|ארגן|וודא|לוודא|ודא|לרשום|להתיק|לתייק|להשלים|לדבר|לבדוק|לטפל|להכין|להוסיף|לתקן|לחתום|לבצע|לארגן))(?![\u0590-\u05FF])/;
+  // «תדפיס בבקשה…», «תקפוץ אליי בבקשה…»: a sentence that opens with a masculine future-form imperative (ת + a 3-to-5 letter stem) and carries «בבקשה». Nouns that start with ת («תודה», «תוכנית», «תביעה», «תשובה»…) end in ות / ית / ים / ין / ון / ה or are listed.
+  const GEN_IMP_HE = /^ת[\u05D0-\u05EA]{2,5}(?![\u0590-\u05FF])/;
+  const GEN_IMP_NOT_HE = /^(?:תודה|תוכנית|תוכניות|תביעה|תביעות|תשובה|תשובות|תאריך|תקנה|תקנות|תוצאה|תוצאות|תקופה|תנאי|תנאים|תמונה|תצהיר|תשלום|תעודה|תוספת|תקציב|תפקיד|תלונה|תרגום|תחילה|תיק|תיקים|תמורה|תקלה|תכנית|תכניות|תחתית|תלות|תחנה|תוכן|תכלית|תחום|תהליך|תוקף|תנועה|תפוז|תבנית|תבניות|תכולה|תפיסה|תחזית|תעריף|תעריפים|תוצר|תוצרים|תרומה|תכשיט|תפריט|תקן|תקשורת)(?![\u0590-\u05FF])/;
   const MODAL_SEND_HE = /^(?:כן,?\s*)?(?:[\u05D0-\u05EA\[\]A-Z\u2013-]{2,12}\s*[,\u2013-]\s*)?(?:תוכל(?:י|ו)?)\s+(?:בבקשה\s+)?(?:להעביר|לשלוח|לצרף|להחזיר|לאשר|להעביר)(?![\u0590-\u05FF])/;
   // «לטיפולכם דחוף» alone on a line: «for your handling» is the whole ask when the mail names the work above it.
   const HANDLING_ONLY_HE = /^(?:דחוף\s+)?לטיפול(?:ך|כם|כן)(?:\s+(?:הדחוף|המיידי|בהקדם|דחוף))?[.!]*$/;
@@ -327,12 +330,13 @@ const FlowIncomingJudge = (() => {
       if (!/[\u0590-\u05FF]/.test(x1) || skip(x1, true) || /(?:^|\s)(?:אל|לא)\s/.test(x1)) continue;
       // A polite frame in front of the verb («אשמח שתעביר לי…», «אודה אם תכין…», «אבקש שתשלח…») or a nominal («אודה על הכנת נספח…») is an explicit ask: it needs no day. A bare imperative still does.
       const pleaseIn = /(?:^|\s)בבקשה(?:\s|[,.]|$)/.test(x1);
-      const modalWork = MODAL_WORK_HE.test(x1), modalSend = MODAL_SEND_HE.test(x1), handling = HANDLING_ONLY_HE.test(x1);
+      const genImp = pleaseIn && GEN_IMP_HE.test(x1) && !GEN_IMP_NOT_HE.test(x1) && !/(?:ות|ית|ים|ין|ון)$/.test(x1.split(/[\s,.!?]/)[0]);
+      const modalWork = MODAL_WORK_HE.test(x1) || /^(?:אתה|את|אתם|אתן)\s+(?:יכול|יכולה|יכולים|יכולות)\s+(?:בבקשה\s+)?ל(?:בדוק|הכין|טפל|הוסיף|תקן|חתום|בצע|השלים|ארגן|וודא|רשום|תייק|דבר)/.test(x1), modalSend = MODAL_SEND_HE.test(x1), handling = HANDLING_ONLY_HE.test(x1);
       const modal = MODAL_REPLY_HE.test(x1) || modalSend;
-      const framed = POLITE_FRAME_HE.test(x1) || modal || modalWork || handling || (pleaseIn && (DIRECT_IMP_WORK_HE.test(x1) || DIRECT_IMP_SEND_HE.test(x1))), nominal = !POLITE_FRAME_HE.test(x1) && !framed && POLITE_NOMINAL_HE.exec(x1);
+      const framed = POLITE_FRAME_HE.test(x1) || modal || modalWork || handling || genImp || (pleaseIn && (DIRECT_IMP_WORK_HE.test(x1) || DIRECT_IMP_SEND_HE.test(x1))), nominal = !POLITE_FRAME_HE.test(x1) && !framed && POLITE_NOMINAL_HE.exec(x1);
       if ((framed || nominal) && greetsOther) continue;
       const x = framed ? x1.replace(POLITE_FRAME_HE, '') : x1;
-      const work = modalWork || handling || (nominal ? NOMINAL_WORK_HE.test(nominal[1] || nominal[2]) : DIRECT_IMP_WORK_HE.test(x));
+      const work = modalWork || handling || (genImp && !DIRECT_IMP_BACK_HE.test(x) && !DIRECT_IMP_SEND_HE.test(x)) || (nominal ? NOMINAL_WORK_HE.test(nominal[1] || nominal[2]) : DIRECT_IMP_WORK_HE.test(x));
       const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)) || modal);
       if (!work && !back) continue;
       const d = dayOf(x1, now0).date;

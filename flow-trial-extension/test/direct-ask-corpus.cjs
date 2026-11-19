@@ -215,6 +215,13 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   for (const t of ['שלום,\n\nהוא יכול לבדוק מול הספק אם הגיע האישור.\n\nבברכה', 'שלום,\n\nהם דיברו איתו על התיאום בבוקר.\n\nבברכה']) {
     const r = judge(t); check('round-4 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
   }
+  // Round 5 (invented sentences): a masculine future-form imperative with «בבקשה»; «אתה יכול ל…?»; nouns that start with ת stay quiet.
+  for (const t of ['היי סאלי,\n\nתדפיס בבקשה את הטבלה בצבעוני.\n\nתודה', 'שלום,\n\nתקפוץ אליי בבקשה בזמנך הפנוי.\n\nתודה', 'שלום,\n\nאתה יכול לטפל בנושא הזה?\n\nתודה']) {
+    const r = judge(t); check('round-5 ask offers: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const t of ['שלום,\n\nתודה בבקשה על הדיווח.\n\nבברכה', 'שלום,\n\nתוכנית העבודה בבקשה מצורפת לעיונך.\n\nבברכה', 'היי דנה,\n\nתדפיס בבקשה את הטבלה בצבעוני.']) {
+    const r = judge(t); check('round-5 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
 }
 
 console.log('\nTOTAL FAILURES:', failures);
