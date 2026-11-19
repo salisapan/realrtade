@@ -222,6 +222,13 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   for (const t of ['שלום,\n\nתודה בבקשה על הדיווח.\n\nבברכה', 'שלום,\n\nתוכנית העבודה בבקשה מצורפת לעיונך.\n\nבברכה', 'היי דנה,\n\nתדפיס בבקשה את הטבלה בצבעוני.']) {
     const r = judge(t); check('round-5 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
   }
+  // Round 6 (invented sentences): a polite frame after a lead-in clause, «אודה לטיפולך / על התייחסותכם / לאישורך», «לטיפולך» alone; a frame that follows someone else's name stays quiet.
+  for (const t of ['היי סאלי,\n\nהבנתי שאתה מטפל בעניין, אשמח שתחזור ללקוח.\n\nתודה', 'שלום,\n\nבעניין ההסכם עם הספק אודה לטיפולך.\n\nתודה', 'שלום רב,\n\nהבנק מבקש את המסמך הנוסף. אודה על התייחסותכם.\n\nבברכה', 'שלום,\n\nצריך אישור נקי מהרשם\nלטיפולך\nתודה']) {
+    const r = judge(t); check('round-6 ask offers: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const t of ['שלום,\n\nדנה, אשמח לטיפולך בעניין.\n\nתודה', 'היי,\n\n@דנה @רון נודה לעזרתכם בעניין החתימה.\n\nתודה', 'שלום,\n\nהוא אמר שאשמח לשמוע על הטיפול בו.\n\nבברכה']) {
+    const r = judge(t); check('round-6 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
 }
 
 console.log('\nTOTAL FAILURES:', failures);
