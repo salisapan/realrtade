@@ -1123,6 +1123,52 @@ const FlowIntent = (() => {
     }
     return sawOther && !sawReader;
   }
+  // Who a mail is for, read from its own first words (the group-mail rule, docs/glance-ai/user-context-v0.md):
+  //   'reader' the reader is named at the head («Sali, ...», «היי סאלי ו-דנה,», «סאלי - נא טיפולכם», a thanks to them) or at the start of a line with a dash, colon or comma
+  //   'other'  a vocative names someone else and not the reader («דנה שלום, ...», «Tom - please send ...»)
+  //   'group'  the head greets the group («היי כולם», «Hi all», «שלום לכולם»): the reader is one of them
+  //   'none'   no one is named (or the reader's names are not known yet): the mail says nothing about who it is for
+  // Only a positive 'reader' or 'group' widens anything; 'none' keeps today's behavior.
+  function readerToken(tok, ctx) {
+    const t = String(tok || '');
+    if (!t) return false;
+    if (nameIsReader(t, ctx)) return true;
+    return /^[\u05D5]/.test(t) && t.length > 3 && nameIsReader(t.slice(1), ctx);
+  }
+  const NAME_LEAD_PREP = /^(?:עם|את|של|from|with|by|to|cc|about|regarding|via)$/i;
+  function addressing(text, ctx) {
+    const c = ctx || {};
+    if (!readerNameList(c).length) return 'none';
+    const lines = String(text || '').replace(/^\uFEFF/, '').split(/\n+/).map((x) => x.replace(/^[\s\u00a0\u202f\u200e\u200f]+/, '').trim()).filter(Boolean).slice(0, 8);
+    if (!lines.length) return 'none';
+    const toks = lines[0].split(/[\s,،:;!.?\-\u2013\u2014()"]+/).filter(Boolean).slice(0, 7);
+    for (let k = 0; k < toks.length; k++) {
+      if (k > 0 && NAME_LEAD_PREP.test(toks[k - 1])) continue;
+      if (readerToken(toks[k], c)) return 'reader';
+    }
+    for (let k = 1; k < lines.length; k++) {
+      const m = /^@?([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’]{1,30})\s*(?:[-\u2013\u2014:,،]\s*\S|\s+(?:תוכל|תוכלי|נא|אנא|בבקשה|please|can|could|would|will)(?![\u0590-\u05FFA-Za-z]))/i.exec(lines[k]);
+      if (m && readerToken(m[1], c)) return 'reader';
+    }
+    if (vocativeIsOther(text, c)) return 'other';
+    // «דנה- אפשר להעביר לסבב», «@דנה מחכים שתחתום»: a line that opens on someone else's name (a dash, or an @) and asks.
+    for (let k = 0; k < lines.length && k < 8; k++) {
+      const dash = /^(@?)([A-Za-z\u0590-\u05FF'’]{2,30})(?:\s*[-\u2013\u2014:]\s*(\S[^\n]*)|\s+(\S[^\n]*))?$/.exec(lines[k]);
+      if (!dash || !personToken(dash[2]) || readerToken(dash[2], c)) continue;
+      if (dash[1] === '@' || (dash[3] && restStartsAsk(dash[3]))) return 'other';
+    }
+    // A name alone on a line, with a colon or a comma, and the ask on the next line («Dana:» / «דנה,»): a vocative to someone else.
+    for (let k = 0; k < lines.length - 1 && k < 6; k++) {
+      const lone = /^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{1,30})\s*[:,،]$/.exec(lines[k]);
+      if (lone && personToken(lone[1]) && !readerToken(lone[1], c)) return 'other';
+    }
+    for (let k = 0; k < toks.length && k < 6; k++) {
+      if (/^(?:hi|hey|hello|dear|good|morning|afternoon|evening|greetings|thanks|thank|שלום|היי|הי|בוקר|ערב|טוב|רב|ו?תודה)$/i.test(toks[k])) continue;
+      if (GROUP_ADDRESSEE.test(toks[k]) || /^ל(?:כולם|כולן)$/.test(toks[k])) return 'group';
+      break;
+    }
+    return 'none';
+  }
   // The reader is only in Cc, and the mail does not greet them by name.
   // That is quiet for every kind: a file, a task, a log, a hold. A greeting
   // of their own name, while they sit on Cc, is still theirs. No To and no
@@ -3609,7 +3655,7 @@ const FlowIntent = (() => {
     return titleAfter(hit.verb, hit.match, src, subject, {});
   }
 
-  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, slotChangeSafe, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar };
+  return { TYPES, classify, shouldShowChip, copiedOnly: ccOnlyWithoutGreeting, openingAddressee, addressedToSelf, meetingPlanVeto, attachToInvitePlan, soloPhoneTask, phishingOrNegative, slotChangeSafe, bankChangePayment, nameIsReader, readerNamesFrom, marketingWebinar, addressing };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };
