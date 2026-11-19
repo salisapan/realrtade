@@ -13,13 +13,16 @@ const file = fs.readdirSync(dir).filter((f) => /messages\.jsonl$/.test(f)).map((
 const rows = [].concat(...file.map((f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } }))).filter(Boolean);
 const MAP = { draft: 'reply', task: 'task', pay: 'payment', calendar: 'calendar', file_save: 'document' };
 const goldKind = (r) => (r.label && r.label.has_request ? (r.label.kind || 'none') : 'none');
+// The mask replaced the owner's own name too. A first [NAME] within the first 30 characters is the vocative to the reader (these mails sit in the owner's inbox), so with GLANCE_ADDRESSEE=1 it is put back as the owner's name; the default run leaves the mask as it is.
+const ADDRESSEE = process.env.GLANCE_ADDRESSEE === '1';
+const addressee = (b, r) => (ADDRESSEE && r.ownInTo !== false ? String(b || '').replace(/\[NAME\]/, (m, off) => (off < 30 ? 'סאלי' : m)) : b);
 function engineInbound(r, surface) {
   const own = OWN[surface];
   const colleagues = []; for (let i = 0; i < Math.max(0, (r.toN || 1) - (r.ownInTo ? 1 : 0)); i++) colleagues.push('colleague' + i + '@firm.example');
   const to = r.ownInTo === false ? colleagues : [own].concat(colleagues);
   const cc = r.ownInTo === false ? [own] : [];
   try {
-    const rec = recognize({ surface, sender: { name: 'Person', email: 'person@firm.example' }, to, cc, subject: r.subject || 'RE: x', ownNames: ['סאלי', 'Sali'] }, r.body || '');
+    const rec = recognize({ surface, sender: { name: 'Person', email: 'person@firm.example' }, to, cc, subject: r.subject || 'RE: x', ownNames: ['סאלי', 'Sali'] }, addressee(r.body || '', r));
     return MAP[rec.family] || (rec.family === 'none' ? 'none' : 'other');
   } catch (e) { return 'none'; }
 }

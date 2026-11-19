@@ -395,5 +395,9 @@ console.log('\n--- real-mail dev set grammar (2026-11-18): bare Hebrew amount, s
   for (const x of ['מצ"ב אישור ניהול חשבון להעברת שכ"ט.', 'שלחתי מספר מיילים לעורך הדין וגם וואטצפ, ממתין לעדכון ממנו.', 'מצ"ב הסכם מכר חתום.\nבברכה,']) { const r = classify(x); check('opens none: ' + x.slice(0, 30), !r, r && r.kind); }
 }
 
+// A fee chase with no figure is a payment chase; a chase about something else stays a reply (invented sentences, 2026-11-18).
+for (const t of ['שלום רב,\nנודה למענה מכם על הסדרת הנושאים, ובפרט על עדכון תשלום השובר הראשון.\nבברכה,', 'מעולה, תודה רבה!\nממתינים לעדכון בנוגע לשכ"ט.\nבברכה', 'שלום, אשמח שתעבירו לכאן את אישור התשלום.']) { const r = classify(t); check('fee chase is a payment: ' + t.slice(0, 24), r && r.kind === 'payment', r && r.kind); }
+for (const t of ['שלום רב,\nנודה למענה מכם על הסדרת הנושאים.\nבברכה,', 'שלום, אשמח שתעדכנו אותי לגבי מועד הפגישה.']) { const r = classify(t); check('non-fee chase stays a reply: ' + t.slice(0, 24), !r || r.kind === 'reply', r && r.kind); }
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

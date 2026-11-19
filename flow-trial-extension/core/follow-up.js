@@ -112,6 +112,7 @@ const FlowFollowUp = (() => {
   ];
 
   // ---- payment --------------------------------------------------------------
+  const FEE_CHASE_HE = /(?:שכ"ט|שכ״ט|שכר\s+טרחה|תשלומי|תשלום\s+ה|אישור\s+(?:ה)?תשלום|עדכון\s+(?:ה)?תשלום|תשלום\s+שובר|שובר(?:ים)?\s+ה?(?:ראשון|שני|שלישי)|(?:על|בנוגע\s+ל|לגבי)\s+תשלום)/;
   const PAY_WORD = /\b(?:invoice|payment|balance|amount due|outstanding|remit(?:tance)?|please pay|pay(?:able)?|wire|settle|owed|overdue|due on|due by)\b|(?:חשבונית|תשלום|יתרה|לשלם|העברה בנקאית|חוב|לתשלום)/i;
   const RECEIPT = /\b(?:payment (?:received|confirmed|made|sent|processed)|has been paid|paid in full|thank you for (?:your )?payment|receipt (?:attached|enclosed)|we(?:'ve| have) (?:received|sent) (?:the )?payment)\b|(?:התשלום (?:התקבל|בוצע|נשלח)|שולם|קבלה מצורפת)/i;
 
@@ -328,7 +329,9 @@ const FlowFollowUp = (() => {
     const chosen = isPayment ? payLine : askLine;
     if (HEDGE.test(chosen) && !deadlineIso && !isPayment) return null;
 
-    const kind = isPayment || payAsk ? KINDS.PAYMENT : KINDS.REPLY;
+    // A chase whose own ask line is about a fee or a payment («ממתינים לעדכון בנוגע לשכ"ט», «נודה למענה… ובפרט על עדכון תשלום השובר», «אשמח לברר האם התקבלו תשלומי…», «תעבירו את אישור התשלום») is a payment chase even with no figure (real-mail dev set, 2026-11-18).
+    const feeChase = !isPayment && !payAsk && askLine && FEE_CHASE_HE.test(askLine);
+    const kind = isPayment || payAsk || feeChase ? KINDS.PAYMENT : KINDS.REPLY;
     const req = typed && (typed.line === chosen || !isPayment) ? typed.req : null;
     // Does this intention carry enough weight to deserve a loop? (A soft "let me
     // know what you think" with no money, date or concrete action does not.)
