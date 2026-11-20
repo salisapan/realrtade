@@ -759,8 +759,9 @@
       screen.appendChild(lab);
     });
     card.appendChild(screen);
-    const contactsOff = el('button', 'ghost sm', 'כבה');
+    const contactsOff = el('button', 'ghost sm');
     contactsOff.type = 'button';
+    contactsOff.textContent = 'כבה';
     contactsOff.hidden = true;
     contactsOff.setAttribute('data-glance-contacts-off', '1');
     function syncContactsOff() {
