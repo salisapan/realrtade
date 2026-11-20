@@ -236,6 +236,11 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   for (const t of ['שלום,\n\nהוא ביקש שנדבר איתי על ההצעה, כך כתב.\n\nבברכה', 'שלום,\n\nתודה על העדכון, הכל ברור.\n\nבברכה']) {
     const r = judge(t); check('round-7 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
   }
+  // Round 8 (invented sentences): automated notices stay quiet even from a person-looking sender: meeting notes written by a bot, an order-status notice.
+  for (const x of ['Notes from the meeting on Tuesday at 4 PM.\n\nThese notes were shared with the host. The content was auto-generated and may be wrong.\n\nOpen notes', 'We\'re getting your order ready.\n\nYour order is being prepared, total 45.00. Track your order below.', 'ההזמנה שלך נשלחה והיא בדרך אליך.\n\nמעקב משלוח בקישור']) {
+    const r = judge(x); check('round-8 automated notice stays quiet: ' + x.split('\n')[0].slice(0, 28), !r.show, kinds(r));
+  }
+  const keep8 = judge('היי סאלי,\n\nתעדכן אותי בבקשה עד יום ראשון אם ההזמנה שלך מוכנה.\n\nתודה'); check('round-8 a person asking about an order still offers', keep8.show, kinds(keep8));
 }
 
 console.log('\nTOTAL FAILURES:', failures);

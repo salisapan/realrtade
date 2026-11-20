@@ -30,7 +30,7 @@ function engineInbound(r, surface) {
   const to = r.ownInTo === false ? colleagues : [own].concat(colleagues);
   const cc = r.ownInTo === false ? [own] : [];
   try {
-    const rec = recognize({ surface, sender: { name: 'Person', email: 'person@firm.example' }, to, cc, subject: r.subject || 'RE: x', ownNames: ['סאלי', 'Sali'] }, addressee(r.body || '', r));
+    const rec = recognize({ surface, sender: { name: 'Person', email: r.fromKind === 'automated' ? 'noreply@firm.example' : r.fromKind === 'list' ? 'newsletter@firm.example' : 'person@firm.example' }, to, cc, subject: r.subject || 'RE: x', ownNames: ['סאלי', 'Sali'] }, addressee(r.body || '', r));
     return MAP[rec.family] || (rec.family === 'none' ? 'none' : 'other');
   } catch (e) { return 'none'; }
 }

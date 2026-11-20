@@ -56,6 +56,23 @@ const BASE = ' newer_than:' + DAYS + 'd -in:spam -in:trash -in:chats';
 const inboxPick = pick('in:inbox -category:promotions -category:social -category:forums' + BASE, NIN);
 const sentPick = pick('in:sent' + BASE, NSENT);
 
+// --enrich: keep the masked rows and labels, add `fromKind` (automated | list | person) from the sender's local part and the bulk/auto headers, matched by the hashed message id. No text is touched.
+if (process.argv.includes('--enrich')) {
+  const byMid = {};
+  for (const f of fs.readdirSync(OUT).filter((x) => /\.jsonl$/.test(x))) for (const l of fs.readFileSync(path.join(OUT, f), 'utf8').split('\n').filter(Boolean)) { const r = JSON.parse(l); byMid[r.mid] = 1; }
+  const kind = {}; let n0 = 0;
+  for (const it of inboxPick.concat(sentPick)) {
+    if (!byMid[H('mid:' + it.id)]) continue;
+    let m; for (let k = 0; k < 4 && !m; k++) { try { m = api('messages/' + it.id + '?format=metadata&metadataHeaders=From&metadataHeaders=List-Unsubscribe&metadataHeaders=Precedence&metadataHeaders=Auto-Submitted'); } catch (e) { cp.spawnSync('sleep', [String(1 + k * 2)]); } }
+    if (!m) continue;
+    const h = (n) => { const x = (m.payload.headers || []).find((y) => y.name.toLowerCase() === n); return x ? x.value : ''; };
+    const local = (String(h('from')).match(/([\w.+-]+)@/) || [, ''])[1].toLowerCase();
+    kind[H('mid:' + it.id)] = /^(?:no-?reply|do-?not-?reply|notifications?|noreply|alerts?|mailer|news|newsletter|marketing|updates?|info|hello|team|support|billing|orders?)\b|no-?reply/.test(local) || /auto-/i.test(h('auto-submitted')) ? 'automated' : (h('list-unsubscribe') || /bulk|list|junk/i.test(h('precedence')) ? 'list' : 'person'); n0++;
+  }
+  const cnt = {};
+  for (const f of fs.readdirSync(OUT).filter((x) => /\.jsonl$/.test(x))) { const rows = fs.readFileSync(path.join(OUT, f), 'utf8').split('\n').filter(Boolean).map(JSON.parse); for (const r of rows) { if (kind[r.mid]) { r.fromKind = kind[r.mid]; cnt[r.fromKind] = (cnt[r.fromKind] || 0) + 1; } } fs.writeFileSync(path.join(OUT, f), rows.map((r) => JSON.stringify(r)).join('\n') + '\n'); }
+  console.log('enriched', n0, JSON.stringify(cnt)); process.exit(0);
+}
 const hdr = (m, n) => { const h = (m.payload.headers || []).find((x) => x.name.toLowerCase() === n); return h ? h.value : ''; };
 const b64 = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
 function bodyOf(part, want) {
