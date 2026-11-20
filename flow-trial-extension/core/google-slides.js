@@ -1,12 +1,11 @@
 // A Google Slides deck from a meeting summary, with drive.file only.
-// slides.googleapis.com is not in the extension host list. A service-worker
-// fetch to that host fails, and adding the host needs the owner's approval,
-// so this file never calls it. The deck is a small PPTX uploaded through
-// Drive multipart and converted to a Google Slides file in the Glance
-// folder. The text is verified by files.get and a text/plain export. A
-// failed verify trashes the file. Undo trashes it only while the export
-// and the file stamp still match. Nothing is shared. Hebrew is written
-// right to left. Portable: no chrome.*, no DOM, no network.
+// slides.googleapis.com is not called. Drive converts a real PPTX: a zip of
+// slide XML alone is not a presentation, and Drive answers 400 with no
+// denial log. This file includes a slide master, a layout, a theme, and a
+// text box with a size. The text is verified by files.get and a text/plain
+// export. A failed verify trashes the file. Undo trashes it only while the
+// export and the file stamp still match. Nothing is shared. Hebrew is
+// written right to left. Portable: no chrome.*, no DOM, no network.
 const FlowGoogleSlides = (() => {
   const SYSTEM = 'google/slides';
   const CONNECTOR = 'googleSlides';
@@ -113,16 +112,62 @@ const FlowGoogleSlides = (() => {
     return '<a:p>' + dir + '<a:r><a:rPr lang="' + lang + '" dirty="0" smtClean="0"/><a:t>' + xml(text) + '</a:t></a:r></a:p>';
   }
 
+  const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const P = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+  const REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
+
+  function xfrm() {
+    return '<a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm>';
+  }
+
+  function groupTree(inner) {
+    return '<p:spTree>' +
+      '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+      '<p:grpSpPr>' + xfrm() + '</p:grpSpPr>' +
+      (inner || '') +
+      '</p:spTree>';
+  }
+
+  function rels(pairs) {
+    const rows = pairs.map((p) => '<Relationship Id="' + p[0] + '" Type="' + p[1] + '" Target="' + p[2] + '"/>').join('');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="' + REL + '">' + rows + '</Relationships>';
+  }
+
+  function themeXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<a:theme xmlns:a="' + A + '" name="Glance"><a:themeElements>' +
+      '<a:clrScheme name="Glance">' +
+      '<a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1>' +
+      '<a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>' +
+      '<a:dk2><a:srgbClr val="1F4E79"/></a:dk2><a:lt2><a:srgbClr val="EEECE1"/></a:lt2>' +
+      '<a:accent1><a:srgbClr val="5B9BD5"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2>' +
+      '<a:accent3><a:srgbClr val="A9D08E"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4>' +
+      '<a:accent5><a:srgbClr val="4472C4"/></a:accent5><a:accent6><a:srgbClr val="70AD47"/></a:accent6>' +
+      '<a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink>' +
+      '</a:clrScheme>' +
+      '<a:fontScheme name="Glance"><a:majorFont><a:latin typeface="Calibri Light"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>' +
+      '<a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme>' +
+      '<a:fmtScheme name="Glance">' +
+      '<a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst>' +
+      '<a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst>' +
+      '<a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>' +
+      '<a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst>' +
+      '</a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>';
+  }
+
   function slideXml(title, bullets, rtl) {
     const paras = [paragraph(title, rtl)];
     for (let i = 0; i < bullets.length; i++) paras.push(paragraph(bullets[i], rtl));
+    const shape = '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>' +
+      '<p:spPr><a:xfrm><a:off x="457200" y="457200"/><a:ext cx="8229600" cy="4114800"/></a:xfrm>' +
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
+      '<p:txBody><a:bodyPr/><a:lstStyle/>' + paras.join('') + '</p:txBody></p:sp>';
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
-      '<p:cSld><p:spTree>' +
-      '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>' +
-      '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/>' +
-      '<p:txBody><a:bodyPr/><a:lstStyle/>' + paras.join('') + '</p:txBody></p:sp>' +
-      '</p:spTree></p:cSld></p:sld>';
+      '<p:sld xmlns:a="' + A + '" xmlns:r="' + R + '" xmlns:p="' + P + '">' +
+      '<p:cSld>' + groupTree(shape) + '</p:cSld>' +
+      '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>';
   }
 
   function deckSlides(input) {
@@ -162,28 +207,58 @@ const FlowGoogleSlides = (() => {
     const rtl = hasHebrew(deck.title) || deck.slides.some((s) => hasHebrew(s.title) || s.bullets.some(hasHebrew));
     const files = [];
     const overrides = [];
-    const rels = [];
+    const presRels = [
+      ['rId1', R + '/slideMaster', 'slideMasters/slideMaster1.xml']
+    ];
     for (let i = 0; i < deck.slides.length; i++) {
       const n = i + 1;
       const path = 'ppt/slides/slide' + n + '.xml';
       files.push({ name: path, bytes: utf8Bytes(slideXml(deck.slides[i].title, deck.slides[i].bullets, rtl)) });
+      files.push({
+        name: 'ppt/slides/_rels/slide' + n + '.xml.rels',
+        bytes: utf8Bytes(rels([['rId1', R + '/slideLayout', '../slideLayouts/slideLayout1.xml']]))
+      });
       overrides.push('<Override PartName="/' + path + '" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>');
-      rels.push('<Relationship Id="rId' + n + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide' + n + '.xml"/>');
+      presRels.push(['rId' + (n + 1), R + '/slide', 'slides/slide' + n + '.xml']);
     }
-    const sldId = deck.slides.map((_, i) => '<p:sldId id="' + (256 + i) + '" r:id="rId' + (i + 1) + '"/>').join('');
+    const sldId = deck.slides.map((_, i) => '<p:sldId id="' + (256 + i) + '" r:id="rId' + (i + 2) + '"/>').join('');
     files.push({
       name: 'ppt/presentation.xml',
       bytes: utf8Bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<p:presentation xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
+        '<p:presentation xmlns:r="' + R + '" xmlns:p="' + P + '">' +
+        '<p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>' +
         '<p:sldIdLst>' + sldId + '</p:sldIdLst>' +
         '<p:sldSz cx="9144000" cy="5143500"/><p:notesSz cx="6858000" cy="9144000"/>' +
         '</p:presentation>')
     });
+    files.push({ name: 'ppt/_rels/presentation.xml.rels', bytes: utf8Bytes(rels(presRels)) });
     files.push({
-      name: 'ppt/_rels/presentation.xml.rels',
+      name: 'ppt/slideMasters/slideMaster1.xml',
       bytes: utf8Bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels.join('') + '</Relationships>')
+        '<p:sldMaster xmlns:a="' + A + '" xmlns:r="' + R + '" xmlns:p="' + P + '">' +
+        '<p:cSld>' + groupTree('') + '</p:cSld>' +
+        '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>' +
+        '<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst></p:sldMaster>')
     });
+    files.push({
+      name: 'ppt/slideMasters/_rels/slideMaster1.xml.rels',
+      bytes: utf8Bytes(rels([
+        ['rId1', R + '/slideLayout', '../slideLayouts/slideLayout1.xml'],
+        ['rId2', R + '/theme', '../theme/theme1.xml']
+      ]))
+    });
+    files.push({
+      name: 'ppt/slideLayouts/slideLayout1.xml',
+      bytes: utf8Bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<p:sldLayout xmlns:a="' + A + '" xmlns:r="' + R + '" xmlns:p="' + P + '" type="blank" preserve="1">' +
+        '<p:cSld name="Blank">' + groupTree('') + '</p:cSld>' +
+        '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>')
+    });
+    files.push({
+      name: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels',
+      bytes: utf8Bytes(rels([['rId1', R + '/slideMaster', '../slideMasters/slideMaster1.xml']]))
+    });
+    files.push({ name: 'ppt/theme/theme1.xml', bytes: utf8Bytes(themeXml()) });
     files.push({
       name: '[Content_Types].xml',
       bytes: utf8Bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
@@ -191,14 +266,14 @@ const FlowGoogleSlides = (() => {
         '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
         '<Default Extension="xml" ContentType="application/xml"/>' +
         '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>' +
+        '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>' +
+        '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>' +
+        '<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>' +
         overrides.join('') + '</Types>')
     });
     files.push({
       name: '_rels/.rels',
-      bytes: utf8Bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>' +
-        '</Relationships>')
+      bytes: utf8Bytes(rels([['rId1', R + '/officeDocument', 'ppt/presentation.xml']]))
     });
     return zipStore(files);
   }
@@ -395,9 +470,15 @@ const FlowGoogleSlides = (() => {
     if (blocked) return blocked;
     const deck = deckSlides(i);
     if (!deck) return { ok: false, reason: 'unclear' };
+    let bytes;
+    try { bytes = pptxBytes(deck); } catch (e) {
+      return { ok: false, reason: 'pptx-failed', error: String(e && e.message || e).slice(0, 180) };
+    }
+    if (!bytes || bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
+      return { ok: false, reason: 'pptx-failed', error: 'The deck file was not a zip.' };
+    }
     const folder = await glanceFolder(http);
     if (folder && folder.ok === false) return folder;
-    const bytes = pptxBytes(deck);
     const meta = withGlance(Object.assign({ name: deck.title, mimeType: SLIDES_MIME }, folder && folder.id ? { parents: [folder.id] } : {}), i, deck.title, clock);
     const packed = multipart(meta, bytes);
     const posted = await call(http, {
@@ -409,7 +490,10 @@ const FlowGoogleSlides = (() => {
     const denied = authFail(posted);
     if (denied) return denied;
     const base = { where: 'Google Slides', target: deck.title, written: 'Slides · ' + deck.title, url: null };
-    if (!posted.ok) return Object.assign({ ok: false, reason: 'http-' + posted.status, ref: null, proof: null }, base);
+    if (!posted.ok) {
+      const msg = posted.json && posted.json.error && posted.json.error.message;
+      return Object.assign({ ok: false, reason: 'http-' + posted.status, error: msg ? String(msg).slice(0, 240) : '', ref: null, proof: null }, base);
+    }
     const file = posted.json || {};
     if (!file.id) return Object.assign({ ok: false, reason: 'proof_pending', ref: null, proof: null }, base);
     async function failClean(reason) {

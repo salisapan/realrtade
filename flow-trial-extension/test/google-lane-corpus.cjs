@@ -475,7 +475,8 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
     { status: 200, ok: true, json: { files: [{ id: 'fld', name: 'Glance' }] } },
     { status: 200, ok: true, json: SHEET_FILE },
     { status: 200, ok: true, json: SHEET_FILE },
-    { status: 200, ok: true, text: 'Ada,100\n' }
+    { status: 200, ok: true, text: 'Ada,100\n' },
+    { status: 200, ok: true, json: SHEET_FILE }
   ]);
   const appended = await Sheets.write({ scopes: Cfg.SCOPES, name: 'Payments', row: row }, sheet.http, CLOCK);
   check('sheet create append is proved', proved(appended) && appended.proof.system === 'google/sheets' && appended.ref.created === true && appended.ref.snapshot.version === '1' && sheet.calls[2].method === 'GET' && sheet.calls[3].method === 'GET', appended);
@@ -514,6 +515,13 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
   ]);
   const sheetVersionRefused = await Sheets.undo(appended.ref, sheetVersion.http);
   check('sheet undo refuses a version mismatch and does not trash', sheetVersionRefused.ok === false && sheetVersionRefused.reason === 'user-edited' && sheetVersionRefused.error === 'You edited this. Undo left it alone.' && sheetVersion.calls.length === 2, sheetVersionRefused);
+  const sheetBump = scripted([
+    { status: 200, ok: true, text: 'Ada,100\n' },
+    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', name: 'Payments', trashed: false }, SNAP, { version: '2', headRevisionId: 'rev-2', modifiedTime: '2026-11-20T00:00:02.000Z' }) },
+    { status: 200, ok: true, json: { trashed: true } }
+  ]);
+  const sheetBumpUndo = await Sheets.undo(appended.ref, sheetBump.http);
+  check('a single revision bump after create is not a user edit', sheetBumpUndo.ok === true && sheetBump.calls[2].method === 'PATCH' && sheetBump.calls[1].url.indexOf('/files/sheet1') >= 0, sheetBumpUndo);
   const picked = scripted([
     { status: 200, ok: true, json: { sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }] } },
     { status: 200, ok: true, json: { updates: { updatedRange: 'Sheet1!A2:B2', updatedRows: 1 } } },

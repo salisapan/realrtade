@@ -3711,6 +3711,36 @@ function glanceUiCopy(kind) {
     return true;
   }
 
+  function chooseNewSheet(host, params, note) {
+    if (params) {
+      params.createNew = true;
+      params.spreadsheetId = '';
+      params.origin = '';
+    }
+    if (host && host.dataset) {
+      host.dataset.glanceSheetNew = '1';
+      host.dataset.glanceSheetId = '';
+    }
+    if (note) note.textContent = 'ייווצר גיליון חדש.';
+  }
+
+  function offerNewSheet(host, step) {
+    if (!host || host.querySelector('.flow-sheet-choose-new')) return;
+    const params = step && step.params;
+    const box = el('div', 'flow-sheet-choose');
+    box.setAttribute('dir', 'rtl');
+    const note = el('p', 'flow-sheet-choose-note', 'הוספה לגיליון קיים עדיין לא זמינה. אפשר ליצור גיליון חדש.');
+    const create = el('button', 'flow-sheet-choose-new', 'גיליון חדש');
+    create.type = 'button';
+    create.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      chooseNewSheet(host, params, note);
+    });
+    box.appendChild(note);
+    box.appendChild(create);
+    host.appendChild(box);
+  }
+
   function mountSheetChooser(message, step) {
     const host = message.querySelector('.flow-chip-host');
     const params = step && step.params;
@@ -3778,12 +3808,7 @@ function glanceUiCopy(kind) {
     });
     create.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      params.createNew = true;
-      params.spreadsheetId = '';
-      params.origin = '';
-      host.dataset.glanceSheetNew = '1';
-      host.dataset.glanceSheetId = '';
-      note.textContent = 'ייווצר גיליון חדש.';
+      chooseNewSheet(host, params, note);
     });
     box.appendChild(title);
     box.appendChild(list);
@@ -4192,6 +4217,11 @@ function glanceUiCopy(kind) {
     if (!response) return 'Something went wrong. Try again.';
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return response.needsReconnect ? glanceUiCopy('reconnect') : glanceUiCopy('connect');
+    if (response.reason === 'sheets-api-disabled') {
+      return glanceUiHebrew()
+        ? 'הוספה לגיליון קיים עדיין לא זמינה. אפשר ליצור גיליון חדש.'
+        : 'Adding to an existing sheet is not available yet. You can create a new sheet.';
+    }
     if (response.reason === 'drive-not-granted') {
       return glanceUiHebrew()
         ? 'דרייב עדיין לא אושר. חבר מחדש את Google ואשר את Drive.'
@@ -4378,6 +4408,7 @@ function glanceUiCopy(kind) {
             rows: action.params.rows,
             spreadsheetId: spreadsheetId,
             origin: origin,
+            createNew: action.params.createNew === true,
             threadId: ctx.threadId || '',
             glance: { threadId: ctx.threadId || '', titleKey: String(action.params.title || '').toLowerCase().slice(0, 60) }
           }
@@ -6672,12 +6703,15 @@ function glanceUiCopy(kind) {
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
     if (host && host.dataset) {
       liveSteps.forEach((step) => {
-        if (!step || step.kind !== 'driveSheet' || !step.params || step.params.pick !== true) return;
+        if (!step || step.kind !== 'driveSheet' || !step.params) return;
         if (host.dataset.glanceSheetNew === '1') {
           step.params.createNew = true;
           step.params.spreadsheetId = '';
           step.params.origin = '';
-        } else if (host.dataset.glanceSheetId) {
+          return;
+        }
+        if (step.params.pick !== true) return;
+        if (host.dataset.glanceSheetId) {
           step.params.spreadsheetId = host.dataset.glanceSheetId;
           step.params.origin = 'picked';
           step.params.name = host.dataset.glanceSheetName || step.params.title || '';
@@ -6762,11 +6796,14 @@ function glanceUiCopy(kind) {
       if (host.__glanceSteps && result && result.action) {
         const proved = result.response && result.response.proof && result.response.proof.fetchedBack === true;
         const next = (result.response && result.response.ok) ? (proved ? 'verified' : 'verifying') : 'failed';
+        const sheetsOff = result.response && result.response.reason === 'sheets-api-disabled';
         const hold = next !== 'failed' ? null
           : (result.action.kind === 'calendar' ? calendarHoldOutcome(result.response)
             : ((result.action.kind === 'driveDocFull' || (result.action.kind === 'driveDoc' && ctx && ctx.previewOnly)) ? fullDocumentOutcome(result.response) : null));
         const why = next === 'failed' ? (hold && hold.result === 'failed' ? glanceShow(hold.line) : reasonMessage(result.response, ctx)) : null;
-        host.__glanceSteps.setRow(result.action.id, next, why, hold && hold.result === 'failed' ? { blocker: true } : null);
+        const rowOpts = sheetsOff ? { blocker: true, noRetry: true } : (hold && hold.result === 'failed' ? { blocker: true } : null);
+        host.__glanceSteps.setRow(result.action.id, next, why, rowOpts);
+        if (sheetsOff) offerNewSheet(host, result.action);
       }
       if (result.response && result.response.ok) {
         doneVerbs.push(STEP_DONE_VERB[result.action.kind] || 'completed one step');

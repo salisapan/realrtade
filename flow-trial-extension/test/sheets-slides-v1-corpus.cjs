@@ -60,6 +60,24 @@ console.log('\n--- the mail ---\n');
     text: 'Please put this in a sheet:\n| Item | Amount |\n| chairs | 12 |\n| desks | 3 |'
   });
   check('a table with a sheet ask is a new sheet', table && table.mode === 'create' && table.rows.length === 3 && table.rows[1][0] === 'chairs', table);
+  const csv = Mail.plan({
+    subject: 'Contacts',
+    text: 'Please put these in a sheet:\n"Dana Cohen, Jr.", 052-1111111, "Tel Aviv"\nNoa Levi, 052-2222222, Haifa'
+  });
+  check('comma rows are a sheet and quotes stay one cell', csv && csv.rows.length === 2 && csv.rows[0][0] === 'Dana Cohen, Jr.' && csv.rows[0][2] === 'Tel Aviv' && csv.header !== true, csv);
+  const heCsv = Mail.plan({
+    subject: 'אנשי קשר',
+    text: 'בבקשה תכין גיליון:\nשם, טלפון, עיר\nדנה כהן, 052-1111111, תל אביב\nנועה לוי, 052-2222222, חיפה'
+  });
+  check('a Hebrew comma table keeps the header row', heCsv && heCsv.header === true && heCsv.rows.length === 3 && heCsv.rows[0][0] === 'שם' && heCsv.rows[0][1] === 'טלפון' && heCsv.rows[1][2] === 'תל אביב', heCsv);
+  const heSep = Mail.plan({
+    text: 'Please put these in a sheet:\nדנה כהן، 052-1111111، תל אביב\nנועה לוי، 052-2222222، חיפה'
+  });
+  check('a Hebrew comma separates cells', heSep && heSep.rows.length === 2 && heSep.rows[0].length === 3 && heSep.rows[0][1] === '052-1111111', heSep);
+  const ragged = Mail.plan({
+    text: 'Please put these in a sheet:\nDana Cohen, 052-1111111, Tel Aviv\nNoa Levi, Haifa'
+  });
+  check('ragged comma lines are not a sheet', ragged === null, ragged);
   const list = Mail.plan({ text: 'Please record these in a spreadsheet:\n- chairs 12\n- desks 3' });
   check('a list with a sheet ask is a new sheet', list && list.mode === 'create' && list.rows.length === 2, list);
   const he = Mail.plan({ subject: 'גיליון', text: 'בבקשה תכין גיליון:\nכיסאות 12\nשולחנות 3' });
@@ -96,6 +114,7 @@ console.log('\n--- the deck ---\n');
   check('the PPTX is a zip', bytes && bytes[0] === 0x50 && bytes[1] === 0x4b);
   const xml = new TextDecoder().decode(bytes);
   check('Hebrew slides are right to left', xml.indexOf('rtl="1"') >= 0 && xml.indexOf('דנה שולחת את החוזה') >= 0, xml.indexOf('rtl'));
+  check('the deck PPTX includes a master, a layout and a theme', xml.indexOf('ppt/slideMasters/slideMaster1.xml') >= 0 && xml.indexOf('ppt/slideLayouts/slideLayout1.xml') >= 0 && xml.indexOf('ppt/theme/theme1.xml') >= 0 && xml.indexOf('sldMasterIdLst') >= 0, xml.indexOf('slideMaster'));
 }
 
 console.log('\n--- same thread, and a failed read-back ---\n');
@@ -145,7 +164,8 @@ console.log('\n--- same thread, and a failed read-back ---\n');
     { status: 200, ok: true, json: { files: [{ id: 'fld', name: 'Glance' }] } },
     { status: 200, ok: true, json: heFile },
     { status: 200, ok: true, json: heFile },
-    { status: 200, ok: true, text: 'כיסא,4\nשולחן,2\n' }
+    { status: 200, ok: true, text: 'כיסא,4\nשולחן,2\n' },
+    { status: 200, ok: true, json: heFile }
   ]);
   const hebrew = await Sheets.write({ scopes: Cfg.SCOPES, name: 'גיליון', threadId: 't-he', rows: heRows }, heWrite.http, CLOCK);
   const body = new TextDecoder().decode(heWrite.calls[2].body);
@@ -212,6 +232,28 @@ console.log('\n--- list, link, and a sheet Glance cannot open ---\n');
   check('a 404 link is the same refusal', gone.reason === 'no-access' && gone.message === Sheets.NO_ACCESS);
   const gmail = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
   check('the sheet card does not open the Drive picker', gmail.indexOf("openDrivePicker('sheet')") < 0 && gmail.indexOf('flow:google-sheet-list') >= 0);
+}
+
+console.log('\n--- a disabled Sheets API, and a deck Drive refuses ---\n');
+{
+  const off = scripted([{
+    status: 403,
+    ok: false,
+    json: { error: { code: 403, status: 'PERMISSION_DENIED', message: 'Sheets API has not been used in project 93977330357 before or it is disabled.', details: [{ reason: 'SERVICE_DISABLED', metadata: { service: 'sheets.googleapis.com' } }] } }
+  }]);
+  const denied = await Sheets.write({ scopes: Cfg.SCOPES, name: 'Payments', spreadsheetId: 'sheet1', origin: 'picked', rows: [['Bea', '200']] }, off.http, CLOCK);
+  check('a Sheets API that is off is named and does not upload a csv', denied.ok === false && denied.reason === 'sheets-api-disabled' && denied.googleReason === 'SERVICE_DISABLED' && off.calls.length === 1 && off.calls[0].url.indexOf('sheets.googleapis.com') >= 0 && off.calls.every((c) => c.url.indexOf('/upload/drive/') < 0), denied);
+  const gmail = fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8');
+  const steps = fs.readFileSync(path.join(EXT, 'src', 'step-list-view.js'), 'utf8');
+  check('the card names the disabled append and does not offer retry', gmail.indexOf('הוספה לגיליון קיים עדיין לא זמינה. אפשר ליצור גיליון חדש.') >= 0 && gmail.indexOf('noRetry: true') >= 0 && gmail.indexOf("offerNewSheet") >= 0 && steps.indexOf('row.noRetry') >= 0);
+  const host = fs.readFileSync(path.join(EXT, 'src', 'google-lane-host.js'), 'utf8');
+  const refused = scripted([
+    { status: 200, ok: true, json: { files: [{ id: 'fld', name: 'Glance' }] } },
+    { status: 400, ok: false, json: { error: { code: 400, message: 'Invalid presentation' } } }
+  ]);
+  const deck = await Slides.write({ scopes: Cfg.SCOPES, title: 'Q4', slides: [{ title: 'Q4', bullets: ['Dana sends the contract', 'The budget stays'] }] }, refused.http, CLOCK);
+  check('a refused deck keeps Google’s reason', deck.ok === false && deck.reason === 'http-400' && deck.error === 'Invalid presentation' && refused.calls.some((c) => c.url.indexOf('/upload/drive/') >= 0) && offApi(refused.calls), deck);
+  check('every slides failure is logged', host.indexOf("[Glance] slides why-not ") >= 0);
 }
 
 console.log('\n--- picker stays unused for sheets ---\n');

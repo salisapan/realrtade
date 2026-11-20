@@ -918,8 +918,9 @@ async function prepareWrite(connectorId, input, cred) {
       name: params.title || i.title || 'Sheet',
       rows: rows,
       row: params.row || i.row || (rows && rows.length === 1 ? rows[0] : null),
-      spreadsheetId: spreadsheetId,
-      origin: spreadsheetId ? (i.origin || params.origin || 'picked') : 'created',
+      spreadsheetId: params.createNew === true || i.createNew === true ? '' : spreadsheetId,
+      origin: (params.createNew === true || i.createNew === true) ? 'created' : (spreadsheetId ? (i.origin || params.origin || 'picked') : 'created'),
+      createNew: params.createNew === true || i.createNew === true,
       threadId: threadId,
       glance: params.glance || i.glance || (threadId ? { threadId: threadId } : null)
     };
@@ -1113,6 +1114,17 @@ async function verifySteps(steps, tab) {
   return { ok: true, account: picked.email, states: states };
 }
 
+function logSlidesWhy(connectorId, result, err) {
+  if (connectorId !== 'googleSlides') return;
+  if (result && result.ok === true && !err) return;
+  let reason = 'no-result';
+  if (err) reason = 'threw ' + String((err && err.message) || err).slice(0, 180);
+  else if (result && result.reason) reason = String(result.reason);
+  const google = result && result.googleReason ? ' ' + result.googleReason : '';
+  const detail = result && result.error ? ' ' + String(result.error).slice(0, 180) : '';
+  try { console.info('[Glance] slides why-not ' + reason + google + detail); } catch (e) { /* no console */ }
+}
+
 function onLaneMessage(msg, sender, sendResponse) {
   activeTab = msg && typeof msg.tabAccount === 'string' ? msg.tabAccount : '';
   if (msg && msg.type === 'flow:fetch-attachment') {
@@ -1131,7 +1143,13 @@ function onLaneMessage(msg, sender, sendResponse) {
         return result;
       })
       .then((result) => decorate(result))
-      .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
+      .then((result) => {
+        logSlidesWhy(msg.connectorId, result);
+        sendResponse(result);
+      }, (err) => {
+        logSlidesWhy(msg.connectorId, null, err);
+        sendResponse({ ok: false, reason: 'unavailable' });
+      });
     return true;
   }
   if (msg.type === 'flow:google-sheet-list') {

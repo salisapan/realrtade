@@ -117,11 +117,22 @@ const FlowGoogleSheets = (() => {
     return !!(obj && obj[key] != null && String(obj[key]) !== '');
   }
 
+  function versionGap(snapshot, live) {
+    const a = Number(snapshot && snapshot.version);
+    const b = Number(live && live.version);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+    return b - a;
+  }
+
+  // Version and modifiedTime both have to be present. One later revision is
+  // the creator's own conversion bump, not a person opening the file.
+  // A wider gap, or a same version with a different time, is an edit.
   function unchanged(snapshot, live) {
     if (!snapshot || typeof snapshot !== 'object') return 'missing';
     const got = live && typeof live === 'object' ? live : {};
     if (!present(snapshot, 'version') || !present(snapshot, 'modifiedTime')) return 'unconfirmed';
     if (!present(got, 'version') || !present(got, 'modifiedTime')) return 'unconfirmed';
+    if (versionGap(snapshot, got) === 1) return 'match';
     if (String(snapshot.version) !== String(got.version)) return 'edited';
     if (String(snapshot.modifiedTime) !== String(got.modifiedTime)) return 'edited';
     const snapRev = present(snapshot, 'headRevisionId');
@@ -284,7 +295,11 @@ const FlowGoogleSheets = (() => {
     if (d && d.service) out.service = d.service;
     if (status === 403 && d) {
       if (d.kind === 'scope') out.reason = 'drive-not-granted';
-      else if (d.kind === 'api-disabled') out.reason = 'drive-api-disabled';
+      else if (d.kind === 'api-disabled') {
+        const svc = String(d.service || '');
+        const url = String((res && res.url) || '');
+        out.reason = (svc.indexOf('sheets.googleapis.com') >= 0 || url.indexOf('sheets.googleapis.com') >= 0) ? 'sheets-api-disabled' : 'drive-api-disabled';
+      }
       else if (d.kind === 'forbidden') out.reason = 'http-403';
     }
     return out;
@@ -613,7 +628,16 @@ const FlowGoogleSheets = (() => {
       return exported;
     }
     if (!exported.ok || !sameGrid(parseCsv(exported.text || ''), rows)) return failClean('verify_failed');
-    const link = sheetLink(got.json, file.id);
+    const settled = await call(http, { method: 'GET', url: fileUrl(file.id) });
+    const settledDenied = authFail(settled);
+    if (settledDenied) {
+      settledDenied.cleanedUp = await trashCreated(http, file.id);
+      return settledDenied;
+    }
+    if (!settled.ok || !settled.json || settled.json.id !== file.id || settled.json.trashed === true || settled.json.mimeType !== SHEET_MIME) {
+      return failClean('verify_failed');
+    }
+    const link = sheetLink(settled.json, file.id);
     base.url = link;
     const range = a1(1, rows);
     const ref = {
@@ -624,8 +648,8 @@ const FlowGoogleSheets = (() => {
       rows: rows,
       row: rows.length === 1 ? rows[0] : rows[0],
       startRow: 1,
-      name: (got.json && got.json.name) || name,
-      snapshot: fileSnapshot(got.json)
+      name: (settled.json && settled.json.name) || name,
+      snapshot: fileSnapshot(settled.json)
     };
     const proof = C && C.proofOf(SYSTEM, ref.externalId, link, C.clockIso(clock));
     if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: ref, proof: null }, base);
@@ -641,9 +665,14 @@ const FlowGoogleSheets = (() => {
     if (!rows) return { ok: false, reason: 'unclear' };
     const existing = sheetId(i.spreadsheetId);
     const name = safeName(i.name || i.title || '') || (existing || 'Sheet');
-    if (existing) {
+    if (existing && i.createNew !== true) {
       if (!ours(i)) return { ok: false, reason: 'not-ours' };
       return appendRows(existing, rows, http, clock, name, i);
+    }
+    if (i.createNew === true) {
+      const title = safeName(i.name || i.title || 'Sheet');
+      if (!title) return { ok: false, reason: 'unclear' };
+      return createAndRead(title, rows, http, clock, i);
     }
     const found = await findThreadSheet(http, i);
     if (found && found.ok === false) return found;

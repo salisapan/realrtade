@@ -2,6 +2,7 @@
 tags: [decisions]
 updated: 2026-10-28
 ---
+- 2026-11-20 · Live Gate on cce5cbe4: comma rows are a sheet, a created sheet's snapshot is read after the export and one revision bump is not an edit, a disabled Sheets API is named in Hebrew with a new sheet and no retry, and a deck is a Drive PPTX with a master, layout and theme. No new scope or host. Nothing is sent. Gate: not run live · Cursor agent · [[open-tasks]] row 88
 - 2026-11-20 · Sheets append host check: Chromium 140 service worker with no host_permissions reaches sheets.googleapis.com (POST with Authorization returns Google's 401; example.com is Failed to fetch). CORS echoes the extension origin and allows authorization. No host was added. Gate: not run live · Cursor agent · [[open-tasks]] row 88
 - 2026-11-20 · Sheets and Slides v1: a mail's rows become a Google Sheet in the Glance folder, an existing sheet is chosen from files Glance can already list, or a pasted link that 403/404 refuses in Hebrew. Append is values.append and Undo is deleteDimension. No Picker and no spreadsheets scope. A meeting summary becomes a Slides deck via Drive. Gate: not run live · Cursor agent · [[open-tasks]] row 88
 - 2026-11-20 · Live Gate #319 step 1: a self-sent שיחה or פגישה with a clock and «שריין / תשריין ביומן» is a calendar hold. A geresh weekday with no word יום («ג׳ 10:00») is that weekday, and שריין need not sit next to ביומן. The [G-Calendar] tag stays off the event title. No new scope. Gate: the previous head created a Google Task. · Cursor agent · [[open-tasks]]

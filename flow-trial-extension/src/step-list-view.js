@@ -178,7 +178,8 @@ const FlowStepListView = (() => {
       return base;
     }
     if (failed) {
-      base.out = (row.why ? plainText(row.why) : (L.couldnt || 'Couldn’t confirm')) + ' · <em class="ss-retry">' + (L.retry || 'Retry') + '</em>';
+      const why = row.why ? plainText(row.why) : (L.couldnt || 'Couldn’t confirm');
+      base.out = row.noRetry ? why : (why + ' · <em class="ss-retry">' + (L.retry || 'Retry') + '</em>');
       return base;
     }
     function statusWord(name) {
@@ -466,7 +467,8 @@ const FlowStepListView = (() => {
       },
       setRow: function (id, state, why, opts) {
         const blocker = Boolean(opts && opts.blocker === true && state === 'failed');
-        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state, why: why || null, blocker: blocker }) : row; });
+        const noRetry = Boolean(opts && opts.noRetry === true);
+        list = list.map(function (row) { return (row && row.id === id) ? Object.assign({}, row, { state: state, why: why || null, blocker: blocker, noRetry: noRetry }) : row; });
         pushState(state);
         draw();
       }

@@ -15,13 +15,63 @@ const FlowSheetMail = (() => {
     return String(s || '').replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
+  function usable(cells) {
+    if (!cells || cells.length < 2 || cells.length > 12) return null;
+    if (!cells.some((c) => c)) return null;
+    return cells;
+  }
+
+  function csvSep(raw) {
+    const counts = { ',': 0, '\u060C': 0, '\uFF0C': 0 };
+    let quote = false;
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+      if (ch === '"') {
+        if (quote && raw[i + 1] === '"') { i++; continue; }
+        quote = !quote;
+        continue;
+      }
+      if (!quote && Object.prototype.hasOwnProperty.call(counts, ch)) counts[ch]++;
+    }
+    let best = '';
+    let n = 0;
+    Object.keys(counts).forEach((k) => {
+      if (counts[k] > n) { n = counts[k]; best = k; }
+    });
+    return best;
+  }
+
+  function csvCells(raw) {
+    const sep = csvSep(raw);
+    if (!sep) return null;
+    const cells = [];
+    let cell = '';
+    let quote = false;
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+      if (quote) {
+        if (ch === '"') {
+          if (raw[i + 1] === '"') { cell += '"'; i++; }
+          else quote = false;
+        } else cell += ch;
+        continue;
+      }
+      if (ch === '"') { quote = true; continue; }
+      if (ch === sep) { cells.push(clean(cell)); cell = ''; continue; }
+      cell += ch;
+    }
+    cells.push(clean(cell));
+    return usable(cells);
+  }
+
   function splitCells(line) {
     const raw = String(line || '').trim();
+    if (!raw) return null;
     if (raw.indexOf('|') >= 0) {
-      return raw.replace(/^\|/, '').replace(/\|$/, '').split('|').map(clean).filter(Boolean);
+      return usable(raw.replace(/^\|/, '').replace(/\|$/, '').split('|').map(clean));
     }
-    if (raw.indexOf('\t') >= 0) return raw.split('\t').map(clean).filter(Boolean);
-    return null;
+    if (raw.indexOf('\t') >= 0) return usable(raw.split('\t').map(clean));
+    return csvCells(raw);
   }
 
   function isRule(line) {
@@ -39,8 +89,10 @@ const FlowSheetMail = (() => {
     for (let i = 0; i < lines.length; i++) {
       if (isRule(lines[i])) continue;
       const cells = splitCells(lines[i]);
-      if (cells && cells.length >= 2) current.push(cells.slice(0, 12));
-      else flush();
+      if (cells && cells.length >= 2) {
+        if (current.length && current[0].length !== cells.length) flush();
+        current.push(cells.slice(0, 12));
+      } else flush();
     }
     flush();
     if (!block.length) return null;
@@ -81,6 +133,18 @@ const FlowSheetMail = (() => {
       if (rows.length >= 40) break;
     }
     return rows.length >= 2 ? rows : null;
+  }
+
+  function headerCell(cell) {
+    const s = String(cell || '').trim();
+    if (!s || s.length > 40 || /\d/.test(s)) return false;
+    return /^[\p{L}][\p{L}\s.'’\-]{0,39}$/u.test(s);
+  }
+
+  function hasHeader(rows) {
+    if (!rows || rows.length < 2) return false;
+    if (!rows[0].every(headerCell)) return false;
+    return rows.slice(1).some((r) => r.some((c) => /\d/.test(String(c || ''))));
   }
 
   function rowsOf(text) {
@@ -125,6 +189,7 @@ const FlowSheetMail = (() => {
       mode: pick ? 'pick' : 'create',
       title: titleOf(whole, subject, he),
       rows: rows,
+      header: hasHeader(rows),
       lang: he ? 'he' : 'en'
     };
   }
