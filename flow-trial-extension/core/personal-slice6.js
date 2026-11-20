@@ -341,6 +341,17 @@ const FlowPersonalSlice6 = (() => {
     return { ok: false, reason: 'disabled', k: K_ANON, library: 'opendp', kept: (counts || []).filter((row) => row.count >= K_ANON).length };
   }
 
+  function hebrewEval(cases) {
+    const rows = Array.isArray(cases) ? cases : [];
+    const scores = rows.map((row) => {
+      const ranked = retrieve(row.query, row.docs || [], row.graph || {}).map((item) => item.id);
+      return ndcg(ranked, row.relevant || [], 20);
+    });
+    const sum = scores.reduce((total, score) => total + score, 0);
+    const mean = scores.length ? Math.round((sum / scores.length) * 1000) / 1000 : 0;
+    return { queries: scores.length, meanNdcg: mean, scores: scores };
+  }
+
   return {
     CLOUD_ENABLED: CLOUD_ENABLED,
     ENGINE: ENGINE,
@@ -368,6 +379,7 @@ const FlowPersonalSlice6 = (() => {
     readCache: readCache,
     visibleBriefs: visibleBriefs,
     ndcg: ndcg,
+    hebrewEval: hebrewEval,
     latestPreference: latestPreference,
     f1: f1,
     temporalSplit: temporalSplit,

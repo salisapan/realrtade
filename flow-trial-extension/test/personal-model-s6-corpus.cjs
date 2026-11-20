@@ -47,6 +47,19 @@ check('Hebrew retrieval puts Dana first', ranked[0].id === 'd1', ranked);
 const nd = S.ndcg(['d1', 'd2'], [{ id: 'd1', gain: 2 }, { id: 'd2', gain: 1 }], 20);
 check('nDCG at 20 scores a perfect order at 1', nd === 1, nd);
 
+const benchDocs = [
+  { id: 'meet', entityId: 'p1', text: 'פגישה עם דנה על הפרויקט' },
+  { id: 'invoice', entityId: 'p2', text: 'חשבונית לתשלום' },
+  { id: 'file', entityId: 'p3', text: 'קובץ מצורף לחוזה' }
+];
+const benchGraph = { p1: ['p2'], p2: ['p3'], p3: ['p1'] };
+const bench = S.hebrewEval([
+  { query: 'דנה', docs: benchDocs, graph: benchGraph, relevant: [{ id: 'meet', gain: 2 }] },
+  { query: 'חשבונית', docs: benchDocs, graph: benchGraph, relevant: [{ id: 'invoice', gain: 2 }] },
+  { query: 'חוזה', docs: benchDocs, graph: benchGraph, relevant: [{ id: 'file', gain: 2 }] }
+]);
+check('Hebrew bench mean nDCG at 20 is 1', bench.queries === 3 && bench.meanNdcg === 1, bench);
+
 const latest = S.latestPreference([
   { id: 'a', tier: 'explicit', created_at: '2026-01-01', predicate: 'style.greeting', object: 'hi' },
   { id: 'b', tier: 'explicit', created_at: '2026-06-01', predicate: 'style.greeting', object: 'hello', invalid_at: null },
