@@ -2417,21 +2417,25 @@
 
   // The side panel is already open on a Teams tab that has not granted the optional hosts.
   // The button asks for those two origins only. It does not add a scope.
+  function wireTeamsPageGrant() {
+    const btn = document.getElementById('teams-page-grant-btn');
+    const row = document.getElementById('teams-page-grant');
+    if (!btn || btn.__glanceTeamsGrant) return;
+    btn.__glanceTeamsGrant = true;
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      requestTeamsWebHosts().then((ok) => {
+        btn.disabled = false;
+        if (ok && row) row.hidden = true;
+      });
+    });
+  }
+
   async function renderTeamsPageGrant() {
+    wireTeamsPageGrant();
     const row = document.getElementById('teams-page-grant');
     const btn = document.getElementById('teams-page-grant-btn');
     if (!row || !btn) return;
-    if (!btn.dataset.bound) {
-      btn.dataset.bound = '1';
-      btn.addEventListener('click', () => {
-        btn.disabled = true;
-        requestTeamsWebHosts().then((ok) => {
-          btn.disabled = false;
-          if (ok) row.hidden = true;
-        });
-      });
-    }
-    row.hidden = true;
     let url = '';
     try {
       if (chrome.tabs && chrome.tabs.query) {
@@ -2439,12 +2443,17 @@
         url = (tabs && tabs[0] && tabs[0].url) || '';
       }
     } catch (e) { url = ''; }
-    if (!/https:\/\/teams\.(?:live|microsoft)\.com\//i.test(url)) return;
-    let granted = false;
+    const onTeams = /https:\/\/teams\.(?:live|microsoft)\.com\//i.test(url);
+    if (!onTeams) {
+      if (!row.hidden) row.hidden = true;
+      return;
+    }
+    let granted = true;
     try {
       if (chrome.permissions && chrome.permissions.contains) granted = await chrome.permissions.contains({ origins: teamsWebHosts() });
-    } catch (e) { granted = false; }
-    row.hidden = granted === true;
+    } catch (e) { granted = true; }
+    const show = granted !== true;
+    if (row.hidden === show) row.hidden = !show;
   }
 
   function askTeamsWebHosts(ui) {
