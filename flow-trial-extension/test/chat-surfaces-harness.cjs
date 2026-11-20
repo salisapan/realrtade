@@ -112,6 +112,7 @@ async function open(browser, kind, url, pageHtml, opts) {
   if (opts.prepare) await opts.prepare(p);
   if (opts.watches) await p.evaluate((w) => { window.__store.followWatches = w; }, opts.watches);
   for (const src of SCRIPTS[kind]) await p.addScriptTag({ path: path.join(ROOT, src) });
+  await p.addStyleTag({ path: path.join(ROOT, 'src/chip.css') });
   await p.waitForTimeout(opts.wait == null ? 2200 : opts.wait);
   const state = async () => ({
     errs,
@@ -244,6 +245,21 @@ const baseWatch = (channel, threadId, id, name) => ({ id: threadId, threadId, ch
   check('Slack Hebrew self-chat ask has no follow-up card', (await t.p.locator('.flow-fu').count()) === 0);
   check('Slack Hebrew self-chat Do It label is בצע', (await t.p.locator('[data-glance-do-it]').innerText()) === 'בצע');
   check('Slack Hebrew self-chat Undo label is בטל', (await t.p.locator('[data-glance-undo]').innerText()) === 'בטל');
+  const paintOf = (sel) => t.p.locator(sel).evaluate((el) => ({ hidden: el.hidden, display: getComputedStyle(el).display }));
+  const before = { doIt: await paintOf('[data-glance-do-it]'), undo: await paintOf('[data-glance-undo]') };
+  check('Slack Hebrew self-chat paints only בצע before Do It', before.doIt.hidden === false && before.doIt.display !== 'none' && before.undo.hidden === true && before.undo.display === 'none', before);
+  await t.p.evaluate(() => {
+    const box = document.createElement('div');
+    box.className = 'ql-editor';
+    box.setAttribute('contenteditable', 'true');
+    document.body.appendChild(box);
+  });
+  await t.p.locator('[data-glance-do-it]').click();
+  const afterDo = { doIt: await paintOf('[data-glance-do-it]'), undo: await paintOf('[data-glance-undo]') };
+  check('Slack Hebrew self-chat paints only בטל after Do It', afterDo.undo.hidden === false && afterDo.undo.display !== 'none' && afterDo.doIt.hidden === true && afterDo.doIt.display === 'none', afterDo);
+  await t.p.locator('[data-glance-undo]').click();
+  const afterUndo = { doIt: await paintOf('[data-glance-do-it]'), undo: await paintOf('[data-glance-undo]') };
+  check('Slack Hebrew self-chat paints only בצע after Undo', afterUndo.doIt.hidden === false && afterUndo.doIt.display !== 'none' && afterUndo.undo.hidden === true && afterUndo.undo.display === 'none', afterUndo);
   await t.p.evaluate((text) => {
     const pane = document.querySelector('[data-qa="message_pane"]');
     const row = document.createElement('div');

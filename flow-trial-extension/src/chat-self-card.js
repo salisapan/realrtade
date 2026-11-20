@@ -75,13 +75,17 @@ const FlowChatSelfCard = (() => {
         return;
       }
       drafted = draft;
+      doIt.hidden = true;
       undo.hidden = false;
     });
     undo.addEventListener('click', () => {
       const box = typeof o.composer === 'function' ? o.composer() : null;
       if (typeof FlowChatCompose === 'undefined' || typeof FlowChatCompose.clearIfUnchanged !== 'function') return;
       const cleared = FlowChatCompose.clearIfUnchanged(box, drafted);
-      if (cleared && cleared.ok) undo.hidden = true;
+      if (cleared && cleared.ok) {
+        undo.hidden = true;
+        doIt.hidden = false;
+      }
     });
     card.appendChild(doIt);
     card.appendChild(undo);
