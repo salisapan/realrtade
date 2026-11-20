@@ -386,7 +386,8 @@
     }, (graph) => {
       const err = chrome.runtime.lastError;
       const opened = insertCompose(res.draft);
-      const verified = !err && graph && graph.ok === true && graph.ref && graph.fetchedBack !== false && opened.ok === true;
+      const graphOk = !!(graph && graph.ok === true && graph.ref);
+      const verified = !err && opened.ok === true && graphOk && graph.fetchedBack !== false;
       const status = statusNode(card);
       let draft = card.querySelector('.flow-lane-draft');
       if (!draft) {
@@ -398,6 +399,19 @@
       if (!verified) {
         status.textContent = draftStatus(lang, false);
         status.setAttribute('dir', 'rtl');
+        const why = document.createElement('span');
+        why.className = 'flow-lane-draft-why';
+        why.hidden = true;
+        why.textContent = [
+          err ? 'channel' : '',
+          graph && graph.ok === true ? 'graph-ok' : 'graph-not-ok',
+          graph && graph.ref ? 'ref' : 'no-ref',
+          graph && graph.fetchedBack === false ? 'fetchedBack-false' : '',
+          graph && graph.reason ? String(graph.reason) : '',
+          graph && graph.error ? String(graph.error).slice(0, 80) : '',
+          opened.ok ? 'compose-ok' : (opened.reason || 'compose-no')
+        ].filter(Boolean).join(' ');
+        card.appendChild(why);
         if (!card.querySelector('.flow-lane-copy')) card.appendChild(copyButton(res.draft));
         button.disabled = false;
         return;
