@@ -8,9 +8,16 @@ const FlowOutlookContacts = (() => {
   const SYSTEM = 'microsoft/contacts';
   const READ_SCOPE = 'Contacts.Read';
   const WHY_REASON = 'contacts-not-granted';
+  const TOGGLE_OFF = 'contacts-toggle-off';
+  const SCOPE_MISSING = 'contacts-scope-missing';
+  const CHOICE_KEY = 'glanceContactsChoice';
   // The Outlook row in the Glance popup is where Contacts is ticked. The card
   // says so in Hebrew. Nothing is looked up and nothing is sent.
   const GRANT_HE = 'כדי למצוא את איש הקשר, פתח את חלון Glance וסמן אנשי קשר בשורת Outlook.';
+  const ALREADY_LINE = 'אנשי קשר כבר כלולים בכניסה.';
+  const DRAFT_FAIL = 'לא הצלחתי להכניס לטיוטה';
+  const IN_DRAFT_HE = 'פרטי איש הקשר בטיוטה. אתה שולח.';
+  const IN_DRAFT_EN = 'Contact details in the draft. You send it.';
 
   const ANSWER_EMAIL_EN = /\bwhat(?:'s| is)\s+([\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z\w.'\s-]{0,60}?)['']?s\s+(?:email|e-mail)\b/i;
   const ANSWER_EMAIL_EN2 = /\b(?:email|e-mail)\s+(?:for|of)\s+([\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z\w.'\s-]{0,60}?)\b/i;
@@ -33,6 +40,28 @@ const FlowOutlookContacts = (() => {
     const list = scopeList(scopes);
     if (!list) return null;
     return list.some((s) => s === READ_SCOPE || s === 'https://graph.microsoft.com/' + READ_SCOPE);
+  }
+
+  // Granted only when the person left Contacts ticked AND the token scp
+  // includes Contacts.Read. A missing choice is off. An old consent on the
+  // token does not turn the toggle back on.
+  function accessOf(deps) {
+    const d = deps || {};
+    const toggleOn = d.contactsChoice === true;
+    const scopeOn = hasReadScope(d.grantedScopes) === true;
+    if (!toggleOn) return { granted: false, reason: WHY_REASON, detail: TOGGLE_OFF };
+    if (!scopeOn) return { granted: false, reason: WHY_REASON, detail: SCOPE_MISSING };
+    return { granted: true, reason: '', detail: '' };
+  }
+
+  // What «הוסף הרשאה» does with the Contacts box. A scope already on the
+  // token stays ticked and is named. A missing scope asks with prompt=consent.
+  function consentPlan(input) {
+    const ticked = !!(input && input.ticked === true);
+    const scopeOn = hasReadScope(input && input.scopes) === true;
+    if (!ticked) return { choice: false, request: false, already: false, prompt: '', scope: READ_SCOPE, line: '' };
+    if (scopeOn) return { choice: true, request: false, already: true, prompt: '', scope: READ_SCOPE, line: ALREADY_LINE };
+    return { choice: true, request: true, already: false, prompt: 'consent', scope: READ_SCOPE, line: '' };
   }
 
   function mailLang(text) {
@@ -93,8 +122,9 @@ const FlowOutlookContacts = (() => {
     const text = [i.subject, i.text].filter(Boolean).join('\n');
     const rec = recognize(text);
     if (rec.kind !== 'clear') return { action: 'silence', reason: 'no-ask' };
-    if (hasReadScope(deps && deps.grantedScopes) === false) {
-      return { action: 'why', reason: WHY_REASON, written: GRANT_HE, connectorId: CONNECTOR };
+    const access = accessOf(deps);
+    if (!access.granted) {
+      return { action: 'why', reason: access.reason, detail: access.detail, written: GRANT_HE, connectorId: CONNECTOR };
     }
     return {
       action: 'lane-ms',
@@ -279,7 +309,7 @@ const FlowOutlookContacts = (() => {
     });
   }
 
-  function grantOffer(rec) {
+  function grantOffer(rec, detail) {
     return {
       show: true,
       connectorId: CONNECTOR,
@@ -289,6 +319,7 @@ const FlowOutlookContacts = (() => {
       button: '',
       grant: true,
       reason: WHY_REASON,
+      detail: detail || TOGGLE_OFF,
       closes: false,
       params: { name: rec.name, mode: rec.mode, lang: rec.lang }
     };
@@ -298,7 +329,8 @@ const FlowOutlookContacts = (() => {
     const text = String((ctx && (ctx.text || ctx.body)) || '');
     const rec = recognize(text);
     if (rec.kind !== 'clear') return { show: false };
-    if (hasReadScope(deps && deps.grantedScopes) === false) return grantOffer(rec);
+    const access = accessOf(deps);
+    if (!access.granted) return grantOffer(rec, access.detail);
     return {
       show: true,
       connectorId: CONNECTOR,
@@ -322,8 +354,9 @@ const FlowOutlookContacts = (() => {
     if (!name) return { ok: false, reason: 'unclear' };
     const call = deps && deps.call;
     if (typeof call !== 'function') return { ok: false, reason: 'unclear' };
-    if (hasReadScope(deps.grantedScopes) === false) {
-      return { ok: false, reason: WHY_REASON, written: GRANT_HE, connectorId: CONNECTOR, posted: false, closes: false };
+    const access = accessOf(deps);
+    if (!access.granted) {
+      return { ok: false, reason: WHY_REASON, detail: access.detail, written: GRANT_HE, connectorId: CONNECTOR, posted: false, closes: false };
     }
 
     const contacts = await call({
@@ -374,7 +407,8 @@ const FlowOutlookContacts = (() => {
       draft: draft,
       fetchedBack: fetchedBack,
       proof: proof,
-      written: lang === 'he' ? 'פרטי איש הקשר בטיוטה. אתה שולח.' : 'Contact details in the draft. You send it.'
+      written: lang === 'he' ? IN_DRAFT_HE : IN_DRAFT_EN,
+      verified: false
     };
   }
 
@@ -391,7 +425,16 @@ const FlowOutlookContacts = (() => {
     SYSTEM: SYSTEM,
     READ_SCOPE: READ_SCOPE,
     WHY_REASON: WHY_REASON,
+    TOGGLE_OFF: TOGGLE_OFF,
+    SCOPE_MISSING: SCOPE_MISSING,
+    CHOICE_KEY: CHOICE_KEY,
     GRANT_HE: GRANT_HE,
+    ALREADY_LINE: ALREADY_LINE,
+    DRAFT_FAIL: DRAFT_FAIL,
+    IN_DRAFT_HE: IN_DRAFT_HE,
+    IN_DRAFT_EN: IN_DRAFT_EN,
+    accessOf: accessOf,
+    consentPlan: consentPlan,
     hasReadScope: hasReadScope,
     recognize: recognize,
     judgeInput: judgeInput,

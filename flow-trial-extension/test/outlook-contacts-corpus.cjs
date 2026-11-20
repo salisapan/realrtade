@@ -28,7 +28,7 @@ function fake(routes) {
 }
 
 const now = () => new Date().toISOString();
-const scopes = { call: null, grantedScopes: ['Contacts.Read'], now: now };
+const scopes = { call: null, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now };
 
 function danaRoutes(readBack) {
   const contact = {
@@ -65,31 +65,56 @@ function danaRoutes(readBack) {
   check('English phone ask is recognized', C.recognize("send me Dana's phone").mode === 'phone');
   check('Hebrew nameMatches', C.nameMatches('דנה כהן', 'דנה כהן לוי') === true);
 
-  const judge = C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Contacts.Read'] });
+  const judge = C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Contacts.Read'], contactsChoice: true });
   check('judgeInput offers lane-ms', judge.action === 'lane-ms' && judge.connectorId === 'outlookContacts');
-  const missing = C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Mail.Read'] });
+  const missing = C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Mail.Read'], contactsChoice: true });
   check('missing Contacts.Read is a visible why, not a lookup',
-    missing.action === 'why' && missing.reason === 'contacts-not-granted' && missing.action !== 'lane-ms' &&
+    missing.action === 'why' && missing.reason === 'contacts-not-granted' && missing.detail === 'contacts-scope-missing' && missing.action !== 'lane-ms' &&
     /שורת Outlook/.test(missing.written) && /אנשי קשר/.test(missing.written),
     missing);
-  const grant = C.offer({ text: "What's Dana Cohen's email?" }, { grantedScopes: ['Mail.Read'] });
+  const grant = C.offer({ text: "What's Dana Cohen's email?" }, { grantedScopes: ['Mail.Read'], contactsChoice: true });
   check('missing scope card names the Outlook row and does not close',
     grant.show === true && grant.grant === true && grant.button === '' && grant.closes === false &&
-    grant.reason === 'contacts-not-granted' && /שורת Outlook/.test(grant.written) && /אנשי קשר/.test(grant.written),
+    grant.reason === 'contacts-not-granted' && grant.detail === 'contacts-scope-missing' &&
+    /שורת Outlook/.test(grant.written) && /אנשי קשר/.test(grant.written),
     grant);
+  const unticked = C.offer({ text: "What's Dana Cohen's email?" }, { grantedScopes: ['Contacts.Read'], contactsChoice: false });
+  check('an unticked Contacts box is not granted even when the token still has the scope',
+    unticked.show === true && unticked.grant === true && unticked.detail === 'contacts-toggle-off' && unticked.button === '',
+    unticked);
   let called = false;
   const denied = await C.run(
     { params: { name: 'Dana Cohen', mode: 'email', lang: 'en' } },
-    { call: () => { called = true; return { ok: true, body: {} }; }, grantedScopes: ['Mail.Read'], now: now }
+    { call: () => { called = true; return { ok: true, body: {} }; }, grantedScopes: ['Mail.Read'], contactsChoice: true, now: now }
   );
   check('missing scope does not call Graph and does not send',
-    called === false && denied.ok === false && denied.posted === false && denied.reason === 'contacts-not-granted' && /אנשי קשר/.test(denied.written),
+    called === false && denied.ok === false && denied.posted === false && denied.reason === 'contacts-not-granted' && denied.detail === 'contacts-scope-missing' && /אנשי קשר/.test(denied.written),
     denied);
+  let calledOff = false;
+  const off = await C.run(
+    { params: { name: 'Dana Cohen', mode: 'email', lang: 'en' } },
+    { call: () => { calledOff = true; return { ok: true, body: {} }; }, grantedScopes: ['Contacts.Read'], contactsChoice: false, now: now }
+  );
+  check('toggle off makes no contacts call',
+    calledOff === false && off.detail === 'contacts-toggle-off' && off.posted === false,
+    off);
+  const already = C.consentPlan({ ticked: true, scopes: ['Mail.ReadWrite', 'Contacts.Read'] });
+  check('a ticked box whose token already has Contacts.Read stays ticked and does not ask again',
+    already.choice === true && already.already === true && already.request === false && /כבר כלולים/.test(already.line),
+    already);
+  const ask = C.consentPlan({ ticked: true, scopes: ['Mail.ReadWrite'] });
+  check('a ticked box without Contacts.Read asks with prompt=consent',
+    ask.choice === true && ask.request === true && ask.prompt === 'consent' && ask.scope === 'Contacts.Read',
+    ask);
+  const dropped = C.consentPlan({ ticked: false, scopes: ['Contacts.Read'] });
+  check('unticking stores the choice off even when the token keeps Contacts.Read',
+    dropped.choice === false && dropped.request === false && dropped.already === false,
+    dropped);
 
   const hit = danaRoutes();
   const resolved = await C.run(
     { params: { name: 'Dana Cohen', mode: 'email', lang: 'en' } },
-    { call: hit.call, grantedScopes: ['Contacts.Read'], now: now }
+    { call: hit.call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
   );
   check('one Dana: draft with email and fetchedBack', resolved.ok === true && resolved.posted === false && /dana@acme\.com/.test(resolved.draft) && resolved.fetchedBack === true && resolved.proof && resolved.proof.fetchedBack === true, resolved);
   check('resolve is GET only', hit.calls.every((c) => c.method === 'GET') && !hit.calls.some((c) => /sendMail/.test(c.path)), hit.calls.map((c) => c.method));
@@ -97,7 +122,7 @@ function danaRoutes(readBack) {
   const phoneHit = danaRoutes();
   const phone = await C.run(
     { params: { name: 'Dana Cohen', mode: 'phone', lang: 'en' } },
-    { call: phoneHit.call, grantedScopes: ['Contacts.Read'], now: now }
+    { call: phoneHit.call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
   );
   check('phone ask drafts the number', /\+972501234567/.test(phone.draft), phone);
 
@@ -120,7 +145,7 @@ function danaRoutes(readBack) {
   ]);
   const amb = await C.run(
     { params: { name: 'Dana', mode: 'email', lang: 'en' } },
-    { call: split.call, grantedScopes: ['Contacts.Read'], now: now }
+    { call: split.call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
   );
   check('two addresses stay ambiguous', amb.ok === false && amb.reason === 'ambiguous', amb);
 
@@ -132,17 +157,17 @@ function danaRoutes(readBack) {
   });
   const bad = await C.run(
     { params: { name: 'Dana Cohen', mode: 'email', lang: 'en' } },
-    { call: mismatch.call, grantedScopes: ['Contacts.Read'], now: now }
+    { call: mismatch.call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
   );
   check('read-back mismatch is verify_failed', bad.reason === 'verify_failed' && bad.fetchedBack === false, bad);
 
   const forbidden = await C.run(
     { post: true, params: { name: 'Dana Cohen', mode: 'email' } },
-    { call: danaRoutes().call, grantedScopes: ['Contacts.Read'], now: now }
+    { call: danaRoutes().call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
   );
   check('never sends on post flag', forbidden.reason === 'FORBIDDEN_SEND');
 
-  const offer = C.offer({ text: "What's Dana Cohen's email?" });
+  const offer = C.offer({ text: "What's Dana Cohen's email?" }, { grantedScopes: ['Contacts.Read'], contactsChoice: true });
   check('offer names Dana and does not close', offer.show === true && offer.params.name === 'Dana Cohen' && offer.closes === false, offer);
 
   check('undo is not a write', (await C.undo({}, { call: () => { throw new Error('called'); } })).reason === 'no-undo');
@@ -159,6 +184,13 @@ function danaRoutes(readBack) {
   check('the card says how to grant Contacts.Read', page.indexOf('data-glance-contacts-why') >= 0 && page.indexOf('flow:contacts-why') >= 0 && page.indexOf('שורת Outlook') >= 0);
   check('the worker logs the contacts why', host.indexOf("[Glance] contacts why-not") >= 0 && host.indexOf("type === 'flow:contacts-why'") >= 0);
   check('Outlook leaves a contacts ask to that card', outlook.indexOf('contactsLaneOwns') >= 0 && outlook.indexOf('contacts-unavailable') >= 0);
+  check('a quiet no-ask is not kept after the contacts grant changes',
+    outlook.indexOf('glanceContactsChoice') >= 0 && outlook.indexOf('intent-null') >= 0 && outlook.indexOf('data-glance-ms-card') >= 0);
+  const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+  check('the Outlook row persists the Contacts tick and asks with prompt=consent',
+    popup.indexOf('glanceContactsChoice') >= 0 && popup.indexOf('consentPlan') >= 0 && popup.indexOf("prompt: 'consent'") >= 0);
+  check('a failed insert says so and offers copy', page.indexOf('לא הצלחתי להכניס לטיוטה') >= 0 && page.indexOf('flow-lane-copy') >= 0 && page.indexOf('createReply') < 0);
+  check('the card sits above the message body', page.indexOf('mailMessageBodyContainer') >= 0 && page.indexOf('z-index:30') >= 0);
 
   if (failures) process.exit(1);
   console.log('outlook-contacts-corpus: all passed');

@@ -90,9 +90,12 @@ async function makeDeps() {
   };
 }
 
-function logContactsWhy(reason) {
+function logContactsWhy(reason, detail) {
   const why = String(reason || 'contacts-not-granted');
   try { console.info('[Glance] contacts why-not', why); } catch (e) { /* no console */ }
+  if (detail && String(detail) !== why) {
+    try { console.info('[Glance] contacts why-not', String(detail)); } catch (e) { /* no console */ }
+  }
 }
 
 function laneId(msg) {
@@ -126,14 +129,14 @@ async function dispatch(msg) {
     messageId: payload.messageId || '',
     explicitClick: payload.explicitClick === true
   }, deps);
-  if (id === 'outlookContacts' && result && result.reason === 'contacts-not-granted') logContactsWhy(result.reason);
+  if (id === 'outlookContacts' && result && result.reason === 'contacts-not-granted') logContactsWhy(result.reason, result.detail);
   return result;
 }
 
 function laneListener(msg, sender, sendResponse) {
   if (msg && msg.type === 'flow:contacts-why') {
-    logContactsWhy(msg.reason);
-    sendResponse({ ok: true, reason: String(msg.reason || 'contacts-not-granted') });
+    logContactsWhy(msg.reason, msg.detail);
+    sendResponse({ ok: true, reason: String(msg.reason || 'contacts-not-granted'), detail: String(msg.detail || '') });
     return true;
   }
   if (!laneId(msg)) return;

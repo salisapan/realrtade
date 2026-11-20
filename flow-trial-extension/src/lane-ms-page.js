@@ -43,7 +43,7 @@
     const style = document.createElement('style');
     style.id = 'flow-lane-ms-style';
     style.textContent = [
-      '.flow-lane-ms{margin:8px 0;padding:10px 12px;border:1px solid #d7dce3;border-radius:8px;background:#fff;font:13px/1.4 Arial,sans-serif;color:#1a1a1a;max-width:440px}',
+      '.flow-lane-ms{position:relative;z-index:30;pointer-events:auto;margin:8px 0;padding:10px 12px;border:1px solid #d7dce3;border-radius:8px;background:#fff;font:13px/1.4 Arial,sans-serif;color:#1a1a1a;max-width:440px}',
       '.flow-lane-ms .flow-lane-title{font-weight:700;margin:0 0 6px}',
       '.flow-lane-ms .flow-lane-line{margin:2px 0}',
       '.flow-lane-ms .flow-lane-label{color:#555;margin-right:6px}',
@@ -61,7 +61,18 @@
     return document.getElementById('ReadingPaneContainerId') || document.body;
   }
 
+  function bodyCover() {
+    return document.getElementById('mailMessageBodyContainer')
+      || document.querySelector('#ReadingPaneContainerId #mailMessageBodyContainer')
+      || document.querySelector('[id="mailMessageBodyContainer"]');
+  }
+
   function place(card) {
+    const cover = bodyCover();
+    if (cover && cover.parentNode) {
+      cover.parentNode.insertBefore(card, cover);
+      return;
+    }
     const parent = mount();
     const host = cardHost && cardHost.isConnected && cardHost.parentNode === parent ? cardHost : null;
     if (host) {
@@ -69,7 +80,18 @@
       else parent.appendChild(card);
       return;
     }
-    parent.appendChild(card);
+    if (parent.firstChild) parent.insertBefore(card, parent.firstChild);
+    else parent.appendChild(card);
+  }
+
+  function clearMailWhy() {
+    const roots = [document.getElementById('ReadingPaneContainerId'), document.body];
+    roots.forEach((root) => {
+      if (!root || !root.querySelectorAll) return;
+      root.querySelectorAll('.flow-why-not').forEach((node) => {
+        try { node.remove(); } catch (e) { /* already gone */ }
+      });
+    });
   }
 
   function clearCard() {
@@ -266,8 +288,163 @@
     });
   }
 
+  function replyControl() {
+    const nodes = document.querySelectorAll('button, [role="button"]');
+    for (let i = 0; i < nodes.length; i++) {
+      const name = String((nodes[i].getAttribute && nodes[i].getAttribute('aria-label')) || nodes[i].textContent || '').trim();
+      if (name === 'Reply' || name === 'השב') return nodes[i];
+    }
+    return null;
+  }
+
+  function composeBox() {
+    const nodes = document.querySelectorAll('[data-glance-reply-body], div[role="textbox"][contenteditable="true"]');
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].closest && nodes[i].closest('.flow-lane-ms')) continue;
+      return nodes[i];
+    }
+    return null;
+  }
+
+  function insertCompose(text) {
+    const btn = replyControl();
+    if (btn) btn.click();
+    const box = composeBox();
+    if (!box) return { ok: false, reason: 'no-compose' };
+    const cur = String(box.innerText || box.textContent || '').trim();
+    const want = String(text || '').trim();
+    if (cur && cur.indexOf(want) < 0) return { ok: false, reason: 'compose-not-empty' };
+    if (cur.indexOf(want) < 0) box.textContent = want;
+    const got = String(box.innerText || box.textContent || '');
+    return { ok: want && got.indexOf(want) >= 0, reason: got.indexOf(want) >= 0 ? '' : 'not-inserted' };
+  }
+
+  function clearComposeIfUnchanged(text) {
+    const box = composeBox();
+    if (!box) return true;
+    const cur = String(box.innerText || box.textContent || '').trim();
+    if (cur !== String(text || '').trim()) return false;
+    box.textContent = '';
+    return true;
+  }
+
+  function copyButton(text) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'flow-lane-copy';
+    button.textContent = 'העתק';
+    button.addEventListener('click', () => {
+      const value = String(text || '');
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(value).catch(() => {});
+        return;
+      }
+      const area = document.createElement('textarea');
+      area.value = value;
+      button.parentNode.appendChild(area);
+      area.select();
+      try { document.execCommand('copy'); } catch (e) { /* the text stays on the card */ }
+      area.remove();
+    });
+    return button;
+  }
+
+  function draftStatus(lang, ok) {
+    if (!ok) return 'לא הצלחתי להכניס לטיוטה';
+    return lang === 'he'
+      ? 'פרטי איש הקשר בטיוטה. אתה שולח.'
+      : 'Contact details in the draft. You send it.';
+  }
+
+  function finishContactsDraft(card, pane, offer, res, button) {
+    const lang = offer && offer.params && offer.params.lang === 'he' ? 'he' : 'en';
+    if (!res || res.ok !== true || !res.draft) {
+      button.disabled = false;
+      paintResult(card, res);
+      return;
+    }
+    let messageId = (pane && (pane.itemId || pane.rawUrlId || pane.pathId)) || '';
+    if (!messageId) {
+      const parse = named('FlowOwaParse');
+      if (parse && typeof parse.urlIds === 'function') {
+        try {
+          const ids = parse.urlIds(location.href) || {};
+          messageId = ids.itemId || ids.raw || '';
+        } catch (e) { messageId = ''; }
+      }
+    }
+    chrome.runtime.sendMessage({
+      type: 'flow:execute-action',
+      payload: {
+        connectorId: 'outlookDraft',
+        body: res.draft,
+        comment: res.draft,
+        outlookIncomingId: messageId,
+        messageId: messageId,
+        explicitClick: true
+      }
+    }, (graph) => {
+      const err = chrome.runtime.lastError;
+      const opened = insertCompose(res.draft);
+      const verified = !err && graph && graph.ok === true && graph.ref && graph.fetchedBack !== false && opened.ok === true;
+      const status = statusNode(card);
+      let draft = card.querySelector('.flow-lane-draft');
+      if (!draft) {
+        draft = document.createElement('div');
+        draft.className = 'flow-lane-draft';
+        card.appendChild(draft);
+      }
+      draft.textContent = res.draft;
+      if (!verified) {
+        status.textContent = draftStatus(lang, false);
+        status.setAttribute('dir', 'rtl');
+        if (!card.querySelector('.flow-lane-copy')) card.appendChild(copyButton(res.draft));
+        button.disabled = false;
+        return;
+      }
+      status.textContent = draftStatus(lang, true);
+      button.hidden = true;
+      showDraftUndo(card, graph, res.draft, lang);
+    });
+  }
+
+  function showDraftUndo(card, graph, text, lang) {
+    let undo = card.querySelector('.flow-lane-undo');
+    if (!undo) {
+      undo = document.createElement('button');
+      undo.type = 'button';
+      undo.className = 'flow-lane-undo';
+      undo.textContent = 'Undo';
+      card.appendChild(undo);
+    }
+    undo.hidden = false;
+    undo.onclick = () => {
+      if (clearComposeIfUnchanged(text) === false) {
+        statusNode(card).textContent = lang === 'he' ? 'שינית את הטיוטה, השארתי אותה' : 'You edited this. Undo left it alone.';
+        return;
+      }
+      undo.disabled = true;
+      chrome.runtime.sendMessage({
+        type: 'flow:undo-action',
+        connectorId: 'outlookDraft',
+        ref: graph.ref,
+        created: graph.created
+      }, (u) => {
+        const err = chrome.runtime.lastError;
+        if (err || !u || u.ok !== true) {
+          statusNode(card).textContent = (u && u.written) || (lang === 'he' ? 'שינית את הטיוטה, השארתי אותה' : 'You edited this. Undo left it alone.');
+          undo.disabled = false;
+          return;
+        }
+        statusNode(card).textContent = 'Undone.';
+        undo.hidden = true;
+      });
+    };
+  }
+
   function paintOffer(offer, pane, text) {
     clearCard();
+    clearMailWhy();
     if (offer && offer.connectorId === 'outlookContacts') clearStaleContactsWhy();
     const card = document.createElement('div');
     card.className = 'flow-lane-ms';
@@ -290,6 +467,10 @@
         if (button.disabled) return;
         button.disabled = true;
         sendAction(card, pane, { connectorId: offer.connectorId, params: offer.params, text: text }, (res) => {
+          if (offer.connectorId === 'outlookContacts') {
+            finishContactsDraft(card, pane, offer, res, button);
+            return;
+          }
           button.disabled = false;
           paintResult(card, res);
         });
@@ -328,26 +509,34 @@
   let timer = null;
   let busy = false;
 
-  function readGrantedScopes() {
+  function readContactsAccess() {
     return new Promise((resolve) => {
       try {
         const store = chrome && chrome.storage && chrome.storage.local;
         if (!store || typeof store.get !== 'function') { resolve(null); return; }
-        store.get('outlookAuth', (bag) => {
+        store.get(['outlookAuth', 'glanceContactsChoice'], (bag) => {
           try { void chrome.runtime.lastError; } catch (e) { /* the read still settles */ }
           const token = bag && bag.outlookAuth && bag.outlookAuth.token;
-          if (!token) { resolve([]); return; }
-          resolve(token.grantedScopes || token.scopes || token.scope || []);
+          const scopes = token ? (token.grantedScopes || token.scopes || token.scope || []) : [];
+          resolve({
+            grantedScopes: scopes,
+            contactsChoice: !!(bag && bag.glanceContactsChoice === true)
+          });
         });
       } catch (e) { resolve(null); }
     });
   }
 
-  function reportContactsWhy(reason, key) {
-    if (whyKey === key) return;
-    whyKey = key;
+  function reportContactsWhy(reason, detail, key) {
+    const mark = key + '|' + String(detail || '');
+    if (whyKey === mark) return;
+    whyKey = mark;
     try {
-      chrome.runtime.sendMessage({ type: 'flow:contacts-why', reason: reason || 'contacts-not-granted' }, () => {
+      chrome.runtime.sendMessage({
+        type: 'flow:contacts-why',
+        reason: reason || 'contacts-not-granted',
+        detail: detail || ''
+      }, () => {
         try { void chrome.runtime.lastError; } catch (e) { /* the log is on the worker */ }
       });
     } catch (e) { /* the card still says how to grant it */ }
@@ -378,7 +567,8 @@
     row.textContent = offer.written || quietGrantLine();
     card.appendChild(row);
     place(card);
-    reportContactsWhy(offer.reason || 'contacts-not-granted', key);
+    clearMailWhy();
+    reportContactsWhy(offer.reason || 'contacts-not-granted', offer.detail || '', key);
   }
 
   async function tick() {
@@ -402,11 +592,11 @@
       const mods = modules();
       const chipUp = cardHost && cardHost.isConnected;
       const list = chipUp ? mods : mods.filter((mod) => mod && mod.CONNECTOR === 'outlookContacts');
-      let scopes = null;
+      let access = null;
       if (list.some((mod) => mod && mod.CONNECTOR === 'outlookContacts')) {
-        try { scopes = await readGrantedScopes(); } catch (e) { scopes = null; }
+        try { access = await readContactsAccess(); } catch (e) { access = null; }
       }
-      const offerDeps = scopes == null ? undefined : { grantedScopes: scopes };
+      const offerDeps = access || { grantedScopes: [], contactsChoice: false };
       for (let i = 0; i < mods.length; i++) {
         if (typeof mods[i].receiptFromLog !== 'function') continue;
         const row = mods[i].receiptFromLog(log, pane);
@@ -463,6 +653,18 @@
     watch();
     return true;
   }
+
+  try {
+    if (chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === 'function') {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        if (!changes.glanceContactsChoice && !changes.outlookAuth) return;
+        paneKey = '';
+        whyKey = '';
+        schedule();
+      });
+    }
+  } catch (e) { /* the next mail open still reads the choice */ }
 
   function bootWatch() {
     if (named('FlowOwaParse')) {

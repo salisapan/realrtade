@@ -4606,7 +4606,19 @@
     const laneCard = document.querySelector('#ReadingPaneContainerId [data-glance-ms-card="1"]');
     const undoneOnly = earlyHost && earlyHost.getAttribute('data-glance-undone') === '1';
     const openGen = mailOpenGen;
-    if (sig === lastSig && openGen === reconciledOpenGen && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && (earlyHost || laneCard) && !undoneOnly))) {
+    const quietCached = lastOutcome === 'reason' && /intent-null|no-outcome|too-short|contacts-unavailable|scan-skipped/.test(String(lastLoggedReason || ''));
+    const skipCache = quietCached && contactsLaneOwns(pane) && !laneCard;
+    if (!skipCache && sig === lastSig && openGen === reconciledOpenGen && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && (earlyHost || laneCard) && !undoneOnly))) {
+      if (laneCard && /intent-null|no-outcome|too-short|contacts-unavailable|scan-skipped/.test(String(lastLoggedReason || ''))) {
+        try {
+          const whyMount = mountPoint();
+          if (whyMount) clearWhyNot(whyMount);
+        } catch (e) { /* the contacts card is the one verdict */ }
+        lastOutcome = 'card';
+        lastLoggedReason = 'contacts-lane';
+        dbg('decision', { shown: true, reason: 'contacts-lane', subject: pane.subject });
+        return;
+      }
       if (String(lastLoggedReason || '').indexOf('contacts-unavailable') >= 0 && contactsLaneOwns(pane)) {
         try {
           const whyMount = mountPoint();
@@ -5399,6 +5411,19 @@
     if (timer) return;
     timer = setTimeout(runScan, SCAN_EVERY_MS);
   }
+
+  try {
+    if (chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === 'function') {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        if (!changes.glanceContactsChoice && !changes.outlookAuth) return;
+        lastSig = '';
+        lastOutcome = '';
+        lastLoggedReason = '';
+        schedule();
+      });
+    }
+  } catch (e) { /* the next open mail still reads the choice */ }
 
   async function appendSuggestLog(entry) {
     if (!entry || typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return;

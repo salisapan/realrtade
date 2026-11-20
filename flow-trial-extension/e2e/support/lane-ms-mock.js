@@ -231,7 +231,8 @@ async function grantScopes(glance, scopes) {
     token.grantedScopes = list;
     token.scopes = list.slice();
     token.scope = list.join(' ');
-    await chrome.storage.local.set({ outlookAuth: auth });
+    const choice = list.indexOf('Contacts.Read') >= 0;
+    await chrome.storage.local.set({ outlookAuth: auth, glanceContactsChoice: choice });
     return { ok: true };
   }, scopes);
 }

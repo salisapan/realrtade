@@ -7,8 +7,13 @@ const SCENARIO = {
   contacts: [{
     id: 'c1',
     displayName: 'Dana Cohen',
-    emailAddresses: [{ address: 'dana@acme.com', name: 'Dana Cohen' }],
+    emailAddresses: [{ address: 'dana.cohen.test@example.com', name: 'Dana Cohen' }],
     businessPhones: ['+972501234567']
+  }, {
+    id: 'c2',
+    displayName: 'Levi Dana',
+    emailAddresses: [{ address: 'levi.dana@example.com', name: 'Levi Dana' }],
+    businessPhones: ['+972509999999']
   }],
   people: []
 };

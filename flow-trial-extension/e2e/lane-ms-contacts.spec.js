@@ -3,7 +3,7 @@ const S = require('./support/sentences');
 const FIX = require('./fixtures/ms-contacts');
 const lane = require('./support/lane-ms-mock');
 
-test('Contacts.Read drafts one contact card and does not write', async ({ glance }) => {
+test('Contacts.Read puts the contact into a reply draft and does not send', async ({ glance }) => {
   await glance.seedOutlook();
   await lane.run(glance, { scopes: ['Contacts.Read'], scenario: FIX.SCENARIO }, {
     id: FIX.ID,
@@ -14,13 +14,44 @@ test('Contacts.Read drafts one contact card and does not write', async ({ glance
     await page.waitForSelector('html[data-glance-lane-ms="on"]', { timeout: 20000 });
     const card = page.locator('#ReadingPaneContainerId .flow-lane-ms');
     await expect(card).toBeVisible();
+    await page.evaluate(() => {
+      const pane = document.getElementById('ReadingPaneContainerId');
+      pane.style.position = 'relative';
+      const cover = document.createElement('div');
+      cover.id = 'mailMessageBodyContainer';
+      cover.style.cssText = 'position:absolute;inset:0;z-index:1';
+      pane.appendChild(cover);
+      const reply = document.createElement('button');
+      reply.setAttribute('aria-label', 'Reply');
+      reply.textContent = 'Reply';
+      const box = document.createElement('div');
+      box.setAttribute('role', 'textbox');
+      box.setAttribute('contenteditable', 'true');
+      box.setAttribute('data-glance-reply-body', '1');
+      reply.addEventListener('click', () => { box.hidden = false; });
+      box.hidden = true;
+      pane.appendChild(reply);
+      pane.appendChild(box);
+    });
+    const clickable = await page.evaluate(() => {
+      const btn = document.querySelector('#ReadingPaneContainerId .flow-lane-do');
+      if (!btn) return false;
+      const rect = btn.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return !!(hit && (hit === btn || btn.contains(hit)));
+    });
+    expect(clickable).toBe(true);
+    await expect(page.locator('#ReadingPaneContainerId .flow-why-not')).toHaveCount(0);
     await card.locator('button.flow-lane-do').click();
-    await expect(card.locator('.flow-lane-draft')).toContainText('dana@acme.com');
+    await expect(card.locator('.flow-lane-draft')).toContainText('dana.cohen.test@example.com');
+    await expect(card.locator('.flow-lane-draft')).not.toContainText('levi.dana@example.com');
+    await expect(page.locator('[data-glance-reply-body]')).toContainText('dana.cohen.test@example.com');
     const calls = await glance.apiCalls();
     const looked = calls.filter((c) => c.url.indexOf('/me/contacts') >= 0 || c.url.indexOf('/me/people') >= 0);
     expect(looked.some((c) => c.method === 'GET' && c.url.indexOf('/me/contacts') >= 0)).toBe(true);
     expect(looked.some((c) => c.method === 'GET' && c.url.indexOf('/me/people') >= 0)).toBe(true);
     expect(looked.some((c) => c.method !== 'GET')).toBe(false);
+    expect(calls.some((c) => c.method === 'POST' && c.url.indexOf('/createReply') >= 0)).toBe(true);
     expect(calls.some((c) => c.url.indexOf('sendMail') >= 0)).toBe(false);
     await expect(card).toContainText('You send');
     await expect(card).not.toContainText('Handled');
@@ -47,6 +78,32 @@ test('without Contacts.Read the card says how to grant it and does not call Grap
     expect(calls.some((c) => String(c.url).indexOf('/me/people') >= 0)).toBe(false);
     expect(calls.some((c) => String(c.url).indexOf('sendMail') >= 0)).toBe(false);
     await expect(card).not.toContainText('Handled');
+  } finally {
+    await lane.release(glance);
+  }
+});
+
+test('unticking Contacts hides the lookup even when the token still has Contacts.Read', async ({ glance }) => {
+  await glance.seedOutlook();
+  await lane.prepare(glance, { scopes: ['Contacts.Read'], scenario: FIX.SCENARIO });
+  await glance.evaluateWorker(async () => {
+    await chrome.storage.local.set({ glanceContactsChoice: false });
+    return true;
+  });
+  const page = await glance.openOutlook({
+    id: 'AQMkLaneMsContactsOff',
+    subject: 'Contacts',
+    senderEmail: S.SENDER,
+    body: FIX.BODY
+  });
+  try {
+    const card = page.locator('#ReadingPaneContainerId .flow-lane-ms');
+    await expect(card).toBeVisible({ timeout: 20000 });
+    await expect(card).toContainText('כדי למצוא את איש הקשר');
+    await expect(card.locator('button.flow-lane-do')).toHaveCount(0);
+    const calls = await glance.apiCalls();
+    expect(calls.some((c) => String(c.url).indexOf('/me/contacts') >= 0)).toBe(false);
+    expect(calls.some((c) => String(c.url).indexOf('sendMail') >= 0)).toBe(false);
   } finally {
     await lane.release(glance);
   }

@@ -1955,6 +1955,11 @@
           note.textContent = sentence;
           return;
         }
+        const contactsOn = !!(boxes.contacts && boxes.contacts.checked);
+        if (state) state.glanceContactsChoice = contactsOn;
+        if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+          try { await FlowStorage.set({ glanceContactsChoice: contactsOn }); } catch (e) { /* the next paint reads storage */ }
+        }
         await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
       });
       screen.appendChild(c);
@@ -1976,6 +1981,16 @@
           : { checked: false, disabled: false, granted: false };
         box.checked = ui.checked;
         box.disabled = ui.disabled;
+        if (svc.id === 'contacts') {
+          box.checked = !!(state && state.glanceContactsChoice === true);
+          box.addEventListener('change', () => {
+            const on = box.checked === true;
+            if (state) state.glanceContactsChoice = on;
+            if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+              FlowStorage.set({ glanceContactsChoice: on }).catch(() => {});
+            }
+          });
+        }
         if (ui.granted) lab.setAttribute('data-glance-granted', '1');
         scopeBoxes[svc.id] = box;
         lab.appendChild(box);
@@ -2000,18 +2015,47 @@
       addScope.setAttribute('data-glance-add-scope', '1');
       addScope.addEventListener('click', async () => {
         addScope.disabled = true;
+        const contactsBox = scopeBoxes.contacts;
+        let contactsNoted = '';
+        if (contactsBox && typeof FlowOutlookContacts !== 'undefined' && typeof FlowOutlookContacts.consentPlan === 'function') {
+          const plan = FlowOutlookContacts.consentPlan({ ticked: contactsBox.checked === true, scopes: grantedNow });
+          if (state) state.glanceContactsChoice = plan.choice === true;
+          if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+            try { await FlowStorage.set({ glanceContactsChoice: plan.choice === true }); } catch (e) { /* kept on state */ }
+          }
+          if (plan.request) {
+            const grantedScope = await send({ type: 'flow:microsoft-optional-scopes', bucket: 'contacts', prompt: 'consent' });
+            if (!grantedScope || grantedScope.ok !== true) {
+              addScope.disabled = false;
+              note.hidden = false;
+              note.textContent = (grantedScope && (grantedScope.reason || grantedScope.error)) || 'ההרשאה לא נוספה.';
+              return;
+            }
+          } else if (plan.already) {
+            contactsBox.checked = true;
+            contactsNoted = plan.line;
+            if (state) state.glanceContactsNoted = plan.line;
+          }
+        }
         const add = scopeServices.filter((svc) => {
+          if (svc.id === 'contacts') return false;
           const box = scopeBoxes[svc.id];
           if (!box || !box.checked || box.disabled) return false;
           return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
         });
         let consentedNow = [];
-        const ticked = scopeServices.some((svc) => { const b = scopeBoxes[svc.id]; return b && b.checked && !b.disabled; });
+        const ticked = scopeServices.some((svc) => { const b = scopeBoxes[svc.id]; return b && b.checked && !b.disabled && svc.id !== 'contacts'; });
         if (ticked && !add.length) {
           // Ticked, and every scope of it is already on the token: nothing to ask, and the person is told so.
           addScope.disabled = false;
           note.hidden = false;
-          note.textContent = 'ההרשאות שסימנת כבר ניתנו.';
+          note.textContent = contactsNoted || 'ההרשאות שסימנת כבר ניתנו.';
+          return;
+        }
+        if (!add.length && contactsNoted) {
+          addScope.disabled = false;
+          if (state) state.glanceContactsNoted = contactsNoted;
+          await renderSurfaces();
           return;
         }
         for (let i = 0; i < add.length; i++) {
@@ -2094,6 +2138,11 @@
     }
     row.appendChild(acts);
     if (offRow) row.appendChild(offRow);
+    if (state && state.glanceContactsNoted) {
+      note.hidden = false;
+      note.textContent = state.glanceContactsNoted;
+      state.glanceContactsNoted = '';
+    }
     row.appendChild(note);
     if (gen !== surfaceGen) return;
     host.appendChild(row);

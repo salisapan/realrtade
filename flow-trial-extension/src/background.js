@@ -7792,7 +7792,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:microsoft-optional-scopes') {
     if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
     const bucket = msg.bucket || msg.optionalBucket;
-    return reply(sendResponse, requestMicrosoftOptionalScopes(bucket, { launchInteractive: outlookLaunchInteractive }));
+    return reply(sendResponse, requestMicrosoftOptionalScopes(bucket, {
+      launchInteractive: outlookLaunchInteractive,
+      prompt: msg.prompt === 'consent' ? 'consent' : ''
+    }));
   }
 
   if (msg.type === 'flow:connect') {
