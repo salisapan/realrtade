@@ -14,6 +14,9 @@ test('Contacts.Read puts the contact into a reply draft and does not send', asyn
     await page.waitForSelector('html[data-glance-lane-ms="on"]', { timeout: 20000 });
     const card = page.locator('#ReadingPaneContainerId .flow-lane-ms');
     await expect(card).toBeVisible();
+    await expect(card).toContainText('dana.cohen.test@example.com');
+    await expect(card).not.toContainText('dana.levi.test@example.com');
+    await expect(card.locator('button.flow-lane-do')).toHaveCount(1);
     await page.evaluate(() => {
       const pane = document.getElementById('ReadingPaneContainerId');
       pane.style.position = 'relative';
@@ -44,17 +47,35 @@ test('Contacts.Read puts the contact into a reply draft and does not send', asyn
     await expect(page.locator('#ReadingPaneContainerId .flow-why-not')).toHaveCount(0);
     await card.locator('button.flow-lane-do').click();
     await expect(card.locator('.flow-lane-draft')).toContainText('dana.cohen.test@example.com');
-    await expect(card.locator('.flow-lane-draft')).not.toContainText('levi.dana@example.com');
+    await expect(card.locator('.flow-lane-draft')).not.toContainText('dana.levi.test@example.com');
     await expect(page.locator('[data-glance-reply-body]')).toContainText('dana.cohen.test@example.com');
     const calls = await glance.apiCalls();
     const looked = calls.filter((c) => c.url.indexOf('/me/contacts') >= 0 || c.url.indexOf('/me/people') >= 0);
     expect(looked.some((c) => c.method === 'GET' && c.url.indexOf('/me/contacts') >= 0)).toBe(true);
-    expect(looked.some((c) => c.method === 'GET' && c.url.indexOf('/me/people') >= 0)).toBe(true);
     expect(looked.some((c) => c.method !== 'GET')).toBe(false);
     expect(calls.some((c) => c.method === 'POST' && c.url.indexOf('/createReply') >= 0)).toBe(true);
     expect(calls.some((c) => c.url.indexOf('sendMail') >= 0)).toBe(false);
-    await expect(card).toContainText('You send');
+    await expect(card).toContainText('בטיוטה');
     await expect(card).not.toContainText('Handled');
+  });
+});
+
+test('zero contact matches says so and does not offer a draft', async ({ glance }) => {
+  await glance.seedOutlook();
+  await lane.run(glance, { scopes: ['Contacts.Read'], scenario: { contacts: [], people: [] } }, {
+    id: 'AQMkLaneMsContactsNone',
+    subject: 'Contacts',
+    senderEmail: S.SENDER,
+    body: FIX.BODY
+  }, async (page) => {
+    const card = page.locator('#ReadingPaneContainerId .flow-lane-ms');
+    await expect(card).toBeVisible({ timeout: 20000 });
+    await expect(card).toContainText('לא מצאתי את דנה כהן באנשי הקשר');
+    await expect(card.locator('button.flow-lane-do')).toHaveCount(0);
+    const calls = await glance.apiCalls();
+    expect(calls.some((c) => c.method === 'GET' && String(c.url).indexOf('/me/contacts') >= 0)).toBe(true);
+    expect(calls.some((c) => c.url.indexOf('/createReply') >= 0)).toBe(false);
+    expect(calls.some((c) => c.url.indexOf('sendMail') >= 0)).toBe(false);
   });
 });
 

@@ -2010,9 +2010,14 @@
         const code = r && (r.reason || r.error);
         return SCOPE_NOTES[code] || (code ? 'ההרשאה לא נוספה (' + code + ').' : 'ההרשאה לא נוספה.');
       }
+      function contactsAlreadySentence(box, scopes) {
+        if (!box || box.checked !== true) return '';
+        return (scopes || []).indexOf('Contacts.Read') >= 0 ? 'אנשי קשר כבר כלולים בכניסה.' : '';
+      }
       const addScope = el('button', 'ghost sm', 'הוסף הרשאה');
       addScope.type = 'button';
       addScope.setAttribute('data-glance-add-scope', '1');
+      const bucketForOutlookService = globalThis.FlowConnectEcosystem && FlowConnectEcosystem.optionalScopeBucketForOutlookService;
       addScope.addEventListener('click', async () => {
         addScope.disabled = true;
         const contactsBox = scopeBoxes.contacts;
@@ -2038,21 +2043,21 @@
         const add = scopeServices.filter((svc) => svc.id !== 'contacts' && scopeBoxes[svc.id] && scopeBoxes[svc.id].checked && !scopeBoxes[svc.id].disabled && (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0));
         let consentedNow = [];
         const ticked = scopeServices.some((svc) => svc.id !== 'contacts' && scopeBoxes[svc.id] && scopeBoxes[svc.id].checked && !scopeBoxes[svc.id].disabled);
-        if (ticked && !add.length) {
+        if (!add.length && (ticked || contactsNoted || contactsAlreadySentence(contactsBox, grantedNow))) {
+          const contactsLine = contactsNoted || contactsAlreadySentence(contactsBox, grantedNow);
           addScope.disabled = false; note.hidden = false;
-          note.textContent = contactsNoted || 'ההרשאות שסימנת כבר ניתנו.';
-          return;
-        }
-        if (!add.length && contactsNoted) {
-          addScope.disabled = false;
-          await renderSurfaces();
+          note.textContent = contactsLine || 'ההרשאות שסימנת כבר ניתנו.';
+          if (contactsLine) {
+            if (state) state.glanceContactsNoted = contactsLine;
+            if (state) state.glanceContactsChoice = true;
+            try { await FlowStorage.set({ glanceContactsChoice: true }); } catch (e) {}
+            await renderSurfaces();
+          }
           return;
         }
         for (let i = 0; i < add.length; i++) {
           const svc = add[i];
-          const bucket = (globalThis.FlowConnectEcosystem && typeof FlowConnectEcosystem.optionalScopeBucketForOutlookService === 'function')
-            ? FlowConnectEcosystem.optionalScopeBucketForOutlookService(svc.id)
-            : null;
+          const bucket = typeof bucketForOutlookService === 'function' ? bucketForOutlookService(svc.id) : null;
           if (bucket) {
             const grantedScope = await send({ type: 'flow:microsoft-optional-scopes', bucket: bucket });
             if (!grantedScope || grantedScope.ok !== true) {
@@ -2097,7 +2102,16 @@
       });
       const off = el('button', 'ghost sm', 'כבה');
       off.type = 'button';
-      off.addEventListener('click', async () => { off.disabled = true; await o.disconnect(); await renderSurfaces(); await renderOutlookCards(); });
+      off.setAttribute('data-glance-contacts-off', '1');
+      off.addEventListener('click', async () => {
+        off.disabled = true;
+        if (state) state.glanceContactsChoice = false;
+        if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+          try { await FlowStorage.set({ glanceContactsChoice: false }); } catch (e) { /* the next paint reads storage */ }
+        }
+        await renderSurfaces();
+        await renderOutlookCards();
+      });
       acts.appendChild(chk);
       // Turn off sits on its own row, away from Check now.
       offRow = el('div', 'wait-acts wait-off-row');

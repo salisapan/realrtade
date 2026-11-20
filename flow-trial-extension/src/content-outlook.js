@@ -472,6 +472,8 @@
 
   // A named-person contact ask is the contacts card. The "not in this version"
   // why is the Gmail line. On Outlook the card says how to tick Contacts.
+  let contactsSkipKey = '';
+
   function contactsLaneOwns(pane) {
     let mod = null;
     try { mod = (typeof FlowOutlookContacts !== 'undefined') ? FlowOutlookContacts : null; } catch (e) { mod = null; }
@@ -480,6 +482,36 @@
     let rec = null;
     try { rec = mod.recognize(text); } catch (e) { rec = null; }
     return !!(rec && rec.kind === 'clear');
+  }
+
+  // The mail judge runs here. A skipped contact lookup has to reach the service
+  // worker console, not only this page. One line per mail, again after the tick changes.
+  function noteContactsSkip(pane) {
+    if (!contactsLaneOwns(pane)) return;
+    let mod = null;
+    try { mod = (typeof FlowOutlookContacts !== 'undefined') ? FlowOutlookContacts : null; } catch (e) { mod = null; }
+    if (!mod || typeof mod.accessOf !== 'function') return;
+    const key = (pane && (pane.itemId || pane.conversationId || pane.subject)) || '';
+    try {
+      chrome.storage.local.get(['outlookAuth', 'glanceContactsChoice'], (bag) => {
+        try { void chrome.runtime.lastError; } catch (e) { /* the read still settles */ }
+        const token = bag && bag.outlookAuth && bag.outlookAuth.token;
+        const scopes = token ? (token.grantedScopes || token.scopes || token.scope || []) : [];
+        let access = null;
+        try {
+          access = mod.accessOf({
+            grantedScopes: scopes,
+            contactsChoice: !!(bag && bag.glanceContactsChoice === true)
+          });
+        } catch (e) { access = null; }
+        if (access && access.granted) return;
+        const detail = (access && access.detail) || 'contacts-not-granted';
+        const mark = key + '|' + detail;
+        if (contactsSkipKey === mark) return;
+        contactsSkipKey = mark;
+        send({ type: 'flow:contacts-why', reason: 'contacts-not-granted', detail: detail });
+      });
+    } catch (e) { /* the card still says how to grant it */ }
   }
 
   function genericTextQuiet(pane) {
@@ -4616,6 +4648,7 @@
         } catch (e) { /* the contacts card is the one verdict */ }
         lastOutcome = 'card';
         lastLoggedReason = 'contacts-lane';
+        noteContactsSkip(pane);
         dbg('decision', { shown: true, reason: 'contacts-lane', subject: pane.subject });
         return;
       }
@@ -4626,6 +4659,7 @@
         } catch (e) { /* the contacts card is the explanation */ }
         lastOutcome = 'card';
         lastLoggedReason = 'contacts-lane';
+        noteContactsSkip(pane);
         dbg('decision', { shown: true, reason: 'contacts-lane', subject: pane.subject });
         return;
       }
@@ -5015,6 +5049,7 @@
               } catch (e) { /* the contacts card is the explanation */ }
               lastOutcome = 'card';
               lastLoggedReason = 'contacts-lane';
+              noteContactsSkip(pane);
               dbg('decision', { shown: true, reason: 'contacts-lane', subject: pane.subject });
               return;
             }
@@ -5420,6 +5455,7 @@
         lastSig = '';
         lastOutcome = '';
         lastLoggedReason = '';
+        contactsSkipKey = '';
         schedule();
       });
     }

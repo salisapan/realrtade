@@ -63,7 +63,12 @@ function danaRoutes(readBack) {
 (async () => {
   check('Hebrew email ask is recognized', C.recognize('מה כתובת המייל של דנה כהן').mode === 'email' && C.recognize('מה כתובת המייל של דנה כהן').name.indexOf('דנה') >= 0);
   check('English phone ask is recognized', C.recognize("send me Dana's phone").mode === 'phone');
-  check('Hebrew nameMatches', C.nameMatches('דנה כהן', 'דנה כהן לוי') === true);
+  check('reversed Hebrew display is the same token set', C.nameMatches('דנה כהן', 'כהן דנה') === true);
+  check('a longer name is not the same token set', C.nameMatches('דנה כהן', 'דנה כהן לוי') === false);
+  check('Dana Cohen does not match Levi Dana', C.nameMatches('Dana Cohen', 'Levi Dana') === false);
+  check('given and surname match in either order', C.rowMatches('דנה כהן', { givenName: 'כהן', surname: 'דנה', fileAs: 'כהן, דנה' }) === true);
+  check('niqqud and punctuation do not change the tokens', C.nameMatches('דָּנָה כֹּהֵן', 'כהן דנה') === true);
+  check('Dana Cohen matches a reversed English given and surname', C.rowMatches('Dana Cohen', { givenName: 'Cohen', surname: 'Dana' }) === true);
 
   const judge = C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Contacts.Read'], contactsChoice: true });
   check('judgeInput offers lane-ms', judge.action === 'lane-ms' && judge.connectorId === 'outlookContacts');
@@ -135,8 +140,8 @@ function danaRoutes(readBack) {
         status: 200,
         body: {
           value: [
-            { id: 'c1', displayName: 'Dana Cohen', emailAddresses: [{ address: 'dana@acme.com' }] },
-            { id: 'c2', displayName: 'Dana Cole', emailAddresses: [{ address: 'dana.cole@acme.com' }] }
+            { id: 'c1', displayName: 'Dana Cohen', givenName: 'Dana', surname: 'Cohen', emailAddresses: [{ address: 'dana@acme.com' }] },
+            { id: 'c2', displayName: 'Cohen Dana', givenName: 'Cohen', surname: 'Dana', emailAddresses: [{ address: 'dana.cole@acme.com' }] }
           ]
         }
       })
@@ -144,10 +149,82 @@ function danaRoutes(readBack) {
     { method: 'GET', test: /\/me\/people/, reply: () => ({ ok: true, status: 200, body: { value: [] } }) }
   ]);
   const amb = await C.run(
-    { params: { name: 'Dana', mode: 'email', lang: 'en' } },
+    { params: { name: 'Dana Cohen', mode: 'email', lang: 'en' } },
     { call: split.call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
   );
-  check('two addresses stay ambiguous', amb.ok === false && amb.reason === 'ambiguous', amb);
+  check('two addresses stay ambiguous and offer no draft button', amb.ok === false && amb.reason === 'ambiguous' && amb.button === '' && amb.choices && amb.choices.length === 2, amb);
+
+  const reversed = fake([
+    {
+      method: 'GET',
+      test: /\/me\/contacts\?/,
+      reply: () => ({
+        ok: true,
+        status: 200,
+        body: {
+          value: [
+            { id: 'c1', displayName: 'כהן דנה', givenName: 'כהן', surname: 'דנה', fileAs: 'כהן, דנה', emailAddresses: [{ address: 'dana.cohen.test@example.com' }] },
+            { id: 'c2', displayName: 'Levi Dana', givenName: 'Levi', surname: 'Dana', fileAs: 'Levi Dana', emailAddresses: [{ address: 'dana.levi.test@example.com' }] }
+          ]
+        }
+      })
+    },
+    {
+      method: 'GET',
+      test: /\/me\/contacts\/c1/,
+      reply: () => ({
+        ok: true,
+        status: 200,
+        body: { id: 'c1', displayName: 'כהן דנה', givenName: 'כהן', surname: 'דנה', fileAs: 'כהן, דנה', emailAddresses: [{ address: 'dana.cohen.test@example.com' }] }
+      })
+    }
+  ]);
+  const one = await C.run(
+    { params: { name: 'דנה כהן', mode: 'email', lang: 'he' } },
+    { call: reversed.call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
+  );
+  check('reversed given and surname matches Dana and not Levi',
+    one.ok === true && one.matchCount === 1 && one.button === 'הכנס לטיוטה' && /dana\.cohen\.test@example\.com/.test(one.draft) && !/dana\.levi\.test@example\.com/.test(one.draft || ''),
+    one);
+
+  const none = fake([
+    { method: 'GET', test: /\/me\/contacts\?/, reply: () => ({ ok: true, status: 200, body: { value: [] } }) }
+  ]);
+  const missed = await C.run(
+    { params: { name: 'דנה כהן', mode: 'email', lang: 'he' } },
+    { call: none.call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
+  );
+  check('zero matches says so and has no draft button',
+    missed.ok === false && missed.reason === 'not-found' && missed.button === '' && missed.written === 'לא מצאתי את דנה כהן באנשי הקשר' && !/הכנס לטיוטה/.test(JSON.stringify(missed)),
+    missed);
+
+  const noAddress = fake([
+    { method: 'GET', test: /\/me\/contacts\?/, reply: () => ({ ok: true, status: 200, body: { value: [{ id: 'c9', displayName: 'כהן דנה', givenName: 'כהן', surname: 'דנה' }] } }) }
+  ]);
+  const nameless = await C.run(
+    { params: { name: 'דנה כהן', mode: 'email', lang: 'he' } },
+    { call: noAddress.call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
+  );
+  check('a match with no address does not offer the draft button',
+    nameless.reason === 'not-found' && nameless.button === '' && !/הכנס לטיוטה/.test(JSON.stringify(nameless)),
+    nameless);
+
+  let pages = 0;
+  const paged = fake([
+    {
+      method: 'GET',
+      test: /\/me\/contacts\?/,
+      reply: () => {
+        pages += 1;
+        return { ok: true, status: 200, body: { value: [], '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/contacts?$top=100&$skip=' + (pages * 100) } };
+      }
+    }
+  ]);
+  await C.run(
+    { params: { name: 'דנה כהן', mode: 'email', lang: 'he' } },
+    { call: paged.call, grantedScopes: ['Contacts.Read'], contactsChoice: true, now: now }
+  );
+  check('contact paging stops after a few pages', pages === 3 && paged.calls.length === 3, pages);
 
   const mismatch = danaRoutes({
     id: 'c1',
@@ -168,7 +245,8 @@ function danaRoutes(readBack) {
   check('never sends on post flag', forbidden.reason === 'FORBIDDEN_SEND');
 
   const offer = C.offer({ text: "What's Dana Cohen's email?" }, { grantedScopes: ['Contacts.Read'], contactsChoice: true });
-  check('offer names Dana and does not close', offer.show === true && offer.params.name === 'Dana Cohen' && offer.closes === false, offer);
+  check('offer names Dana and does not close or show the draft button before a match',
+    offer.show === true && offer.lookup === true && offer.button === '' && offer.params.name === 'Dana Cohen' && offer.closes === false, offer);
 
   check('undo is not a write', (await C.undo({}, { call: () => { throw new Error('called'); } })).reason === 'no-undo');
   check('a read is not a receipt', C.receiptFromLog([{ kind: 'written', connectorId: 'outlookContacts', fetchedBack: true }], { itemId: 'x' }) === null);
@@ -183,12 +261,21 @@ function danaRoutes(readBack) {
   check('You send is the contacts lane only', page.indexOf("res.connectorId === 'outlookContacts' && res.draft && res.posted === false") >= 0 && page.indexOf("status.textContent = 'Not posted.'") >= 0);
   check('the card says how to grant Contacts.Read', page.indexOf('data-glance-contacts-why') >= 0 && page.indexOf('flow:contacts-why') >= 0 && page.indexOf('שורת Outlook') >= 0);
   check('the worker logs the contacts why', host.indexOf("[Glance] contacts why-not") >= 0 && host.indexOf("type === 'flow:contacts-why'") >= 0);
+  check('the worker logs the contact lookup', host.indexOf('[Glance] contacts lookup q=') >= 0 && host.indexOf('matches=') >= 0 && host.indexOf('status=') >= 0);
   check('Outlook leaves a contacts ask to that card', outlook.indexOf('contactsLaneOwns') >= 0 && outlook.indexOf('contacts-unavailable') >= 0);
   check('a quiet no-ask is not kept after the contacts grant changes',
     outlook.indexOf('glanceContactsChoice') >= 0 && outlook.indexOf('intent-null') >= 0 && outlook.indexOf('data-glance-ms-card') >= 0);
   const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
   check('the Outlook row persists the Contacts tick and asks with prompt=consent',
     popup.indexOf('glanceContactsChoice') >= 0 && popup.indexOf('consentPlan') >= 0 && popup.indexOf("prompt: 'consent'") >= 0);
+  check('an already-granted Contacts tick uses the contacts sentence', popup.indexOf('אנשי קשר כבר כלולים בכניסה.') >= 0);
+  const offAt = popup.indexOf('data-glance-contacts-off');
+  const offBlock = offAt >= 0 ? popup.slice(offAt, offAt + 700) : '';
+  check('כבה on Contacts stores the choice off and does not disconnect Outlook',
+    offAt >= 0 && offBlock.indexOf('glanceContactsChoice: false') >= 0 && offBlock.indexOf('disconnect') < 0, offBlock);
+  check('a skipped contacts mail asks the worker to log why', outlook.indexOf('flow:contacts-why') >= 0 && outlook.indexOf('contacts-not-granted') >= 0);
+  check('zero matches and a missing address leave the draft button off the card',
+    page.indexOf('לא מצאתי את ') >= 0 && page.indexOf('offer.lookup') >= 0 && page.indexOf('flow-lane-pick') >= 0);
   check('a failed insert says so and offers copy', page.indexOf('לא הצלחתי להכניס לטיוטה') >= 0 && page.indexOf('flow-lane-copy') >= 0 && page.indexOf('createReply') < 0);
   check('the card sits above the message body', page.indexOf('mailMessageBodyContainer') >= 0 && page.indexOf('z-index:30') >= 0);
 

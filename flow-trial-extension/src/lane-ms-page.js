@@ -310,12 +310,31 @@
     return String(value || '').replace(/\s+/g, ' ').trim();
   }
 
+  function abandonCompose(text) {
+    const box = composeBox();
+    if (!box) return;
+    const cur = flatText(box.textContent || box.innerText || '');
+    const want = flatText(text);
+    if (want && cur.indexOf(want) >= 0) return;
+    if (cur) return;
+    box.textContent = '';
+    const nodes = document.querySelectorAll('button, [role="button"]');
+    for (let i = 0; i < nodes.length; i++) {
+      const name = String((nodes[i].getAttribute && nodes[i].getAttribute('aria-label')) || nodes[i].textContent || '').trim();
+      if (name === 'Discard' || name === 'בטל' || name === 'מחק') {
+        nodes[i].click();
+        break;
+      }
+    }
+  }
+
   function insertCompose(text) {
+    const want = flatText(text);
+    if (!want) return { ok: false, reason: 'no-text' };
     const btn = replyControl();
     if (btn) btn.click();
     const box = composeBox();
     if (!box) return { ok: false, reason: 'no-compose' };
-    const want = flatText(text);
     const cur = flatText(box.textContent || box.innerText || '');
     if (cur && cur.indexOf(want) < 0) return { ok: false, reason: 'compose-not-empty' };
     if (cur.indexOf(want) < 0) box.textContent = String(text || '').trim();
@@ -402,6 +421,7 @@
       }
       draft.textContent = res.draft;
       if (!verified) {
+        abandonCompose(res.draft);
         status.textContent = draftStatus(lang, false);
         status.setAttribute('dir', 'rtl');
         const why = document.createElement('span');
@@ -590,6 +610,85 @@
     reportContactsWhy(offer.reason || 'contacts-not-granted', offer.detail || '', key);
   }
 
+  function paintLookup(offer, pane, text) {
+    clearCard();
+    clearMailWhy();
+    clearStaleContactsWhy();
+    const lang = offer && offer.params && offer.params.lang === 'he' ? 'he' : 'en';
+    const card = document.createElement('div');
+    card.className = 'flow-lane-ms';
+    card.setAttribute('data-glance-ms-card', '1');
+    card.setAttribute('data-connector', offer.connectorId || 'outlookContacts');
+    const title = document.createElement('div');
+    title.className = 'flow-lane-title';
+    title.textContent = offer.title || '';
+    card.appendChild(title);
+    const line = document.createElement('div');
+    line.className = 'flow-lane-line';
+    line.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    line.textContent = lang === 'he' ? 'מחפש…' : 'Looking…';
+    card.appendChild(line);
+    place(card);
+    sendAction(card, pane, { connectorId: offer.connectorId, params: offer.params, text: text }, (res) => {
+      paintLookupResult(card, pane, offer, res);
+    });
+  }
+
+  function paintLookupResult(card, pane, offer, res) {
+    const lang = offer && offer.params && offer.params.lang === 'he' ? 'he' : 'en';
+    const name = (offer && offer.params && offer.params.name) || '';
+    const line = card.querySelector('.flow-lane-line');
+    card.querySelectorAll('.flow-lane-pick, .flow-lane-do').forEach((node) => node.remove());
+    const honest = (res && res.written) || (lang === 'he' ? ('לא מצאתי את ' + name + ' באנשי הקשר') : ("I didn't find " + name + ' in Contacts'));
+    if (!res || res.ok !== true) {
+      if (res && res.reason === 'ambiguous' && Array.isArray(res.choices) && res.choices.length > 1) {
+        if (line) line.textContent = lang === 'he' ? 'יש כמה אנשי קשר בשם הזה. בחר אחד.' : 'Several matches. Pick one.';
+        res.choices.forEach((choice) => {
+          const pick = document.createElement('button');
+          pick.type = 'button';
+          pick.className = 'flow-lane-pick';
+          const label = choice.displayName || name;
+          const value = choice.email || choice.phone || '';
+          pick.textContent = value ? (label + ' · ' + value) : label;
+          pick.addEventListener('click', () => {
+            if (pick.disabled) return;
+            pick.disabled = true;
+            const params = Object.assign({}, offer.params, { chosenId: choice.id, chosenEmail: choice.email || '' });
+            sendAction(card, pane, { connectorId: offer.connectorId, params: params }, (picked) => {
+              paintLookupResult(card, pane, offer, picked);
+            });
+          });
+          card.appendChild(pick);
+        });
+        return;
+      }
+      if (line) {
+        line.textContent = honest;
+        if (lang === 'he') line.setAttribute('dir', 'rtl');
+      }
+      return;
+    }
+    const address = res.email || res.phone || '';
+    if (!res.draft || !address || !res.button) {
+      if (line) line.textContent = honest;
+      return;
+    }
+    if (line) {
+      line.textContent = address;
+      line.setAttribute('dir', 'ltr');
+    }
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'flow-lane-do';
+    button.textContent = res.button;
+    button.addEventListener('click', () => {
+      if (button.disabled || !res.draft) return;
+      button.disabled = true;
+      finishContactsDraft(card, pane, offer, res, button);
+    });
+    card.appendChild(button);
+  }
+
   async function tick() {
     if (busy) return;
     const pane = readPane();
@@ -629,6 +728,10 @@
         try { offer = list[i].offer(ctx, list[i].CONNECTOR === 'outlookContacts' ? offerDeps : undefined); } catch (e) { offer = null; }
         if (offer && offer.grant) {
           paintGrant(offer, key);
+          return;
+        }
+        if (offer && offer.lookup) {
+          paintLookup(offer, pane, text);
           return;
         }
         if (offer && offer.show) {

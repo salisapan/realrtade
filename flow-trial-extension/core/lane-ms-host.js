@@ -93,10 +93,17 @@ async function makeDeps() {
 
 function logContactsWhy(reason, detail) {
   const why = String(reason || 'contacts-not-granted');
-  try { console.info('[Glance] contacts why-not', why); } catch (e) { /* no console */ }
+  try { console.info('[Glance] contacts why-not ' + why); } catch (e) { /* no console */ }
   if (detail && String(detail) !== why) {
-    try { console.info('[Glance] contacts why-not', String(detail)); } catch (e) { /* no console */ }
+    try { console.info('[Glance] contacts why-not ' + String(detail)); } catch (e) { /* no console */ }
   }
+}
+
+function logContactsLookup(result) {
+  if (!result || result.queryHash == null || result.queryHash === '') return;
+  const count = typeof result.matchCount === 'number' ? result.matchCount : 0;
+  const status = result.status == null ? 0 : result.status;
+  try { console.info('[Glance] contacts lookup q=' + result.queryHash + ' matches=' + count + ' status=' + status); } catch (e) { /* no console */ }
 }
 
 function laneId(msg) {
@@ -131,6 +138,7 @@ async function dispatch(msg) {
     explicitClick: payload.explicitClick === true
   }, deps);
   if (id === 'outlookContacts' && result && result.reason === 'contacts-not-granted') logContactsWhy(result.reason, result.detail);
+  if (id === 'outlookContacts') logContactsLookup(result);
   return result;
 }
 

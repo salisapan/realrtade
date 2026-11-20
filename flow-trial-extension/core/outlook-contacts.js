@@ -1,8 +1,10 @@
-// Microsoft Contacts (MC1): read-only resolve by name through Graph /me/contacts and
-// /me/people. Contacts.Read only — never creates or updates a contact. A clear ask
-// becomes a reply draft with the card details; Glance never sends. After one match
-// is chosen, a GET read-back is the fetchedBack gate. A split or unclear match stays
-// quiet. No network in the portable helpers: pass call().
+// Microsoft Contacts (MC1): read-only resolve by name through Graph /me/contacts.
+// Contacts.Read only — never creates or updates a contact. $search does not match a
+// reversed Hebrew name, so the list is paged and matched here: displayName, fileAs,
+// and givenName+surname in both orders, as the same token set. A clear ask becomes
+// a reply draft only after exactly one address. Glance never sends. After one match
+// is chosen, a GET read-back is the fetchedBack gate. No network in the portable
+// helpers: pass call().
 const FlowOutlookContacts = (() => {
   const CONNECTOR = 'outlookContacts';
   const SYSTEM = 'microsoft/contacts';
@@ -80,17 +82,67 @@ const FlowOutlookContacts = (() => {
     return s;
   }
 
-  function normName(n) {
-    return String(n || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // Hebrew letters only, after niqqud is gone. Punctuation, maqaf, and geresh
+  // become spaces so «כהן, דנה» and «כהן דנה» are the same tokens.
+  function foldName(value) {
+    return String(value || '')
+      .replace(/[\u0591-\u05C7]/g, '')
+      .replace(/[^\u05D0-\u05EAA-Za-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function tokensOf(value) {
+    const folded = foldName(value);
+    if (!folded) return [];
+    return folded.split(' ').filter(Boolean);
+  }
+
+  function sameTokenSet(want, have) {
+    if (!want.length || want.length !== have.length) return false;
+    const left = want.slice().sort();
+    const right = have.slice().sort();
+    for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return false;
+    return true;
   }
 
   function nameMatches(want, displayName) {
-    const w = normName(want);
-    const d = normName(displayName);
-    if (!w || !d) return false;
-    if (d === w || d.indexOf(w) >= 0 || w.indexOf(d) >= 0) return true;
-    const parts = w.split(' ').filter(Boolean);
-    return parts.length > 0 && parts.every((p) => d.indexOf(p) >= 0);
+    return sameTokenSet(tokensOf(want), tokensOf(displayName));
+  }
+
+  function nameForms(row) {
+    const forms = [];
+    const display = row && row.displayName ? String(row.displayName) : '';
+    const fileAs = row && row.fileAs ? String(row.fileAs) : '';
+    const given = row && row.givenName ? String(row.givenName).trim() : '';
+    const surname = row && row.surname ? String(row.surname).trim() : '';
+    if (display) forms.push(display);
+    if (fileAs) forms.push(fileAs);
+    if (given && surname) {
+      forms.push(given + ' ' + surname);
+      forms.push(surname + ' ' + given);
+    } else if (given) forms.push(given);
+    else if (surname) forms.push(surname);
+    return forms;
+  }
+
+  function rowMatches(want, row) {
+    const wantTokens = tokensOf(want);
+    if (!wantTokens.length) return false;
+    return nameForms(row).some((form) => sameTokenSet(wantTokens, tokensOf(form)));
+  }
+
+  function hashQuery(name) {
+    const s = tokensOf(name).join(' ');
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(16);
+  }
+
+  function missLine(name, lang) {
+    if (lang === 'he') return 'לא מצאתי את ' + name + ' באנשי הקשר';
+    return "I didn't find " + name + ' in Contacts';
   }
 
   function recognize(text) {
@@ -139,9 +191,35 @@ const FlowOutlookContacts = (() => {
     return encodeURIComponent('"' + String(name).replace(/"/g, '') + '"');
   }
 
+  const PAGE_TOP = 100;
+  const PAGE_CAP = 3;
+  const LIST_SELECT = 'id,displayName,givenName,surname,fileAs,emailAddresses,businessPhones,mobilePhone';
+
+  function contactsListPath(skip) {
+    let path = '/me/contacts?$select=' + LIST_SELECT + '&$top=' + PAGE_TOP;
+    if (skip) path += '&$skip=' + String(skip);
+    return path;
+  }
+
   function contactsSearchPath(name) {
-    return '/me/contacts?$search=' + searchQuery(name) +
-      '&$select=id,displayName,emailAddresses,businessPhones,mobilePhone&$top=10';
+    return contactsListPath(0);
+  }
+
+  function nextContactsPath(body, pages) {
+    const link = body && (body['@odata.nextLink'] || body['@odata.nextlink']);
+    if (link) {
+      try {
+        const u = new URL(String(link), 'https://graph.microsoft.com');
+        if (u.hostname === 'graph.microsoft.com') {
+          const path = u.pathname.replace(/^\/v1\.0/, '') + u.search;
+          if (path.indexOf('/me/contacts') === 0 && path.indexOf('..') < 0) return path;
+        }
+      } catch (e) { /* a bad link stops the page */ }
+      return '';
+    }
+    const rows = body && Array.isArray(body.value) ? body.value : [];
+    if (rows.length < PAGE_TOP || pages >= PAGE_CAP) return '';
+    return contactsListPath(pages * PAGE_TOP);
   }
 
   function peoplePath(name) {
@@ -176,7 +254,7 @@ const FlowOutlookContacts = (() => {
     rows.forEach((row) => {
       if (!row || !row.id) return;
       const displayName = (row.displayName && String(row.displayName).trim()) || '';
-      if (!nameMatches(wantName, displayName)) return;
+      if (!rowMatches(wantName, row)) return;
       const emails = [];
       (Array.isArray(row.emailAddresses) ? row.emailAddresses : []).forEach((item) => {
         const address = item && item.address ? String(item.address).trim() : '';
@@ -200,7 +278,7 @@ const FlowOutlookContacts = (() => {
     const out = [];
     rows.forEach((row) => {
       const displayName = (row.displayName && String(row.displayName).trim()) || '';
-      if (!nameMatches(wantName, displayName)) return;
+      if (!rowMatches(wantName, row)) return;
       const emails = [];
       (Array.isArray(row.scoredEmailAddresses) ? row.scoredEmailAddresses : []).forEach((item) => {
         const address = item && item.address ? String(item.address).trim() : '';
@@ -333,13 +411,89 @@ const FlowOutlookContacts = (() => {
     if (!access.granted) return grantOffer(rec, access.detail);
     return {
       show: true,
+      lookup: true,
       connectorId: CONNECTOR,
       title: titleFor(rec),
-      lines: [{ label: rec.lang === 'he' ? 'שם' : 'Name', value: rec.name }],
-      button: rec.lang === 'he' ? 'הכנס לטיוטה' : 'Put in draft',
+      lines: [],
+      button: '',
       closes: false,
       params: { name: rec.name, mode: rec.mode, lang: rec.lang }
     };
+  }
+
+  function lookupMeta(name, status, count) {
+    return { queryHash: hashQuery(name), status: status == null ? 0 : status, matchCount: count };
+  }
+
+  function buttonLabel(lang) {
+    return lang === 'he' ? 'הכנס לטיוטה' : 'Put in draft';
+  }
+
+  function missResult(rec, status) {
+    return Object.assign({
+      ok: false,
+      reason: 'not-found',
+      written: missLine(rec.name, rec.lang),
+      button: '',
+      posted: false,
+      closes: false,
+      connectorId: CONNECTOR
+    }, lookupMeta(rec.name, status, 0));
+  }
+
+  async function confirmCard(card, rec, deps, call) {
+    if (!card || !card.id) return { ok: false, reason: 'verify_failed', fetchedBack: false };
+    const back = await call({ method: 'GET', path: contactReadPath(card.id) });
+    const status = back && typeof back.status === 'number' ? back.status : 0;
+    if (!back || back.ok !== true || !bodyMatchesRead(rec.mode, back.body, card)) {
+      return { ok: false, reason: 'verify_failed', fetchedBack: false, status: status };
+    }
+    const proof = proveRead(card.id, deps);
+    if (!proof) return { ok: false, reason: 'verify_failed', fetchedBack: false, status: status };
+    return { ok: true, fetchedBack: true, proof: proof, status: status };
+  }
+
+  function readyResult(rec, card, verified, meta) {
+    const draft = draftFromCard(rec, card);
+    const value = rec.mode === 'phone' ? card.phone : card.email;
+    if (!draft.trim() || !value) return missResult(rec, meta && meta.status);
+    return Object.assign({
+      ok: true,
+      connectorId: CONNECTOR,
+      closes: false,
+      posted: false,
+      draft: draft,
+      email: card.email || '',
+      phone: card.phone || '',
+      button: buttonLabel(rec.lang),
+      lines: [{
+        label: rec.lang === 'he' ? (rec.mode === 'phone' ? 'טלפון' : 'דוא"ל') : (rec.mode === 'phone' ? 'Phone' : 'Email'),
+        value: value
+      }],
+      fetchedBack: verified.fetchedBack === true,
+      proof: verified.proof,
+      written: rec.lang === 'he' ? IN_DRAFT_HE : IN_DRAFT_EN,
+      verified: false
+    }, meta || {});
+  }
+
+  async function pageContacts(call) {
+    const rows = [];
+    let path = contactsListPath(0);
+    let status = 0;
+    let pages = 0;
+    let previous = '';
+    while (path && pages < PAGE_CAP && path !== previous) {
+      previous = path;
+      pages += 1;
+      const res = await call({ method: 'GET', path: path });
+      status = res && typeof res.status === 'number' ? res.status : 0;
+      if (!res || res.ok !== true) return { ok: false, status: status, rows: rows };
+      const value = res.body && Array.isArray(res.body.value) ? res.body.value : [];
+      value.forEach((row) => rows.push(row));
+      path = nextContactsPath(res.body, pages);
+    }
+    return { ok: true, status: status || 200, rows: rows };
   }
 
   async function run(input, deps) {
@@ -359,57 +513,61 @@ const FlowOutlookContacts = (() => {
       return { ok: false, reason: WHY_REASON, detail: access.detail, written: GRANT_HE, connectorId: CONNECTOR, posted: false, closes: false };
     }
 
-    const contacts = await call({
-      method: 'GET',
-      path: contactsSearchPath(name),
-      headers: { ConsistencyLevel: 'eventual' }
-    });
-    if (!contacts || (contacts.ok !== true && contacts.status !== 403)) {
-      return { ok: false, reason: 'contacts-failed', status: contacts && contacts.status };
-    }
-    const people = await call({
-      method: 'GET',
-      path: peoplePath(name),
-      headers: { ConsistencyLevel: 'eventual' }
-    });
-    const merged = candidatesFromContacts(contacts && contacts.ok ? contacts.body : null, name)
-      .concat(candidatesFromPeople(people && people.ok ? people.body : null, name));
-    const picked = dedupeKeys(expandCandidates(merged, mode));
-    if (!picked.length) return { ok: false, reason: 'not-found' };
-    if (picked.length > 1) return { ok: false, reason: 'ambiguous' };
-
-    const card = picked[0];
-    let fetchedBack = false;
-    let proof = null;
-    if (card.id && card.source !== 'people') {
-      const back = await call({ method: 'GET', path: contactReadPath(card.id) });
-      if (!back || back.ok !== true || !bodyMatchesRead(mode, back.body, card)) {
-        return { ok: false, reason: 'verify_failed', fetchedBack: false };
-      }
-      fetchedBack = true;
-      proof = proveRead(card.id, deps);
-      if (!proof) return { ok: false, reason: 'verify_failed', fetchedBack: false };
-    } else if (card.source === 'people' || card.source === 'both') {
-      fetchedBack = true;
-      proof = proveRead(card.id || ('people:' + card.key), deps);
-    } else {
-      return { ok: false, reason: 'verify_failed', fetchedBack: false };
+    if (params.chosenId) {
+      const back = await call({ method: 'GET', path: contactReadPath(params.chosenId) });
+      const status = back && typeof back.status === 'number' ? back.status : 0;
+      const row = back && back.ok === true ? back.body : null;
+      if (!row || !rowMatches(name, row)) return missResult(rec, status);
+      const picked = dedupeKeys(expandCandidates(candidatesFromContacts({ value: [row] }, name), mode));
+      const wantEmail = params.chosenEmail ? String(params.chosenEmail).toLowerCase() : '';
+      const card = picked.filter((item) => !wantEmail || String(item.email || '').toLowerCase() === wantEmail)[0];
+      if (!card || !bodyMatchesRead(mode, row, card)) return missResult(rec, status);
+      const proof = proveRead(card.id, deps);
+      if (!proof) return Object.assign({ ok: false, reason: 'verify_failed', fetchedBack: false, button: '', posted: false }, lookupMeta(name, status, 0));
+      return readyResult(rec, card, { fetchedBack: true, proof: proof }, lookupMeta(name, status, 1));
     }
 
-    const draft = draftFromCard(rec, card);
-    if (!draft.trim()) return { ok: false, reason: 'not-found' };
-
-    return {
-      ok: true,
-      connectorId: CONNECTOR,
-      closes: false,
-      posted: false,
-      draft: draft,
-      fetchedBack: fetchedBack,
-      proof: proof,
-      written: lang === 'he' ? IN_DRAFT_HE : IN_DRAFT_EN,
-      verified: false
-    };
+    const page = await pageContacts(call);
+    if (!page.ok) {
+      return Object.assign({
+        ok: false,
+        reason: 'contacts-failed',
+        button: '',
+        posted: false,
+        closes: false,
+        written: lang === 'he' ? 'לא הצלחתי לקרוא את אנשי הקשר' : 'Could not read Contacts'
+      }, lookupMeta(name, page.status, 0));
+    }
+    const picked = dedupeKeys(expandCandidates(candidatesFromContacts({ value: page.rows }, name), mode));
+    const meta = lookupMeta(name, page.status, picked.length);
+    if (!picked.length) return missResult(rec, page.status);
+    if (picked.length > 1) {
+      return Object.assign({
+        ok: false,
+        reason: 'ambiguous',
+        button: '',
+        posted: false,
+        closes: false,
+        choices: picked.map((item) => ({
+          id: item.id,
+          displayName: item.displayName,
+          email: item.email || '',
+          phone: item.phone || ''
+        }))
+      }, meta);
+    }
+    const verified = await confirmCard(picked[0], rec, deps, call);
+    if (!verified.ok) {
+      return Object.assign({
+        ok: false,
+        reason: 'verify_failed',
+        fetchedBack: false,
+        button: '',
+        posted: false,
+        written: missLine(name, lang)
+      }, lookupMeta(name, verified.status || page.status, 0));
+    }
+    return readyResult(rec, picked[0], verified, meta);
   }
 
   function undo() {
@@ -443,6 +601,10 @@ const FlowOutlookContacts = (() => {
     peoplePath: peoplePath,
     contactReadPath: contactReadPath,
     nameMatches: nameMatches,
+    rowMatches: rowMatches,
+    hashQuery: hashQuery,
+    missLine: missLine,
+    contactsListPath: contactsListPath,
     offer: offer,
     run: run,
     undo: undo,
