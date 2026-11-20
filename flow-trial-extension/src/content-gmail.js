@@ -6021,7 +6021,7 @@ function glanceUiCopy(kind) {
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
     if (response.html) {
-      const updateBtn = el('button', 'flow-chip-undo flow-doc-update', he ? 'עדכן מסמך קיים' : 'Update an existing document');
+      const updateBtn = el('button', 'flow-doc-update', he ? 'עדכן מסמך קיים' : 'Update an existing document');
       updateBtn.type = 'button';
       updateBtn.addEventListener('click', () => {
         updateBtn.disabled = true;

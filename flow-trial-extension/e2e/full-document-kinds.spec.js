@@ -133,7 +133,7 @@ test('a created Doc keeps its receipt and Undo when the same message is scanned 
   await expect(card.getByRole('button', { name: 'בטל' })).toBeVisible({ timeout: 20000 });
   await expect(card.getByRole('button', { name: 'עדכן מסמך קיים' })).toBeVisible();
   await expect(card).not.toContainText('כבר קיים מסמך מהשרשור הזה');
-  await expect(card.getByRole('button', { name: 'עדכן' })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'עדכן', exact: true })).toHaveCount(0);
   expect(docCreates()).toHaveLength(1);
 });
 
