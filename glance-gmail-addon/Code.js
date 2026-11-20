@@ -85,16 +85,24 @@ function normalizeSubject_(subject) {
   return text;
 }
 
-function enterZone_(e) {
+function applyZone_(zone) {
+  // FlowExtract is a const in the bundle file. Apps Script does not share
+  // that binding with Code.js. Glance is a var, so this is the live call.
+  if (typeof Glance !== 'undefined' && typeof Glance.setZone === 'function') {
+    Glance.setZone(zone || '');
+    return;
+  }
   if (typeof FlowExtract !== 'undefined' && typeof FlowExtract.setZone === 'function') {
-    FlowExtract.setZone(timeZoneOf_(e));
+    FlowExtract.setZone(zone || '');
   }
 }
 
+function enterZone_(e) {
+  applyZone_(timeZoneOf_(e));
+}
+
 function leaveZone_() {
-  if (typeof FlowExtract !== 'undefined' && typeof FlowExtract.setZone === 'function') {
-    FlowExtract.setZone('');
-  }
+  applyZone_('');
 }
 
 function subjectKey_(subject) {
@@ -710,14 +718,37 @@ function finishDecision_(decision, opened, messageId, lang, timeZone) {
   }, messageId, lang);
 }
 
+function stripScheduleBits_(value) {
+  var s = String(value || '');
+  s = s.replace(/\[[^[\]]{0,40}\]/g, ' ');
+  s = s.replace(/\b\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?\b/g, ' ');
+  s = s.replace(/\b\d{1,2}:\d{2}\b/g, ' ');
+  s = s.replace(/\b\d{1,2}\s*(?:am|pm)\b/gi, ' ');
+  s = s.replace(/[,\u00a0]+/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  return s.replace(/^[.\s]+|[.\s]+$/g, '');
+}
+
+function eventTitleFor_(opened, decision) {
+  var subject = '';
+  if (opened && opened.subject && typeof FlowActions !== 'undefined' && typeof FlowActions.holdSubjectTitle === 'function') {
+    subject = FlowActions.holdSubjectTitle(opened.subject);
+  } else if (opened && opened.subject) {
+    subject = String(opened.subject);
+  }
+  subject = stripScheduleBits_(subject);
+  if (subject) return Glance.intent.sanitizeTitle(subject);
+  var fallback = stripScheduleBits_(decision && decision.quote || '');
+  if (!fallback) fallback = stripScheduleBits_(decision && decision.eventTitle || '');
+  if (!fallback) fallback = stripScheduleBits_(decision && decision.title || '');
+  return Glance.intent.sanitizeTitle(fallback);
+}
+
 function finishCalendar_(decision, opened, messageId, lang, timeZone) {
-  // A calendar hold's event title is the meeting subject (tags stripped),
-  // or the sentence when the subject is empty. decision.title stays the
-  // card chrome ("שיחת וידאו 17/11 10:00"). Other holds keep that chrome
-  // on the event, the same way they did before.
-  var eventTitle = (decision.kind === 'hold' && decision.useMeetingSubject && decision.eventTitle)
-    ? decision.eventTitle
-    : decision.title;
+  // The event title is the meeting subject, or the what, with the bracket
+  // tag and any date or clock fragment removed. The card chrome
+  // ("פגישה 25/11 10:00") stays on the card and is not the event title.
+  var eventTitle = eventTitleFor_(opened, decision);
   stepLog_({
     step: 'write',
     target: 'event',

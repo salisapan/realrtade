@@ -110,6 +110,13 @@ const FlowIntent = (() => {
     if (SELF_CALENDAR_NEGATED.test(t)) return false;
     return SELF_CALENDAR_ASK_HE.test(t) || SELF_CALENDAR_ASK_EN.test(t);
   }
+  // «שריין ג׳ 10:00 ביומן» and «תשריין ביומן». Words may sit between the verb and ביומן.
+  // «תכניס ליומן» is a different ask (a webinar stays a schedule, not this hold).
+  const CALENDAR_RESERVE_HE = /(?:^|[^\u0590-\u05FF])(?:ת|ל)?(?:שריי?ן|שמור)(?![\u0590-\u05FF])[\s\S]{0,80}?(?:ל|ב)יומן(?![\u0590-\u05FF])/;
+  const TALK_OR_MEET_HE = /(?:^|[^\u0590-\u05FF])(?:שיחה|שיחת|פגישה|פגישת)(?![\u0590-\u05FF])/;
+  function calendarReservePhrase(text) {
+    return CALENDAR_RESERVE_HE.test(String(text || ''));
+  }
 
   // "This is not happening at the time this message names."
   //
@@ -1653,7 +1660,9 @@ const FlowIntent = (() => {
         const held = familyBox.hit;
         const fileHold = Boolean(held && held.fileTarget);
         const familyMeet = Boolean(held && held.family === 'D' && held.type === 'event' && held.personalClose === 'calendar-hold');
-        if (!fileHold && (familyMeet || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text))) {
+        // «שריין ג׳ 10:00 ביומן» is the same explicit hold when the words between
+        // the verb and ביומן kept it out of EXPLICIT_MEETING_ASK_HE.
+        if (!fileHold && (familyMeet || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text) || calendarReservePhrase(text))) {
           intent.explicitHold = true;
         }
       }
@@ -2082,6 +2091,11 @@ const FlowIntent = (() => {
     const eventEvidence = hasMeetingNoun && facts.date && (facts.date.iso || (pendingChoices && clock)) && !calledOff && !isRecap && !isPast && !attachToInvite && !phoneSomeone && !meetingAskHedge;
     const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite && !phoneSomeone &&
       (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text) || (ctx.surface !== 'chat' && (EXPLICIT_SLOT_QUESTION.test(text) || EXPLICIT_SLOT_QUESTION_HE.test(text))));
+    // «נקבע שיחה. שריין ג׳ 10:00 ביומן בבקשה.» and «נקבעה פגישה ב-18/11 בשעה 10:00, תשריין ביומן.»
+    // ask for the calendar. The meeting noun and the clock can sit in different sentences, and
+    // שריין need not be adjacent to ביומן. That is the hold, not a self-sent task.
+    const calendarReserveAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite && !phoneSomeone
+      && calendarReservePhrase(text) && TALK_OR_MEET_HE.test(text);
 
     // Drive / Doc / Sheet closes. Silence here is a decision, not a miss:
     // the remote fallback must not turn it into a different chip. A wait
@@ -2213,7 +2227,7 @@ const FlowIntent = (() => {
       // promise plus a time ("I'll send it at 9am") is not a hold.
       // A stated weekday alone does not make the hold. planFor may still
       // choose a Meeting when a noun, an explicit date, and a clock are present.
-      const meetingHold = explicitMeetingAsk;
+      const meetingHold = explicitMeetingAsk || calendarReserveAsk;
       if (meetingHold) {
         if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
         return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
@@ -2239,7 +2253,7 @@ const FlowIntent = (() => {
     // gate above never saw it, and REQUEST below would draft a reply
     // instead of holding the time. Only the explicit-ask phrase, and only
     // with a resolved clock time.
-    if (!blocked && !replyMisaddressed && explicitMeetingAsk && !hasMeetingNoun) {
+    if (!blocked && !replyMisaddressed && (explicitMeetingAsk || calendarReserveAsk) && !hasMeetingNoun) {
       if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
       return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
     }

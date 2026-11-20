@@ -67,7 +67,14 @@ const footer = [
   '  draftCompose: GlanceDraftCompose,',
   '  classify: function (text, ctx) { return FlowIntent.classify(text, ctx || {}); },',
   '  plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },',
-  '  judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }',
+  '  setZone: function (zone) {',
+  '    if (typeof FlowExtract !== \'undefined\' && FlowExtract.setZone) return FlowExtract.setZone(zone || \'\');',
+  '    return \'\';',
+  '  },',
+  '  judge: function (input) {',
+  '    if (input && input.timeZone && typeof FlowExtract !== \'undefined\' && FlowExtract.setZone) FlowExtract.setZone(input.timeZone);',
+  '    return FlowIncomingJudge.judge(input || {}, {});',
+  '  },',
   '};',
   ''
 ].join('\n');

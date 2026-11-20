@@ -1321,7 +1321,7 @@ console.log('\n--- message path parity ---');
   const written = state.events[eventIds[0]];
   const originalSummary = written.summary;
   check('the hold uses the plan date and clock', written.start.dateTime && written.start.dateTime.indexOf('2026-10-22T14:00') !== -1, written);
-  check('the Hebrew mail is written with a Hebrew title', written.summary === 'פגישה 22/10 14:00', { event: written.summary });
+  check('the Hebrew mail is written with a Hebrew title', written.summary === 'פגישה' && originalSummary.indexOf('22/10') === -1 && originalSummary.indexOf('14:00') === -1, { event: written.summary });
   check('the proof shows the calendar hold that was read back',
     proofLines.indexOf('On your calendar.') !== -1 && proofLines.indexOf(eventIds[0]) !== -1 &&
     buttonsOf(proof).length === 1 && buttonsOf(proof)[0].action === 'onUndo', proofLines);
@@ -2095,8 +2095,8 @@ console.log('\n--- message path parity ---');
         subject: 'פגישה על התקציב 2e34',
         plain: body,
         html: '<div>' + body + '</div>',
-        from: 'Owner <owner@ai.local.flow@gmail.com>',
-        to: 'owner@ai.local.flow@gmail.com',
+        from: 'Sali <sali@example.com>',
+        to: 'sali@example.com',
         date: new RealDate(nowIso)
       });
       const ev = {
@@ -2119,11 +2119,21 @@ console.log('\n--- message path parity ---');
   }
   const BUDGET = 'נקבעה פגישה ב-18/11 בשעה 10:00, תשריין ביומן.';
   const ahead = liveBudgetMeeting('budgetAhead', '2026-11-01T08:00:00Z', BUDGET, true);
+  function subjectOnly(event) {
+    if (!event) return false;
+    var summary = String(event.summary || '');
+    return summary === 'פגישה על התקציב 2e34' &&
+      !/\d{1,2}[./]\d{1,2}/.test(summary) &&
+      !/\d{1,2}:\d{2}/.test(summary) &&
+      !/\b\d{1,2}\s*(?:am|pm)\b/i.test(summary) &&
+      summary.indexOf('[') === -1;
+  }
   check('the exact budget mail is a calendar event on 18/11/2026 10:00 Asia/Jerusalem',
     ahead.event &&
     ahead.event.start.dateTime === '2026-11-18T10:00:00' &&
     ahead.event.start.timeZone === 'Asia/Jerusalem' &&
     ahead.event.end.dateTime === '2026-11-18T10:30:00' &&
+    subjectOnly(ahead.event) &&
     ahead.taskCount === 0 &&
     linesOf(ahead.card).join('\n').indexOf('2026-11-18') !== -1 &&
     linesOf(ahead.card).join('\n').indexOf('10:00') !== -1 &&
@@ -2132,7 +2142,15 @@ console.log('\n--- message path parity ---');
   check('Undo deletes that 18/11/2026 event',
     ahead.left === 0 && linesOf(ahead.undone).join('\n').indexOf('בוטל') !== -1,
     { left: ahead.left, lines: linesOf(ahead.undone) });
+  const savedSetZone = sandbox.Glance.setZone;
+  const savedExtract = sandbox.FlowExtract;
+  sandbox.Glance.setZone = function () { return ''; };
+  sandbox.FlowExtract = undefined;
   const liveDay = liveBudgetMeeting('budgetLive', '2026-11-20T08:00:00Z', BUDGET, false);
+  const messyBody = '\u202bנקבעה פגישה ב־\u00a018/11\u200f בשעה 10:00, תשריין ביומן.\u202c';
+  const messyDay = liveBudgetMeeting('budgetMessy', '2026-11-20T08:00:00Z', messyBody, false);
+  sandbox.Glance.setZone = savedSetZone;
+  sandbox.FlowExtract = savedExtract;
   const liveLines = linesOf(liveDay.card).join('\n');
   check('the budget mail on 20/11/2026 shows a past-date warning and no Do It',
     buttonsOf(liveDay.card).filter((b) => b.action === 'onDoIt').length === 0 &&
@@ -2143,11 +2161,21 @@ console.log('\n--- message path parity ---');
     !liveDay.event &&
     linesOf(liveDay.proof).join('\n').indexOf('התאריך כבר עבר (18/11)') !== -1,
     { card: linesOf(liveDay.card), proof: linesOf(liveDay.proof), event: liveDay.event, tasks: liveDay.taskCount });
+  const messyLines = linesOf(messyDay.card).join('\n');
+  check('a self-sent RTL budget body on 20/11/2026 is the same past calendar card',
+    buttonsOf(messyDay.card).filter((b) => b.action === 'onDoIt').length === 0 &&
+    messyLines.indexOf('התאריך כבר עבר (18/11)') !== -1 &&
+    messyLines.indexOf('2026-11-18') !== -1 &&
+    messyLines.indexOf('10:00') !== -1 &&
+    messyDay.taskCount === 0 &&
+    !messyDay.event,
+    { card: linesOf(messyDay.card), event: messyDay.event, tasks: messyDay.taskCount });
   const january = liveBudgetMeeting('jan5', '2026-12-20T08:00:00Z', 'נקבעה פגישה ב-5/1 בשעה 9:00, תשריין ביומן.', true);
   check('5/1 at 9:00 on 20/12/2026 is 5/1/2027 09:00',
     january.event &&
     january.event.start.dateTime === '2027-01-05T09:00:00' &&
     january.event.start.timeZone === 'Asia/Jerusalem' &&
+    subjectOnly(january.event) &&
     january.taskCount === 0 &&
     linesOf(january.card).join('\n').indexOf('2027-01-05') !== -1 &&
     linesOf(january.card).join('\n').indexOf('09:00') !== -1,
@@ -2157,6 +2185,7 @@ console.log('\n--- message path parity ---');
     laterNovember.event &&
     laterNovember.event.start.dateTime === '2026-11-25T10:00:00' &&
     laterNovember.event.start.timeZone === 'Asia/Jerusalem' &&
+    subjectOnly(laterNovember.event) &&
     laterNovember.taskCount === 0 &&
     linesOf(laterNovember.card).join('\n').indexOf('2026-11-25') !== -1 &&
     linesOf(laterNovember.card).join('\n').indexOf('10:00') !== -1,

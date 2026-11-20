@@ -457,19 +457,29 @@ var GlanceIntent = (function () {
         if (alt) title = sanitizeTitle(alt);
       }
       if (!taskTitleIsMeaningful(title)) return null;
-      var dueIso = isoOrNull(taskParams.dateIso, now, timeZone);
+      var taskPast = datePassed_(result);
+      var factIso = result.intent && result.intent.facts && result.intent.facts.date && result.intent.facts.date.iso;
+      var keptPast = taskPast && validIso(taskParams.dateIso) ? taskParams.dateIso
+        : (taskPast && validIso(factIso) ? factIso : '');
+      var dueIso = keptPast || isoOrNull(taskParams.dateIso, now, timeZone);
       if (planId === 'reply-track') {
         title = replyTrackCardTitle(sourceText || '', title, dueIso);
       }
       title = localizeEngineTitle(sourceText || '', title);
       var asEvent = calendarEventFromTask_(result, sourceText || '', dueIso, title);
-      if (asEvent) return asEvent;
+      if (asEvent) {
+        if (taskPast && keptPast) {
+          asEvent.past = true;
+          asEvent.pastShown = slashShown_(keptPast);
+        }
+        return asEvent;
+      }
       return {
         speak: true,
         source: 'engine',
         kind: 'task',
         title: title,
-        due: dueIso,
+        due: taskPast ? null : dueIso,
         lang: mailLang(sourceText || ''),
         reason: 'task',
         planId: result.plan.id || 'task'
@@ -723,10 +733,15 @@ var GlanceIntent = (function () {
     if (local) return local;
     if (typeof ctx.engine === 'function') {
       var hit = null;
+      var zoneSet = typeof FlowExtract !== 'undefined' && FlowExtract.setZone && ctx.timeZone;
+      var zoneBefore = zoneSet && FlowExtract.zone ? FlowExtract.zone() : '';
+      if (zoneSet) FlowExtract.setZone(ctx.timeZone);
       try { hit = ctx.engine(bodyText); } catch (err) {
         err.diag = err.diag || 'judge';
+        if (zoneSet) FlowExtract.setZone(zoneBefore || '');
         throw err;
       }
+      if (zoneSet) FlowExtract.setZone(zoneBefore || '');
       var sheetOnly = spottedSheetPlan(bodyText, hit);
       if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
         if (sheetOnly) {
