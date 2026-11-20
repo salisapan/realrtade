@@ -199,7 +199,12 @@ const FlowIntent = (() => {
   function isPastDate(dateIso, now) {
     if (!dateIso) return false;
     const n = now || new Date();
-    const todayIso = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+    let todayIso;
+    if (typeof FlowExtract !== 'undefined' && FlowExtract.zone && FlowExtract.zone() && typeof FlowExtract.todayIso === 'function') {
+      todayIso = FlowExtract.todayIso(n);
+    } else {
+      todayIso = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+    }
     return dateIso < todayIso;
   }
 
@@ -1709,7 +1714,10 @@ const FlowIntent = (() => {
     const calledOff = (s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text))
       && !liveWithAsk(vetoClauses(text));
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
-    const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
+    // A slash day with no year that passed within about six months stays on the
+    // facts (extract marks date.past when the user zone is set). It is still
+    // the meeting, with its clock. An older past day is not.
+    const isPast = isPastDate(facts.date && facts.date.iso, ctx.now) && !(facts.date && facts.date.past);
     // infoOrNoise is the same veto as s.flags.noise, for phrasings the
     // scorer's own list does not name yet (FYI, a quick bump, "Accepted:").
     // It also stops the score path below: a FYI wrapped around a strong

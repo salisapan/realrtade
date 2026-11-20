@@ -920,7 +920,10 @@ const FlowIncomingJudge = (() => {
     }
     return null;
   }
-  function ymdOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function ymdOf(d) {
+    if (typeof FlowExtract !== 'undefined' && FlowExtract.zone && FlowExtract.zone() && typeof FlowExtract.todayIso === 'function') return FlowExtract.todayIso(d);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
   function replyCard(i, hit) {
     const when = whenLabel(hit.dateIso);
     const title = 'Reply requested' + (when ? ' by ' + when : '');

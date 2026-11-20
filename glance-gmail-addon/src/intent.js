@@ -338,6 +338,69 @@ var GlanceIntent = (function () {
     return notPast(value, now, timeZone);
   }
 
+  // A calendar-intent mail with a date and a time is a calendar event.
+  // A note to self used to become a task, and the due day was the UTC day,
+  // so the 18th was filed as the 17th. An explicit task ask stays a task.
+  function intentClock_(intent) {
+    var facts = intent && intent.facts;
+    var fromFacts = facts && facts.time;
+    if (fromFacts && Number.isInteger(fromFacts.hour) && fromFacts.hour >= 0 && fromFacts.hour <= 23) {
+      var minute = Number.isInteger(fromFacts.minute) ? fromFacts.minute : 0;
+      if (minute >= 0 && minute <= 59) return { hour: fromFacts.hour, minute: minute };
+    }
+    var entities = intent && intent.entities;
+    if (entities && Number.isInteger(entities.hour) && entities.hour >= 0 && entities.hour <= 23) {
+      var entityMinute = Number.isInteger(entities.minute) ? entities.minute : 0;
+      if (entityMinute >= 0 && entityMinute <= 59) return { hour: entities.hour, minute: entityMinute };
+    }
+    return null;
+  }
+
+  function explicitTaskAsk_(text) {
+    var raw = String(text || '');
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) return true;
+    return /\b(?:please remember to|don'?t forget to|please create a task)\b/i.test(raw);
+  }
+
+  function calendarEventFromTask_(result, sourceText, dueIso, title) {
+    if (!dueIso || !title) return null;
+    var planId = String(result && result.plan && result.plan.id || '');
+    if (planId === 'reply-track') return null;
+    if (explicitTaskAsk_(sourceText)) return null;
+    var intent = result && result.intent;
+    if (!intent) return null;
+    var meeting = intent.type === 'event' || intent.selfHold === true || (intent.signals && intent.signals.hasMeetingNoun === true);
+    if (!meeting) return null;
+    var clock = intentClock_(intent);
+    if (!clock) return null;
+    return {
+      speak: true,
+      source: 'engine',
+      kind: 'hold',
+      title: title,
+      due: dueIso,
+      dateIso: dueIso,
+      hour: clock.hour,
+      minute: clock.minute,
+      quote: '',
+      useMeetingSubject: false,
+      lang: mailLang(sourceText || ''),
+      reason: 'hold',
+      planId: 'hold'
+    };
+  }
+
+  function datePassed_(result) {
+    var facts = result && result.intent && result.intent.facts;
+    return Boolean(facts && facts.date && facts.date.past);
+  }
+
+  function slashShown_(iso) {
+    var parts = String(iso || '').split('-');
+    if (parts.length !== 3) return '';
+    return String(+parts[2]) + '/' + String(+parts[1]);
+  }
+
   function clockOf(params) {
     if (!params) return null;
     var hour = params.hour;
@@ -394,17 +457,29 @@ var GlanceIntent = (function () {
         if (alt) title = sanitizeTitle(alt);
       }
       if (!taskTitleIsMeaningful(title)) return null;
-      var dueIso = isoOrNull(taskParams.dateIso, now, timeZone);
+      var taskPast = datePassed_(result);
+      var factIso = result.intent && result.intent.facts && result.intent.facts.date && result.intent.facts.date.iso;
+      var keptPast = taskPast && validIso(taskParams.dateIso) ? taskParams.dateIso
+        : (taskPast && validIso(factIso) ? factIso : '');
+      var dueIso = keptPast || isoOrNull(taskParams.dateIso, now, timeZone);
       if (planId === 'reply-track') {
         title = replyTrackCardTitle(sourceText || '', title, dueIso);
       }
       title = localizeEngineTitle(sourceText || '', title);
+      var asEvent = calendarEventFromTask_(result, sourceText || '', dueIso, title);
+      if (asEvent) {
+        if (taskPast && keptPast) {
+          asEvent.past = true;
+          asEvent.pastShown = slashShown_(keptPast);
+        }
+        return asEvent;
+      }
       return {
         speak: true,
         source: 'engine',
         kind: 'task',
         title: title,
-        due: dueIso,
+        due: taskPast ? null : dueIso,
         lang: mailLang(sourceText || ''),
         reason: 'task',
         planId: result.plan.id || 'task'
@@ -413,7 +488,10 @@ var GlanceIntent = (function () {
     if (steps.length === 1 && steps[0].kind === 'calendar' && result.plan.id === 'hold') {
       var holdParams = steps[0].params || {};
       var holdClock = clockOf(holdParams);
-      var holdDate = isoOrNull(holdParams.dateIso, now, timeZone);
+      var holdPast = datePassed_(result);
+      var holdDate = holdPast && validIso(holdParams.dateIso)
+        ? holdParams.dateIso
+        : isoOrNull(holdParams.dateIso, now, timeZone);
       var holdTitle = sanitizeTitle(holdParams.title || '');
       if (!holdClock || !holdDate || !holdTitle) return null;
       if (holdParams.requireTime === false && !holdClock) return null;
@@ -428,6 +506,8 @@ var GlanceIntent = (function () {
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
         useMeetingSubject: holdParams.useMeetingSubject === true,
+        past: holdPast,
+        pastShown: holdPast ? slashShown_(holdDate) : '',
         lang: mailLang(sourceText || ''),
         reason: 'hold',
         planId: 'hold'
@@ -653,10 +733,15 @@ var GlanceIntent = (function () {
     if (local) return local;
     if (typeof ctx.engine === 'function') {
       var hit = null;
+      var zoneSet = typeof FlowExtract !== 'undefined' && FlowExtract.setZone && ctx.timeZone;
+      var zoneBefore = zoneSet && FlowExtract.zone ? FlowExtract.zone() : '';
+      if (zoneSet) FlowExtract.setZone(ctx.timeZone);
       try { hit = ctx.engine(bodyText); } catch (err) {
         err.diag = err.diag || 'judge';
+        if (zoneSet) FlowExtract.setZone(zoneBefore || '');
         throw err;
       }
+      if (zoneSet) FlowExtract.setZone(zoneBefore || '');
       var sheetOnly = spottedSheetPlan(bodyText, hit);
       if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
         if (sheetOnly) {

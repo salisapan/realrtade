@@ -112,8 +112,30 @@ const FlowDayWords = (() => {
   const EN_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, a: 1 };
 
   function pad(n) { return String(n).padStart(2, '0'); }
-  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-  function plus(at, days) { return iso(new Date(at.getFullYear(), at.getMonth(), at.getDate() + days)); }
+  function zoned() {
+    try {
+      if (typeof FlowExtract !== 'undefined' && FlowExtract.zone && FlowExtract.zone() && FlowExtract.todayIso && FlowExtract.addDays) return FlowExtract;
+    } catch (e) { /* extension path: no zone */ }
+    return null;
+  }
+  function iso(d) {
+    var Z = zoned();
+    if (Z) return Z.todayIso(d);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function plus(at, days) {
+    var Z = zoned();
+    if (Z) return Z.todayIso(Z.addDays(at, days));
+    return iso(new Date(at.getFullYear(), at.getMonth(), at.getDate() + days));
+  }
+  function civil(at) {
+    var Z = zoned();
+    if (Z && Z.parts) {
+      var p = Z.parts(at);
+      if (p) return p;
+    }
+    return { year: at.getFullYear(), month: at.getMonth() + 1, day: at.getDate(), weekday: at.getDay() };
+  }
 
   function normalize(text, now) {
     let s = String(text == null ? '' : text);
@@ -133,11 +155,12 @@ const FlowDayWords = (() => {
       const dn = parseInt(d, 10); const mn = parseInt(mo, 10);
       if (dn < 1 || dn > 31 || mn < 1 || mn > 12) return m;
       // Always an ISO date: "5/11" is ambiguous (day or month first) to a reader, an ISO date is not. No year means the next such day.
-      let y = at.getFullYear();
-      if (yr) { y = parseInt(yr.slice(1), 10); if (y < 100) y += 2000; } else if (new Date(y, mn - 1, dn) < new Date(at.getFullYear(), at.getMonth(), at.getDate())) y += 1;
-      const probe = new Date(y, mn - 1, dn);
-      if (probe.getMonth() !== mn - 1 || probe.getDate() !== dn) return m;
-      return pre + mark + iso(probe);
+      const today = civil(at);
+      let y = today.year;
+      if (yr) { y = parseInt(yr.slice(1), 10); if (y < 100) y += 2000; } else if (new Date(Date.UTC(y, mn - 1, dn, 12)) < new Date(Date.UTC(today.year, today.month - 1, today.day, 12))) y += 1;
+      const probe = new Date(Date.UTC(y, mn - 1, dn));
+      if (probe.getUTCMonth() !== mn - 1 || probe.getUTCDate() !== dn) return m;
+      return pre + mark + (y + '-' + pad(mn) + '-' + pad(dn));
     });
     // Clocks written the other ways: «ב-8 וחצי», «ב-8 ורבע», "half past 8", "quarter to 9", and a dotted clock («ב-20.00»,
     // "at 8.30 pm"). The date reader would take "at 8.30 pm" for 8:00, a wrong hour, so these are made explicit first.
@@ -169,14 +192,20 @@ const FlowDayWords = (() => {
     s = s.replace(/\bthe\s+(\d{1,2})(?:st|nd|rd|th)\s+of\s+(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi, (m, d, mo) => mo + ' ' + d);
     // End of the week (Friday) and of the month, and a day of the month by itself: "by the 30th", «עד ה-30», «עד 30 לחודש».
     // English: Friday. Hebrew «סוף השבוע» follows the product's Israeli work week, as core/follow-up.js does: Thursday.
-    s = s.replace(/\b(?:end\s+of\s+(?:the\s+)?week|EOW)\b/gi, () => plus(at, (5 - at.getDay() + 7) % 7));
-    s = s.replace(/סוף\s+השבוע(?![\u0590-\u05FF])/g, () => plus(at, (4 - at.getDay() + 7) % 7));
-    s = s.replace(/\bend\s+of\s+(?:the\s+)?month\b|סוף\s+החודש(?![\u0590-\u05FF])/gi, () => iso(new Date(at.getFullYear(), at.getMonth() + 1, 0)));
+    s = s.replace(/\b(?:end\s+of\s+(?:the\s+)?week|EOW)\b/gi, () => plus(at, (5 - civil(at).weekday + 7) % 7));
+    s = s.replace(/סוף\s+השבוע(?![\u0590-\u05FF])/g, () => plus(at, (4 - civil(at).weekday + 7) % 7));
+    s = s.replace(/\bend\s+of\s+(?:the\s+)?month\b|סוף\s+החודש(?![\u0590-\u05FF])/gi, () => {
+      const today = civil(at);
+      const last = new Date(Date.UTC(today.year, today.month, 0));
+      return last.getUTCFullYear() + '-' + pad(last.getUTCMonth() + 1) + '-' + pad(last.getUTCDate());
+    });
     const dayOfMonth = (dn) => {
       if (dn < 1 || dn > 31) return null;
+      const today = civil(at);
+      const todayNoon = Date.UTC(today.year, today.month - 1, today.day, 12);
       for (let k = 0; k < 3; k++) {
-        const probe = new Date(at.getFullYear(), at.getMonth() + k, dn);
-        if (probe.getDate() === dn && probe >= new Date(at.getFullYear(), at.getMonth(), at.getDate())) return iso(probe);
+        const probe = new Date(Date.UTC(today.year, today.month - 1 + k, dn));
+        if (probe.getUTCDate() === dn && probe.getTime() + 12 * 3600000 >= todayNoon) return probe.getUTCFullYear() + '-' + pad(probe.getUTCMonth() + 1) + '-' + pad(dn);
       }
       return null;
     };
@@ -318,8 +347,84 @@ const FlowExtract = (() => {
     return target === 0 ? delta : delta + 7;
   }
 
+  // Empty unless a host set the user's zone (the Gmail add-on: calendar zone,
+  // then Session.getScriptTimeZone(), Asia/Jerusalem in tests). Unset, every
+  // helper below is the local Date the extension has always used.
+  var activeZone = '';
+  var WEEKDAY_SHORT = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+  function setZone(zone) {
+    activeZone = '';
+    if (typeof zone !== 'string' || !zone) return '';
+    var text = zone.trim();
+    if (!/^[A-Za-z0-9_+\-\/]{1,80}$/.test(text)) return '';
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: text });
+      activeZone = text;
+    } catch (err) {
+      activeZone = '';
+    }
+    return activeZone;
+  }
+
+  function currentZone() { return activeZone; }
+
+  function zoneParts(date) {
+    if (!activeZone || !date || typeof date.getTime !== 'function' || isNaN(date.getTime())) return null;
+    var fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: activeZone,
+      hourCycle: 'h23',
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    var map = {};
+    fmt.formatToParts(date).forEach(function (part) {
+      if (part.type !== 'literal') map[part.type] = part.value;
+    });
+    if (!map.year || !map.month || !map.day) return null;
+    return {
+      year: Number(map.year),
+      month: Number(map.month),
+      day: Number(map.day),
+      weekday: WEEKDAY_SHORT[map.weekday]
+    };
+  }
+
+  function isoFromParts(year, month, day) {
+    return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  }
+
   function iso(d) {
+    var p = zoneParts(d);
+    if (p) return isoFromParts(p.year, p.month, p.day);
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function weekdayOf(d) {
+    var p = zoneParts(d);
+    if (p && Number.isInteger(p.weekday)) return p.weekday;
+    return d.getDay();
+  }
+
+  function yearOf(d) {
+    var p = zoneParts(d);
+    return p ? p.year : d.getFullYear();
+  }
+
+  // Civil days in the user's zone. UTC midnight of a wanted day is not that
+  // day in a zone ahead of UTC: 2026-11-18T00:00:00+02:00 is 2026-11-17T22:00Z.
+  // Noon UTC of the civil day stays on that day across the Israel offset,
+  // including the spring-forward and fall-back mornings.
+  function addCivilDays(d, n) {
+    var p = zoneParts(d);
+    if (!p) {
+      var x = new Date(d.getTime());
+      x.setDate(x.getDate() + n);
+      return x;
+    }
+    return new Date(Date.UTC(p.year, p.month - 1, p.day + n, 12, 0, 0));
   }
 
   // `new Date(y, m, d)` silently rolls impossible days forward: February 30
@@ -329,7 +434,12 @@ const FlowExtract = (() => {
   // the only way to tell a valid date from a rolled-over one.
   function buildDate(year, monthIdx, day) {
     if (!(monthIdx >= 0 && monthIdx <= 11) || !(day >= 1 && day <= 31)) return null;
-    const d = new Date(year, monthIdx, day);
+    if (activeZone) {
+      var utc = new Date(Date.UTC(year, monthIdx, day));
+      if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== monthIdx || utc.getUTCDate() !== day) return null;
+      return new Date(Date.UTC(year, monthIdx, day, 12, 0, 0));
+    }
+    var d = new Date(year, monthIdx, day);
     if (d.getFullYear() !== year || d.getMonth() !== monthIdx || d.getDate() !== day) return null;
     return d;
   }
@@ -356,7 +466,7 @@ const FlowExtract = (() => {
       const d = buildDate(+explicitYear, monthIdx, day);
       return d ? { raw, iso: iso(d) } : null;
     }
-    const y = now.getFullYear();
+    const y = yearOf(now);
     const inWindow = [y - 1, y, y + 1]
       .map((yy) => buildDate(yy, monthIdx, day))
       .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
@@ -370,9 +480,12 @@ const FlowExtract = (() => {
   }
 
   function localToday(now) {
-    const d = now || new Date();
-    const p = (n) => String(n).padStart(2, '0');
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    var d = now || new Date();
+    if (isNaN(d.getTime())) d = new Date();
+    var p = zoneParts(d);
+    if (p) return isoFromParts(p.year, p.month, p.day);
+    var pad2 = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
   // An invoice number, a version, or a phone is not a day.
   function slashRejected(text, index) {
@@ -401,6 +514,29 @@ const FlowExtract = (() => {
     if (/(?:בשעה|(?<![\u0590-\u05FF])בעה|\bat\s+\d|\b\d{1,2}:\d{2}\b)/i.test(window)) return true;
     return false;
   }
+  function daysBetweenIso_(later, earlier) {
+    var a = String(later).split('-');
+    var b = String(earlier).split('-');
+    return Math.round((Date.UTC(+a[0], +a[1] - 1, +a[2]) - Date.UTC(+b[0], +b[1] - 1, +b[2])) / 86400000);
+  }
+
+  // ~6 months. A day further back than this, with no year, is next year.
+  var OMITTED_YEAR_PAST_DAYS = 183;
+
+  function omittedSlashInZone_(monthIdx, day, today) {
+    var year = +String(today).slice(0, 4);
+    var thisYear = buildDate(year, monthIdx, day);
+    if (!thisYear) return null;
+    var isoThis = iso(thisYear);
+    if (isoThis >= today) return { iso: isoThis, past: false };
+    if (daysBetweenIso_(today, isoThis) > OMITTED_YEAR_PAST_DAYS) {
+      var nextYear = buildDate(year + 1, monthIdx, day);
+      if (!nextYear) return null;
+      return { iso: iso(nextYear), past: false };
+    }
+    return { iso: isoThis, past: true };
+  }
+
   // 23/10 is day 23. 10/23 is month 10. 5/6 is either, so it stays words with no ISO.
   // Day-first stays. A bare slash, a past day, or a number inside an invoice is not a date.
   function slashDate(text, now) {
@@ -426,10 +562,29 @@ const FlowExtract = (() => {
       }
       else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
       let year = m[3] ? +m[3] : null;
+      const yearOmitted = year == null;
       if (year != null && year < 100) year += 2000;
-      const built = monthDay(m[0], monthIdx, day, year, now || new Date());
-      const iso = built && built.iso;
-      if (!iso || !slashDateContext(src, m.index, m[0]) || iso < today) {
+      let built;
+      let iso;
+      // With the user's zone set, an omitted year is this year when that day
+      // is today or later. More than about six months ago means next year
+      // (5/1 read on 20/12). A day that passed more recently stays this year
+      // and is marked past (18/11 read on 20/11). The clock is left alone.
+      // With no zone, a past slash date is still not a date.
+      if (activeZone && yearOmitted) {
+        const resolved = omittedSlashInZone_(monthIdx, day, today);
+        if (!resolved) {
+          if (!ambiguous) ambiguous = { raw: m[0], iso: null };
+          continue;
+        }
+        built = { raw: m[0], iso: resolved.iso };
+        if (resolved.past) built.past = true;
+        iso = resolved.iso;
+      } else {
+        built = monthDay(m[0], monthIdx, day, year, now || new Date());
+        iso = built && built.iso;
+      }
+      if (!iso || !slashDateContext(src, m.index, m[0]) || (iso < today && !(built && built.past))) {
         if (!ambiguous) ambiguous = { raw: m[0], iso: null };
         continue;
       }
@@ -475,19 +630,21 @@ const FlowExtract = (() => {
     return null;
   }
   function choiceLabel(date, he) {
+    const p = zoneParts(date);
+    const day = p ? p.weekday : date.getDay();
+    const dom = p ? p.day : date.getDate();
+    const month = p ? p.month : date.getMonth() + 1;
     const name = he
-      ? DAYS_HE[date.getDay()]
-      : DAYS[date.getDay()].charAt(0).toUpperCase() + DAYS[date.getDay()].slice(1);
-    return name + ' ' + date.getDate() + '/' + (date.getMonth() + 1);
+      ? DAYS_HE[day]
+      : DAYS[day].charAt(0).toUpperCase() + DAYS[day].slice(1);
+    return name + ' ' + dom + '/' + month;
   }
   function nearestWeekday(anchor, weekday) {
     for (let delta = 1; delta <= 3; delta++) {
-      const before = new Date(anchor.getTime());
-      before.setDate(anchor.getDate() - delta);
-      if (before.getDay() === weekday) return before;
-      const after = new Date(anchor.getTime());
-      after.setDate(anchor.getDate() + delta);
-      if (after.getDay() === weekday) return after;
+      const before = addCivilDays(anchor, -delta);
+      if (weekdayOf(before) === weekday) return before;
+      const after = addCivilDays(anchor, delta);
+      if (weekdayOf(after) === weekday) return after;
     }
     return null;
   }
@@ -517,14 +674,14 @@ const FlowExtract = (() => {
       written = buildDate(year, num.month - 1, num.day);
       if (!written) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
     } else {
-      const y = now.getFullYear();
+      const y = yearOf(now);
       const inWindow = [y - 1, y, y + 1]
         .map((yy) => buildDate(yy, num.month - 1, num.day))
         .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
       if (inWindow.length !== 1) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
       written = inWindow[0];
     }
-    if (written.getDay() === dayName.index) {
+    if (weekdayOf(written) === dayName.index) {
       return { raw: raw, iso: iso(written), statedWeekday: true };
     }
     // No clock: leave the day to the older parser. A conflict with no
@@ -616,8 +773,8 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('\\b(?:by|on|before|due|until|no later than|signing|closing|starting|effective|kick(?:ing)? off)\\s+(?:(?:eod|end of (?:the )?day|end of business|close of business|cob)\\s+)?(?:on\\s+)?(?:next\\s+)?(' + DAYS.join('|') + ')\\b', 'i'));
     if (m) {
       const target = DAYS.indexOf(m[1].toLowerCase());
-      const d = new Date(now);
-      let delta = (target - d.getDay() + 7) % 7;
+      let d = new Date(now.getTime());
+      let delta = (target - weekdayOf(d) + 7) % 7;
       // "next Friday" has to land at least a week further out than plain
       // "Friday" — otherwise the word "next" is captured by the regex but
       // has no effect on the computed date, and a sender who explicitly
@@ -627,7 +784,7 @@ const FlowExtract = (() => {
       // a full week regardless of "next", so it needs no separate bump.
       if (delta === 0) delta = 7;
       else if (/next\s/i.test(m[0])) delta = nextWeekDelta(d, target, delta);
-      d.setDate(d.getDate() + delta);
+      d = addCivilDays(d, delta);
       // "by Friday 23/10": the number is the day. The weekday name is the same Friday.
       const numbered = slashDate(text, now);
       if (numbered && numbered.iso) return numbered;
@@ -642,11 +799,11 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('\\bnext\\s+(' + DAYS.join('|') + ')\\b', 'i'));
     if (m) {
       const target = DAYS.indexOf(m[1].toLowerCase());
-      const d = new Date(now);
-      let delta = (target - d.getDay() + 7) % 7;
+      let d = new Date(now.getTime());
+      let delta = (target - weekdayOf(d) + 7) % 7;
       if (delta === 0) delta = 7;
       else delta = nextWeekDelta(d, target, delta);
-      d.setDate(d.getDate() + delta);
+      d = addCivilDays(d, delta);
       return { raw: m[0], iso: iso(d) };
     }
 
@@ -657,13 +814,13 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('\\b(this\\s+|next\\s+)?(' + DAYS.join('|') + ')\\b(?=\\s+at\\s+\\d)', 'i'));
     if (m) {
       const target = DAYS.indexOf(m[2].toLowerCase());
-      const d = new Date(now);
-      let delta = (target - d.getDay() + 7) % 7;
+      let d = new Date(now.getTime());
+      let delta = (target - weekdayOf(d) + 7) % 7;
       const flagged = (m[1] || '').toLowerCase();
       if (delta === 0) {
         if (flagged.indexOf('this') !== 0) delta = 7;
       } else if (flagged.indexOf('next') === 0) delta += 7;
-      d.setDate(d.getDate() + delta);
+      d = addCivilDays(d, delta);
       return { raw: m[0], iso: iso(d) };
     }
 
@@ -687,12 +844,12 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('(?:עד|ב-?|ל|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')(?:\\s+הבא(?![\\u0590-\\u05FF]))?'));
     if (m) {
       const target = DAYS_HE.indexOf(m[1]);
-      const d = new Date(now);
-      let delta = (target - d.getDay() + 7) % 7;
+      let d = new Date(now.getTime());
+      let delta = (target - weekdayOf(d) + 7) % 7;
       const isNext = /הבא(?![\u0590-\u05FF])/.test(m[0]);
       if (delta === 0) delta = 7;
       else if (isNext) delta = nextWeekDelta(d, target, delta);
-      d.setDate(d.getDate() + delta);
+      d = addCivilDays(d, delta);
       return { raw: m[0], iso: iso(d) };
     }
 
@@ -709,9 +866,7 @@ const FlowExtract = (() => {
     if (m) {
       const word = m[1].toLowerCase();
       const days = word === 'tomorrow' ? 1 : 2;
-      const d = new Date(now);
-      d.setDate(d.getDate() + days);
-      return { raw: m[0], iso: iso(d) };
+      return { raw: m[0], iso: iso(addCivilDays(now, days)) };
     }
     m = text.match(/\b(?:by|due|before|until|no later than)\s+today\b|\b(?:meet(?:ing)?|call|sync)\s+today\b|\btoday\s+at\b/i);
     if (m) {
@@ -733,9 +888,7 @@ const FlowExtract = (() => {
     m = text.match(/(?:^|[^\u0590-\u05FF])ל?(מחרתיים|מחר)(?![\u0590-\u05FF])/);
     if (m) {
       const days = m[1] === 'מחר' ? 1 : 2;
-      const d = new Date(now);
-      d.setDate(d.getDate() + days);
-      return { raw: m[1], iso: iso(d) };
+      return { raw: m[1], iso: iso(addCivilDays(now, days)) };
     }
     m = text.match(/(?:פגישה|שיחה|עד)\s+היום(?![\u0590-\u05FF])|היום\s+בשעה/);
     if (m) {
@@ -946,7 +1099,14 @@ const FlowExtract = (() => {
     };
   }
 
-  return { extract, parseMoney, parseDate, parseTime, fmtMoney, fmtTime, decisiveSentence, senderIsAutomated };
+  return {
+    extract, parseMoney, parseDate, parseTime, fmtMoney, fmtTime, decisiveSentence, senderIsAutomated,
+    setZone: setZone,
+    zone: currentZone,
+    parts: zoneParts,
+    todayIso: function (d) { return localToday(d || new Date()); },
+    addDays: addCivilDays
+  };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExtract };
@@ -4996,7 +5156,12 @@ const FlowIntent = (() => {
   function isPastDate(dateIso, now) {
     if (!dateIso) return false;
     const n = now || new Date();
-    const todayIso = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+    let todayIso;
+    if (typeof FlowExtract !== 'undefined' && FlowExtract.zone && FlowExtract.zone() && typeof FlowExtract.todayIso === 'function') {
+      todayIso = FlowExtract.todayIso(n);
+    } else {
+      todayIso = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+    }
     return dateIso < todayIso;
   }
 
@@ -6506,7 +6671,10 @@ const FlowIntent = (() => {
     const calledOff = (s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text))
       && !liveWithAsk(vetoClauses(text));
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
-    const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
+    // A slash day with no year that passed within about six months stays on the
+    // facts (extract marks date.past when the user zone is set). It is still
+    // the meeting, with its clock. An older past day is not.
+    const isPast = isPastDate(facts.date && facts.date.iso, ctx.now) && !(facts.date && facts.date.past);
     // infoOrNoise is the same veto as s.flags.noise, for phrasings the
     // scorer's own list does not name yet (FYI, a quick bump, "Accepted:").
     // It also stops the score path below: a FYI wrapped around a strong
@@ -11354,7 +11522,10 @@ const FlowIncomingJudge = (() => {
     }
     return null;
   }
-  function ymdOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function ymdOf(d) {
+    if (typeof FlowExtract !== 'undefined' && FlowExtract.zone && FlowExtract.zone() && typeof FlowExtract.todayIso === 'function') return FlowExtract.todayIso(d);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
   function replyCard(i, hit) {
     const when = whenLabel(hit.dateIso);
     const title = 'Reply requested' + (when ? ' by ' + when : '');
@@ -11737,7 +11908,9 @@ var GlanceI18n = (function () {
       draftNoUndo: 'Glance does not read this draft back, and does not undo it.',
       composeNeedsReply: 'Open Glance from a reply. This compose has no message to read.',
       composeNoReply: 'This message has no reply to insert.',
-      composeAskFirst: 'Open the message in Glance first and press Prepare a reply.'
+      composeAskFirst: 'Open the message in Glance first and press Prepare a reply.',
+      alreadyInDraft: 'The reply is already in the draft.',
+      datePassed: 'That date has already passed'
     },
     he: {
       doIt: 'בצע',
@@ -11769,7 +11942,9 @@ var GlanceI18n = (function () {
       draftNoUndo: 'Glance לא קורא את הטיוטה בחזרה, ולא מבטל אותה.',
       composeNeedsReply: 'פתחו את Glance מתשובה. לכתיבה הזו אין הודעה לקרוא.',
       composeNoReply: 'בהודעה הזו אין תשובה להכניס.',
-      composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».'
+      composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».',
+      alreadyInDraft: 'התשובה כבר בטיוטה.',
+      datePassed: 'התאריך כבר עבר'
     }
   };
 
@@ -12170,6 +12345,69 @@ var GlanceIntent = (function () {
     return notPast(value, now, timeZone);
   }
 
+  // A calendar-intent mail with a date and a time is a calendar event.
+  // A note to self used to become a task, and the due day was the UTC day,
+  // so the 18th was filed as the 17th. An explicit task ask stays a task.
+  function intentClock_(intent) {
+    var facts = intent && intent.facts;
+    var fromFacts = facts && facts.time;
+    if (fromFacts && Number.isInteger(fromFacts.hour) && fromFacts.hour >= 0 && fromFacts.hour <= 23) {
+      var minute = Number.isInteger(fromFacts.minute) ? fromFacts.minute : 0;
+      if (minute >= 0 && minute <= 59) return { hour: fromFacts.hour, minute: minute };
+    }
+    var entities = intent && intent.entities;
+    if (entities && Number.isInteger(entities.hour) && entities.hour >= 0 && entities.hour <= 23) {
+      var entityMinute = Number.isInteger(entities.minute) ? entities.minute : 0;
+      if (entityMinute >= 0 && entityMinute <= 59) return { hour: entities.hour, minute: entityMinute };
+    }
+    return null;
+  }
+
+  function explicitTaskAsk_(text) {
+    var raw = String(text || '');
+    if (/(?:^|[^\u0590-\u05FF])(?:תזכיר(?:י|ו)?\s+לי|אל\s+תשכח(?:י|ו)?\s+ל)/.test(raw)) return true;
+    return /\b(?:please remember to|don'?t forget to|please create a task)\b/i.test(raw);
+  }
+
+  function calendarEventFromTask_(result, sourceText, dueIso, title) {
+    if (!dueIso || !title) return null;
+    var planId = String(result && result.plan && result.plan.id || '');
+    if (planId === 'reply-track') return null;
+    if (explicitTaskAsk_(sourceText)) return null;
+    var intent = result && result.intent;
+    if (!intent) return null;
+    var meeting = intent.type === 'event' || intent.selfHold === true || (intent.signals && intent.signals.hasMeetingNoun === true);
+    if (!meeting) return null;
+    var clock = intentClock_(intent);
+    if (!clock) return null;
+    return {
+      speak: true,
+      source: 'engine',
+      kind: 'hold',
+      title: title,
+      due: dueIso,
+      dateIso: dueIso,
+      hour: clock.hour,
+      minute: clock.minute,
+      quote: '',
+      useMeetingSubject: false,
+      lang: mailLang(sourceText || ''),
+      reason: 'hold',
+      planId: 'hold'
+    };
+  }
+
+  function datePassed_(result) {
+    var facts = result && result.intent && result.intent.facts;
+    return Boolean(facts && facts.date && facts.date.past);
+  }
+
+  function slashShown_(iso) {
+    var parts = String(iso || '').split('-');
+    if (parts.length !== 3) return '';
+    return String(+parts[2]) + '/' + String(+parts[1]);
+  }
+
   function clockOf(params) {
     if (!params) return null;
     var hour = params.hour;
@@ -12226,17 +12464,29 @@ var GlanceIntent = (function () {
         if (alt) title = sanitizeTitle(alt);
       }
       if (!taskTitleIsMeaningful(title)) return null;
-      var dueIso = isoOrNull(taskParams.dateIso, now, timeZone);
+      var taskPast = datePassed_(result);
+      var factIso = result.intent && result.intent.facts && result.intent.facts.date && result.intent.facts.date.iso;
+      var keptPast = taskPast && validIso(taskParams.dateIso) ? taskParams.dateIso
+        : (taskPast && validIso(factIso) ? factIso : '');
+      var dueIso = keptPast || isoOrNull(taskParams.dateIso, now, timeZone);
       if (planId === 'reply-track') {
         title = replyTrackCardTitle(sourceText || '', title, dueIso);
       }
       title = localizeEngineTitle(sourceText || '', title);
+      var asEvent = calendarEventFromTask_(result, sourceText || '', dueIso, title);
+      if (asEvent) {
+        if (taskPast && keptPast) {
+          asEvent.past = true;
+          asEvent.pastShown = slashShown_(keptPast);
+        }
+        return asEvent;
+      }
       return {
         speak: true,
         source: 'engine',
         kind: 'task',
         title: title,
-        due: dueIso,
+        due: taskPast ? null : dueIso,
         lang: mailLang(sourceText || ''),
         reason: 'task',
         planId: result.plan.id || 'task'
@@ -12245,7 +12495,10 @@ var GlanceIntent = (function () {
     if (steps.length === 1 && steps[0].kind === 'calendar' && result.plan.id === 'hold') {
       var holdParams = steps[0].params || {};
       var holdClock = clockOf(holdParams);
-      var holdDate = isoOrNull(holdParams.dateIso, now, timeZone);
+      var holdPast = datePassed_(result);
+      var holdDate = holdPast && validIso(holdParams.dateIso)
+        ? holdParams.dateIso
+        : isoOrNull(holdParams.dateIso, now, timeZone);
       var holdTitle = sanitizeTitle(holdParams.title || '');
       if (!holdClock || !holdDate || !holdTitle) return null;
       if (holdParams.requireTime === false && !holdClock) return null;
@@ -12260,6 +12513,8 @@ var GlanceIntent = (function () {
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
         useMeetingSubject: holdParams.useMeetingSubject === true,
+        past: holdPast,
+        pastShown: holdPast ? slashShown_(holdDate) : '',
         lang: mailLang(sourceText || ''),
         reason: 'hold',
         planId: 'hold'
@@ -12485,10 +12740,15 @@ var GlanceIntent = (function () {
     if (local) return local;
     if (typeof ctx.engine === 'function') {
       var hit = null;
+      var zoneSet = typeof FlowExtract !== 'undefined' && FlowExtract.setZone && ctx.timeZone;
+      var zoneBefore = zoneSet && FlowExtract.zone ? FlowExtract.zone() : '';
+      if (zoneSet) FlowExtract.setZone(ctx.timeZone);
       try { hit = ctx.engine(bodyText); } catch (err) {
         err.diag = err.diag || 'judge';
+        if (zoneSet) FlowExtract.setZone(zoneBefore || '');
         throw err;
       }
+      if (zoneSet) FlowExtract.setZone(zoneBefore || '');
       var sheetOnly = spottedSheetPlan(bodyText, hit);
       if (hit && hit.reason && String(hit.reason).indexOf('quiet:') === 0) {
         if (sheetOnly) {
@@ -13031,12 +13291,17 @@ var GlanceCards = (function () {
     var L = i18n();
     if (decision.kind === 'hold') {
       var holdWhen = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
-      return card(lang, [
+      var holdWidgets = [
         text(lang, L.t(lang, 'calendarHold')),
         text(lang, decision.title),
-        whenLine(lang, holdWhen),
-        doItButton(messageId, lang)
-      ]);
+        whenLine(lang, holdWhen)
+      ];
+      if (decision.past) {
+        holdWidgets.push(text(lang, L.t(lang, 'datePassed') + ' (' + (decision.pastShown || '') + ')'));
+        return card(lang, holdWidgets);
+      }
+      holdWidgets.push(doItButton(messageId, lang));
+      return card(lang, holdWidgets);
     }
     if (decision.kind === 'schedule') {
       var when = decision.dateIso;
@@ -13200,6 +13465,10 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'composeAskFirst'))]);
   }
 
+  function composeAlready(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'alreadyInDraft'))]);
+  }
+
   function composeNeedsReply(lang) {
     return card(lang, [text(lang, i18n().t(lang, 'composeNeedsReply'))]);
   }
@@ -13251,6 +13520,7 @@ var GlanceCards = (function () {
     composeNeedsReply: composeNeedsReply,
     composeNoReply: composeNoReply,
     composeAskFirst: composeAskFirst,
+    composeAlready: composeAlready,
     prepareReplyButton: prepareReplyButton,
     replyOnly: replyOnly,
     spottedUnsupported: spottedUnsupported,
@@ -13401,6 +13671,13 @@ var Glance = {
   draftCompose: GlanceDraftCompose,
   classify: function (text, ctx) { return FlowIntent.classify(text, ctx || {}); },
   plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },
-  judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }
+  setZone: function (zone) {
+    if (typeof FlowExtract !== 'undefined' && FlowExtract.setZone) return FlowExtract.setZone(zone || '');
+    return '';
+  },
+  judge: function (input) {
+    if (input && input.timeZone && typeof FlowExtract !== 'undefined' && FlowExtract.setZone) FlowExtract.setZone(input.timeZone);
+    return FlowIncomingJudge.judge(input || {}, {});
+  },
 };
 // GLANCE_BUILD_SHA=dev
