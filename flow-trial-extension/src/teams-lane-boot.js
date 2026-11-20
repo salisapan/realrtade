@@ -5,6 +5,13 @@
     try { return String(location.href || ''); } catch (e) { return ''; }
   }
   try { console.info('[Glance] teams lane injected ' + here()); } catch (e) { /* no console */ }
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ type: 'flow:teams-trace', line: '[Glance] teams lane injected ' + here() }, () => {
+        try { void chrome.runtime.lastError; } catch (e) { /* closing */ }
+      });
+    }
+  } catch (e) { /* no worker */ }
   function mark() {
     try {
       const root = document.documentElement;

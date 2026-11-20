@@ -2415,6 +2415,38 @@
     return chrome.permissions.request({ origins: teamsWebHosts() }).then((ok) => Boolean(ok)).catch(() => false);
   }
 
+  // The side panel is already open on a Teams tab that has not granted the optional hosts.
+  // The button asks for those two origins only. It does not add a scope.
+  async function renderTeamsPageGrant() {
+    const row = document.getElementById('teams-page-grant');
+    const btn = document.getElementById('teams-page-grant-btn');
+    if (!row || !btn) return;
+    if (!btn.dataset.bound) {
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => {
+        btn.disabled = true;
+        requestTeamsWebHosts().then((ok) => {
+          btn.disabled = false;
+          if (ok) row.hidden = true;
+        });
+      });
+    }
+    row.hidden = true;
+    let url = '';
+    try {
+      if (chrome.tabs && chrome.tabs.query) {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        url = (tabs && tabs[0] && tabs[0].url) || '';
+      }
+    } catch (e) { url = ''; }
+    if (!/https:\/\/teams\.(?:live|microsoft)\.com\//i.test(url)) return;
+    let granted = false;
+    try {
+      if (chrome.permissions && chrome.permissions.contains) granted = await chrome.permissions.contains({ origins: teamsWebHosts() });
+    } catch (e) { granted = false; }
+    row.hidden = granted === true;
+  }
+
   function askTeamsWebHosts(ui) {
     const consent = globalThis.FlowTeamsHostConsent;
     if (consent && typeof consent.ask === 'function') return consent.ask(() => requestTeamsWebHosts(), ui);
@@ -3328,6 +3360,7 @@
     if (priorExpired && priorExpired.parentNode && priorExpired.parentNode.removeChild) priorExpired.parentNode.removeChild(priorExpired);
     // Expired rows are not open work. The empty line stays when nothing is still open.
     empty.hidden = openCount > 0;
+    renderTeamsPageGrant().catch(() => {});
     // Suggested and Added are list headings, including a single Do It and a
     // Handled row that has no step list. The chip alone is not the heading.
     function loopsHeading(which) {

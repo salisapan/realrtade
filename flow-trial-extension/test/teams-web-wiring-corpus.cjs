@@ -21,6 +21,8 @@ check('content-teams never clicks send', !/\.click\s*\(/.test(content) && !/requ
 check('worker handles flow:teams-web-read', /flow:teams-web-read/.test(worker));
 check('content asks the worker for Graph read only', /flow:teams-web-read/.test(content) && !/fetch\s*\(\s*['\"]https:\/\/graph/.test(content));
 check('content identifies the open chat from the frame, its parent, and the window title', /bestHref/.test(content) && /titleFromDocument/.test(content) && /chat-not-identified/.test(content) && /missingSignals/.test(content));
+check('a miss is logged for the service worker as teams why-not', /\[Glance\] teams why-not /.test(content) && /flow:teams-trace/.test(content) && /flow:teams-trace/.test(worker));
+check('the Teams lane offers a card without the Labs chat switch', /channel === 'teams'/.test(fs.readFileSync(path.join(root, 'src/chat-task-card.js'), 'utf8')) && /msg.channel === 'teams'/.test(bg));
 check('content names an unidentified sender and never posts', /sender-not-identified/.test(content) && !/\bPOST\b/.test(content));
 check('Connect files untouched in this lane', !fs.existsSync(path.join(root, 'src/outlook-connect.js')) || bg.indexOf('teams.microsoft.com') >= 0);
 

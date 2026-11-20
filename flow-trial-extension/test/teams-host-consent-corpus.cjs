@@ -72,7 +72,8 @@ function check(name, cond, detail) {
   ];
   urls.forEach((href) => check('Teams match covers ' + href, Spec.covers(href) === true));
   check('a different host is not a Teams match', Spec.covers('https://outlook.live.com/mail/') === false);
-  check('the boot script logs the injected url', boot.indexOf("[Glance] teams lane injected ") >= 0 && boot.indexOf('data-glance-lane-teams') >= 0);
+  check('the boot script logs the injected url', boot.indexOf("[Glance] teams lane injected ") >= 0 && boot.indexOf('data-glance-lane-teams') >= 0 && boot.indexOf('flow:teams-trace') >= 0);
+  check('the side panel asks for Teams on the open tab', html.indexOf('id="teams-page-grant"') >= 0 && popup.indexOf('renderTeamsPageGrant') >= 0 && popup.indexOf('teamsWebHosts()') >= 0);
   check('the registration uses every frame and does not wait for the load event',
     bg.indexOf('allFrames: true') >= 0 && bg.indexOf('matchOriginAsFallback: true') >= 0 && bg.indexOf("runAt: 'document_end'") >= 0 && bg.indexOf('src/teams-lane-boot.js') >= 0);
 

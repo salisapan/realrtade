@@ -861,7 +861,7 @@ async function injectTeamsOpenTabs() {
       await chrome.scripting.executeScript({ target: { tabId: tab.id, frameIds: missing }, files: files });
     } catch (e) {
       const detail = e && e.message ? String(e.message) : '';
-      console.info('[Glance] whyNotShown: teams-lane-not-injected' + (detail ? ' ' + detail : ''));
+      console.info('[Glance] teams why-not teams-lane-not-injected' + (detail ? ' ' + detail : ''));
     }
   }
 }
@@ -871,7 +871,7 @@ function queueRestoreLaneTeams() {
   const run = Promise.resolve(teamsLaneJob).then(() => restoreLaneTeams());
   teamsLaneJob = run.then(() => { if (teamsLaneJob === run) teamsLaneJob = null; }, (err) => {
     const detail = err && err.message ? String(err.message) : '';
-    console.info('[Glance] whyNotShown: teams-lane-not-registered ' + detail);
+    console.info('[Glance] teams why-not teams-lane-not-registered ' + detail);
     if (teamsLaneJob === run) teamsLaneJob = null;
   });
   return run;
@@ -882,7 +882,7 @@ async function restoreLaneTeams() {
   let on = false;
   try { on = await chrome.permissions.contains({ origins: TEAMS_HOSTS }); }
   catch (e) {
-    console.info('[Glance] whyNotShown: teams-permission-unknown');
+    console.info('[Glance] teams why-not teams-permission-unknown');
     return;
   }
   const id = LANE_TEAMS.id;
@@ -911,7 +911,7 @@ async function restoreLaneTeams() {
       }
     }
     if (!registered) {
-      console.info('[Glance] whyNotShown: teams-lane-not-registered' + (lastError ? ' ' + lastError : ''));
+      console.info('[Glance] teams why-not teams-lane-not-registered' + (lastError ? ' ' + lastError : ''));
       return;
     }
     console.info('[Glance] teams lane registered ' + spec.matches.join(' '));
@@ -2923,7 +2923,9 @@ async function chatCalendarTarget() {
 }
 
 async function chatTaskTarget(msg) {
-  if (!(await glanceSwitchOn(msg && msg.own === true ? 'CHAT_PROMISE_CARD' : 'CHAT_TASK_CARD'))) return { ok: false, reason: 'switch-off' };
+  // The Teams web lane is on when the host is granted. It does not sit behind the Labs chat-card switch,
+  // and it does not need Microsoft: Google Tasks is enough, Outlook only when that is what is connected.
+  if (!(msg && msg.channel === 'teams') && !(await glanceSwitchOn(msg && msg.own === true ? 'CHAT_PROMISE_CARD' : 'CHAT_TASK_CARD'))) return { ok: false, reason: 'switch-off' };
   if (msg && msg.kind === 'calendar') return chatCalendarTarget();
   // Google writes through the lane, which needs the connected account on record (a chat page has no mailbox to name it).
   let account = '';

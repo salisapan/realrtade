@@ -369,9 +369,26 @@ test('teams.live.com v2: switching chats evaluates the bubble already in the new
   await expect(page.locator('[data-tid="chat-header-title"]')).toHaveText('Dana Cohen');
 });
 
+test('teams.live.com v2 notes chat: a self ask shows a card without the Labs switch or Microsoft', async ({ glance }) => {
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures/teams-v2-live-self.html'), 'utf8');
+  const page = await openV2(glance, html);
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  expect((page.__glanceLogs || []).some((line) => line.indexOf('chat-not-identified') >= 0)).toBe(false);
+  expect((page.__glanceLogs || []).some((line) => line.indexOf('[Glance] teams why-not not-connected') >= 0)).toBe(false);
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+});
+
+test('teams.live.com v2 one-to-one: the other person\'s ask shows a card without the Labs switch', async ({ glance }) => {
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures/teams-v2-live-dm.html'), 'utf8');
+  const page = await openV2(glance, html);
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  expect((page.__glanceLogs || []).some((line) => line.indexOf('chat-not-identified') >= 0)).toBe(false);
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+});
+
 test('teams.live.com v2: a shell with no chat logs the missing signals', async ({ glance }) => {
   const page = await openShell(glance);
-  await expect.poll(() => (page.__glanceLogs || []).some((line) => line.indexOf('[Glance] whyNotShown: chat-not-identified') >= 0 && line.indexOf('urlChatId=missing') >= 0 && line.indexOf('title=missing') >= 0 && line.indexOf('headerAria=missing') >= 0), { timeout: 20000 }).toBe(true);
+  await expect.poll(() => (page.__glanceLogs || []).some((line) => line.indexOf('[Glance] teams why-not chat-not-identified') >= 0 && line.indexOf('urlChatId=missing') >= 0 && line.indexOf('title=missing') >= 0 && line.indexOf('headerAria=missing') >= 0), { timeout: 20000 }).toBe(true);
   const line = (page.__glanceLogs || []).find((item) => item.indexOf('chat-not-identified') >= 0) || '';
   expect(line).not.toMatch(/תוכל|סיכום|review the draft/);
   await expect(page.locator(CARD)).toHaveCount(0);

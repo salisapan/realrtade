@@ -48,7 +48,16 @@ const FlowLaneTeams = (() => {
   function install() {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.onMessage || !chrome.runtime.onMessage.addListener) return;
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-      if (!msg || msg.type !== 'flow:teams-web-read') return;
+      if (!msg) return;
+      if (msg.type === 'flow:teams-trace') {
+        if (!ownSender(sender)) return;
+        const line = String(msg.line || '').slice(0, 400);
+        if (line.indexOf('[Glance] teams ') === 0) {
+          try { console.info(line); } catch (e) { /* no console */ }
+        }
+        return;
+      }
+      if (msg.type !== 'flow:teams-web-read') return;
       if (!ownSender(sender)) {
         sendResponse({ ok: false, reason: 'foreign-sender' });
         return true;

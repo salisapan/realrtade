@@ -99,5 +99,21 @@ check('the parent frame id is 19:', P.chatIdFromHref(P.bestHref('https://teams.l
 check('a frame that already has an id keeps it', P.bestHref('https://teams.microsoft.com/v2/#/l/chat/19%3Adana%40thread.v2', parent) === 'https://teams.microsoft.com/v2/#/l/chat/19%3Adana%40thread.v2');
 check('a foreign parent is ignored', P.bestHref('https://teams.live.com/v2/', 'https://mail.google.com/mail/u/0/#inbox') === 'https://teams.live.com/v2/');
 
+const liveSelf = dom('<div role="main"><div id="chat-header"><h2><span>sali sapan</span><span> (You)</span></h2></div>' +
+  '<div role="log" aria-label="Chat messages"><div role="group" aria-label="You, 12:04 PM">' +
+  '<div id="message-body-1637000000001"><p>תוכל לשלוח לי את הסיכום עד מחר?</p></div></div></div></div>');
+const liveSelfId = P.identify('https://teams.live.com/v2/', liveSelf);
+const liveSelfRows = P.messagesFromDom(liveSelf);
+check('teams.live.com v2 self header split across spans is the notes chat', liveSelfId.signals.self === true && /sali sapan/i.test(liveSelfId.signals.title) && liveSelfId.id.indexOf('teams:') === 0, liveSelfId);
+check('teams.live.com v2 self bubble is you, with no data-tid', liveSelfRows.length === 1 && liveSelfRows[0].author === 'me' && /סיכום/.test(liveSelfRows[0].text), liveSelfRows[0]);
+
+const liveDm = dom('<div role="main"><div id="chat-header"><h2><span>Dana Cohen</span></h2></div>' +
+  '<div role="log" aria-label="Chat messages"><div role="group" aria-label="Dana Cohen, 10:32 AM">' +
+  '<div id="message-body-22"><p dir="auto">Can you review the draft by Wednesday?</p></div></div></div></div>');
+const liveDmId = P.identify('https://teams.live.com/v2/', liveDm);
+const liveDmRows = P.messagesFromDom(liveDm);
+check('teams.live.com v2 one-to-one header is not a self chat', liveDmId.signals.self === false && liveDmId.signals.title === 'Dana Cohen', liveDmId);
+check('teams.live.com v2 one-to-one sender is the other person', liveDmRows.length === 1 && liveDmRows[0].author === 'them' && /review the draft/.test(liveDmRows[0].text), liveDmRows[0]);
+
 if (failures) process.exit(1);
 console.log('teams-parse-corpus: all passed');

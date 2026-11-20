@@ -108,15 +108,30 @@ const FlowTeamsParse = (() => {
       const t = usableTitle(el.getAttribute('data-glance-title') || el.getAttribute('aria-label') || el.textContent);
       if (t) return t;
     }
-    const header = root.querySelector('[data-tid="chat-header"]');
+    const header = root.querySelector('[data-tid="chat-header"], #chat-header, header');
     if (!header) return '';
-    const bits = Array.from(header.querySelectorAll('span, h1, h2, h3, [role="heading"]'));
-    for (let i = 0; i < bits.length; i++) {
-      if (bits[i].closest && bits[i].closest('button, [role="button"]')) continue;
-      const t = plainName(bits[i].textContent);
-      if (t) return t;
+    const bits = [];
+    Array.from(header.querySelectorAll('span, h1, h2, h3, [role="heading"]')).forEach((el) => {
+      if (el.closest && el.closest('button, [role="button"]')) return;
+      const t = fresh(el.textContent);
+      if (!t || t.length > 80 || bits.indexOf(t) >= 0) return;
+      bits.push(t);
+    });
+    const leaves = bits.filter((t) => !bits.some((other) => other !== t && other.indexOf(t) !== -1 && other.length > t.length));
+    const joined = leaves.slice(0, 4).join(' ');
+    if (SELF_MARK.test(joined) || SELF_NAME.test(fresh(joined))) return plainName(joined) || joined.slice(0, 80);
+    if (joined) {
+      const named = plainName(joined);
+      if (named) return named;
     }
-    return plainName(header.textContent);
+    return plainName(header.innerText || header.textContent);
+  }
+
+  function headerBlob(root) {
+    if (!root || !root.querySelector) return '';
+    const header = root.querySelector('[data-tid="chat-header"], [data-tid="chat-header-title"], #chat-header, header, [role="banner"]');
+    if (!header) return '';
+    return fresh(header.innerText || header.textContent || '');
   }
 
   function titleFromDocument(title) {
@@ -227,6 +242,12 @@ const FlowTeamsParse = (() => {
     if (raw === 'me' || raw === 'them') return raw;
     const aria = String((node.getAttribute && node.getAttribute('aria-label')) || '');
     if (/^(?:you|אתה|את)\b|you sent|הודעה שלך/i.test(aria)) return 'me';
+    const stamped = aria.match(/^\s*(.{1,80}?),\s+\d{1,2}:\d{2}\b/);
+    if (stamped) {
+      const who = fresh(stamped[1]);
+      if (SELF_NAME.test(who) || SELF_MARK.test(who)) return 'me';
+      if (who) return 'them';
+    }
     const said = aria.match(/^\s*(.{1,80}?)\s+said\b/i) || aria.match(/^\s*(.{1,80}?)\s+אמר(?:ה|ת)?\b/);
     if (said) {
       const who = fresh(said[1]);
@@ -265,7 +286,10 @@ const FlowTeamsParse = (() => {
     if (marked.length) return marked.slice(-40);
     const panes = Array.from(root.querySelectorAll('[data-tid="chat-pane-message"], [data-tid="channel-pane-message"]')).filter(shown);
     if (panes.length) return panes.slice(-40);
-    const bodies = Array.from(root.querySelectorAll('[data-tid="message-body"], [data-tid="message-body-content"]')).filter(shown);
+    const groups = Array.from(root.querySelectorAll('[role="log"] [role="group"], [role="log"] [role="listitem"], [data-tid="chat-pane-item"]')).filter(shown);
+    const topGroups = groups.filter((el) => !groups.some((other) => other !== el && other.contains(el)));
+    if (topGroups.length) return topGroups.slice(-40);
+    const bodies = Array.from(root.querySelectorAll('[data-tid="message-body"], [data-tid="message-body-content"], [id*="message-body"]')).filter(shown);
     const top = bodies.filter((el) => !bodies.some((other) => other !== el && other.contains(el)));
     return top.slice(-40);
   }
@@ -283,10 +307,11 @@ const FlowTeamsParse = (() => {
   function identify(href, root, titleHint) {
     const urlChatId = chatIdFromHref(href);
     const domChatId = chatIdFromDom(root);
-    const title = titleOf(root) || titleFromDocument(titleHint) || usableTitle(titleHint);
+    const blob = headerBlob(root);
+    const title = titleOf(root) || titleFromDocument(titleHint) || usableTitle(titleHint) || (SELF_MARK.test(blob) ? plainName(blob) : '');
     const aria = headerAria(root);
     const signals = { urlChatId: urlChatId, domChatId: domChatId, title: title, headerAria: aria };
-    signals.self = isSelfChat(title, aria, urlChatId || domChatId);
+    signals.self = isSelfChat((title || '') + ' ' + blob, aria, urlChatId || domChatId);
     const id = urlChatId || domChatId || (title ? 'title:' + title.toLowerCase() : '') || (aria ? 'aria:' + aria.toLowerCase() : '');
     if (id) return { id: 'teams:' + id, signals: signals };
     if (/\/dev\/teams-fixture\.html/i.test(String(href || '')) && !/[?&]shell=1(?:&|$)/.test(String(href || ''))) {
@@ -339,6 +364,7 @@ const FlowTeamsParse = (() => {
     chatIdFromDom: chatIdFromDom,
     bestHref: bestHref,
     titleFromDocument: titleFromDocument,
+    headerBlob: headerBlob,
     identify: identify,
     missingSignals: missingSignals,
     isSelfChat: isSelfChat,

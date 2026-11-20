@@ -9,10 +9,11 @@
   } catch (e) { /* document not ready */ }
   if (window.__glanceLaneTeams) return;
   if (typeof FlowTeamsParse === 'undefined') {
-    try { console.info('[Glance] whyNotShown: teams-parse-missing'); } catch (e) { /* no console */ }
+    whyNot('teams-parse-missing');
     return;
   }
   window.__glanceLaneTeams = { observers: 0 };
+  trace('[Glance] teams lane injected ' + (function () { try { return String(location.href || ''); } catch (e) { return ''; } })());
   const P = FlowTeamsParse;
   const DEBOUNCE_MS = 1200;
   const MAX_ROWS = 40;
@@ -23,7 +24,14 @@
   const inflight = new Set();
 
   function root() {
-    return document.querySelector('[data-glance-teams-root], [role="main"]') || document.body;
+    const marked = document.querySelector('[data-glance-teams-root]');
+    if (marked) return marked;
+    const list = document.querySelector('[role="log"], [data-tid="message-pane-list"], [data-tid="chat-pane-message"], [id*="message-body"]');
+    if (list && list.closest) {
+      const main = list.closest('[role="main"], #chat-pane, [data-tid="chat-pane-main"]');
+      if (main) return main;
+    }
+    return document.querySelector('[role="main"]') || document.body;
   }
 
   function composerBox(main) {
@@ -65,10 +73,19 @@
     try { chrome.runtime.sendMessage({ type: 'flow:surface-health', id: 'teams', ok: ok, reason: reason || null }, () => void chrome.runtime.lastError); } catch (e) { /* page closing */ }
   }
 
+  function trace(line) {
+    const text = String(line || '').slice(0, 400);
+    try { console.info(text); } catch (e) { /* no console */ }
+    if (!runtimeAlive()) return;
+    try {
+      chrome.runtime.sendMessage({ type: 'flow:teams-trace', line: text }, () => { void chrome.runtime.lastError; });
+    } catch (e) { /* worker gone */ }
+  }
+
   function whyNot(reason, detail) {
     const extra = detail ? ' ' + String(detail) : '';
-    const line = '[Glance] whyNotShown: ' + reason + extra;
-    try { console.info(line); } catch (e) { /* no console */ }
+    const line = '[Glance] teams why-not ' + reason + extra;
+    trace(line);
     try {
       const node = document.querySelector('[data-glance-quiet]');
       if (node) { node.hidden = false; node.textContent = line; }
@@ -102,12 +119,13 @@
   }
 
   async function loadMessages(main, href) {
-    if (P.domSufficient(main)) return P.messagesFromDom(main).slice(-MAX_ROWS);
+    const local = P.messagesFromDom(main).slice(-MAX_ROWS);
+    if (P.domSufficient(main)) return local;
     const chatId = P.chatIdFromHref(href);
-    if (!chatId) return P.messagesFromDom(main).slice(-MAX_ROWS);
+    if (!chatId) return local;
     const remote = await askWorker(chatId);
     if (remote && remote.ok && Array.isArray(remote.messages) && remote.messages.length) return remote.messages.slice(-MAX_ROWS);
-    return P.messagesFromDom(main).slice(-MAX_ROWS);
+    return local;
   }
 
   async function maybeAct(main, list, party, oneToOne, threadId) {
