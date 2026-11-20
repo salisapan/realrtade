@@ -2017,17 +2017,15 @@
         addScope.disabled = true;
         const contactsBox = scopeBoxes.contacts;
         let contactsNoted = '';
-        if (contactsBox && typeof FlowOutlookContacts !== 'undefined' && typeof FlowOutlookContacts.consentPlan === 'function') {
-          const plan = FlowOutlookContacts.consentPlan({ ticked: contactsBox.checked === true, scopes: grantedNow });
+        const Contacts = globalThis.FlowOutlookContacts;
+        if (contactsBox && Contacts && Contacts.consentPlan) {
+          const plan = Contacts.consentPlan({ ticked: contactsBox.checked === true, scopes: grantedNow });
           if (state) state.glanceContactsChoice = plan.choice === true;
-          if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
-            try { await FlowStorage.set({ glanceContactsChoice: plan.choice === true }); } catch (e) { /* kept on state */ }
-          }
+          try { await FlowStorage.set({ glanceContactsChoice: plan.choice === true }); } catch (e) {}
           if (plan.request) {
             const grantedScope = await send({ type: 'flow:microsoft-optional-scopes', bucket: 'contacts', prompt: 'consent' });
             if (!grantedScope || grantedScope.ok !== true) {
-              addScope.disabled = false;
-              note.hidden = false;
+              addScope.disabled = false; note.hidden = false;
               note.textContent = (grantedScope && (grantedScope.reason || grantedScope.error)) || 'ההרשאה לא נוספה.';
               return;
             }
@@ -2037,24 +2035,16 @@
             if (state) state.glanceContactsNoted = plan.line;
           }
         }
-        const add = scopeServices.filter((svc) => {
-          if (svc.id === 'contacts') return false;
-          const box = scopeBoxes[svc.id];
-          if (!box || !box.checked || box.disabled) return false;
-          return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
-        });
+        const add = scopeServices.filter((svc) => svc.id !== 'contacts' && scopeBoxes[svc.id] && scopeBoxes[svc.id].checked && !scopeBoxes[svc.id].disabled && (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0));
         let consentedNow = [];
-        const ticked = scopeServices.some((svc) => { const b = scopeBoxes[svc.id]; return b && b.checked && !b.disabled && svc.id !== 'contacts'; });
+        const ticked = scopeServices.some((svc) => svc.id !== 'contacts' && scopeBoxes[svc.id] && scopeBoxes[svc.id].checked && !scopeBoxes[svc.id].disabled);
         if (ticked && !add.length) {
-          // Ticked, and every scope of it is already on the token: nothing to ask, and the person is told so.
-          addScope.disabled = false;
-          note.hidden = false;
+          addScope.disabled = false; note.hidden = false;
           note.textContent = contactsNoted || 'ההרשאות שסימנת כבר ניתנו.';
           return;
         }
         if (!add.length && contactsNoted) {
           addScope.disabled = false;
-          if (state) state.glanceContactsNoted = contactsNoted;
           await renderSurfaces();
           return;
         }
