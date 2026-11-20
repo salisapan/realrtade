@@ -222,6 +222,46 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   for (const t of ['שלום,\n\nתודה בבקשה על הדיווח.\n\nבברכה', 'שלום,\n\nתוכנית העבודה בבקשה מצורפת לעיונך.\n\nבברכה', 'היי דנה,\n\nתדפיס בבקשה את הטבלה בצבעוני.']) {
     const r = judge(t); check('round-5 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
   }
+  // Round 6 (invented sentences): a polite frame after a lead-in clause, «אודה לטיפולך / על התייחסותכם / לאישורך», «לטיפולך» alone; a frame that follows someone else's name stays quiet.
+  for (const t of ['היי סאלי,\n\nהבנתי שאתה מטפל בעניין, אשמח שתחזור ללקוח.\n\nתודה', 'שלום,\n\nבעניין ההסכם עם הספק אודה לטיפולך.\n\nתודה', 'שלום רב,\n\nהבנק מבקש את המסמך הנוסף. אודה על התייחסותכם.\n\nבברכה', 'שלום,\n\nצריך אישור נקי מהרשם\nלטיפולך\nתודה']) {
+    const r = judge(t); check('round-6 ask offers: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const t of ['שלום,\n\nדנה, אשמח לטיפולך בעניין.\n\nתודה', 'היי,\n\n@דנה @רון נודה לעזרתכם בעניין החתימה.\n\nתודה', 'שלום,\n\nהוא אמר שאשמח לשמוע על הטיפול בו.\n\nבברכה']) {
+    const r = judge(t); check('round-6 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
+  // Round 7 (invented sentences): a bare imperative with no day to the reader alone; the same sentence to a group, or after someone else's name, stays quiet.
+  for (const t of ['היי סאלי,\n\nתעדכן אותי כשהמסמך מוכן.\n\nתודה', 'שלום,\n\nדבר איתי על ההצעה.\n\nתודה']) {
+    const r = judge(t); check('round-7 ask offers: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const t of ['שלום,\n\nהוא ביקש שנדבר איתי על ההצעה, כך כתב.\n\nבברכה', 'שלום,\n\nתודה על העדכון, הכל ברור.\n\nבברכה']) {
+    const r = judge(t); check('round-7 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
+  // Round 8 (invented sentences): automated notices stay quiet even from a person-looking sender: meeting notes written by a bot, an order-status notice.
+  for (const x of ['Notes from the meeting on Tuesday at 4 PM.\n\nThese notes were shared with the host. The content was auto-generated and may be wrong.\n\nOpen notes', 'We\'re getting your order ready.\n\nYour order is being prepared, total 45.00. Track your order below.', 'ההזמנה שלך נשלחה והיא בדרך אליך.\n\nמעקב משלוח בקישור']) {
+    const r = judge(x); check('round-8 automated notice stays quiet: ' + x.split('\n')[0].slice(0, 28), !r.show, kinds(r));
+  }
+  const keep8 = judge('היי סאלי,\n\nתעדכן אותי בבקשה עד יום ראשון אם ההזמנה שלך מוכנה.\n\nתודה'); check('round-8 a person asking about an order still offers', keep8.show, kinds(keep8));
+  // Round 9 (invented sentences): «אנא / בבקשה» + a plain imperative; a cold sales outreach with a demo stays quiet.
+  for (const x of ['היי סאלי,\n\nאנא פנה למזכירות לבירור המועד.\n\nתודה', 'שלום,\n\nבבקשה פרט קצת יותר על הרקע.\n\nתודה', 'שלום,\n\nאנא שלח/י במייל חוזר את הטופס החתום.\n\nתודה']) {
+    const r = judge(x); check('round-9 ask offers: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const x of ['שלום,\n\nרציתי לוודא שהחומרים הגיעו. נשמח להיפגש ולהציג הדגמה חיה של המערכת.\n\nבברכה', 'Dear valued customer,\n\nThis is a reminder that your parcel is delayed. Please reply if you have questions.', 'שלום,\n\nאנא לא להפריע בשעות הערב.\n\nתודה']) {
+    const r = judge(x); check('round-9 contrast stays quiet: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
+  // Round 10 (invented sentences): a polite send verb with no reply channel could be a file ask or an answer ask: it stays as the engine left it (quiet); with the reply channel named it offers.
+  for (const x of ['היי,\n\nאנא העבר לי את הטבלה המעודכנת.\n\nתודה', 'שלום,\n\nבבקשה צרף לי את הנספח.\n\nתודה']) {
+    const r = judge(x); check('round-10 send verb without a channel stays quiet: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
+  const ch = judge('שלום,\n\nאנא שלח/י במייל חוזר את הטופס החתום.\n\nתודה'); check('round-10 send verb with the reply channel offers', ch.show, kinds(ch));
+  // Plan order (flag planV2, off by default; invented sentence): the work comes before the reply when a plan has both; with the flag off the order is as before.
+  { const txt = 'היי סאלי,\n\nתעדכן אותי בבקשה עד יום ראשון אם ההזמנה שלך מוכנה.\n\nתודה'; const off = kinds(judge(txt)), on = kinds(judge(txt, { planV2: true }));
+    check('plan order is unchanged with the flag off', off === 'gmailDraft+googleTask', off);
+    check('plan order puts the task first with planV2', on === 'googleTask+gmailDraft', on); }
+  // Plan gap (flag planV2, off by default; invented sentences): a work-only plan whose mail also asks to be told gets the reply draft after the task; without that ask the plan is unchanged.
+  { const wb = 'היי סאלי,\n\nתגישו בבקשה עד מחר את הבקשה לרשות. תשלחו לי אסמכתא על ההגשה.\n\nתודה', wo = 'היי סאלי,\n\nתגישו בבקשה עד מחר את הבקשה לרשות.\n\nתודה';
+    check('work ask that asks to be told: flag off keeps the task alone', kinds(judge(wb)) === 'googleTask', kinds(judge(wb)));
+    check('work ask that asks to be told: planV2 adds the reply draft after the task', kinds(judge(wb, { planV2: true })) === 'googleTask+gmailDraft', kinds(judge(wb, { planV2: true })));
+    check('work ask with no ask to be told: planV2 leaves the task alone', kinds(judge(wo, { planV2: true })) === 'googleTask', kinds(judge(wo, { planV2: true }))); }
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -6,13 +6,13 @@ const PRIV = process.env.GLANCE_PRIVATE || path.join(__dirname, 'private');
 const ROOT = path.join(__dirname, '..', '..', '..');
 const run = (args, env) => { try { return cp.execFileSync(process.execPath, args, { env: Object.assign({}, process.env, env || {}), encoding: 'utf8', maxBuffer: 1 << 26 }); } catch (e) { return String(e.stdout || ''); } };
 const rows = [];
-for (const set of ['v2', 'v2b', 'dev2', 'dev3']) {
-  if (!fs.existsSync(path.join(PRIV, set))) continue;
+for (const set of ['v2', 'v2b', 'dev2', 'dev3', 'personal-dev', 'personal-heldout']) {
+  if (!fs.existsSync(path.join(PRIV, set.startsWith('personal') ? 'personal' : set))) continue;
   let j; try { j = JSON.parse(run([path.join(__dirname, 'real-eval.cjs'), set, '--json'])); } catch (e) { continue; }
   for (const key of ['inbox/gmail', 'inbox/outlook', 'sent/follow']) {
     const v = j.out[key]; if (!v) continue;
     const pos = v.pos || 0, hit = v.hit || 0, fo = v.falseOffer || 0, wt = v.wrongType || 0;
-    rows.push([set + (set.startsWith('v2') ? ' (held-out)' : ''), key, hit + '/' + pos, pos ? Math.round(100 * hit / pos) + '%' : '-', 'wrong ' + (fo + wt) + ' (false ' + fo + ', type ' + wt + ')']);
+    rows.push([set + (/^v2|heldout/.test(set) ? ' (held-out)' : ''), key, hit + '/' + pos, pos ? Math.round(100 * hit / pos) + '%' : '-', 'wrong ' + (fo + wt) + ' (false ' + fo + ', type ' + wt + ')']);
   }
 }
 const kf = (v1) => { try { const j = JSON.parse(run([path.join(ROOT, 'glance-ai', 'scoreboard', 'capabilities', 'kind-frozen-run.cjs'), '--json'].concat(v1 ? ['--v1'] : []), { GLANCE_SHIPPED: 'wave2' })); return j.tot || j; } catch (e) { return null; } };
@@ -25,6 +25,7 @@ if (!process.argv.includes('--no-corpora')) {
   const extra = fails.filter((f) => KNOWN.indexOf(f) < 0);
   corpora = extra.length ? 'NEW FAILURES: ' + extra.join(' ') : 'green (only the 3 known red)';
 }
+try { const pv = JSON.parse(fs.readFileSync(path.join(PRIV, 'personal', 'provenance.json'), 'utf8')); const a = pv.ownerApproval || {}; console.log('personal set provenance: owner approval ' + a.level + ' (' + a.date + '), row-level owner-verified rows ' + (a.ownerVerifiedRows || 0) + '; labels are Claude labels'); } catch (e) {}
 const w = [26, 14, 9, 6]; console.log('GOALS  v2 inbox >=60% | v2 sent >=90% | wrong Do It 0 | old sets must not drop (70/89, 54/70, 0 false)\n');
 for (const r of rows) console.log(r[0].padEnd(w[0]), r[1].padEnd(w[1]), r[2].padEnd(w[2]), r[3].padEnd(w[3]), r[4]);
 console.log('\ncorpora:', corpora);
