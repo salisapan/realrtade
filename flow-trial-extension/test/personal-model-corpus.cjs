@@ -154,8 +154,8 @@ function model(extra) {
     isOwn: true, ownEmail: 'me@example.com', audience: 'client', messageId: 's1',
     text: 'Hi,\nPlease write me at roni@example.com or +1 415 555 0133.\nThanks,'
   });
-  const styleBlob = JSON.stringify(m.exportJson());
-  check('an exemplar drops addresses and phones', styled.written > 0 && styleBlob.indexOf('roni@example.com') < 0 && styleBlob.indexOf('415') < 0);
+  const snippets = m.state.exemplars.map((row) => row.snippet).join('\n');
+  check('an exemplar drops addresses and phones', styled.written > 0 && snippets.indexOf('@') < 0 && snippets.indexOf('415') < 0 && snippets.indexOf('555') < 0);
   m.setStyleRule({ audience: 'client', lang: 'en', greeting: 'hi-name', signoff: 'thanks', formality: 'casual' });
   const conditioned = m.conditionDraft('Hello there', { lang: 'en', audience: 'client' });
   check('a style rule can shape a draft', conditioned.applied === true && conditioned.status === 'one' && conditioned.text.indexOf('Hi,') >= 0);
