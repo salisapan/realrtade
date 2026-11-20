@@ -11,6 +11,29 @@ const FlowChatSelfCard = (() => {
     if (card && card.remove) card.remove();
   }
 
+  function hebrewUi(text) {
+    if (/[\u0590-\u05FF]/.test(String(text || ''))) return true;
+    try {
+      const lang = (document.documentElement && document.documentElement.lang) || '';
+      if (/^he/i.test(lang)) return true;
+    } catch (e) { /* no document */ }
+    try {
+      if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getUILanguage === 'function' && /^he/i.test(chrome.i18n.getUILanguage() || '')) return true;
+    } catch (e) { /* no chrome language */ }
+    return false;
+  }
+
+  function labels(text) {
+    const he = hebrewUi(text);
+    try {
+      if (typeof FlowDisplay !== 'undefined' && typeof FlowDisplay.chrome === 'function') {
+        const table = FlowDisplay.chrome(he ? 'he' : 'en') || {};
+        if (table.doIt && table.undo) return { doIt: table.doIt, undo: table.undo, he: he };
+      }
+    } catch (e) { /* the shared table is optional */ }
+    return he ? { doIt: 'בצע', undo: 'בטל', he: true } : { doIt: 'Do It', undo: 'Undo', he: false };
+  }
+
   function paint(opts) {
     const o = opts || {};
     const text = String(o.text || '');
@@ -20,21 +43,23 @@ const FlowChatSelfCard = (() => {
     const existing = node();
     if (existing && existing.getAttribute('data-glance-key') === text) return { shown: true, reason: 'already' };
     clear();
+    const words = labels(text);
     const card = document.createElement('div');
     card.id = 'glance-self-draft';
     card.className = 'flow-chip-host';
     card.setAttribute('data-glance-self-draft', '1');
     card.setAttribute('data-glance-key', text);
+    card.setAttribute('dir', words.he ? 'rtl' : 'ltr');
     const doIt = document.createElement('button');
     doIt.type = 'button';
     doIt.className = 'flow-chip';
     doIt.setAttribute('data-glance-do-it', '1');
-    doIt.textContent = 'Do It';
+    doIt.textContent = words.doIt;
     const undo = document.createElement('button');
     undo.type = 'button';
     undo.className = 'flow-chip';
     undo.setAttribute('data-glance-undo', '1');
-    undo.textContent = 'Undo';
+    undo.textContent = words.undo;
     undo.hidden = true;
     let drafted = '';
     doIt.addEventListener('click', () => {

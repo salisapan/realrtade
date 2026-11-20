@@ -135,6 +135,12 @@
     const last = list[list.length - 1];
     remember(threadId, isOwnNode(last) ? 'me' : (t || 'them'));
     offerSelf(list);
+    const lastText = textOf(last);
+    const self = P.isSelfTitle(selfBlob());
+    if (self || (isOwnNode(last) && !P.isAsk(lastText))) {
+      if (typeof FlowFollow !== 'undefined' && typeof FlowFollow.dismiss === 'function') FlowFollow.dismiss();
+      return;
+    }
     if (typeof FlowFollow === 'undefined') return;
     const party = { name: t, phone: null, email: null };
     const ctx = {

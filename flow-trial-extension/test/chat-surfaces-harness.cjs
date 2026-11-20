@@ -107,7 +107,7 @@ async function open(browser, kind, url, pageHtml, opts) {
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 200)); });
   await p.addInitScript(stub);
   const origin = new URL(url).origin;
-  await p.route(origin + '/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: pageHtml }));
+  await p.route(origin + '/**', (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: pageHtml }));
   await p.goto(url);
   if (opts.prepare) await opts.prepare(p);
   if (opts.watches) await p.evaluate((w) => { window.__store.followWatches = w; }, opts.watches);
@@ -221,6 +221,7 @@ const baseWatch = (channel, threadId, id, name) => ({ id: threadId, threadId, ch
   s = await t.state();
   const slackDraft = await t.p.locator('[data-glance-do-it]').count();
   check('Slack web fixture: a self-chat ask shows Do It', slackDraft === 1, s);
+  check('Slack web fixture: a self-chat ask has no follow-up card', (await t.p.locator('.flow-fu').count()) === 0);
   await t.p.locator('[data-glance-do-it]').click();
   const slackBox = await t.p.locator('.ql-editor').innerText();
   const slackSends = await t.p.evaluate(() => window.__glanceSendClicks || 0);
@@ -233,6 +234,44 @@ const baseWatch = (channel, threadId, id, name) => ({ id: threadId, threadId, ch
   t = await open(browser, 'slack', 'https://app.slack.com/client/T01ABC/D02FYI', slackFyi, {});
   const slackFyiCount = await t.p.locator('[data-glance-do-it]').count();
   check('Slack web fixture: FYI gets no Do It', slackFyiCount === 0, slackFyiCount);
+  check('Slack web fixture: an FYI leaves no follow-up card', (await t.p.locator('.flow-fu').count()) === 0);
+  await t.ctx.close();
+
+  const HE_ASK = 'תוכל לשלוח לי את הסיכום ביום שלישי?';
+  const HE_FYI = 'רק לעדכון: הפגישה נדחתה לשבוע הבא';
+  t = await open(browser, 'slack', 'https://app.slack.com/client/T01ABC/D02SELF', slackHtml('Flow (you)', [S('01', 'Flow', HE_ASK)]), {});
+  check('Slack Hebrew self-chat ask shows exactly one Do It chip', (await t.p.locator('[data-glance-do-it]').count()) === 1);
+  check('Slack Hebrew self-chat ask has no follow-up card', (await t.p.locator('.flow-fu').count()) === 0);
+  check('Slack Hebrew self-chat Do It label is בצע', (await t.p.locator('[data-glance-do-it]').innerText()) === 'בצע');
+  check('Slack Hebrew self-chat Undo label is בטל', (await t.p.locator('[data-glance-undo]').innerText()) === 'בטל');
+  await t.p.evaluate((text) => {
+    const pane = document.querySelector('[data-qa="message_pane"]');
+    const row = document.createElement('div');
+    row.innerHTML = '<div data-qa="virtual-list-item"><div data-qa="message_container" data-msg-ts="1790800099.000100"><button data-qa="message_sender_name">Flow</button><div data-qa="message-text"></div></div></div>';
+    row.querySelector('[data-qa="message-text"]').textContent = text;
+    pane.appendChild(row.firstChild);
+  }, HE_FYI);
+  await t.p.waitForTimeout(2500);
+  check('Slack Hebrew self-chat FYI after an ask leaves no Do It chip', (await t.p.locator('[data-glance-do-it]').count()) === 0);
+  check('Slack Hebrew self-chat FYI after an ask leaves no follow-up card', (await t.p.locator('.flow-fu').count()) === 0);
+  await t.ctx.close();
+
+  t = await open(browser, 'slack', SLACK_DM, slackHtml('Dana Cole', [S('01', SLACK_ME, HE_ASK)]), {});
+  s = await t.state();
+  const fuDir = await t.p.locator('.flow-fu').getAttribute('dir');
+  check('Slack Hebrew 1:1 follow-up card uses Hebrew copy', s.card && s.card.indexOf('האם אתה מחכה לתשובה על זה?') >= 0 && s.card.indexOf('להמשיך לעקוב') >= 0 && s.card.indexOf('לא עכשיו') >= 0 && s.card.indexOf('Waiting on a reply') < 0 && s.card.indexOf('Stay on it') < 0 && s.card.indexOf('Not now') < 0, s.card);
+  check('Slack Hebrew 1:1 follow-up card is RTL', fuDir === 'rtl', fuDir);
+  check('Slack Hebrew 1:1 follow-up is not a self Do It', (await t.p.locator('[data-glance-do-it]').count()) === 0);
+  await t.p.evaluate((text) => {
+    const pane = document.querySelector('[data-qa="message_pane"]');
+    const row = document.createElement('div');
+    row.innerHTML = '<div data-qa="virtual-list-item"><div data-qa="message_container" data-msg-ts="1790800099.000100"><button data-qa="message_sender_name">Sali Sapan</button><div data-qa="message-text"></div></div></div>';
+    row.querySelector('[data-qa="message-text"]').textContent = text;
+    pane.appendChild(row.firstChild);
+  }, HE_FYI);
+  await t.p.waitForTimeout(2500);
+  s = await t.state();
+  check('Slack Hebrew 1:1 FYI after an ask leaves no follow-up card and no Do It', s.card === null && (await t.p.locator('[data-glance-do-it]').count()) === 0 && (await t.p.locator('.flow-fu').count()) === 0, s.card);
   await t.ctx.close();
 
   t = await open(browser, 'telegram', 'https://web.telegram.org/a/#777000123', tgA, {});

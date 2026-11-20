@@ -217,6 +217,14 @@
     const last = list[list.length - 1];
     remember(threadId, self ? (who.id || senderOf(last) || 'me') : (senderOf(last) || (own[own.length - 1] === true ? 'me' : 'them')));
     offerSelf(list, self, live.bubbleCount, where.conversation);
+    const lastText = textOf(last);
+    const ownLast = self || own[own.length - 1] === true;
+    // A self-DM has nobody else to wait on. An FYI, or any last message that
+    // is not an open ask, drops a follow-up card left by the message before it.
+    if (self || (ownLast && !P.isAsk(lastText))) {
+      if (typeof FlowFollow !== 'undefined' && typeof FlowFollow.dismiss === 'function') FlowFollow.dismiss();
+      return;
+    }
     if (typeof FlowFollow === 'undefined') return;
     const idx = new Map(list.map((n, i) => [n, i]));
     const party = { name: t, phone: null, email: null };
