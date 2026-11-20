@@ -19,6 +19,9 @@ const FlowDayWords = (() => {
     const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);
     s = s.replace(/־/g, '-');
     s = s.replace(/(יום|ליום|ביום)\s+([אבגדהוש])[׳'’`]/g, (m, d, a) => d + ' ' + ABBR[a]);
+    // «נקבע לשני בשעה 9:00», «ניפגש בחמישי ב-10:00»: the weekday without «יום». Only with a clock right after, because «לשני» alone is also «for the second»
+    // and «בשלישי» «in the third». It becomes «ליום שני בשעה 9:00», which the date reader takes.
+    s = s.replace(/(^|[^\u0590-\u05FF])([לב])(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?=\s+(?:בשעה\s+\d|ב-?\d{1,2}[:.]\d{2}|ב-?\d{1,2}(?![\d:.]|\s*(?:אנשים|אנשי|פעמים|שעות))))/g, (m, pre, lead, d) => pre + lead + 'יום ' + d);
     // 28.10 or 28.10.2026 after a day marker, not a price or a version.
     s = s.replace(/(^|[\s(])((?:עד|לפני|ב-?|ל-?|on|by|before|until|till)\s*)([0-3]?\d)\.([01]?\d)(\.\d{2,4})?(?![\d.]*\d)/gi, (m, pre, mark, d, mo, yr) => {
       const dn = parseInt(d, 10); const mn = parseInt(mo, 10);

@@ -1,6 +1,6 @@
 # The refund you asked for, carried until the money is back
 
-- **Status:** experiment built (2026-11-11, Wednesday run; not approved by Sali yet: no «כן» or «לא» since Sunday, so this run took it as the newest measured gap)
+- **Status:** approved (Sali 2026-11-12: «מה שהכי נכון וקולע למהות של המוצר, לעשות דברים ולגרום להם להיות מבוצעים!»; the lab read this as: approve what makes a thing get done, and this is the one where Glance carries the loop and prepares the chase until the money is back). Experiment built 2026-11-11. **Lane built 2026-11-18** (`core/refund-lane.js`): the wiring end to end, behind `REFUND_LOOP` and `REFUND_CHASE` (off). Three host call sites wait on the open PRs that hold `src/follow.js` (#121, #241)
 - **Date:** 2026-11-08 (product lab, Sunday run)
 - **Switch:** `opts.enabled` on `FlowRefundLoop.ask`, `.reply` and `.judge` (`REFUND_LOOP`, **off**; nothing calls it). It joins `core/labs-switches.js` only when it is wired.
 - **Code:**
@@ -215,4 +215,73 @@ Today's changes are the edge cases from "Size", in Hebrew and English. Each one 
 - The ask goes on the sent-mail hook in `src/follow.js`, the reply on the same thread, and the credit on the opened-mail hook that `outside-signals` uses. The notice is read back by id before the close.
 - Before the labs switch: a mock of the line («החזר משופ · ₪189 · עד 26/11») for the owner, and a live Gate.
 - The offline numbers are clean, but the n are small and from one author. The real-user A/B is what will show whether carrying a refund raises the share of refunds that are actually seen back.
+
+## Lane built (Wednesday 2026-11-18): the wiring, end to end
+
+Sali's test of 12/11 is «לעשות דברים ולגרום להם להיות מבוצעים». A module that nothing calls makes nothing happen. Today's work is `core/refund-lane.js`, the wiring itself, in one portable piece that both mail surfaces call (surfaces rule, 2026-10-22). The host gives it storage, a read-back by id, and its draft writer.
+
+| hook | what happens |
+|---|---|
+| `onSent` | a refund request opens one loop. A later message to the merchant on the thread, or naming the order, is a reminder whatever its words: an edited Glance draft and a hand-written one count the same. It is counted once per sent id |
+| `onReply` | the merchant's answer moves the stage. It never closes the loop |
+| `onOpened` | a credit closes the loop **only after the host read the notice back by the same id** (`fetchedBack: true` in the proof). A failed read-back, or one with a different id, stays open as "verifying". A part of the amount is counted; an unnamed credit asks once (`answerAsk`) |
+| `today` | the Loops lines, each with its next move from `refund-chase` |
+| `doIt` | the host writes the draft. **Nothing is sent.** A draft is not a reminder, and never a close |
+| `release` / `reopen` | a true close, or back to open |
+
+**Switches:**
+- With `REFUND_LOOP` off, every hook returns nothing and touches no storage, no read-back and no draft writer. The corpus checks this.
+- With `REFUND_LOOP` on and `REFUND_CHASE` off, loops are carried with no move and no draft.
+
+**The real-user A/B (experiment `refund-loop`, dormant):**
+- Arm A counts the refunds asked and the money back, but shows nothing.
+- Arm B counts the same, plus lines shown and "not back by their day", each once.
+- Counts are event names only.
+
+**What is left:** three call sites.
+- `onSent` and `onReply` on the sent-mail and thread hooks in `src/follow.js`.
+- `onOpened` on the opened-mail hook.
+- `today`, `doIt`, `release` and `reopen` on the Loops line in `popup/popup.js`.
+
+`src/follow.js` is held by open PRs #121 (a 0.9.40 store candidate marked "do not merge") and #241. `popup/popup.js` is held by five PRs. Under the auto-merge rule the lab may not change them until those land or close. The Outlook twin calls the same lane through its own host.
+
+**Compatibility with the red team (#291).** #291 hardens `refund-loop.js`: `authPass` must be true, card statements are read line by line, and injected text is refused. The lane corpus and the journeys were also run against #291's `refund-loop.js` and `ai-floor.js`, and both pass unchanged: the lane passes `authPass` through from the host.
+
+### Offline A/B: end-to-end journeys
+
+- **The set:** `refund-lane-journeys-v0.jsonl`: 12 journeys, 7 Hebrew and 5 English. Each is a sequence of real-shaped events (sent, merchant reply, opened notice, days passing, a release) replayed through the lane.
+- **Frozen:** in commit `27b2e0b4` (sha256 `e0da464a…`) before the lane was written, and scored once.
+- **Disclosure:** I wrote both the set and the lane.
+- **What the journeys cover:**
+  - an approved refund that is late, a reminder, then the credit;
+  - two silent reminders leading to the card question;
+  - store credit, then a release;
+  - another merchant's credit;
+  - a refund with no amount;
+  - a spoofed notice;
+  - a refund in two parts;
+  - a merchant answering in Hebrew to an English ask;
+  - a failed read-back;
+  - a policy question;
+  - a reminder on a new thread found by its order number;
+  - two equal refunds from one merchant.
+
+| arm | lang | journeys n | ended right | closes due | closed with proof | missed close | wrong close | moves due | right move |
+|---|---|---|---|---|---|---|---|---|---|
+| A | all | 12 | 1 | 5 | 0 | 5 | 0 | 3 | 0 |
+| **B** | all | 12 | **12** | 5 | **5** | **0** | **0** | 3 | **3** |
+| A | he | 7 | 0 | 3 | 0 | 3 | 0 | 3 | 0 |
+| B | he | 7 | 7 | 3 | 3 | 0 | 0 | 3 | 3 |
+| A | en | 5 | 1 | 2 | 0 | 2 | 0 | 0 | 0 |
+| B | en | 5 | 5 | 2 | 2 | 0 | 0 | 0 | 0 |
+
+- **In the routine's terms:** wrong Do It 0/12; missed close 0/5 (A: 5/5); wrong action 0/3; wrong close 0.
+- A's one "ended right" is the policy question, where nothing should open.
+
+### Recommendation
+
+**Keep both switches off.** Then:
+1. Add the three call sites as soon as #121 and #241 free `src/follow.js`. **Closing #121 is the owner's step.**
+2. Then a mock of the Loops line and both drafts for the owner, and a live Gate on a real refund.
+3. Only then the labs switch.
 

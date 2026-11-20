@@ -2,6 +2,10 @@
 
 Glance closes open loops. Gmail is where it starts today.
 
+**Update 2026-11-16 (owner: «תדליק»):** the first wave, `TASK_ASK`, `PAYMENT_ASK`, `BOOKING_NOTICE` and `SYSTEM_NOTICE`, now starts ON in an unpacked (non-store) install (`core/labs-seed.js`, seeded once per version; a row you turn off stays off; a Chrome Web Store install never seeds). `CALENDAR_CHANGE` is not in the wave: a delete or an update of an existing event has no read-back path wired yet. No live Gate has passed for any of them, and the Labs rows still say so.
+
+**Update 2026-11-16 (owner: «יש לך אישור להכול»):** wave 2, `WORKSPACE_FILE`, `MEET_LINK`, `TEAMS_MEETING` and `ONEDRIVE_NEW_FILE`, is on too in a non-store install (`core/labs-seed.js` version 2); evidence in `instinct-level-2026-11-16.md` section 5b. `CALENDAR_CHANGE` stays off: ProofOfClose has no calendar system yet.
+
 Most closes built since 2026-10-20 ship behind an off switch (shared rule: a routine never turns a switch on). All of them are off in your browser until you turn them on, so a live check shows the old product. The switches live in one storage object, `glanceSwitches`, in the extension's storage. A missing key is off (`src/background.js`, `glanceSwitchOn`).
 
 **Switches and what each turns on (status 2026-10-24; none passed a live Gate)**

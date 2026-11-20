@@ -86,6 +86,32 @@ const judgment = fs.readFileSync(path.join(__dirname, '..', 'core', 'judgment.js
 check('neutralTitle still names a dated chip from the date text',
   /return 'Log commitment for ' \+ facts\.dateText/.test(judgment));
 
+
+// An ask with no promise in it is titled by the work, not by its date (instinct-level reading, 2026-11-16). English, verb plus object, nothing guessed.
+{
+  const A = (typeof FlowCommitmentTitle !== 'undefined' ? FlowCommitmentTitle : require('../core/commitment-title.js').FlowCommitmentTitle).askTitleFromBody;
+  const cases = [
+    ['Sali, please send me the updated budget by Thursday.', 'Send the updated budget'],
+    ['Hi Sali, could you please forward the signed NDA to Dana by Friday?', 'Forward the signed NDA to Dana'],
+    ['Please upload the final slides by EOD Thursday.', 'Upload the final slides'],
+    ['Please review the attached draft and let me know.', 'Review the attached draft'],
+    ['Please pay the $1,200 invoice by Friday.', 'Pay the $1,200 invoice'],
+    ['Reminder: renew the parking permit by Sunday.', 'Renew the parking permit'],
+    ['Please transfer 2,300 NIS to my account by Monday.', 'Transfer 2,300 NIS to my account'],
+    ['תוכל לשלוח לי את ההסכם החתום עד יום שישי?', 'לשלוח את ההסכם החתום'],
+    ['נא להגיש את דוח ההוצאות עד יום שני.', 'להגיש את דוח ההוצאות'],
+    ['בבקשה תכין את המצגת הסופית עד יום רביעי בבוקר.', 'להכין את המצגת הסופית'],
+    ['סאלי, תשלח לי את הצעת המחיר מחר.', 'לשלוח את הצעת המחיר'],
+    ['נא לבדוק בפסיקה העוסקת באיחור במסירת דירה.', 'לבדוק בפסיקה העוסקת באיחור במסירת דירה'],
+    ['נא לתקן את הנספח עד יום שני.', 'לתקן את הנספח'],
+    ['בבקשה להרים אליה טלפון.', 'להרים אליה טלפון'],
+    ['תוכל להרים אליה טלפון מחר?', 'להרים אליה טלפון']
+  ];
+  for (const [text, want] of cases) check('ask title: ' + text.slice(0, 50), A(text) === want, A(text));
+  for (const text of ['What is the price for ten users?', 'Can you tell me the price by Friday?', 'Please send it by Friday.', 'Thanks, that works.', 'I need the signed NDA by Friday.', 'מה המחיר לעשרה משתמשים?', 'בבקשה תכין את זה', 'תחזיר לי אותו עד מחר'])
+    check('no ask title (nothing guessed): ' + text.slice(0, 45), A(text) === '', A(text));
+}
+
 if (failures) {
   console.log('\n' + failures + ' failed');
   process.exit(1);
