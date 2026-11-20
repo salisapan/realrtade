@@ -9,14 +9,14 @@ const F = g('FlowFollowUp');
 const NOW = new Date('2026-11-17T10:00:00+02:00').getTime();
 const set = process.argv[2] || 'v2', show = process.argv.includes('--show');
 // Sets: v2 (held-out), v2b (re-masked + expanded held-out), dev2, dev3 (development). GLANCE_PRIVATE points at the private folder when this runs from another checkout.
-const HELD = set === 'v2' || set === 'v2b';
-const dir = path.join(process.env.GLANCE_PRIVATE || path.join(__dirname, 'private'), set);
+const PERSONAL = /^personal-(dev|heldout)$/.test(set), HELD = set === 'v2' || set === 'v2b' || set === 'personal-heldout';
+const dir = path.join(process.env.GLANCE_PRIVATE || path.join(__dirname, 'private'), PERSONAL ? 'personal' : set);
 const JSON_OUT = process.argv.includes('--json'), ROWS_OUT = (process.argv.find((a) => a.startsWith('--rows-out=')) || '').slice(11);
-const file = fs.readdirSync(dir).filter((f) => (set === 'v2b' ? /^v2b-.*\.jsonl$/ : /messages\.jsonl$/).test(f)).map((f) => path.join(dir, f));
+const file = fs.readdirSync(dir).filter((f) => (PERSONAL ? new RegExp('^' + set.slice(9) + '-.*\\.jsonl$') : set === 'v2b' ? /^v2b-.*\.jsonl$/ : /messages\.jsonl$/).test(f)).map((f) => path.join(dir, f));
 const rows = [].concat(...file.map((f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch (e) { return null; } }))).filter(Boolean).filter((r) => !(set === 'v2b' && r.remasked === false)); // v2b: rows whose owner marking could not be verified stay out (they remain in v2)
 const MAP = { draft: 'reply', task: 'task', pay: 'payment', calendar: 'calendar', file_save: 'document' };
 // dev3 labels name the close kind the way the plan does (draft, file_save); dev2 and the engine side use reply and document.
-const GOLD_ALIAS = { draft: 'reply', file_save: 'document' };
+const GOLD_ALIAS = { draft: 'reply', file_save: 'document', pay: 'payment' };
 const goldKind = (r) => (r.label && r.label.has_request ? (GOLD_ALIAS[r.label.kind] || r.label.kind || 'none') : 'none');
 // The mask replaced the owner's own name too. A first [NAME] within the first 30 characters is the vocative to the reader (these mails sit in the owner's inbox), so with GLANCE_ADDRESSEE=1 it is put back as the owner's name; the default run leaves the mask as it is.
 const ADDRESSEE = process.env.GLANCE_ADDRESSEE === '1';
@@ -30,7 +30,7 @@ function engineInbound(r, surface) {
   const to = r.ownInTo === false ? colleagues : [own].concat(colleagues);
   const cc = r.ownInTo === false ? [own] : [];
   try {
-    const rec = recognize({ surface, sender: { name: 'Person', email: 'person@firm.example' }, to, cc, subject: r.subject || 'RE: x', ownNames: ['סאלי', 'Sali'] }, addressee(r.body || '', r));
+    const rec = recognize({ surface, sender: { name: 'Person', email: r.fromKind === 'automated' ? 'noreply@firm.example' : r.fromKind === 'list' ? 'newsletter@firm.example' : 'person@firm.example' }, to, cc, subject: r.subject || 'RE: x', ownNames: ['סאלי', 'Sali'] }, addressee(r.body || '', r));
     return MAP[rec.family] || (rec.family === 'none' ? 'none' : 'other');
   } catch (e) { return 'none'; }
 }
