@@ -47,7 +47,7 @@ Mail bodies, subjects, street addresses, map pins, and personality scores. A thi
 
 ## Glance cloud
 
-Glance has its own cloud. Unlike Flow, this personal model is not the on-prem product. Two models run there, not in the browser: `multilingual-e5-small` (MIT, weights SHA-256 `1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477`) and DictaBERT-NER (CC-BY-4.0, weights SHA-256 `beeea5e7bfb6a8acf6765abc22400b27d0ae88afb177a89009574ddc0c1f4188`). See `NOTICE.md`.
+Glance has its own cloud. Unlike Flow, this personal model is not the on-prem product. The cloud embedder is `Qwen/Qwen3-Embedding-0.6B` (Apache-2.0). `multilingual-e5-small` is the offline fallback and is not a download. Hebrew NER is `dicta-il/dictabert-joint` (CC-BY-4.0). The catalog is `infra/models.yaml`. See `NOTICE.md`. The client flag is off until the owner approves the host.
 
 The client switch is off. The only host, when a CTO turns the action on, is `https://theflow-ai.com/.netlify/functions/glance-assist`. No new host permission is added. A call sends a few spans of at most 400 characters, over TLS, and the service must not keep the raw text and must not train on it unless the person opts in. Consent for the category is required before a span is sent. The result is stored in the encrypted model on this computer. Offline, rules and libphonenumber answer instead.
 

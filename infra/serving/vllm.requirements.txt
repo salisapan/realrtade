@@ -1,0 +1,5 @@
+# Not installed in CI. Security floor for the extract server.
+vllm>=0.11.1
+# CVE-2025-62164 is fixed at 0.11.1 and above.
+# prompt_embeds transport: disabled (VLLM_ENABLE_PROMPT_EMBEDS=0)
+# pickle transport: disabled (VLLM_ALLOW_PICKLE=0)

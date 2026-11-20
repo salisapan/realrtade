@@ -1,0 +1,3 @@
+# Not installed in CI. The extension uses the disabled stub in personal-slice6.js.
+# k-anonymity stays 5. The flag stays off.
+opendp>=0.12.1
