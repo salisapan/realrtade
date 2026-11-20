@@ -306,24 +306,29 @@
     return null;
   }
 
+  function flatText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
   function insertCompose(text) {
     const btn = replyControl();
     if (btn) btn.click();
     const box = composeBox();
     if (!box) return { ok: false, reason: 'no-compose' };
-    const cur = String(box.innerText || box.textContent || '').trim();
-    const want = String(text || '').trim();
+    const want = flatText(text);
+    const cur = flatText(box.textContent || box.innerText || '');
     if (cur && cur.indexOf(want) < 0) return { ok: false, reason: 'compose-not-empty' };
-    if (cur.indexOf(want) < 0) box.textContent = want;
-    const got = String(box.innerText || box.textContent || '');
-    return { ok: want && got.indexOf(want) >= 0, reason: got.indexOf(want) >= 0 ? '' : 'not-inserted' };
+    if (cur.indexOf(want) < 0) box.textContent = String(text || '').trim();
+    const got = flatText(box.textContent || box.innerText || '');
+    const ok = !!want && got.indexOf(want) >= 0;
+    return { ok: ok, reason: ok ? '' : 'not-inserted' };
   }
 
   function clearComposeIfUnchanged(text) {
     const box = composeBox();
     if (!box) return true;
-    const cur = String(box.innerText || box.textContent || '').trim();
-    if (cur !== String(text || '').trim()) return false;
+    const cur = flatText(box.textContent || box.innerText || '');
+    if (cur !== flatText(text)) return false;
     box.textContent = '';
     return true;
   }
