@@ -272,9 +272,12 @@ const baseWatch = (channel, threadId, id, name) => ({ id: threadId, threadId, ch
   await t.p.waitForTimeout(2500);
   check('Slack /dms late render: self DM by user id shows Do It', (await t.p.locator('[data-glance-do-it]').count()) === 1);
   check('Slack /dms names the signed-in user, not only the title', await t.p.locator('html').getAttribute('data-glance-sender') === 'UFLOW123');
-  check('Slack /dms thread is the DOM conversation', await t.p.locator('html').getAttribute('data-glance-chat') === 'slack:T01ABC:D0C9BS6UD9A');
+  check('Slack /dms with no selected row is still the self chat', await t.p.locator('html').getAttribute('data-glance-chat') === 'slack:T01ABC:self-UFLOW123');
   const dmsNotes = await t.p.evaluate(() => (window.__msgs || []).filter((m) => m && m.type === 'flow:slack-trace').map((m) => m.line || ''));
   check('Slack /dms logs a selector probe and that the observer attached', dmsNotes.some((line) => line.indexOf('[Glance] slack probe url=') === 0 && line.indexOf('[data-qa="message_pane"]:') >= 0) && dmsNotes.some((line) => line.indexOf('[Glance] slack observer attached target=') === 0) && dmsNotes.some((line) => line.indexOf('[Glance] slack rescan reason=') === 0), dmsNotes);
+  check('Slack /dms re-logs when the bubble count changes', dmsNotes.some((line) => line.indexOf('bubbles=0') >= 0) && dmsNotes.some((line) => /bubbles=[1-9]/.test(line)), dmsNotes);
+  const dmsHealth = await t.p.evaluate(() => window.__health);
+  check('Slack /dms reports the page identified so the panel leaves unrecognized', dmsHealth && dmsHealth.ok === true && dmsHealth.id === 'slack', dmsHealth);
   await t.p.locator('[data-glance-do-it]').click();
   const dmsBox = await t.p.locator('.ql-editor').innerText();
   const dmsSends = await t.p.evaluate(() => window.__glanceSendClicks || 0);

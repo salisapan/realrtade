@@ -3,7 +3,7 @@
 // One-to-one direct messages only. A self-chat ask gets one Do It. Do It places a draft in the compose box.
 // Undo clears that draft only while it is still the same text. Glance never presses Send.
 // A channel, a group direct message, a thread, and an FYI stay quiet.
-// If the page cannot be read, the reason is logged once: [Glance] slack why-not …
+// If the page cannot be read, the reason is logged again when the reason or the bubble count changes: [Glance] slack why-not …
 (() => {
   if (typeof FlowSlackParse === 'undefined') return;
   const P = FlowSlackParse;
@@ -12,7 +12,6 @@
   const ORIGINS = ['https://app.slack.com/*'];
   let timer = null;
   let lastReportedHealth = null;
-  const seenWhy = new Set();
 
   function markLane() {
     try {
@@ -29,23 +28,7 @@
     try { return location.hostname === 'app.slack.com'; } catch (e) { return false; }
   }
 
-  const PROBE_SELECTORS = [
-    '[data-qa="message_pane"]',
-    '[data-qa="virtual-list-item"]',
-    '[data-qa="message_content"]',
-    '.c-message_kit__blocks',
-    '[data-qa="message-text"]',
-    '[data-msg-ts]',
-    '[data-item-key]',
-    '[data-qa="message_sender_name"]',
-    '[data-qa="channel_name"]',
-    '.p-view_header',
-    '[data-qa="virtual-list-item"][aria-selected="true"]',
-    '.p-channel_sidebar__channel--selected',
-    '[data-qa-channel-sidebar-channel-id]'
-  ];
-
-  function pane() { return document.querySelector('[data-qa="message_pane"], [data-qa="slack_kit_list"], .p-workspace__primary_view_body'); }
+  function pane() { return document.querySelector('[data-qa="message_pane"]'); }
 
   function tsMatch(raw) {
     const m = String(raw || '').match(/(\d{9,11}\.\d{6})/);
@@ -53,34 +36,11 @@
   }
 
   function messageIdOf(n) {
-    if (!n || !n.getAttribute) return '';
-    const own = tsMatch(n.getAttribute('data-msg-ts') || n.getAttribute('data-item-key'));
-    if (own && P.parseTs(own)) return own;
-    const child = n.querySelector && n.querySelector('[data-msg-ts], [data-item-key]');
-    const nested = child ? tsMatch(child.getAttribute('data-msg-ts') || child.getAttribute('data-item-key')) : '';
-    return nested && P.parseTs(nested) ? nested : '';
-  }
-
-  function rowScore(n) {
-    let score = 0;
-    if (n.getAttribute('data-msg-ts') || n.getAttribute('data-item-key')) score += 2;
-    const qa = n.getAttribute('data-qa') || '';
-    if (qa === 'message_container' || qa === 'virtual-list-item') score += 2;
-    if (n.querySelector && n.querySelector('[data-qa="message-text"], [data-qa="message_content"], .c-message_kit__blocks')) score += 1;
-    return score;
-  }
-
-  function rows() {
-    const root = pane() || document.body || document;
-    const nodes = Array.from(root.querySelectorAll('[data-qa="message_container"], [data-qa="virtual-list-item"], [data-qa="message_content"], .c-message_kit__blocks'));
-    const byTs = new Map();
-    nodes.forEach((n) => {
-      const ts = messageIdOf(n);
-      if (!ts) return;
-      const prev = byTs.get(ts);
-      if (!prev || rowScore(n) > rowScore(prev)) byTs.set(ts, n);
-    });
-    return Array.from(byTs.values()).slice(-MAX_ROWS);
+    if (!n) return '';
+    const host = n.closest ? (n.closest('[data-msg-ts], [data-item-key]') || n) : n;
+    if (!host.getAttribute) return '';
+    const ts = tsMatch(host.getAttribute('data-msg-ts') || host.getAttribute('data-item-key'));
+    return ts && P.parseTs(ts) ? ts : '';
   }
 
   function title() {
@@ -89,11 +49,20 @@
     const header = document.querySelector('.p-view_header [data-qa="channel_name"], .p-view_header');
     return header ? (header.textContent || '').trim() : '';
   }
-  function senderOf(n) { const s = n.querySelector('[data-qa="message_sender_name"], [data-qa="message_sender"]'); return s ? (s.textContent || '').trim() : ''; }
+  function rowOf(n) {
+    return (n && n.closest && n.closest('[data-qa="virtual-list-item"], [data-qa="message_container"], [data-qa="message_content"], .c-message_kit__blocks')) || n;
+  }
+  function senderOf(n) {
+    const row = rowOf(n);
+    const s = row && row.querySelector ? row.querySelector('[data-qa="message_sender_name"], [data-qa="message_sender"]') : null;
+    return s ? (s.textContent || '').trim() : '';
+  }
   function textOf(n) {
-    let nodes = Array.from(n.querySelectorAll('[data-qa="message-text"]'));
-    if (!nodes.length) nodes = Array.from(n.querySelectorAll('.p-rich_text_section'));
-    const pieces = nodes.map((s) => ({ text: s.innerText || s.textContent || '', quoted: Boolean(s.closest('blockquote, [data-qa="message_attachment"]')) }));
+    if (n && n.getAttribute && n.getAttribute('data-qa') === 'message-text') {
+      return P.joinText([{ text: n.innerText || n.textContent || '', quoted: Boolean(n.closest && n.closest('blockquote, [data-qa="message_attachment"]')) }]);
+    }
+    const nodes = n && n.querySelectorAll ? Array.from(n.querySelectorAll('[data-qa="message-text"]')) : [];
+    const pieces = (nodes.length ? nodes : [n]).map((s) => ({ text: (s && (s.innerText || s.textContent)) || '', quoted: Boolean(s && s.closest && s.closest('blockquote, [data-qa="message_attachment"]')) }));
     return P.joinText(pieces);
   }
   function composerBox() {
@@ -121,40 +90,6 @@
       if (value) return String(value).trim();
     }
     return '';
-  }
-
-  function idsOn(node) {
-    const out = [];
-    if (!node) return out;
-    if (node.attributes) {
-      for (let i = 0; i < node.attributes.length; i++) {
-        const found = String(node.attributes[i].value || '').match(/\b(D[A-Z0-9]{6,})\b/);
-        if (found) out.push(found[1]);
-      }
-    }
-    const link = node.querySelector && node.querySelector('a[href*="/D"], [data-qa-channel-sidebar-channel-id]');
-    if (link) {
-      const href = link.getAttribute('href') || '';
-      const fromHref = href.match(/\/(D[A-Z0-9]{6,})/);
-      if (fromHref) out.push(fromHref[1]);
-      if (link.getAttribute('data-qa-channel-sidebar-channel-id')) out.push(link.getAttribute('data-qa-channel-sidebar-channel-id'));
-    }
-    return out;
-  }
-
-  function domConversationId() {
-    const selected = document.querySelector('[data-qa="virtual-list-item"][aria-selected="true"], .p-channel_sidebar__channel--selected, [aria-selected="true"][data-qa-channel-sidebar-channel-id], [aria-current="page"][data-qa-channel-sidebar-channel-id]');
-    const main = pane();
-    return P.conversationIdFrom([].concat(
-      idsOn(selected),
-      idsOn(main),
-      [
-        selected && selected.getAttribute('data-qa-channel-sidebar-channel-id'),
-        main && main.getAttribute('data-qa-channel-id'),
-        main && main.getAttribute('data-channel-id'),
-        main && main.getAttribute('data-conversation-id')
-      ]
-    ));
   }
 
   function signedInId(team) {
@@ -190,12 +125,17 @@
     } catch (e) { /* the page may be closing */ }
   }
 
-  function whyNot(reason, detail) {
-    const extra = detail ? ' ' + String(detail) : '';
-    const line = '[Glance] slack why-not ' + reason + extra;
-    if (seenWhy.has(line)) return;
-    seenWhy.add(line);
-    trace(line);
+  let lastWhyKey = '';
+  function whyNot(reason, bubbles, chat) {
+    const count = bubbles == null ? '' : String(bubbles);
+    const id = chat || '';
+    const key = reason + '|' + count + '|' + id;
+    if (key === lastWhyKey) return;
+    lastWhyKey = key;
+    const bits = [reason];
+    if (count !== '') bits.push('bubbles=' + count);
+    bits.push('chat=' + (id || 'missing'));
+    trace('[Glance] slack why-not ' + bits.join(' '));
   }
 
   function report(ok, reason) {
@@ -233,7 +173,12 @@
     return true;
   }
 
-  function offerSelf(list, self) {
+  function ownName() {
+    const button = document.querySelector('[data-qa="user-button"], [data-qa="nav_user"], [data-qa-own-user="1"]');
+    return button ? (button.textContent || '').trim() : '';
+  }
+
+  function offerSelf(list, self, bubbles, chat) {
     if (typeof FlowChatSelfCard === 'undefined') return;
     const last = list[list.length - 1];
     const text = textOf(last);
@@ -244,31 +189,34 @@
       text: text,
       draft: (value) => P.selfDraft(value),
       composer: composerBox,
-      whyNot: whyNot
+      whyNot: (reason) => whyNot(reason, bubbles, chat)
     });
-    if (self && result && result.reason === 'fyi') whyNot('fyi');
+    if (self && result && result.reason === 'fyi') whyNot('fyi', bubbles, chat);
   }
 
-  async function scan() {
+  async function scan(liveIn) {
     if (!(await hostOpen())) return;
+    const live = liveIn && liveIn.bubbles ? liveIn : P.readLive(document);
     const parsed = P.parseUrl(location.href);
-    if (!parsed) { whyNot('chat-not-identified', 'url=missing'); return; }
-    const where = P.resolveConversation(parsed, domConversationId());
-    if (where.unresolved) { whyNot('chat-not-identified', 'dom=missing'); return; }
-    if (!where.oneToOne || where.inThread) { report(true); whyNot('not-one-to-one'); return; }
-    const list = rows();
-    if (!list.length) { report(false, 'no-messages-recognised'); whyNot('no-messages-recognised', 'bubbles=0'); return; }
+    if (!parsed) { report(false, 'chat-not-identified'); whyNot('chat-not-identified', live.bubbleCount, 'missing'); return; }
+    const who = { id: signedInId(parsed.team), name: ownName() };
+    const where = P.identify(location.href, document, who, live);
+    if (!where || where.unresolved) { report(false, 'chat-not-identified'); whyNot('chat-not-identified', live.bubbleCount, 'missing'); return; }
+    if (!where.oneToOne || where.inThread) { report(true); whyNot('not-one-to-one', live.bubbleCount, where.conversation); return; }
+    const list = live.bubbles.slice(-MAX_ROWS);
+    if (!list.length) { report(false, 'no-messages-recognised'); whyNot('no-messages-recognised', live.bubbleCount, where.conversation || 'missing'); return; }
     const t = title();
-    if (!t) { whyNot('chat-not-identified', 'title=missing'); return; }
-    const self = P.isSelfDm({ selfId: signedInId(where.team), counterpartId: counterpartId(), titleBlob: selfBlob() });
+    if (!t) { report(false, 'chat-not-identified'); whyNot('chat-not-identified', live.bubbleCount, where.conversation || 'missing'); return; }
+    const self = where.self === true || P.isSelfDm({ selfId: who.id, counterpartId: counterpartId(), titleBlob: selfBlob() }) || (who.name && t.toLowerCase() === who.name.toLowerCase());
     const filled = P.fillSenders(list.map((n) => ({ sender: senderOf(n) })));
     const own = filled.map((r) => (self ? true : P.isOwn(r.sender, t)));
-    if (!self && own.some((x) => x === null)) { whyNot('sender-not-identified'); return; }
+    if (!self && own.some((x) => x === null)) { whyNot('sender-not-identified', live.bubbleCount, where.conversation); return; }
+    whyNot('recognised', live.bubbleCount, where.conversation);
     report(true);
-    const threadId = P.threadIdFor(where);
+    const threadId = P.threadIdFor(where) || ('slack:' + where.team + ':' + where.conversation);
     const last = list[list.length - 1];
-    remember(threadId, self ? (signedInId(where.team) || senderOf(last) || 'me') : (senderOf(last) || (own[own.length - 1] === true ? 'me' : 'them')));
-    offerSelf(list, self);
+    remember(threadId, self ? (who.id || senderOf(last) || 'me') : (senderOf(last) || (own[own.length - 1] === true ? 'me' : 'them')));
+    offerSelf(list, self, live.bubbleCount, where.conversation);
     if (typeof FlowFollow === 'undefined') return;
     const idx = new Map(list.map((n, i) => [n, i]));
     const party = { name: t, phone: null, email: null };
@@ -306,30 +254,29 @@
     return (node.nodeName || 'node').toLowerCase();
   }
 
-  function probe(reason) {
+  function probe(reason, live) {
     const now = Date.now();
-    if (now - lastProbeAt < 2000) return;
+    if (now - lastProbeAt < 2000) return live || P.readLive(document);
     lastProbeAt = now;
-    const parts = PROBE_SELECTORS.map((sel) => {
-      let count = 0;
-      try { count = document.querySelectorAll(sel).length; } catch (e) { count = -1; }
-      return sel + ':' + count;
-    });
+    const reading = live || P.readLive(document);
+    const parts = P.PROBE_SELECTORS.map((sel) => sel + ':' + (reading.counts[sel] == null ? 0 : reading.counts[sel]));
     trace('[Glance] slack probe url=' + here() + ' sel=' + parts.join(' '));
     trace('[Glance] slack rescan reason=' + (reason || 'mutation'));
+    return reading;
   }
 
   function schedule(reason) {
     clearTimeout(timer);
     timer = setTimeout(() => {
       ensureObservers();
-      probe(reason || 'mutation');
-      scan().catch((e) => console.error('[Glance] Slack scan failed', e));
+      const live = P.readLive(document);
+      probe(reason || 'mutation', live);
+      scan(live).catch((e) => console.error('[Glance] Slack scan failed', e));
     }, DEBOUNCE_MS);
   }
 
   function onNav() {
-    seenWhy.clear();
+    lastWhyKey = '';
     lastReportedHealth = null;
     schedule('nav');
   }
