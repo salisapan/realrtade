@@ -68,7 +68,7 @@ test('quote, meeting summary, and agreement each create one Doc', async ({ glanc
       subject: 'הסכם שכירות למשרד',
       body: 'נא לנסח טיוטת הסכם שכירות בין דנה כהן לבין רוני לוי. תקופה: שנה.',
       card: 'טיוטת הסכם',
-      bits: ['הסכם — שכירות למשרד', 'דנה כהן', '[להשלים: חתימות]']
+      bits: ['הסכם — שכירות למשרד', 'דנה כהן', 'חתימות:', '__________']
     }
   ];
   for (const row of cases) {

@@ -146,9 +146,10 @@ const FlowIncomingJudge = (() => {
   // «מצורף מסמך הסיכום.» hands over a file. It is not an ask, so it is not a task and not a Do It.
   function attachmentNotice(rawText) {
     const s = String(rawText || '').replace(/\s+/g, ' ').trim();
-    if (!s || s.length > 160) return false;
-    if (/(?:הכן|הכיני|תכין|לנסח|לכתוב|נא\s|בבקשה|אפשר|תוכל|please\b|can you|could you|\bdraft\b|\bprepare\b)/i.test(s)) return false;
-    return /^(?:(?:היי|הי|שלום|hi|hey|hello)[,!\s]+)?(?:מצורף|מצורפת|מצורפים|מצורפות|enclosed is|attached is|attached:|please find attached)(?:\s|$).{0,80}$/i.test(s);
+    if (!s || s.length > 80) return false;
+    if (/(?:תעבור|תגיד|תגידי|תשלח|עד\s|נא\s|בבקשה|אפשר|תוכל|הכן|תכין|לנסח|לכתוב|please\b|can you|could you|tell me|let me know|\bdraft\b|\bprepare\b)/i.test(s)) return false;
+    return /^(?:(?:היי|הי|שלום|hi|hey|hello)[,!\s]+)?(?:מצורף|מצורפת|מצורפים|מצורפות)\s+[\u0590-\u05FF\s"״']{2,40}[.!]?\s*$/.test(s)
+      || /^(?:please find attached|attached is|attached:|enclosed is)\s+\S.{1,60}[.!]?\s*$/i.test(s);
   }
 
   function namedQuietOf(rawText, i) {
