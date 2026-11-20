@@ -147,9 +147,8 @@ const FlowIncomingJudge = (() => {
   function attachmentNotice(rawText) {
     const s = String(rawText || '').replace(/\s+/g, ' ').trim();
     if (!s || s.length > 80) return false;
-    if (/(?:תעבור|תגיד|תגידי|תשלח|עד\s|נא\s|בבקשה|אפשר|תוכל|הכן|תכין|לנסח|לכתוב|please\b|can you|could you|tell me|let me know|\bdraft\b|\bprepare\b)/i.test(s)) return false;
-    return /^(?:(?:היי|הי|שלום|hi|hey|hello)[,!\s]+)?(?:מצורף|מצורפת|מצורפים|מצורפות)\s+[\u0590-\u05FF\s"״']{2,40}[.!]?\s*$/.test(s)
-      || /^(?:please find attached|attached is|attached:|enclosed is)\s+\S.{1,60}[.!]?\s*$/i.test(s);
+    if (/(?:תעבור|תגיד|תגידי|תשלח|עד\s|נא\s|בבקשה|אפשר|תוכל|הכן|תכין|לנסח|לכתוב)/.test(s)) return false;
+    return /^(?:(?:היי|הי|שלום)[,!\s]+)?מצורף(?:ה|ים|ות)?\s+מסמך\s+[\u0590-\u05FF]{2,24}[.!]?\s*$/.test(s);
   }
 
   function namedQuietOf(rawText, i) {
