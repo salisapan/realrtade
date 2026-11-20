@@ -8,6 +8,7 @@ const FlowGoogleCalendar = (() => {
   const CONNECTOR = 'googleHold';
   const DURATION_MIN = 30;
   const API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+  const HE_WD = { 'א': 0, 'ב': 1, 'ג': 2, 'ד': 3, 'ה': 4, 'ו': 5, 'ש': 6 };
 
   function cfg() {
     return typeof FlowGoogleConfig !== 'undefined' ? FlowGoogleConfig : null;
@@ -173,21 +174,96 @@ const FlowGoogleCalendar = (() => {
     return date + ' ' + pad(h) + ':' + pad(m);
   }
 
-  function eventUrl(id) {
+  // primary, or the id the insert used. A slash or a space is not an id.
+  function calendarIdOf(input) {
+    const id = String((input && (input.calendarId || input.id)) || 'primary').trim();
+    if (!id || id === 'primary') return 'primary';
+    if (/[\/\\\s?#]/.test(id) || id.length > 200) return 'primary';
+    return id;
+  }
+
+  function collectionUrl(calendarId) {
+    return 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calendarIdOf({ calendarId: calendarId })) + '/events';
+  }
+
+  function eventUrl(id, calendarId) {
     const clean = String(id || '').trim();
     if (!clean || /[\/\\\s]/.test(clean)) return '';
-    return API + '/' + encodeURIComponent(clean) + '?sendUpdates=none';
+    return collectionUrl(calendarId) + '/' + encodeURIComponent(clean) + '?sendUpdates=none';
   }
 
-  function createRequest(body) {
+  function createRequest(body, calendarId) {
     if (!body || (Array.isArray(body.attendees) && body.attendees.length) || body.isOnlineMeeting) return null;
-    return { method: 'POST', url: API + '?sendUpdates=none', json: body };
+    return { method: 'POST', url: collectionUrl(calendarId) + '?sendUpdates=none', json: body };
   }
 
-  function undoRequest(eventId) {
-    const url = eventUrl(eventId);
+  function undoRequest(eventId, calendarId) {
+    const url = eventUrl(eventId, calendarId);
     if (!url) return null;
     return { method: 'DELETE', url: url };
+  }
+
+  // «יום ג׳» / «ביום ג׳» is Tuesday. The geresh may be ׳, ', or U+05F3.
+  function hebrewWeekdayIndex(text) {
+    const m = String(text || '').match(/יום\s+([אבגדהוש])[׳'’`\u05F3]/);
+    if (!m || !Object.prototype.hasOwnProperty.call(HE_WD, m[1])) return null;
+    return HE_WD[m[1]];
+  }
+
+  function ymdInZone(timeZone, utcMs) {
+    const zone = zoneName(timeZone);
+    if (!zone) return null;
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      hourCycle: 'h23',
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    const bag = {};
+    fmt.formatToParts(new Date(utcMs)).forEach((part) => {
+      if (part.type !== 'literal') bag[part.type] = part.value;
+    });
+    const wdName = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    let hour = bag.hour === '24' ? '00' : bag.hour;
+    return {
+      iso: bag.year + '-' + bag.month + '-' + bag.day,
+      wd: wdName[bag.weekday],
+      wall: bag.year + '-' + bag.month + '-' + bag.day + 'T' + hour + ':' + bag.minute + ':' + bag.second
+    };
+  }
+
+  function addDaysIso(iso, days) {
+    const parts = String(iso || '').split('-').map(Number);
+    if (parts.length !== 3 || parts.some((n) => !Number.isInteger(n))) return '';
+    const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + days));
+    return dt.getUTCFullYear() + '-' + pad(dt.getUTCMonth() + 1) + '-' + pad(dt.getUTCDate());
+  }
+
+  function weekdayOfIso(iso) {
+    const parts = String(iso || '').split('-').map(Number);
+    if (parts.length !== 3 || parts.some((n) => !Number.isInteger(n))) return null;
+    return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])).getUTCDay();
+  }
+
+  // The next ג׳ (or any weekday) in the person's zone. Today is not that day:
+  // said on a Tuesday, ג׳ is a week ahead. The calendar date is the zone's date.
+  function nextWeekdayIso(weekday, timeZone, nowMs) {
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return '';
+    const zone = zoneName(timeZone);
+    if (!zone) return '';
+    const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+    const today = ymdInZone(zone, now);
+    if (!today || !today.iso) return '';
+    for (let add = 1; add <= 7; add++) {
+      const iso = addDaysIso(today.iso, add);
+      if (weekdayOfIso(iso) === weekday) return iso;
+    }
+    return '';
   }
 
   function hash(text) {
@@ -204,17 +280,31 @@ const FlowGoogleCalendar = (() => {
     return hash(summary + '\n' + description + '\n' + start);
   }
 
-  function sameInstant(a, b) {
-    const x = Date.parse(a);
-    const y = Date.parse(b);
-    return Number.isFinite(x) && Number.isFinite(y) && x === y;
+  function offsetPresent(iso) {
+    return /(?:Z|[+-]\d{2}:\d{2})$/i.test(String(iso || '').trim());
+  }
+
+  // Google often reads an instant back as wall time in the event's zone, with
+  // an offset or without one. Both are the same hold when the zone wall matches.
+  function sameInstant(a, b, timeZone) {
+    const left = String(a || '').trim();
+    const right = String(b || '').trim();
+    const x = Date.parse(left);
+    const y = Date.parse(right);
+    if (offsetPresent(left) && offsetPresent(right) && Number.isFinite(x) && Number.isFinite(y) && x === y) return true;
+    const zone = zoneName(timeZone);
+    if (!zone) return false;
+    const wa = offsetPresent(left) ? (ymdInZone(zone, x) || {}).wall : left.slice(0, 19);
+    const wb = offsetPresent(right) ? (ymdInZone(zone, y) || {}).wall : right.slice(0, 19);
+    return Boolean(wa && wb && wa === wb);
   }
 
   function sameEvent(sent, back) {
     if (!sent || !back) return false;
     if (String(back.summary || '') !== String(sent.summary || '')) return false;
-    if (!back.start || !sameInstant(back.start.dateTime, sent.start.dateTime)) return false;
-    if (!back.end || !sameInstant(back.end.dateTime, sent.end.dateTime)) return false;
+    const zone = (sent.start && sent.start.timeZone) || (back.start && back.start.timeZone) || '';
+    if (!back.start || !sameInstant(back.start.dateTime, sent.start.dateTime, zone)) return false;
+    if (!back.end || !sameInstant(back.end.dateTime, sent.end.dateTime, zone)) return false;
     return true;
   }
 
@@ -298,23 +388,30 @@ const FlowGoogleCalendar = (() => {
     return got.status === 404 || got.status === 410 || got.status === 0 || got.status >= 500;
   }
 
-  async function readBack(http, id, delays) {
+  async function readBack(http, id, delays, calendarId) {
     const waits = Array.isArray(delays) ? delays : READ_BACK_DELAYS;
-    let got = await call(http, { method: 'GET', url: eventUrl(id) });
+    let got = await call(http, { method: 'GET', url: eventUrl(id, calendarId) });
     for (let n = 0; n < waits.length && notYetReadable(got); n++) {
       await pause(waits[n]);
-      got = await call(http, { method: 'GET', url: eventUrl(id) });
+      got = await call(http, { method: 'GET', url: eventUrl(id, calendarId) });
     }
     return got;
   }
 
   async function write(input, http, clock) {
     const C = cfg();
-    const i = input || {};
+    const i = Object.assign({}, input || {});
     const blocked = C && C.gate(i.scopes, C.SCOPE_CALENDAR, 'calendar-not-granted');
     if (blocked) return blocked;
+    const namedDay = Number.isInteger(i.weekday) ? i.weekday : hebrewWeekdayIndex(i.callText || i.text || '');
+    if (namedDay != null && i.timeZone) {
+      const resolved = nextWeekdayIso(namedDay, i.timeZone, Number.isFinite(i.nowMs) ? i.nowMs : Date.now());
+      const have = isoDate(i.dateIso);
+      if (resolved && (!have || weekdayOfIso(have) !== namedDay)) i.dateIso = resolved;
+    }
+    const calendarId = calendarIdOf(i);
     const body = eventBody(i);
-    const req = createRequest(body);
+    const req = createRequest(body, calendarId);
     if (!req) return { ok: false, reason: 'unclear', error: 'No single time for this event.' };
     const posted = await call(http, Object.assign({ body: JSON.stringify(req.json), headers: { 'Content-Type': 'application/json' } }, req));
     const denied = authFail(posted.status);
@@ -330,23 +427,24 @@ const FlowGoogleCalendar = (() => {
       written: 'Calendar · ' + body.summary + (when ? ' · ' + when : ''),
       url: null
     };
-    if (!event.id) return Object.assign({ ok: false, reason: pending, ref: null, proof: null, object: 'event', title: body.summary }, base);
-    const got = await readBack(http, event.id, i.readBackDelays);
-    const named = { object: 'event', title: body.summary, eventId: event.id };
+    if (!event.id) return Object.assign({ ok: false, reason: pending, ref: null, proof: null, object: 'event', title: body.summary, calendarId: calendarId }, base);
+    const got = await readBack(http, event.id, i.readBackDelays, calendarId);
+    const named = { object: 'event', title: body.summary, eventId: event.id, calendarId: calendarId };
+    const keptRef = { eventId: event.id, externalId: event.id, calendarId: calendarId, unverified: true };
     // An event that cannot be confirmed is removed again, so nothing stays in
     // Google that the card does not own. If the removal also fails the ref is
     // kept, and the card offers Undo for it.
     const withdraw = async () => {
-      const gone = await call(http, { method: 'DELETE', url: eventUrl(event.id) });
+      const gone = await call(http, { method: 'DELETE', url: eventUrl(event.id, calendarId) });
       const removed = gone.ok || gone.status === 204 || gone.status === 404 || gone.status === 410;
-      return Object.assign({ ok: false, reason: failed, ref: removed ? null : { eventId: event.id, externalId: event.id }, proof: null, removed: removed }, named, base);
+      return Object.assign({ ok: false, reason: failed, ref: removed ? null : keptRef, proof: null, removed: removed, error: 'Google did not return the event after the write, so it was removed.' }, named, base);
     };
     if (!got.ok || !got.json || got.json.id !== event.id || got.json.status === 'cancelled') {
       // The event was created and Google has not shown it to a read yet.
       // It stays, with its id, so Undo can delete it, and the card says it
       // was not verified. Nothing is claimed and nothing is left unowned.
       if (got.status === 404 || got.status === 410) {
-        return Object.assign({ ok: false, reason: UNVERIFIED, ref: { eventId: event.id, externalId: event.id, unverified: true }, proof: null, unverified: true }, named, base);
+        return Object.assign({ ok: false, reason: UNVERIFIED, ref: keptRef, proof: null, unverified: true, error: 'Google has not returned the event yet.' }, named, base);
       }
       return withdraw();
     }
@@ -357,7 +455,7 @@ const FlowGoogleCalendar = (() => {
     const expected = String(i.expectAccount || '').trim().toLowerCase();
     const actual = accountOf(got.json);
     if (expected && actual && expected !== actual) {
-      await call(http, { method: 'DELETE', url: eventUrl(event.id) });
+      await call(http, { method: 'DELETE', url: eventUrl(event.id, calendarId) });
       return Object.assign({ ok: false, reason: 'wrong-account', account: actual, expected: expected, ref: null, proof: null }, named, base);
     }
     const link = event.htmlLink && String(event.htmlLink).slice(0, 8) === 'https://' ? event.htmlLink : null;
@@ -367,7 +465,7 @@ const FlowGoogleCalendar = (() => {
     const backWhen = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(backStart) ? backStart.slice(0, 10) + ' ' + backStart.slice(11, 16) : when;
     base.written = 'Calendar · ' + String(got.json.summary || body.summary) + (backWhen ? ' · ' + backWhen : '');
     const proof = C && C.proofOf(SYSTEM, event.id, link, C.clockIso(clock));
-    const ref = { eventId: event.id, externalId: event.id, contentHash: contentHash(got.json) };
+    const ref = { eventId: event.id, externalId: event.id, calendarId: calendarId, contentHash: contentHash(got.json) };
     if (!proof) return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, named, base);
     return Object.assign({ ok: true, ref: ref, proof: proof, title: String(got.json.summary || body.summary) }, base);
   }
@@ -378,7 +476,8 @@ const FlowGoogleCalendar = (() => {
 
   async function undo(ref, http) {
     const id = ref && typeof ref === 'object' ? (ref.externalId || ref.eventId) : ref;
-    const req = undoRequest(id);
+    const calendarId = ref && typeof ref === 'object' ? ref.calendarId : 'primary';
+    const req = undoRequest(id, calendarId);
     if (!req) return { ok: false };
     // An event Google had not shown back yet is deleted by its id, with no
     // content check: Glance made it moments ago and nothing was verified.
@@ -391,7 +490,7 @@ const FlowGoogleCalendar = (() => {
       return { ok: false, reason: UNVERIFIED, error: 'Not verified — Google has not returned the event yet. It stays, and Undo removes it.' };
     }
     if (!ref || typeof ref !== 'object' || !ref.contentHash) return unconfirmedUndo();
-    const got = await call(http, { method: 'GET', url: eventUrl(id) });
+    const got = await call(http, { method: 'GET', url: eventUrl(id, calendarId) });
     if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
     if (got.status === 404 || got.status === 410) return { ok: true, written: 'Calendar event removed.' };
     if (!got.ok || !got.json) return { ok: false, reason: 'http-' + got.status };
@@ -411,6 +510,8 @@ const FlowGoogleCalendar = (() => {
     CONNECTOR: CONNECTOR,
     DURATION_MIN: DURATION_MIN,
     durationOf: durationOf,
+    hebrewWeekdayIndex: hebrewWeekdayIndex,
+    nextWeekdayIso: nextWeekdayIso,
     hasWriteScope: hasWriteScope,
     eventBody: eventBody,
     cleanMailSubject: cleanMailSubject,

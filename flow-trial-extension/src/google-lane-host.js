@@ -116,7 +116,7 @@ function storedConnectToken() {
     .catch(() => '');
 }
 
-function identityToken() {
+function identityTokenOnce() {
   return new Promise((resolve) => {
     const identity = typeof chrome !== 'undefined' ? chrome.identity : null;
     if (!identity || typeof identity.getAuthToken !== 'function') {
@@ -133,6 +133,12 @@ function identityToken() {
       resolve('');
     }
   });
+}
+
+// Silent only. The first call after a reload often misses Chrome's cache.
+// One retry, still not interactive. A click is what may open the window.
+function identityToken() {
+  return identityTokenOnce().then((token) => (token ? token : identityTokenOnce()));
 }
 
 // The address a token belongs to, from the openid/userinfo email claim (already
@@ -219,8 +225,10 @@ globalThis.FlowGoogleLaneAccount = {
   forget: () => seenAccounts.clear()
 };
 
+let preferredLang = '';
+
 function statusLanguage() {
-  const code = String(uiLanguage() || '').trim().toLowerCase().replace(/_/g, '-');
+  const code = String(preferredLang || uiLanguage() || '').trim().toLowerCase().replace(/_/g, '-');
   return (code === 'he' || code.indexOf('he-') === 0) ? 'he' : 'en';
 }
 
@@ -831,17 +839,24 @@ async function prepareWrite(connectorId, input, cred) {
     if (!zone) {
       try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { zone = ''; }
     }
+    const scopes = await storedGrantedScopes();
     return {
       dateIso: params.dateIso || i.dateIso,
       hour: params.hour != null ? params.hour : i.hour,
       minute: params.minute != null ? params.minute : i.minute,
+      weekday: Number.isInteger(params.weekday) ? params.weekday : i.weekday,
       durationMinutes: params.durationMinutes != null ? params.durationMinutes : i.durationMinutes,
       fileName: params.fileName || params.fileTerm || i.fileName || '',
       fileUrl: params.fileUrl || params.shareUrl || i.fileUrl || '',
       fileTerm: params.fileTerm || i.fileTerm || '',
       title: params.title || i.title || i.label || '',
       quote: params.quote || i.quote || '',
+      subject: params.subject || i.subject || '',
+      callText: params.callText || i.callText || '',
       timeZone: zone,
+      calendarId: 'primary',
+      scopes: scopes,
+      nowMs: Date.now(),
       expectAccount: cred && cred.email ? cred.email : ''
     };
   }
@@ -942,6 +957,7 @@ function unconfirmedRefusal(lang) {
 }
 
 function uiLanguage() {
+  if (preferredLang) return preferredLang;
   try {
     const i18n = typeof chrome !== 'undefined' && chrome.i18n;
     if (i18n && typeof i18n.getUILanguage === 'function') {
@@ -1105,6 +1121,7 @@ function onLaneMessage(msg, sender, sendResponse) {
   }
   if (!msg || !Lane) return undefined;
   if (msg.type === 'flow:google-write') {
+    preferredLang = msg.lang ? String(msg.lang) : '';
     Promise.resolve(guardedWrite(msg.connectorId, msg.input, { tab: msg.tabAccount, lang: msg.lang }))
       .then((result) => {
         const ref = result && result.ref;

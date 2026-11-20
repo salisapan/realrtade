@@ -1631,7 +1631,14 @@ function glanceUiCopy(kind) {
       ? FlowIncomingJudge.prepareForJudge(text)
       : text;
     const template = await readCompanyTemplate();
-    const ctx = Object.assign({ now: new Date() }, base, { companyTemplate: template });
+    // Headless regression only. The suite sets glanceE2eNowMs so a mail dated
+    // 18/11 is still in the future. Production never sets that key.
+    let now = new Date();
+    try {
+      const clock = await chrome.storage.local.get('glanceE2eNowMs');
+      if (clock && typeof clock.glanceE2eNowMs === 'number' && Number.isFinite(clock.glanceE2eNowMs)) now = new Date(clock.glanceE2eNowMs);
+    } catch (e) { /* the real clock */ }
+    const ctx = Object.assign({ now: now }, base, { companyTemplate: template });
     // A known service's notice with a deadline and a preventing action is a task with the date (core/system-notice.js).
     // Off unless glanceSwitches.SYSTEM_NOTICE is true.
     let noticeOn = false;
@@ -4209,7 +4216,12 @@ function glanceUiCopy(kind) {
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
     if (response.reason === 'compose-closed') return response.error || 'Open Reply first. Glance does not press Send.';
     if (response.reason === 'user-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || glanceUiCopy('edited'));
-    if (response.reason === 'unconfirmed') return response.error || response.written || "Couldn't confirm it's unchanged. Undo left it alone.";
+    if (response.reason === 'unconfirmed') {
+      if (response.error || response.written) return response.error || response.written;
+      return glanceUiHebrew()
+        ? 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא'
+        : "Couldn't confirm it's unchanged. Undo left it alone.";
+    }
     if (response.reason === 'range-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || 'Undo stopped. That text was edited, so nothing was deleted.');
     if (response.preview && response.reason === 'verify_failed') return response.error || 'The compose window is still empty.';
     if (response.reason === 'wrong-account' && !response.expected && response.error) return response.error;
@@ -5379,11 +5391,13 @@ function glanceUiCopy(kind) {
       return { result: 'created', reason: r.proof && r.proof.fetchedBack === true ? 'verified' : 'unproved', line: '', reconnect: false };
     }
     const raw = r && typeof r.reason === 'string' && r.reason ? r.reason : 'no-response';
+    const he = glanceUiHebrew();
+    const lead = he ? 'לא נוצר אירוע ביומן — ' : 'No calendar event was created — ';
+    // The event was created and Google has not shown it back yet. The receipt
+    // says Not verified / לא אומת and keeps Undo. It is not "nothing was created".
     if (raw === 'unverified' || (r && r.unverified === true && r.ref)) {
       return { result: 'unverified', reason: 'unverified', line: '', reconnect: false };
     }
-    const he = glanceUiHebrew();
-    const lead = he ? 'לא נוצר אירוע ביומן — ' : 'No calendar event was created — ';
     if (raw === 'not-connected') {
       return {
         result: 'failed',
