@@ -1631,7 +1631,14 @@ function glanceUiCopy(kind) {
       ? FlowIncomingJudge.prepareForJudge(text)
       : text;
     const template = await readCompanyTemplate();
-    const ctx = Object.assign({ now: new Date() }, base, { companyTemplate: template });
+    // Headless regression only. The suite sets glanceE2eNowMs so a mail dated
+    // 18/11 is still in the future. Production never sets that key.
+    let now = new Date();
+    try {
+      const clock = await chrome.storage.local.get('glanceE2eNowMs');
+      if (clock && typeof clock.glanceE2eNowMs === 'number' && Number.isFinite(clock.glanceE2eNowMs)) now = new Date(clock.glanceE2eNowMs);
+    } catch (e) { /* the real clock */ }
+    const ctx = Object.assign({ now: now }, base, { companyTemplate: template });
     // A known service's notice with a deadline and a preventing action is a task with the date (core/system-notice.js).
     // Off unless glanceSwitches.SYSTEM_NOTICE is true.
     let noticeOn = false;

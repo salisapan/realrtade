@@ -178,3 +178,75 @@ test('Google does not return the event after the insert: it is removed, and the 
   expect(events()).toHaveLength(0);
   await expect.poll(() => lines).toContain('[Glance] calendar hold failed verify_failed');
 });
+
+// Next named weekday, same rule as core/extract.js: a bare weekday said on
+// that weekday is a week ahead. The browser clock is the job clock.
+function nextWeekdayIso(target) {
+  const d = new Date();
+  let delta = (target - d.getDay() + 7) % 7;
+  if (delta === 0) delta = 7;
+  d.setDate(d.getDate() + delta);
+  const p = (x) => String(x).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+async function openSelf(glance, subject, body, messageId) {
+  n += 1;
+  const page = await glance.openGmail({
+    liveSelf: true, messageId: messageId + n, threadId: 't-' + messageId + n, ownEmail: SELF, senderName: 'flow',
+    subject: subject, body: body, lang: 'he',
+    accountLabel: 'Google Account: flow (' + SELF + ')'
+  });
+  const host = page.locator(MAIN + ' .flow-chip-host').first();
+  return { page, host };
+}
+
+test('self-sent «שריין ג׳ 10:00 ביומן» offers the Tuesday hold, בצע creates it, בטל deletes it', async ({ glance }) => {
+  const tuesday = nextWeekdayIso(2);
+  await glance.seedGmail({});
+  const { page, host } = await openSelf(
+    glance,
+    '[G-Calendar] שיחה עם רוני ce3f',
+    'נקבע שיחה. שריין ג׳ 10:00 ביומן בבקשה.',
+    'm-ce3f-'
+  );
+  await expect(host.locator('.gs-intent')).toHaveText('שריין ג׳ 10:00', { timeout: 20000 });
+  await expect(host.locator('.flow-chip-when')).toContainText('10:00');
+  await expect(host.locator('button.flow-chip')).toHaveText('בצע');
+  await host.locator('button.flow-chip').click();
+  await expect(host.locator('.flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(inserts()).toHaveLength(1);
+  const ev = events()[0];
+  expect(ev.summary).toBe('שיחה עם רוני ce3f');
+  expect(ev.start.dateTime).toContain(tuesday);
+  expect(ev.start.dateTime).toMatch(/T10:00:00/);
+  const undo = page.locator(MAIN + ' button.flow-chip-undo');
+  await expect(undo).toHaveText('בטל');
+  await undo.click();
+  await expect.poll(() => events().length).toBe(0);
+});
+
+test('self-sent «נקבעה פגישה ב-18/11 בשעה 10:00, תשריין ביומן» is the 18 Nov 10:00 hold when that day is still ahead', async ({ glance }) => {
+  await glance.seedGmail({});
+  await glance.evaluateWorker(() => chrome.storage.local.set({ glanceE2eNowMs: Date.parse('2026-11-01T08:00:00Z') }));
+  const { page, host } = await openSelf(
+    glance,
+    'פגישה עם דנה',
+    'נקבעה פגישה ב-18/11 בשעה 10:00, תשריין ביומן.',
+    'm-1811-'
+  );
+  await expect(host.locator('.gs-intent')).toHaveText('שריין ד׳ 10:00', { timeout: 20000 });
+  await expect(host.locator('.flow-chip-when')).toContainText('18');
+  await expect(host.locator('.flow-chip-when')).toContainText('10:00');
+  await expect(host.locator('button.flow-chip')).toHaveText('בצע');
+  await host.locator('button.flow-chip').click();
+  await expect(host.locator('.flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(inserts()).toHaveLength(1);
+  const ev = events()[0];
+  expect(ev.summary).toBe('פגישה עם דנה');
+  expect(ev.start.dateTime).toContain('2026-11-18');
+  expect(ev.start.dateTime).toMatch(/T10:00:00/);
+  await expect(page.locator(MAIN + ' button.flow-chip-undo')).toHaveText('בטל');
+  await page.locator(MAIN + ' button.flow-chip-undo').click();
+  await expect.poll(() => events().length).toBe(0);
+});
