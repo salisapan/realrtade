@@ -72,7 +72,7 @@ import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same 
 import '../core/closed-intent-ledger.js'; // classic: types-only CloudEvents ledger
 import '../src/closed-intent-ledger-idb.js'; // extension-origin log, alarms, and ledger messages
 import '../core/personal-model.js'; // classic: on-device personal model, consent off
-import '../vendor/libphonenumber-min.js'; // offline phone fallback, MIT, min metadata
+import '../src/libphonenumber-min.js'; // offline phone fallback, MIT, min metadata. Not under vendor/: that folder is the on-device model runtime.
 import '../core/personal-inference.js'; // Glance cloud embeddings and Hebrew NER, flag off
 import '../core/personal-thompson.js'; // passive chip sampling, never a Do It
 import '../src/personal-model-idb.js'; // extension-origin store, not a page database
