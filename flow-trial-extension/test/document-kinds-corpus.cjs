@@ -43,8 +43,8 @@ const FIXTURES = [
     body: 'שלום, נא לנסח טיוטת הסכם שכירות בין דנה כהן לבין רוני לוי. תקופה: שנה. דמי שכירות: 5,000 ש״ח לחודש.',
     title: 'הסכם — שכירות למשרד',
     has: ['דנה כהן', 'רוני לוי', 'שנה', '5,000 ש״ח לחודש'],
-    sections: ['צדדים', 'נושא', 'כתובת', 'תנאים', 'תוקף', 'חתימות'],
-    placeholder: 'חתימות'
+    sections: ['צדדים', 'נושא', 'תנאים', 'תוקף', 'חתימות'],
+    omit: ['כתובת']
   },
   {
     type: 'meeting-summary',
@@ -52,8 +52,8 @@ const FIXTURES = [
     body: 'נא להכין סיכום פגישה. משתתפים: דנה כהן, רוני לוי ונועה. סוכם להתחיל ביום ראשון. משימה: נועה שולחת את המספרים.',
     title: 'סיכום פגישה — תקציב רבעון',
     has: ['דנה כהן', 'סוכם להתחיל ביום ראשון', 'נועה שולחת את המספרים'],
-    sections: ['משתתפים', 'נושאים', 'החלטות', 'משימות להמשך'],
-    placeholder: ''
+    sections: ['משתתפים', 'נושאים', 'החלטות', 'משימות'],
+    omit: []
   },
   {
     type: 'work-plan',
@@ -61,8 +61,8 @@ const FIXTURES = [
     body: 'נא להכין תוכנית עבודה. מטרה: השקת האתר. שלב א: אפיון. שלב ב: פיתוח. אחראית: נועה.',
     title: 'תוכנית עבודה — רבעון הראשון',
     has: ['השקת האתר', 'אפיון', 'פיתוח', 'נועה'],
-    sections: ['מטרה', 'שלבים', 'לוח זמנים', 'אחראים'],
-    placeholder: 'לוח זמנים'
+    sections: ['מטרה', 'שלבים', 'אחראים'],
+    omit: ['לוח זמנים']
   },
   {
     type: 'letter',
@@ -70,8 +70,8 @@ const FIXTURES = [
     body: 'נא לכתוב מכתב לדנה כהן על סיום הפרויקט.',
     title: 'מכתב — תודה ללקוח',
     has: ['דנה כהן', 'סיום הפרויקט'],
-    sections: ['נמען', 'נושא', 'תוכן', 'סיום'],
-    placeholder: 'סיום'
+    sections: ['נמען', 'נושא', 'תוכן'],
+    omit: ['סיום']
   },
   {
     type: 'report',
@@ -79,8 +79,8 @@ const FIXTURES = [
     body: 'נא להכין דוח חודשי. ממצאים: העלייה במכירות. מסקנה: להמשיך באותה דרך.',
     title: 'דוח — חודשי מרץ',
     has: ['העלייה במכירות', 'להמשיך באותה דרך'],
-    sections: ['רקע', 'ממצאים', 'מסקנות', 'המלצות'],
-    placeholder: 'המלצות'
+    sections: ['ממצאים', 'מסקנות'],
+    omit: ['רקע', 'המלצות']
   },
   {
     type: 'proposal',
@@ -88,8 +88,8 @@ const FIXTURES = [
     body: 'נא להכין הצעה לשיתוף פעולה עם סטודיו נור. בלי מחיר.',
     title: 'הצעה — שיתוף פעולה',
     has: ['סטודיו נור'],
-    sections: ['רקע', 'ההצעה', 'היקף', 'הצעד הבא'],
-    placeholder: 'היקף'
+    sections: ['ההצעה'],
+    omit: ['רקע', 'היקף', 'הצעד הבא']
   },
   {
     type: 'spec',
@@ -97,8 +97,8 @@ const FIXTURES = [
     body: 'נא להכין אפיון. דרישות: התחברות, הזמנה ותשלום.',
     title: 'אפיון — מערכת הזמנות',
     has: ['התחברות', 'הזמנה', 'תשלום'],
-    sections: ['מטרה', 'דרישות', 'מחוץ להיקף', 'קבלה'],
-    placeholder: 'קבלה'
+    sections: ['מטרה', 'דרישות'],
+    omit: ['מחוץ להיקף', 'קבלה']
   },
   {
     type: 'form',
@@ -106,8 +106,8 @@ const FIXTURES = [
     body: 'נא להכין טופס קליטת לקוח. שדות: שם, טלפון ואימייל.',
     title: 'טופס — קליטת לקוח',
     has: ['שם', 'טלפון', 'אימייל'],
-    sections: ['שדות', 'הנחיות'],
-    placeholder: 'הנחיות'
+    sections: ['שדות'],
+    omit: ['הנחיות']
   },
   {
     type: 'document',
@@ -115,8 +115,8 @@ const FIXTURES = [
     body: 'נא להכין מסמך עם הנחיות למשלוח: אריזה, ביטוח וכתובת.',
     title: 'מסמך — הנחיות למשלוח',
     has: ['אריזה', 'ביטוח', 'כתובת'],
-    sections: ['נושא', 'תוכן', 'הערות'],
-    placeholder: 'הערות'
+    sections: ['נושא', 'תוכן'],
+    omit: ['הערות']
   }
 ];
 
@@ -137,10 +137,10 @@ FIXTURES.forEach((row) => {
   row.has.forEach((bit) => {
     check(row.type + ' keeps ' + bit + ' from the mail', html.indexOf(bit) >= 0, html);
   });
-  if (row.placeholder) {
-    check(row.type + ' placeholder for ' + row.placeholder,
-      html.indexOf('[להשלים: ' + row.placeholder + ']') >= 0, html);
-  }
+  check(row.type + ' has no fill-in placeholder', html.indexOf('[להשלים:') < 0 && html.indexOf('[to fill in:') < 0, html);
+  (row.omit || []).forEach((label) => {
+    check(row.type + ' omits empty section ' + label, html.indexOf(label + ':') < 0 && html.indexOf('[להשלים: ' + label + ']') < 0, html);
+  });
   check(row.type + ' does not invent an English Party/Amount label',
     html.indexOf('Party:') < 0 && html.indexOf('Amount:') < 0 && html.indexOf('Title:') < 0, html);
 });
@@ -248,7 +248,38 @@ check('an abbreviated street and an hourly amount keep לא כולל מע״מ',
   (hourly.built.html || '').indexOf("רח' אלנבי 4 חיפה") >= 0 && (hourly.built.html || '').indexOf('200 ש״ח לשעה') >= 0 &&
   (hourly.built.html || '').indexOf('לא כולל מע״מ') >= 0, hourly.built && hourly.built.html);
 
-const signoffTemplates = ['quote'].concat(Object.keys(F.DOC_TYPES).filter((type) => type !== 'quote'));
+const M5 = 'השתתפו: רוני, מיכל, אבי / הוחלט: לעבור לספק החדש; להשק בינואר / משימות: רוני שולח הצעה עד יום ב׳; מיכל מעדכנת את התקציב';
+const m5 = offer('סיכום פגישה', 'נא להכין סיכום פגישה. ' + M5);
+const m5html = (m5.built && m5.built.html) || '';
+check('live M5 meeting summary lists every name, decision and task under its heading',
+  m5.docType === 'meeting-summary' &&
+  m5html.indexOf('משתתפים:') >= 0 && m5html.indexOf('<li>רוני</li>') >= 0 && m5html.indexOf('<li>מיכל</li>') >= 0 && m5html.indexOf('<li>אבי</li>') >= 0 &&
+  m5html.indexOf('החלטות:') >= 0 && m5html.indexOf('<li>לעבור לספק החדש</li>') >= 0 && m5html.indexOf('<li>להשק בינואר</li>') >= 0 &&
+  m5html.indexOf('משימות:') >= 0 && m5html.indexOf('<li>רוני שולח הצעה עד יום ב׳</li>') >= 0 && m5html.indexOf('<li>מיכל מעדכנת את התקציב</li>') >= 0 &&
+  m5html.indexOf('תוכן:') < 0 && m5html.indexOf('[להשלים:') < 0 && m5html.indexOf('בברכה') < 0,
+  m5html);
+const m5bare = offer('מסמך', M5);
+check('live M5 notes are a meeting summary even when the subject only says מסמך', m5bare.docType === 'meeting-summary' && (m5bare.built.html || '').indexOf('<li>אבי</li>') >= 0, m5bare.docType);
+
+const commaAddress = offer('הסכם שכירות', 'נא לנסח הסכם שכירות. צדדים: דנה כהן, רוני לוי. רחוב הרצל 12, תל אביב.');
+const commaHtml = (commaAddress.built && commaAddress.built.html) || '';
+check('live agreement keeps the city after the comma and a blank signature block',
+  commaHtml.indexOf('רחוב הרצל 12, תל אביב') >= 0 && commaHtml.indexOf('דנה כהן, רוני לוי') >= 0 &&
+  commaHtml.indexOf('[להשלים: צדדים]') < 0 && commaHtml.indexOf('[להשלים: חתימות]') < 0 &&
+  commaHtml.indexOf('חתימות:') >= 0 && commaHtml.indexOf('__________') >= 0,
+  commaHtml);
+
+const attachedSummary = F.plan({
+  flags: flags,
+  text: 'מצורף מסמך הסיכום.',
+  lang: 'he',
+  attachments: [{ filename: 'summary.txt', mimeType: 'text/plain' }]
+});
+check('an attached summary notice is not a document Do It', attachedSummary.action === 'silence' && attachedSummary.reason === 'not-a-request', attachedSummary);
+const labOff = F.plan({ flags: {}, text: 'סיכום פגישה. ' + M5, lang: 'he' });
+check('with the full-document lab off, M5 is not a Doc', labOff.action === 'off' && labOff.reason === 'switch-off', labOff);
+
+const signoffTemplates = ['quote'].concat(Object.keys(F.DOC_TYPES).filter((type) => type !== 'quote' && type !== 'meeting-summary'));
 signoffTemplates.forEach((type) => {
   const row = type === 'quote'
     ? offer('בקשה להצעת מחיר לאתר חדש', 'שלום, נשמח לקבל הצעת מחיר לבניית אתר חדש לעסק: 5 עמודים, טופס יצירת קשר ובלוג.')
@@ -261,8 +292,9 @@ const bekavod = offer('מכתב תודה ללקוח', 'נא לכתוב מכתב 
 check('a brakha profile still signs בברכה, and bekavod signs בכבוד רב,',
   (brakha.built.html || '').indexOf('<p>בברכה,</p>') >= 0 && (bekavod.built.html || '').indexOf('<p>בכבוד רב,</p>') >= 0,
   { quote: brakha.built && brakha.built.html, letter: bekavod.built && bekavod.built.html });
-const english = F.plan({ flags: flags, text: 'Please draft a meeting summary for the budget review.', lang: 'en', threadId: 't-1' });
+const english = F.plan({ flags: flags, text: 'Please write a letter to Dana about the finished project.', lang: 'en', threadId: 't-1' });
 check('an English template signs off exactly Best,', (english.built && english.built.html || '').indexOf('<p>Best,</p>') >= 0, english.built && english.built.html);
+check('a meeting summary does not end with בברכה,', (m5html.indexOf('בברכה') < 0));
 
 const ownFile = glanceFile('doc-own', 't-1', 'quote', 'הצעת מחיר', '2026-11-14');
 ownFile.appProperties.glanceMessage = 'm-1';
@@ -281,6 +313,40 @@ const otherMessage = offer('בקשה להצעת מחיר לאתר', 'נא להכ
   existingDocs: [ownFile]
 });
 check('another message in the thread still offers the existing Doc', otherMessage.mode === 'update' && otherMessage.doItLabel === 'עדכן', otherMessage);
+
+const judgeBox = { module: undefined, console };
+vm.createContext(judgeBox);
+['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js'].forEach((file) => {
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', file), 'utf8'), judgeBox, { filename: file });
+});
+const judged = vm.runInContext('FlowIncomingJudge', judgeBox).judge({
+  text: 'מצורף מסמך הסיכום.',
+  subject: '',
+  sender: { name: 'רוני', email: 'roni@example.com' },
+  now: new Date('2026-11-20T09:00:00Z'),
+  surface: 'gmail',
+  attachmentCount: 1,
+  to: ['ai.local.flow@gmail.com'],
+  ownAddresses: ['ai.local.flow@gmail.com'],
+  inbound: true
+});
+check('an attached summary notice is quiet with no Do It',
+  judged && judged.show === false && judged.reason === 'quiet:not-a-request' && !(judged.intent && judged.intent.type),
+  judged);
+const m5judge = vm.runInContext('FlowIncomingJudge', judgeBox).judge({
+  text: M5,
+  subject: 'סיכום פגישה',
+  sender: { name: 'רוני', email: 'roni@example.com' },
+  now: new Date('2026-11-20T09:00:00Z'),
+  surface: 'gmail',
+  attachmentCount: 0,
+  to: ['ai.local.flow@gmail.com'],
+  ownAddresses: ['ai.local.flow@gmail.com'],
+  inbound: true
+});
+check('with the full-document lab off, M5 is not a Google Task',
+  m5judge && m5judge.show === false && !(m5judge.process && m5judge.process.steps && m5judge.process.steps.some((step) => step.kind === 'googleTask')),
+  m5judge);
 
 console.log('\n--- verify normalization for each new template ---\n');
 

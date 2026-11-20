@@ -378,7 +378,11 @@ const FlowFullDocumentClose = (() => {
     if (CREATE_ONLY.test(flat) || ASK_CONTENT_IN_MAIL.test(flat)) return null;
     const asked = askedTypes(flat);
     if (!asked.length && (FYI_RE.test(flat) || NEWS_RE.test(flat) || courtesyOnly(parts.body || flat))) return null;
-    if (asked.length) return asked[0];
+    if (asked.length) {
+      if (asked[0] === 'document' && meetingShape(flat)) return 'meeting-summary';
+      return asked[0];
+    }
+    if (meetingShape(flat)) return 'meeting-summary';
     if (!subject || courtesyOnly(parts.body)) return null;
     const named = TYPE_ORDER.filter((type) => subject.search(TYPE_RE[type]) >= 0);
     const specific = named.filter((type) => type !== 'document');
@@ -428,27 +432,68 @@ const FlowFullDocumentClose = (() => {
     return s;
   }
 
+  const NEXT_SECTION = '(?:השתתפו|משתתפים|נכחו|נוכחים|הוחלט|החלטות|סוכם|משימות|משימה|לביצוע|רחוב|רח[\'׳])';
+
+  function meetingShape(flat) {
+    const s = String(flat || '');
+    const people = /(?:השתתפו|משתתפים|נכחו|נוכחים)\s*[:：]/u.test(s);
+    const rest = /(?:הוחלט|החלטות|סוכם|משימות|משימה|לביצוע)\s*[:：]/u.test(s);
+    return people && rest;
+  }
+
+  // A section ends at the next heading, including one written after " / " or a period.
+  // The value keeps its commas. A later split is on the section alone, so the last name is not glued to the next heading and dropped.
+  function labeledBody(text, labels) {
+    const re = new RegExp('(' + labels + ')\\s*[:：]?\\s*([\\s\\S]{1,500}?)(?=\\s*(?:[/|]|[.]\\s+|\\n)\\s*' + NEXT_SECTION + '(?:\\s*[:：]|\\s)|$)', 'u');
+    const m = String(text || '').match(re);
+    if (!m) return { cue: '', body: '' };
+    return { cue: m[1], body: m[2].replace(/\s+/g, ' ').replace(/[./|]+$/g, '').trim() };
+  }
+
+  function splitList(raw) {
+    return String(raw || '')
+      .split(/\s*[,;؛]\s*|\s+and\s+|\s+ו/)
+      .map((part) => stripCuePrefix(part).replace(/^ו/, '').replace(/[./|]+$/g, '').trim())
+      .filter((part) => part.length >= 2 && part.length <= 80 && !/^(?:השתתפו|משתתפים|נכחו|נוכחים|הוחלט|החלטות|סוכם|משימות|משימה|לביצוע)$/.test(part));
+  }
+
   function peopleFrom(text) {
-    const m = String(text || '').match(/(?:השתתפו|משתתפים|נכחו|נוכחים)\s*[:：]?\s*([^\n.]{2,180})/u);
-    if (!m) return [];
-    return splitItems(m[1]).map(stripCuePrefix).filter((name) => name && !/^(?:השתתפו|משתתפים|נכחו|נוכחים)$/.test(name));
+    const found = labeledBody(text, 'השתתפו|משתתפים|נכחו|נוכחים');
+    if (!found.body) return [];
+    return splitList(found.body);
   }
 
   function cueList(text, pattern, keepCue) {
+    const re = new RegExp('(' + pattern + ')\\s*[:：]?\\s*([\\s\\S]{1,500}?)(?=\\s*(?:[/|]|[.]\\s+|\\n)\\s*' + NEXT_SECTION + '(?:\\s*[:：]|\\s)|$)', 'gu');
     const out = [];
-    const re = new RegExp('(' + pattern + ')\\s*[:：]?\\s*([^\\n.]{2,160})', 'g');
     let m;
-    while ((m = re.exec(String(text || '')))) {
-      let value = stripCuePrefix(m[2]);
-      if (keepCue && m[1] === keepCue) value = (keepCue + ' ' + value).trim();
-      if (value) out.push(value);
+    const src = String(text || '');
+    while ((m = re.exec(src))) {
+      const items = splitList(m[2].replace(/\s+/g, ' ').replace(/[./|]+$/g, '').trim());
+      if (keepCue && m[1] === keepCue && items.length && items[0].indexOf(keepCue) !== 0) items[0] = (keepCue + ' ' + items[0]).trim();
+      items.forEach((item) => { if (out.indexOf(item) < 0) out.push(item); });
+      if (m.index === re.lastIndex) re.lastIndex += 1;
     }
     return out;
   }
 
   function addressFrom(text) {
-    const m = String(text || '').match(/(?:רחוב|רח['׳])\s+[\u0590-\u05FF]{2,20}(?:\s+[\u0590-\u05FF]{2,20})?\s+\d{1,4}(?:\s+[\u0590-\u05FF]{2,20}(?:\s+[\u0590-\u05FF]{2,20})?)?/u);
+    const m = String(text || '').match(/(?:רחוב|רח['׳])\s+[\u0590-\u05FF][\u0590-\u05FF\s'׳]{0,40}?\d{1,4}\s*[,،]?\s*[\u0590-\u05FF][\u0590-\u05FF\s]{1,30}/u);
     return m ? m[0].replace(/\s+/g, ' ').trim() : '';
+  }
+
+  function partiesFrom(text) {
+    const between = String(text || '').match(/בין\s+([\u0590-\u05FF][\u0590-\u05FF\s]{1,40}?)\s+לבין\s+([\u0590-\u05FF][\u0590-\u05FF\s]{1,40})/u);
+    if (between) return between[1].trim() + ', ' + between[2].trim();
+    const labeled = labeledBody(text, 'צדדים|הצדדים');
+    return labeled.body || '';
+  }
+
+  function attachmentNotice(text) {
+    const s = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!s || s.length > 160) return false;
+    if (/(?:הכן|הכיני|תכין|לנסח|לכתוב|נא\s|בבקשה|אפשר|תוכל|please\b|can you|could you|\bdraft\b|\bprepare\b)/i.test(s)) return false;
+    return /^(?:(?:היי|הי|שלום|hi|hey|hello)[,!\s]+)?(?:מצורף|מצורפת|מצורפים|מצורפות|enclosed is|attached is|attached:|please find attached)(?:\s|$).{0,80}$/i.test(s);
   }
 
   function termFrom(text) {
@@ -487,8 +532,7 @@ const FlowFullDocumentClose = (() => {
     const parts = splitSubject(text);
     const topic = topicFrom(parts.subject, type);
     if (type === 'agreement') {
-      const between = t.match(/בין\s+([\u0590-\u05FF][\u0590-\u05FF\s]{1,40}?)\s+לבין\s+([\u0590-\u05FF][\u0590-\u05FF\s]{1,40})/u);
-      const parties = between ? (between[1].trim() + ', ' + between[2].trim()) : '';
+      const parties = partiesFrom(t);
       const term = termFrom(t);
       const rent = phraseAfter(t, '(?:דמי שכירות|תנאים)');
       const terms = richerAmount(rent, amountClause(t));
@@ -511,7 +555,7 @@ const FlowFullDocumentClose = (() => {
           sectionOf('attendees', 'משתתפים', 'Attendees', '', peopleFrom(t)),
           sectionOf('topics', 'נושאים', 'Topics', topic),
           sectionOf('decisions', 'החלטות', 'Decisions', '', cueList(t, 'החלטות|הוחלט|סוכם', 'סוכם')),
-          sectionOf('actions', 'משימות להמשך', 'Follow-ups', '', cueList(t, 'משימות|משימה|לביצוע', ''))
+          sectionOf('actions', 'משימות', 'Tasks', '', cueList(t, 'משימות|משימה|לביצוע', ''))
         ]
       };
     }
@@ -611,16 +655,23 @@ const FlowFullDocumentClose = (() => {
     }
     (filled.sections || []).forEach((sec) => {
       const label = useLang === 'he' ? sec.he : sec.en;
-      if (sec.items && sec.items.length) {
+      if (sec.id === 'signatures') {
+        html += '<p><strong>' + escapeHtml(label) + ':</strong></p>';
+        html += '<p>__________</p><p>__________</p>';
+        return;
+      }
+      const items = (sec.items || []).filter(Boolean);
+      const value = String(sec.value || '').trim();
+      if (!items.length && !value) return;
+      if (items.length) {
         html += '<p><strong>' + escapeHtml(label) + ':</strong></p><ul>';
-        sec.items.forEach((item) => { html += '<li>' + escapeHtml(item) + '</li>'; });
+        items.forEach((item) => { html += '<li>' + escapeHtml(item) + '</li>'; });
         html += '</ul>';
         return;
       }
-      const value = sec.value || placeholder(useLang, label);
       html += '<p><strong>' + escapeHtml(label) + ':</strong> ' + escapeHtml(value) + '</p>';
     });
-    html += '<p>' + escapeHtml(signoffLine(styleSummary, useLang)) + '</p>';
+    if (type !== 'meeting-summary') html += '<p>' + escapeHtml(signoffLine(styleSummary, useLang)) + '</p>';
     return { html: html, title: heading, previewOnly: true, closes: false, sections: filled.sections, topic: filled.topic };
   }
 
@@ -850,6 +901,7 @@ const FlowFullDocumentClose = (() => {
     input = input || {};
     if (!enabled(input.flags)) return { action: 'off', reason: 'switch-off' };
     const text = String(input.text || '').slice(0, 8000);
+    if (attachmentNotice(text)) return { action: 'silence', reason: 'not-a-request' };
     const rec = recognize(text);
     if (rec.kind === 'empty' || rec.reason === 'wrong-shape') return { action: 'silence', reason: rec.reason || rec.kind };
 
@@ -868,7 +920,7 @@ const FlowFullDocumentClose = (() => {
       return { action: 'silence', reason: rec.reason || 'no-ask' };
     }
     if (notARequest(text, docType)) return { action: 'silence', reason: 'not-a-request' };
-    if (!isAsked(flattenMail(text), docType)) {
+    if (!isAsked(flattenMail(text), docType) && !(docType === 'meeting-summary' && meetingShape(flattenMail(text)))) {
       const parts = splitSubject(text);
       const named = parts.subject && matchIndex(parts.subject, docType) >= 0 && !courtesyOnly(parts.body);
       if (!named) return { action: 'silence', reason: 'no-ask' };
@@ -904,6 +956,7 @@ const FlowFullDocumentClose = (() => {
     itemsFrom,
     quoteTitleFrom,
     classifyDocument,
+    attachmentNotice,
     decideExisting,
     DOC_TYPES,
     titleKeyOf,

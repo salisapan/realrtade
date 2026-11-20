@@ -123,13 +123,15 @@ test('a created Doc keeps its receipt and Undo when the same message is scanned 
   const host = first.locator('.flow-chip-host');
   await expect(host).toContainText('טיוטת הצעת מחיר', { timeout: 20000 });
   await clickDo(host);
-  await expect(first.locator('.flow-chip-undo')).toContainText('בטל', { timeout: 20000 });
+  await expect(first.getByRole('button', { name: 'בטל' })).toBeVisible({ timeout: 20000 });
+  await expect(first.getByRole('button', { name: 'עדכן מסמך קיים' })).toBeVisible();
   await expect.poll(() => logs.some((line) => line.indexOf('full-document receipt stored') >= 0)).toBe(true);
   await first.close();
 
   const again = await openMail(glance, { subject: subject, body: body, threadId: 't-receipt', messageId: 'm-receipt' });
   const card = again.locator('.flow-chip-host');
-  await expect(card.locator('.flow-chip-undo')).toContainText('בטל', { timeout: 20000 });
+  await expect(card.getByRole('button', { name: 'בטל' })).toBeVisible({ timeout: 20000 });
+  await expect(card.getByRole('button', { name: 'עדכן מסמך קיים' })).toBeVisible();
   await expect(card).not.toContainText('כבר קיים מסמך מהשרשור הזה');
   await expect(card.getByRole('button', { name: 'עדכן' })).toHaveCount(0);
   expect(docCreates()).toHaveLength(1);

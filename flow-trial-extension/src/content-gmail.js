@@ -5916,6 +5916,8 @@ function glanceUiCopy(kind) {
       threadId: String((ctx && ctx.threadId) || ''),
       written: String((response && response.written) || ''),
       url: String((response && response.url) || ''),
+      title: String((ctx && ctx.googleBuilt && ctx.googleBuilt.title) || ''),
+      html: String((ctx && ctx.googleBuilt && ctx.googleBuilt.html) || ''),
       ref: ref,
       ids: keys
     };
@@ -6018,14 +6020,60 @@ function glanceUiCopy(kind) {
     // expanded), which left this Undo invisible and unclickable.
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
+    if (response.html) {
+      const updateBtn = el('button', 'flow-chip-undo flow-doc-update', he ? 'עדכן מסמך קיים' : 'Update an existing document');
+      updateBtn.type = 'button';
+      updateBtn.addEventListener('click', () => {
+        updateBtn.disabled = true;
+        const previous = updateBtn.textContent;
+        updateBtn.textContent = he ? 'בוחרים מסמך…' : 'Choose a document…';
+        openDrivePicker().then((file) => {
+          const picked = file && (file.id || file.documentId);
+          if (!picked) {
+            updateBtn.disabled = false;
+            updateBtn.textContent = previous;
+            return null;
+          }
+          updateBtn.textContent = he ? 'מעדכן…' : 'Updating…';
+          return sendExecuteAction({
+            connectorId: 'driveDocFull',
+            params: {
+              title: response.title || 'Document',
+              html: response.html,
+              fullDocument: true,
+              documentId: picked,
+              origin: 'picked'
+            }
+          });
+        }).then((res) => {
+          if (!res) return;
+          if (res.ok) {
+            const written = done.querySelector('.flow-chip-written');
+            if (written) written.textContent = res.written || (he ? 'המסמך הקיים עודכן.' : 'The existing document was updated.');
+            updateBtn.disabled = false;
+            updateBtn.textContent = he ? 'עדכן מסמך קיים' : 'Update an existing document';
+            return;
+          }
+          updateBtn.disabled = false;
+          updateBtn.textContent = previous;
+        }).catch(() => {
+          updateBtn.disabled = false;
+          updateBtn.textContent = previous;
+        });
+      });
+      actionsRow.appendChild(updateBtn);
+    }
     done.appendChild(actionsRow);
     if (host) placeReceipt(host, chip, done);
     return done;
   }
 
   function showDocPreviewReceipt(host, chip, result, ctx) {
-    const response = result.response || {};
-    rememberDocReceipt(ctx, response);
+    const response = Object.assign({}, result.response || {}, {
+      html: (ctx && ctx.googleBuilt && ctx.googleBuilt.html) || '',
+      title: (ctx && ctx.googleBuilt && ctx.googleBuilt.title) || ''
+    });
+    rememberDocReceipt(ctx, result.response || {});
     paintDocReceipt(host, chip, response, ctx);
     if (response.proof && response.proof.fetchedBack === true) {
       userContextEvent({

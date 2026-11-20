@@ -109,6 +109,8 @@ check('B10: worker plan path offers a non-blank built doc (GFD wiring)', hostPla
 
 const docPreviewSlice = gmail.slice(gmail.indexOf('function showDocPreviewReceipt'), gmail.indexOf('function showPreviewReceipt'));
 check('B10: doc preview receipt learns approved only with fetchedBack proof', /response\.proof/.test(docPreviewSlice) && /fetchedBack === true/.test(docPreviewSlice) && /type: 'approved'/.test(docPreviewSlice) && /fetchedBack: true/.test(docPreviewSlice));
+check('the created Doc receipt offers עדכן מסמך קיים through the Drive picker',
+  gmail.indexOf('עדכן מסמך קיים') >= 0 && gmail.indexOf('openDrivePicker') >= 0 && gmail.indexOf("origin: 'picked'") >= 0);
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
 process.exit(failures ? 1 : 0);
