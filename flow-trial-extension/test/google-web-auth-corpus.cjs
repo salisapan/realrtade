@@ -630,6 +630,28 @@ async function run() {
       url: 'http://example.com/inbox',
       tab: { id: 11, url: 'http://example.com/inbox' }
     }) === false);
+    check('a Slack page does not open Google even when a script asks', wants({
+      id: EXTENSION_ID,
+      url: 'https://app.slack.com/client/T/D0C9BS6UD9A',
+      tab: { id: 12, url: 'https://app.slack.com/client/T/D0C9BS6UD9A' }
+    }, true) === false);
+    check('a Telegram page does not open Google even when a script asks', wants({
+      id: EXTENSION_ID,
+      url: 'https://web.telegram.org/k/#777',
+      tab: { id: 13, url: 'https://web.telegram.org/k/#777' }
+    }, true) === false);
+  }
+  {
+    const env = load({
+      chromeToken: 'ya29.probe',
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_P' },
+        googleEverConnected: { connected: true },
+        googleGrantedScopes: { version: 'old', status: 'granted', source: 'chrome', at: 1 }
+      }
+    });
+    const probed = await env.fn('probeGoogleAuthStillValid')();
+    check('the panel probe on a stale grant does not open Google', interactiveCalls(env.calls).length === 0 && probed && probed.ok === true, { calls: env.calls, probed });
   }
   {
     const env = load({

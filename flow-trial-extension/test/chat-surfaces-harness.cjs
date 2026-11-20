@@ -109,9 +109,10 @@ async function open(browser, kind, url, pageHtml, opts) {
   const origin = new URL(url).origin;
   await p.route(origin + '/**', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: pageHtml }));
   await p.goto(url);
+  if (opts.prepare) await opts.prepare(p);
   if (opts.watches) await p.evaluate((w) => { window.__store.followWatches = w; }, opts.watches);
   for (const src of SCRIPTS[kind]) await p.addScriptTag({ path: path.join(ROOT, src) });
-  await p.waitForTimeout(2200);
+  await p.waitForTimeout(opts.wait == null ? 2200 : opts.wait);
   const state = async () => ({
     errs,
     card: await p.evaluate(() => { const h = document.getElementById('flow-follow-host'); return h ? h.innerText.replace(/\n+/g, ' | ') : null; }),
@@ -246,6 +247,61 @@ const baseWatch = (channel, threadId, id, name) => ({ id: threadId, threadId, ch
 
   t = await open(browser, 'telegram', 'https://web.telegram.org/k/#777000123', tgK, {});
   check('Telegram Web K fixture: a self-chat ask shows Do It', (await t.p.locator('[data-glance-do-it]').count()) === 1);
+  await t.ctx.close();
+
+  const dmsHtml = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/slack-web-dms.html'), 'utf8');
+  t = await open(browser, 'slack', 'https://app.slack.com/client/T01ABC/dms', dmsHtml, {
+    prepare: async (p) => {
+      await p.evaluate(() => localStorage.setItem('localConfig_v2', JSON.stringify({ teams: { T01ABC: { user_id: 'UFLOW123', token: 'xoxc-secret' } } })));
+    },
+    wait: 500
+  });
+  check('Slack /dms before render: no Do It yet', (await t.p.locator('[data-glance-do-it]').count()) === 0);
+  await t.p.evaluate(() => {
+    const list = document.querySelector('[data-qa="message_pane"]');
+    const row = document.createElement('div');
+    row.innerHTML = '<div data-qa="message_container" data-msg-ts="1732100000.000100"><button type="button" data-qa="message_sender_name">Flow</button><div data-qa="message-text"><div class="p-rich_text_section">Can you send the invoice by Friday?</div></div></div>';
+    list.appendChild(row.firstChild);
+  });
+  await t.p.waitForTimeout(1800);
+  check('Slack /dms late render: self DM by user id shows Do It', (await t.p.locator('[data-glance-do-it]').count()) === 1);
+  check('Slack /dms names the signed-in user, not only the title', await t.p.locator('html').getAttribute('data-glance-sender') === 'UFLOW123');
+  check('Slack /dms thread is the DOM conversation', await t.p.locator('html').getAttribute('data-glance-chat') === 'slack:T01ABC:D0C9BS6UD9A');
+  await t.p.locator('[data-glance-do-it]').click();
+  const dmsBox = await t.p.locator('.ql-editor').innerText();
+  const dmsSends = await t.p.evaluate(() => window.__glanceSendClicks || 0);
+  check('Slack /dms Do It drafts and does not press Send', dmsBox.indexOf('Send the invoice by Friday.') >= 0 && dmsSends === 0, { dmsBox, dmsSends });
+  await t.ctx.close();
+
+  const tgAEmpty = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/telegram-a-empty.html'), 'utf8');
+  const tgADm = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/telegram-a-dm.html'), 'utf8');
+  const tgKDm = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/telegram-k-dm.html'), 'utf8');
+  t = await open(browser, 'telegram', 'https://web.telegram.org/a/#777000123', tgAEmpty, { wait: 500 });
+  check('Telegram Web A before render: no Do It yet', (await t.p.locator('[data-glance-do-it]').count()) === 0);
+  await t.p.evaluate(() => {
+    const list = document.querySelector('#MessageList');
+    const row = document.createElement('div');
+    row.className = 'Message own';
+    row.id = 'message-4242';
+    const text = document.createElement('div');
+    text.className = 'text-content';
+    text.textContent = 'Can you send the invoice by Friday?';
+    row.appendChild(text);
+    list.appendChild(row);
+  });
+  await t.p.waitForTimeout(1800);
+  check('Telegram Web A late render: Saved Messages shows Do It', (await t.p.locator('[data-glance-do-it]').count()) === 1);
+  check('Telegram Web A late render does not press Send', (await t.p.evaluate(() => window.__glanceSendClicks || 0)) === 0);
+  await t.ctx.close();
+
+  t = await open(browser, 'telegram', 'https://web.telegram.org/a/#777000123', tgADm, {});
+  check('Telegram Web A 1:1 identifies the chat and the other person', await t.p.locator('html').getAttribute('data-glance-chat') === 'tg:777000123' && await t.p.locator('html').getAttribute('data-glance-sender') === 'Dana Cole');
+  check('Telegram Web A 1:1 that is not Saved Messages has no self Do It', (await t.p.locator('[data-glance-do-it]').count()) === 0);
+  await t.ctx.close();
+
+  t = await open(browser, 'telegram', 'https://web.telegram.org/k/#424242', tgKDm, {});
+  check('Telegram Web K 1:1 identifies the chat and the other person', await t.p.locator('html').getAttribute('data-glance-chat') === 'tg:424242' && await t.p.locator('html').getAttribute('data-glance-sender') === 'Dana Cole');
+  check('Telegram Web K 1:1 that is not Saved Messages has no self Do It', (await t.p.locator('[data-glance-do-it]').count()) === 0);
   await t.ctx.close();
 
   await browser.close();

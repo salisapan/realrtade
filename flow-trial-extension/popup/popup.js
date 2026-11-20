@@ -195,7 +195,8 @@
         // leave the line off after the write has landed.
         syncWhyLine(whyRev).catch(() => {});
       }
-      if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent || ch.glanceWhyByConv || ch.glanceUiLanguage)) return;
+      if (ch.surfaceHealth) renderSurfaces().catch(() => {});
+      if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent || ch.glanceWhyByConv || ch.glanceUiLanguage || ch.surfaceHealth)) return;
       const rev = whyRev;
       refresh().then(() => {
         if (rev !== whyRev) return;

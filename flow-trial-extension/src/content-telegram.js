@@ -156,10 +156,47 @@
     FlowFollow.consider(ctx).catch((e) => console.error('[Glance] Telegram follow-up check failed', e));
   }
 
+  let seenHref = '';
+  let listRoot = null;
+  let listObserver = null;
+
+  function listNode() {
+    return document.querySelector('#MessageList, .MessageList, .bubbles, .bubbles-inner');
+  }
+
   function schedule() { clearTimeout(timer); timer = setTimeout(() => { scan().catch((e) => console.error('[Glance] Telegram scan failed', e)); }, DEBOUNCE_MS); }
+
+  function onNav() {
+    seenWhy.clear();
+    lastReportedHealth = null;
+    schedule();
+  }
+
+  function watchList() {
+    const root = listNode();
+    if (!root || root === listRoot) return;
+    if (listObserver) listObserver.disconnect();
+    listRoot = root;
+    listObserver = new MutationObserver(schedule);
+    listObserver.observe(root, { childList: true, subtree: true });
+  }
+
+  function watchHref() {
+    let href = '';
+    try { href = String(location.href || ''); } catch (e) { href = ''; }
+    if (href === seenHref) return;
+    seenHref = href;
+    onNav();
+  }
+
   markLane();
   const watch = document.documentElement || document.body;
-  if (watch) new MutationObserver(schedule).observe(watch, { childList: true, subtree: true });
+  if (watch) new MutationObserver(() => { watchList(); schedule(); }).observe(watch, { childList: true, subtree: true });
+  watchList();
+  try { window.addEventListener('popstate', onNav); } catch (e) { /* no window */ }
+  try { window.addEventListener('hashchange', onNav); } catch (e) { /* no window */ }
+  seenHref = here();
+  setInterval(watchHref, 500);
   schedule();
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
   globalThis.__glanceChatSurfaces.telegram = { scan: () => scan() };

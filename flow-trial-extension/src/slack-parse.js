@@ -9,9 +9,31 @@ const FlowSlackParse = (() => {
     let u;
     try { u = new URL(String(href || '')); } catch (e) { return null; }
     if (!/(^|\.)slack\.com$/.test(u.hostname)) return null;
+    // /client/<team>/dms is the DMs view. The open conversation id is not in the path.
+    const dms = /^\/client\/([A-Z0-9]+)\/dms\/?$/i.exec(u.pathname);
+    if (dms) return { team: dms[1], conversation: null, oneToOne: false, inThread: false, needsDom: true, view: 'dms' };
     const m = /^\/client\/([A-Z0-9]+)\/([A-Z0-9]+)(\/thread\/.*)?\/?$/.exec(u.pathname);
     if (!m) return null;
-    return { team: m[1], conversation: m[2], oneToOne: /^D/.test(m[2]), inThread: Boolean(m[3]) };
+    return { team: m[1], conversation: m[2], oneToOne: /^D/.test(m[2]), inThread: Boolean(m[3]), needsDom: false, view: 'client' };
+  }
+
+  // A direct-message id from the selected sidebar row or the message pane. Channels and groups are not taken.
+  function conversationIdFrom(ids) {
+    const list = Array.isArray(ids) ? ids : [ids];
+    for (let i = 0; i < list.length; i++) {
+      const id = String(list[i] || '').trim();
+      if (/^D[A-Z0-9]+$/.test(id)) return id;
+    }
+    return '';
+  }
+
+  // The DMs view borrows the open conversation from the DOM. A /D… address already has it.
+  function resolveConversation(parsed, domId) {
+    if (!parsed) return null;
+    if (!parsed.needsDom) return parsed;
+    const id = conversationIdFrom(domId);
+    if (!id) return Object.assign({}, parsed, { conversation: null, oneToOne: false, unresolved: true });
+    return Object.assign({}, parsed, { conversation: id, oneToOne: true, unresolved: false, needsDom: false });
   }
 
   // Slack's message timestamp "1700000000.000100": seconds since the epoch, then a counter that makes it unique in its conversation.
@@ -23,7 +45,36 @@ const FlowSlackParse = (() => {
   // A stable thread id for the conversation.
   function threadIdFor(url) {
     const p = typeof url === 'string' ? parseUrl(url) : url;
-    return p && p.oneToOne ? 'slack:' + p.team + ':' + p.conversation : null;
+    return p && p.oneToOne && p.conversation ? 'slack:' + p.team + ':' + p.conversation : null;
+  }
+
+  // localConfig_v2 or a boot blob. Only a user id comes back. Tokens stay in the object.
+  function selfIdFromStore(raw, team) {
+    let data = raw;
+    if (typeof raw === 'string') {
+      try { data = JSON.parse(raw); } catch (e) { data = null; }
+    }
+    if (!data || typeof data !== 'object') return '';
+    const teams = data.teams && typeof data.teams === 'object' ? data.teams : data;
+    const row = team && teams[team] && typeof teams[team] === 'object' ? teams[team] : null;
+    const candidates = [];
+    if (row) candidates.push(row.user_id, row.userId, row.user && row.user.id, row.user && row.user.user_id);
+    candidates.push(data.user_id, data.userId);
+    for (let i = 0; i < candidates.length; i++) {
+      const id = String(candidates[i] || '').trim();
+      if (/^U[A-Z0-9]+$/.test(id)) return id;
+    }
+    return '';
+  }
+
+  // Primary: the open DM's counterpart is the signed-in user. Title text is only a backup.
+  function isSelfDm(signals) {
+    const s = signals || {};
+    const selfId = String(s.selfId || '').trim();
+    const otherId = String(s.counterpartId || '').trim();
+    if (selfId && otherId && selfId === otherId) return true;
+    if (s.titleBlob && isSelfTitle(s.titleBlob)) return true;
+    return false;
   }
 
   // Slack shows the sender once and then leaves it out of the messages that follow from the same person. Fill the blanks forward.
@@ -73,7 +124,7 @@ const FlowSlackParse = (() => {
     return body.slice(0, 500);
   }
 
-  return { parseUrl, parseTs, threadIdFor, fillSenders, isOwn, joinText, isSelfTitle, isFyi, isAsk, selfDraft };
+  return { parseUrl, parseTs, threadIdFor, fillSenders, isOwn, joinText, isSelfTitle, isFyi, isAsk, selfDraft, conversationIdFrom, resolveConversation, selfIdFromStore, isSelfDm };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowSlackParse };

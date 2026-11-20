@@ -36,6 +36,16 @@ check('another person is not a self chat', S.isSelfTitle('Dana Cole') === false 
 check('an ask is an ask', S.isAsk('Can you send the invoice by Friday?') === true && T.isAsk('תוכל לשלוח לי את הקובץ עד יום חמישי?') === true);
 check('FYI is not an ask', S.isAsk('fyi, no action needed') === false && S.isFyi('fyi, no action needed') === true && T.isFyi('לידיעתך') === true && T.isAsk('לידיעתך') === false);
 check('the draft is the ask without the question, and it is not a send', S.selfDraft('Can you send the invoice by Friday?') === 'Send the invoice by Friday.' && T.selfDraft('תוכל לשלוח לי את הקובץ עד יום חמישי?') === 'לשלוח לי את הקובץ עד יום חמישי.');
+check('a /D address is still a direct message', S.parseUrl('https://app.slack.com/client/T01ABC/D0C9BS6UD9A').oneToOne === true && S.threadIdFor('https://app.slack.com/client/T01ABC/D0C9BS6UD9A') === 'slack:T01ABC:D0C9BS6UD9A');
+check('the DMs view needs the open conversation from the page', S.parseUrl('https://app.slack.com/client/T01ABC/dms').needsDom === true && S.parseUrl('https://app.slack.com/client/T01ABC/DMs').needsDom === true);
+const dms = S.resolveConversation(S.parseUrl('https://app.slack.com/client/T01ABC/dms'), 'D0C9BS6UD9A');
+check('the DMs view takes a D id from the DOM and ignores a channel id', dms && dms.oneToOne === true && dms.conversation === 'D0C9BS6UD9A' && S.threadIdFor(dms) === 'slack:T01ABC:D0C9BS6UD9A' && S.conversationIdFrom(['C09CHAN', 'D0C9BS6UD9A']) === 'D0C9BS6UD9A');
+check('the DMs view stays unresolved until a DM id is on the page', S.resolveConversation(S.parseUrl('https://app.slack.com/client/T01ABC/dms'), '').unresolved === true);
+const cfg = JSON.stringify({ teams: { T01ABC: { user_id: 'UFLOW123', token: 'xoxc-secret' } } });
+check('the signed-in id comes from localConfig and the token does not', S.selfIdFromStore(cfg, 'T01ABC') === 'UFLOW123' && S.selfIdFromStore(cfg, 'T01ABC').indexOf('xoxc') < 0);
+check('self is the same user id, not the display name', S.isSelfDm({ selfId: 'UFLOW123', counterpartId: 'UFLOW123', titleBlob: 'Flow Message to Flow' }) === true);
+check('the same display name with another user id is not self', S.isSelfDm({ selfId: 'UFLOW123', counterpartId: 'UDANA456', titleBlob: 'Flow' }) === false);
+check('a (you) title is only the backup signal', S.isSelfDm({ titleBlob: 'Sali Sapan (you)' }) === true);
 const fs = require('fs');
 const path = require('path');
 const bg = fs.readFileSync(path.join(__dirname, '../src/background.js'), 'utf8');

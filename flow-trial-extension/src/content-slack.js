@@ -58,7 +58,54 @@
   function selfBlob() {
     const box = composerBox();
     const aria = box ? ((box.getAttribute('aria-label') || '') + ' ' + (box.getAttribute('data-placeholder') || '') + ' ' + (box.getAttribute('placeholder') || '')) : '';
-    return title() + ' ' + aria;
+    const hint = document.querySelector('[data-qa="message_input"] .ql-placeholder, [data-qa="message_input"] [data-placeholder]');
+    const hintText = hint ? ((hint.getAttribute && hint.getAttribute('data-placeholder')) || hint.textContent || '') : '';
+    return title() + ' ' + aria + ' ' + hintText;
+  }
+
+  function attrOf(node, names) {
+    if (!node || !node.getAttribute) return '';
+    for (let i = 0; i < names.length; i++) {
+      const value = node.getAttribute(names[i]);
+      if (value) return String(value).trim();
+    }
+    return '';
+  }
+
+  function domConversationId() {
+    const selected = document.querySelector('[aria-selected="true"][data-qa-channel-sidebar-channel-id], [aria-current="page"][data-qa-channel-sidebar-channel-id]');
+    const main = pane();
+    return P.conversationIdFrom([
+      selected && selected.getAttribute('data-qa-channel-sidebar-channel-id'),
+      main && main.getAttribute('data-qa-channel-id'),
+      main && main.getAttribute('data-channel-id'),
+      main && main.getAttribute('data-conversation-id')
+    ]);
+  }
+
+  function signedInId(team) {
+    let fromStore = '';
+    try { fromStore = P.selfIdFromStore(localStorage.getItem('localConfig_v2'), team); } catch (e) { fromStore = ''; }
+    if (fromStore) return fromStore;
+    const own = document.querySelector('[data-qa="user-button"], [data-qa="nav_user"], [data-qa-own-user="1"]');
+    const id = attrOf(own, ['data-user-id', 'data-member-id', 'data-qa-user-id']);
+    return /^U[A-Z0-9]+$/.test(id) ? id : '';
+  }
+
+  function counterpartId() {
+    const nodes = [pane(), document.querySelector('[data-qa="channel_name"]'), document.querySelector('[aria-selected="true"]')];
+    const names = ['data-user-id', 'data-member-id', 'data-qa-user-id', 'data-qa-member-id'];
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      const id = attrOf(node, names);
+      if (/^U[A-Z0-9]+$/.test(id)) return id;
+      if (node && node.querySelector) {
+        const child = node.querySelector('[data-user-id], [data-member-id], [data-qa-user-id]');
+        const childId = attrOf(child, names);
+        if (/^U[A-Z0-9]+$/.test(childId)) return childId;
+      }
+    }
+    return '';
   }
 
   function trace(line) {
@@ -112,11 +159,10 @@
     return true;
   }
 
-  function offerSelf(list, own) {
+  function offerSelf(list, self) {
     if (typeof FlowChatSelfCard === 'undefined') return;
     const last = list[list.length - 1];
     const text = textOf(last);
-    const self = P.isSelfTitle(selfBlob());
     const result = FlowChatSelfCard.paint({
       self: self,
       fyi: P.isFyi(text),
@@ -127,26 +173,28 @@
       whyNot: whyNot
     });
     if (self && result && result.reason === 'fyi') whyNot('fyi');
-    else if (self && own[own.length - 1] === null) whyNot('sender-not-identified');
   }
 
   async function scan() {
     if (!(await hostOpen())) return;
-    const where = P.parseUrl(location.href);
-    if (!where) { whyNot('chat-not-identified', 'url=missing'); return; }
+    const parsed = P.parseUrl(location.href);
+    if (!parsed) { whyNot('chat-not-identified', 'url=missing'); return; }
+    const where = P.resolveConversation(parsed, domConversationId());
+    if (where.unresolved) { whyNot('chat-not-identified', 'dom=missing'); return; }
     if (!where.oneToOne || where.inThread) { report(true); whyNot('not-one-to-one'); return; }
     const list = rows();
     if (!list.length) { report(false, 'no-messages-recognised'); whyNot('no-messages-recognised', 'bubbles=0'); return; }
     const t = title();
-    if (!t) { report(false, 'chat-not-identified'); whyNot('chat-not-identified', 'title=missing'); return; }
+    if (!t) { whyNot('chat-not-identified', 'title=missing'); return; }
+    const self = P.isSelfDm({ selfId: signedInId(where.team), counterpartId: counterpartId(), titleBlob: selfBlob() });
     const filled = P.fillSenders(list.map((n) => ({ sender: senderOf(n) })));
-    const own = filled.map((r) => P.isOwn(r.sender, t));
-    if (own.some((x) => x === null) && !P.isSelfTitle(selfBlob())) { report(false, 'sender-not-identified'); whyNot('sender-not-identified'); return; }
+    const own = filled.map((r) => (self ? true : P.isOwn(r.sender, t)));
+    if (!self && own.some((x) => x === null)) { whyNot('sender-not-identified'); return; }
     report(true);
     const threadId = P.threadIdFor(where);
     const last = list[list.length - 1];
-    remember(threadId, senderOf(last) || (own[own.length - 1] === true ? 'me' : 'them'));
-    offerSelf(list, own);
+    remember(threadId, self ? (signedInId(where.team) || senderOf(last) || 'me') : (senderOf(last) || (own[own.length - 1] === true ? 'me' : 'them')));
+    offerSelf(list, self);
     if (typeof FlowFollow === 'undefined') return;
     const idx = new Map(list.map((n, i) => [n, i]));
     const party = { name: t, phone: null, email: null };
@@ -169,10 +217,43 @@
     FlowFollow.consider(ctx).catch((e) => console.error('[Glance] Slack follow-up check failed', e));
   }
 
+  let seenHref = '';
+  let listRoot = null;
+  let listObserver = null;
+
   function schedule() { clearTimeout(timer); timer = setTimeout(() => { scan().catch((e) => console.error('[Glance] Slack scan failed', e)); }, DEBOUNCE_MS); }
+
+  function onNav() {
+    seenWhy.clear();
+    lastReportedHealth = null;
+    schedule();
+  }
+
+  function watchList() {
+    const root = pane();
+    if (!root || root === listRoot) return;
+    if (listObserver) listObserver.disconnect();
+    listRoot = root;
+    listObserver = new MutationObserver(schedule);
+    listObserver.observe(root, { childList: true, subtree: true });
+  }
+
+  function watchHref() {
+    let href = '';
+    try { href = String(location.href || ''); } catch (e) { href = ''; }
+    if (href === seenHref) return;
+    seenHref = href;
+    onNav();
+  }
+
   markLane();
   const watch = document.documentElement || document.body;
-  if (watch) new MutationObserver(schedule).observe(watch, { childList: true, subtree: true });
+  if (watch) new MutationObserver(() => { watchList(); schedule(); }).observe(watch, { childList: true, subtree: true });
+  watchList();
+  try { window.addEventListener('popstate', onNav); } catch (e) { /* no window */ }
+  try { window.addEventListener('hashchange', onNav); } catch (e) { /* no window */ }
+  seenHref = here();
+  setInterval(watchHref, 500);
   schedule();
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
   globalThis.__glanceChatSurfaces.slack = { scan: () => scan() };

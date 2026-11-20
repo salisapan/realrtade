@@ -1565,11 +1565,13 @@ function invalidateGoogleWebAuthFlight() {
 // card (msg.interactive === true). Silent auto-connect never sets it.
 function googleConnectWantsInteractive(sender, forceInteractive) {
   const runtimeId = chrome.runtime && chrome.runtime.id;
+  const url = sender && typeof sender.url === 'string' ? sender.url : '';
+  // A Slack or Telegram page never opens the account chooser, even if a script asks.
+  if (/^https:\/\/(app\.slack\.com|web\.telegram\.org)\//i.test(url)) return false;
   if (forceInteractive === true) {
     return Boolean(runtimeId && sender && sender.id === runtimeId);
   }
   if (!sender || !sender.tab) return true;
-  const url = typeof sender.url === 'string' ? sender.url : '';
   if (!runtimeId || sender.id !== runtimeId) return false;
   return url.indexOf('chrome-extension://' + runtimeId + '/') === 0;
 }
@@ -2646,8 +2648,9 @@ async function probeGoogleAuthStillValid() {
     if (lastRefresh && lastRefresh.token && Date.now() - lastRefresh.at < 3000) {
       token = lastRefresh.token;
     } else {
-      const cred = await getGoogleAccessToken(false);
-      token = (cred && cred.token) || '';
+      // The status probe must stay silent. getGoogleAccessToken(false) upgrades a stale
+      // scope list with getAuthToken({ interactive: true }), which opened Google on a Slack page.
+      token = await getGoogleAuthToken(false);
     }
   } catch (e) {
     if (googleRefreshRevoked(e)) {
