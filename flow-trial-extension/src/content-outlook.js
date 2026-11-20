@@ -4603,7 +4603,7 @@
       return;
     }
     const earlyHost = document.querySelector('#ReadingPaneContainerId .flow-chip-host');
-    const laneCard = document.querySelector('#ReadingPaneContainerId .flow-lane-ms');
+    const laneCard = document.querySelector('#ReadingPaneContainerId [data-glance-ms-card="1"]');
     const undoneOnly = earlyHost && earlyHost.getAttribute('data-glance-undone') === '1';
     const openGen = mailOpenGen;
     if (sig === lastSig && openGen === reconciledOpenGen && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && (earlyHost || laneCard) && !undoneOnly))) {

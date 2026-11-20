@@ -271,6 +271,7 @@
     if (offer && offer.connectorId === 'outlookContacts') clearStaleContactsWhy();
     const card = document.createElement('div');
     card.className = 'flow-lane-ms';
+    card.setAttribute('data-glance-ms-card', '1');
     card.setAttribute('data-connector', offer.connectorId || '');
     const title = document.createElement('div');
     title.className = 'flow-lane-title';
@@ -302,6 +303,7 @@
     clearCard();
     const card = document.createElement('div');
     card.className = 'flow-lane-ms';
+    card.setAttribute('data-glance-ms-card', '1');
     card.setAttribute('data-connector', row.connectorId || '');
     const title = document.createElement('div');
     title.className = 'flow-lane-title';
@@ -363,6 +365,7 @@
     clearStaleContactsWhy();
     const card = document.createElement('div');
     card.className = 'flow-lane-ms';
+    card.setAttribute('data-glance-ms-card', '1');
     card.setAttribute('data-connector', offer.connectorId || 'outlookContacts');
     card.setAttribute('data-glance-contacts-why', offer.reason || 'contacts-not-granted');
     const title = document.createElement('div');
