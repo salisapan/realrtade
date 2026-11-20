@@ -14,28 +14,31 @@ var FI={
  cal:'<rect x="4" y="5.5" width="16" height="14.5" rx="3.2"/><path d="M4 10.2h16M8.5 3.5v3.6M15.5 3.5v3.6"/>',
  team:'<circle cx="9" cy="9" r="3"/><path d="M3.5 19c.5-3.2 2.7-5 5.5-5s5 1.8 5.5 5"/><circle cx="17" cy="9.8" r="2.2"/><path d="M16 14.2c2.6-.2 4.2 1.4 4.6 4.3"/>',
  mask:'<path d="M3 12s3.2-5.5 9-5.5S21 12 21 12s-3.2 5.5-9 5.5S3 12 3 12z"/><circle cx="12" cy="12" r="2.6"/><path d="M4.5 19.5l15-15"/>',
+ task:'<rect x="4" y="4" width="16" height="16" rx="4.2"/><path d="M8.5 12.3l2.5 2.5 4.6-5"/>',
+ person:'<circle cx="12" cy="9" r="3.4"/><path d="M5.5 19.5c.6-3.6 3.1-5.6 6.5-5.6s5.9 2 6.5 5.6"/>',
+ arch:'<rect x="3.5" y="4.5" width="17" height="5" rx="1.8"/><path d="M5 9.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9.5M10 13.5h4"/>',
  cloud:'<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.6 4.7 4.7 0 0 1 17.5 18z"/><path d="M5 20.5l14-17"/>'};
 var C={
  he:{ask:'הבקשה מגיעה',back:'התשובה חוזרת',stay:'נשאר במחשב',
   src:['מייל מלקוח','מסמך','בקשה מצוות'],dst:['טיוטת תשובה','תיק לקוח','יומן'],
   cloud:['ענן Flow · ממוסך',''],gate:'מוסר לפני העיבוד',
-  edge:['Flow-Edge','על המחשב הזה'],pc:'המחשב של העובד',ext:'ענן חיצוני',never:'אף פעם'},
+  edge:['Flow-Edge','על המחשב הזה'],dx:['מסמך','משימה','אנשי קשר','ארכיון'],pc:'המחשב של העובד',ext:'ענן חיצוני',never:'אף פעם'},
  en:{ask:'The ask arrives',back:'The answer comes back',stay:'Stays on the computer',
   src:['Client email','Document','Team request'],dst:['Draft reply','Client file','Calendar'],
   cloud:['Flow cloud · masked',''],gate:'Masked before processing',
-  edge:['Flow-Edge','on this computer'],pc:'The employee’s computer',ext:'External cloud',never:'Never'},
+  edge:['Flow-Edge','on this computer'],dx:['Document','Task','Contacts','Archive'],pc:'The employee’s computer',ext:'External cloud',never:'Never'},
  de:{ask:'Die Anfrage kommt an',back:'Die Antwort kommt zurück',stay:'Bleibt auf dem Rechner',
   src:['Kunden-E-Mail','Dokument','Teamanfrage'],dst:['Entwurf','Akte','Kalender'],
   cloud:['Flow-Cloud · maskiert',''],gate:'Maskiert vor der Verarbeitung',
-  edge:['Flow-Edge','auf diesem Rechner'],pc:'Der Rechner der Mitarbeitenden',ext:'Externe Cloud',never:'Nie'},
+  edge:['Flow-Edge','auf diesem Rechner'],dx:['Dokument','Aufgabe','Kontakte','Archiv'],pc:'Der Rechner der Mitarbeitenden',ext:'Externe Cloud',never:'Nie'},
  fr:{ask:'La demande arrive',back:'La réponse revient',stay:'Reste sur l’ordinateur',
   src:['E-mail client','Document','Équipe'],dst:['Brouillon','Dossier','Agenda'],
   cloud:['Cloud Flow · masqué',''],gate:'Masqué avant le traitement',
-  edge:['Flow-Edge','sur cet ordinateur'],pc:'L’ordinateur du collaborateur',ext:'Cloud externe',never:'Jamais'},
+  edge:['Flow-Edge','sur cet ordinateur'],dx:['Document','Tâche','Contacts','Archive'],pc:'L’ordinateur du collaborateur',ext:'Cloud externe',never:'Jamais'},
  es:{ask:'La solicitud llega',back:'La respuesta vuelve',stay:'Se queda en el equipo',
   src:['Correo cliente','Documento','Del equipo'],dst:['Borrador','Expediente','Agenda'],
   cloud:['Nube Flow · enmascarada',''],gate:'Enmascarado antes de procesar',
-  edge:['Flow-Edge','en este equipo'],pc:'El ordenador del empleado',ext:'Nube externa',never:'Nunca'}};
+  edge:['Flow-Edge','en este equipo'],dx:['Documento','Tarea','Contactos','Archivo'],pc:'El ordenador del empleado',ext:'Nube externa',never:'Nunca'}};
 var RING={l:['assets/onprem/flow-ring-lumf-live-l.webp','assets/onprem/flow-ring-lumf-still-l.webp'],d:['assets/onprem/flow-ring-lumf-live-d.webp','assets/onprem/flow-ring-lumf-still-d.webp']};
 var rm=function(){return matchMedia('(prefers-reduced-motion:reduce)').matches||html.classList.contains('rm')};
 var ico=function(k){return '<svg viewBox="0 0 24 24" aria-hidden="true">'+FI[k]+'</svg>'};
@@ -45,6 +48,9 @@ var SK=['mail','doc','team'],DK=['reply','file','cal'];
 var ez=function(x){return x<=0?0:x>=1?1:x*x*(3-2*x)},f1=function(n){return n.toFixed(1)};
 var L={},cur=0,lang='en',lastRB=null;
 function lg(){var u=html.dataset.ui;return C[u]?u:'en'}
+/* r10: on the phone only, split "Flow cloud · masked" into two spans. Desktop DOM stays as it is. */
+var hsp=function(t){var k=t.indexOf(' · ');return k<0?t:'<span class="ph-a">'+t.slice(0,k)+'</span><span class="ph-dot"> · </span><span class="ph-b">'+t.slice(k+3)+'</span>'};
+var PH=function(){return matchMedia('(max-width:760px)').matches};
 
 function make(kind){
  var T=C[lang],isC=kind==='cloud',hub=isC?T.cloud:T.edge;
@@ -67,11 +73,39 @@ function inst(kind){
   halo=box.querySelector('.opf-halo'),live=box.querySelector('.opf-live'),hubT=box.querySelector('.opf-hub'),
   gate=box.querySelector('.dg-gate'),bound=box.querySelector('.dg-bound'),stub=box.querySelector('.dg-stub'),ext=box.querySelector('.dg-ext'),
   CS=[].slice.call(box.querySelectorAll('.opf-cd.s')),CD=[].slice.call(box.querySelectorAll('.opf-cd.d'));
- var G=null,lens=[0,0],pair=0,gl=0,t0=0,raf=0,running=false,vis=false,I={kind:kind,lay:lay,root:root,box:box};
+ var XD=null,G=null,lens=[0,0],pair=0,gl=0,t0=0,raf=0,running=false,vis=false,I={kind:kind,lay:lay,root:root,box:box};
  var th=function(){return html.getAttribute('data-theme')==='dark'?'d':'l'};
  function ring(){var t=RING[th()];live.setAttribute('src',rm()?t[1]:t[0])}
  I.ring=ring;ring();
- I.layout=function(){var rb=RB(),HB=rb&&rb.offsetWidth?1024*rb.getBoundingClientRect().height/rb.getBoundingClientRect().width:530,dy=(HB-(isC?400:490))/2;box.style.setProperty('aspect-ratio','1024/'+HB.toFixed(3),'important');var W=box.offsetWidth,H=box.offsetHeight;if(!W)return;var u=W/1024;root.style.setProperty('--u',u.toFixed(5));
+ /* r10 + r11: phone (max-width 760px) uses a vertical 446-wide unit space, same panel height as the On-Prem hub. The desktop branch below is unchanged. */
+ function layoutPhone(){var rb=RB(),HB=rb&&rb.offsetWidth?446*rb.getBoundingClientRect().height/rb.getBoundingClientRect().width:446,dy=(HB-446)/2;box.style.setProperty('aspect-ratio','446/'+HB.toFixed(3),'important');
+  var W=box.offsetWidth,H=box.offsetHeight;if(!W)return;var u=W/446;root.style.setProperty('--u',u.toFixed(5));root.classList.add('ph');
+  /* r11: Cloud and Edge share the On-Prem phone grid (ask row 42, seven icon tiles 330, caption 412). Only the hub moves for Cloud (230, room for the mask gate). Edge: dashed computer border, name on the bottom edge, external-cloud line as a quiet caption. */
+  var Y=isC?{la:26,st:42,gy:152,hy:230,tt:330,lb:412}:{la:26,st:42,hy:210,tt:330,bt:8,bb:396,ext:424};
+  if(!XD){var T0=C[lang]||C.en,DX=['doc','task','person','arch'];XD=T0.dx.map(function(s,i){var d=document.createElement('div');d.innerHTML=card('d dgx',3+i,DX[i],s);return d.firstChild});XD.forEach(function(e){box.insertBefore(e,hubT)})}
+  var TL=CD.concat(XD),tw=50*u,tg=(446-28-7*50)/6*u;
+  root.style.setProperty('--pla',(Y.la+dy).toFixed(2));root.style.setProperty('--plb',((Y.lb||Y.ext)+dy).toFixed(2));
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  var rtl=getComputedStyle(root).direction==='rtl',hx=W/2,R=48*u,cw=133.3*u,gp=9*u,ch=72*u;
+  var cx=function(i){var c=14*u+cw/2+i*(cw+gp);return rtl?W-c:c};
+  var tx=function(i){var c=14*u+tw/2+i*(tw+tg);return rtl?W-c:c};
+  var st=(Y.st+dy)*u,sb=st+ch,dt=(Y.tt+dy)*u,hy=(Y.hy+dy)*u,ht=hy-R,hb=hy+R,gy=isC?(Y.gy+dy)*u:0;
+  CS.forEach(function(c,i){c.style.cssText='left:'+(cx(i)-cw/2)+'px;top:'+st+'px;width:'+cw+'px;height:'+ch+'px'});
+  TL.forEach(function(c,i){c.style.cssText='left:'+(tx(i)-tw/2)+'px;top:'+dt+'px;width:'+tw+'px;height:'+tw+'px'});
+  var PS=function(i){var x=cx(i);if(isC){var k=(gy-sb)*.62;return 'M'+f1(x)+' '+f1(sb)+'C'+f1(x)+' '+f1(sb+k)+' '+f1(hx)+' '+f1(gy-k)+' '+f1(hx)+' '+f1(gy)+'L'+f1(hx)+' '+f1(ht)}
+   var k2=(ht-sb)*.62;return 'M'+f1(x)+' '+f1(sb)+'C'+f1(x)+' '+f1(sb+k2)+' '+f1(hx)+' '+f1(ht-k2)+' '+f1(hx)+' '+f1(ht)};
+  var PD=function(i){var x=tx(i),k=(dt-hb)*.62;return 'M'+f1(hx)+' '+f1(hb)+'C'+f1(hx)+' '+f1(hb+k)+' '+f1(x)+' '+f1(dt-k)+' '+f1(x)+' '+f1(dt)};
+  var p1=[0,1,2].map(PS),p2=[0,1,2,3,4,5,6].map(PD);
+  gf.innerHTML=p1.concat(p2).map(function(d){return '<path class="f" d="'+d+'"/>'}).join('');
+  halo.style.cssText='left:'+hx+'px;top:'+hy+'px';live.style.cssText='left:'+hx+'px;top:'+hy+'px';
+  hubT.style.cssText=rtl?'right:'+(W-hx+72*u)+'px;top:'+hy+'px':'left:'+(hx+72*u)+'px;top:'+hy+'px';
+  if(gate){gate.style.cssText='left:'+hx+'px;top:'+gy+'px';I.gx=null;I.gy=gy}
+  if(bound){bound.style.cssText='left:'+(10*u)+'px;right:'+(10*u)+'px;top:'+((Y.bt+dy)*u)+'px;height:'+((Y.bb-Y.bt)*u)+'px';
+   var ey=(Y.ext+dy)*u;bound.style.left=bound.style.right=(6*u)+'px';stub.style.cssText='display:none';ext.style.cssText='left:'+hx+'px;top:'+ey+'px'}
+  var hb0=hubT.querySelector('b');if(hb0&&!hb0.querySelector('.ph-a')&&hb0.textContent.indexOf(' · ')>0){hb0.setAttribute('data-t',hb0.textContent);hb0.innerHTML=hsp(hb0.textContent)}
+  G={p1:p1,p2:p2,hy:hy,hx:hx};I.cur(pair)}
+ I.layout=function(){if(PH())return layoutPhone();if(root.classList.contains('ph')){root.classList.remove('ph');root.style.removeProperty('--pla');root.style.removeProperty('--plb');I.gy=null;if(XD){XD.forEach(function(e){e.remove()});XD=null}var hb1=hubT.querySelector('b[data-t]');if(hb1){hb1.textContent=hb1.getAttribute('data-t');hb1.removeAttribute('data-t')}}
+  var rb=RB(),HB=rb&&rb.offsetWidth?1024*rb.getBoundingClientRect().height/rb.getBoundingClientRect().width:530,dy=(HB-(isC?400:490))/2;box.style.setProperty('aspect-ratio','1024/'+HB.toFixed(3),'important');var W=box.offsetWidth,H=box.offsetHeight;if(!W)return;var u=W/1024;root.style.setProperty('--u',u.toFixed(5));
   svg.setAttribute('viewBox','0 0 '+W+' '+H);
   var rtl=getComputedStyle(root).direction==='rtl',s=rtl?1:-1,hx=W/2,hy=((isC?232.5:237.5)+dy)*u,R=54*u,cw=233*u,sh=61.5*u,dh=49.2*u;
   var sL=rtl?W-49*u-cw:49*u,dL=rtl?49.5*u:W-49.5*u-cw,sIn=rtl?sL:sL+cw,dIn=rtl?dL+cw:dL;
@@ -91,6 +125,7 @@ function inst(kind){
   G={p1:p1,p2:p2,hy:hy,hx:hx};I.cur(pair)};
  I.cur=function(i){pair=i;if(!G)return;l1.setAttribute('d',G.p1[i]);l2.setAttribute('d',G.p2[i]);lens[0]=l1.getTotalLength();lens[1]=l2.getTotalLength();
   if(isC&&I.gx!=null){var lo=0,hi=lens[0],sg=Math.sign(l1.getPointAtLength(0).x-I.gx);for(var q=0;q<26;q++){var m=(lo+hi)/2;if(Math.sign(l1.getPointAtLength(m).x-I.gx)===sg)lo=m;else hi=m}gl=(lo+hi)/2}
+  else if(isC&&I.gy!=null){var lo2=0,hi2=lens[0];for(var q2=0;q2<26;q2++){var m2=(lo2+hi2)/2;if(l1.getPointAtLength(m2).y<I.gy)lo2=m2;else hi2=m2}gl=(lo2+hi2)/2}
   CS.forEach(function(c,k){c.classList.toggle('act',k===i)});CD.forEach(function(c,k){c.classList.toggle('act',k===i)})};
  var CYC=4.5;
  function draw(t){if(!G)return;

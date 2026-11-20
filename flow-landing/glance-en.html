@@ -21,9 +21,15 @@
 (function(){try{/* Glance opens in day mode. Its own toggle is remembered for this tab only (sessionStorage, key glance.ui.theme); Flow's flow.theme and the old glance.corner.theme are never read. */var t=sessionStorage.getItem('glance.ui.theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');else document.documentElement.removeAttribute('data-theme');}catch(e){document.documentElement.removeAttribute('data-theme');}})();
 </script>
 <link rel="stylesheet" href="glance/rtl-gradient-20261119.css">
+<!-- 20.11 Glance hero = Flow home hero clone approved 19.11 (Do It D, Glance blue, B2C apps) -->
+<script id="r35-guard">(function(){var T=matchMedia("(hover:none),(pointer:coarse)").matches;if(T){var w=innerWidth,h=innerHeight,add=window.addEventListener;window.addEventListener=function(t,f,o){if(t==="resize"&&typeof f=="function"){var g=function(e){var nw=innerWidth,nh=innerHeight;if(!(nw===w&&Math.abs(nh-h)<160))return w=nw,h=nh,f.call(this,e)};return add.call(this,t,g,o)}return add.call(this,t,f,o)}}})();</script>
+<script>(function(){var d=document.documentElement;d.setAttribute("data-doit","D");d.classList.add("card-sum")})();</script>
+<link rel="stylesheet" href="glance/glance-hero-20261120.css">
+
 <script defer src="/assets/flow-consent.js"></script><link rel="preload" href="glance/glance-header-brand-20261119.css" as="style"></head>
 <body class="v21">
 
+<style id="gx-noflash">/* 19.11 final QA: keep the Flow logo hidden until the Glance wordmark swap (no logo flash on load) */flow-header .fh-brand:not([data-gx])>*{visibility:hidden}</style>
 <div class="ctl" id="ctl">
   <a aria-label='עברית' class='ctl-b' href='/glance' id='btn-lang' lang='he' onclick='try{localStorage.setItem(\'flow.lang\','he\')}catch(e){}' title='עברית'><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4C6.1 12.4 5.2 10.3 5.2 8S6.1 3.6 8 1.6z"/></svg></a>
   <button type="button" class="ctl-b" id="btn-theme" aria-label="Night mode" title="Night mode">
@@ -31,135 +37,108 @@
     <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
   </button>
 </div>
-<style id="gx-noflash">/* 19.11 final QA: keep the Flow logo hidden until the Glance wordmark swap (no logo flash on load) */flow-header .fh-brand:not([data-gx])>*{visibility:hidden}</style><flow-header data-base=""></flow-header>
+<flow-header data-base=""></flow-header>
 
-<!-- HERO · cinematic scroll story (pinned ~325vh) · Detect → Do It → Prepared → Approve → Closed -->
-<section class="h21" id="hero" aria-label="Glance">
-  <div class="h21-pin">
-    <div class="h21-bg" aria-hidden="true"><div class="h21-stars"></div><div class="h21-floor"></div></div>
-
-    <div class="h21-copy">
-      <p class="h21-eye">Glance</p>
-      <h1 class="h21-h1"><span class="h1-echo" aria-hidden="true">Open loops<br><em>Closed</em></span><span class="h1-main">Open loops<br><em>Closed</em></span></h1>
-      <p class="h21-sub">Glance notices the ask, prepares every step, and waits. One click. You approve.</p>
-      <div class="h21-ctas"><a class="doit h21-get" href="#get-glance"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Get Glance</span></a></div>
-      </div>
-
-    <div class="h21-end" aria-hidden="true">
-      <p class="h21-end-h">Closed <span>Across 3 tools</span> <em>One click</em></p>
+<div id="gx-hero-stub" hidden aria-hidden="true"><button type="button" id="langBtn" tabindex="-1"></button><span id="langName"></span><div id="langMenu"></div><button type="button" id="themeBtn" tabindex="-1"></button></div>
+<section id="hero" class="gxh" aria-label="Glance">
+  <div class="stage" id="stage">
+    <div class="copy" id="copy">
+      <span class="logo gx-logo" id="logo" role="img" aria-label="Glance"><span>Glance</span></span>
+      <h1 id="h1" data-k="h1">Intent into action</h1>
+      <p class="sub" id="sub"><bdi>Flow</bdi> understands what your organization means, not just what it says, and carries it through to the end across every system your people already use. Finished, proven, and reversible.</p>
+      <div class="slot" id="slot"><div class="hbtn" id="hbtn"><button class="doit" id="heroBtn" type="button" aria-label="Do It"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">[Do It]</span></button></div></div>
     </div>
 
-    <div class="h21-scene">
-      <div class="h21-rig">
-        <div class="h21-win h21-mail">
-          <div class="gw-top">
-            <span class="gw-dots"><i></i><i></i><i></i></span>
-            <span class="gw-logo"><span class="brand-ico" data-brand="gmail"></span><b>Gmail</b></span>
-            <span class="gw-search"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"/></svg><span>Search mail</span></span>
-            <span class="gw-av viewer-initials" title="Sali Sapan">SS</span>
-          </div>
-          <div class="gw-body">
-            <aside class="gw-side">
-              <span class="gw-nav on"><b>Inbox</b></span>
-              <span class="gw-nav">Starred</span>
-              <span class="gw-nav">Sent</span>
-              <span class="gw-nav">Drafts</span>
-            </aside>
-            <div class="gw-main">
-              <div class="gw-mail">
-                <h4 class="gw-subj"><span data-bind="subj">Can we move to Wednesday?</span></h4>
-                <div class="gw-msg">
-                  <span class="gw-mav" data-bind="av">M</span>
-                  <div class="gw-mbody">
-                    <div class="gw-from"><b data-bind="fromName">Megan Carter</b><span class="gw-addr" data-bind="fromAddr">megan.carter@gmail.com</span><span class="gw-time" data-bind="fromTime">09:12</span></div>
-                    <div class="gw-to">to <span class="viewer-first">me</span></div>
-                    <p class="gw-p" data-bind="greet">Hi Sali,</p>
-                    <p class="gw-p"><span class="h21-ask" data-bind="msgBody">Can we move our design session to Wednesday at 6pm? I attached photos of the room.</span></p>
-                    <div class="gw-att"><span class="gw-att-ic" aria-hidden="true">PDF</span><span class="gw-att-n" data-bind="att">Room photos.pdf</span></div>
-                    <p class="gw-p gw-sign" data-bind="sign">Megan</p>
-                    <div class="h21-ping" aria-hidden="true"><span class="h21-ping-r"></span><span class="h21-ping-r"></span><img class="living-ico" src="glance/living/key-idle-192.png" alt="" width="18" height="18"><b>Glance</b><span class="h21-ping-t" data-bind="pingTxt">can close this · 3 steps</span></div>
-                  </div>
-                </div>
-                <div class="gw-artifact" id="gw-artifact" hidden>
-                  <div class="gw-art-top"><span class="gw-art-k" data-art-k>Draft</span><span class="gw-art-app">Gmail</span></div>
-                  <div class="gw-slack">
-                    <span class="gw-mav viewer-initials" title="Sali Sapan">SS</span>
-                    <div class="gw-slack-body">
-                      <div class="gw-from"><b class="viewer-name">Sali Sapan</b><span class="gw-addr">to</span> <span data-art-who>Megan Carter</span></div>
-                      <p class="gw-art-body" data-art-body>Wednesday at 6 works.</p>
-                      <div class="gw-notion"><span class="gw-notion-ic" data-brand="drive"></span><span data-art-notion>Room photos</span></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="h21-sweep" aria-hidden="true"></div>
-          <div class="h21-dim" aria-hidden="true"></div>
-        </div>
+    <span class="hfloor" id="hfloor" aria-hidden="true"></span>
+    <p class="finale" id="finale" data-k="finale"></p>
 
-        <!-- floating tool tiles (execution) -->
-        <div class="h21-tiles" aria-hidden="true"></div>
+    <div class="desk" id="desk">
+    <div class="ring fade" id="ring" aria-hidden="true">
+      <span class="r-floor" aria-hidden="true"></span>
+      <div class="pulse">
+        <img class="r-idle" data-r="idle" alt="" width="384" height="384" decoding="async" fetchpriority="low">
+        <img class="r-done" id="ringDone" data-r="done" alt="" width="384" height="384" decoding="async" fetchpriority="low">
+        <span class="r-tone" aria-hidden="true"></span>
+        <span class="r-sheen" aria-hidden="true"></span>
+        <span class="r-gloss" aria-hidden="true"></span>
+      </div>
+    </div>
+    <script>(function(){var d=document.documentElement;function set(){var t=d.dataset.theme==='dark'?'d':'l';document.querySelectorAll(window.__gxRingAll?'#ring img[data-r]':'#ring img[data-r=idle]').forEach(function(i){var u='glance/hero-clone-20261119/ring-'+i.dataset.r+'-'+t+'.webp';if(i.getAttribute('src')!==u)i.src=u;});}set();new MutationObserver(set).observe(d,{attributes:true,attributeFilter:['data-theme']});var go=function(){if(window.__gxRingAll)return;window.__gxRingAll=1;set();['scroll','pointerdown','keydown','touchstart','wheel'].forEach(function(e){removeEventListener(e,go,true)})};['scroll','pointerdown','keydown','touchstart','wheel'].forEach(function(e){addEventListener(e,go,{capture:true,passive:true})});addEventListener('load',function(){setTimeout(go,8000)});})();</script>
+    <div class="dock-label" id="dockLabel" aria-live="polite"><b>Glance</b><span id="dockTxt"></span></div>
 
-        <!-- Glance, the floating extension card (step card · step-states v1) -->
-        <div class="h21-card stage stage-live" id="product-moment" data-state="propose" data-case="launch">
-          <div class="glance-surface g19 h21-gs" id="live-glance">
-            <div class="gs-head">
-              <img class="living-ico" id="live-living-ico" src="glance/living/key-idle-192.png" alt="" width="26" height="26">
-              <div class="gs-head-meta">
-                <div class="gs-brand">Glance</div>
-                <div class="gs-intent-label">Detected intent</div>
-              </div>
-              <span class="handled gs-badge">Closed</span>
-            </div>
-            <p class="gs-intent" data-bind="intent">Megan wants the session on Wednesday at 6pm.</p>
-            <div class="acts-head">
-              <span class="acts-label">Glance will</span>
-              <span class="acts-hint">Untick to skip</span>
-            </div>
-            <ol class="acts" id="live-acts"></ol>
-            <div class="ss-add" data-open="true">
-              <button type="button" class="ss-add-btn" id="btn-add-open">+ Add a step</button>
-              <div class="ss-add-row act-row">
-                <span class="act-box act-none" aria-hidden="true"></span>
-                <span class="act-glyph" data-glyph="you"></span>
-                <input type="text" class="ss-add-input" id="custom-step-input" maxlength="80" placeholder="+ Add a step… e.g. also save the menu to Dropbox" aria-label="New step">
-                <kbd class="ss-kbd">↵</kbd>
-              </div>
-            </div>
-            <div class="approve-banner" id="live-approve" hidden>
-              <div class="approve-meta">
-                <div class="approve-title">Prepared · nothing sent</div>
-                <div class="approve-sub">Glance never sends for you</div>
-              </div>
-              <button type="button" class="do-halo approve-btn" id="btn-approve" aria-label="Do It"><img class="chip-do" src="glance/do-it-flow-228.webp" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span></button>
-            </div>
-            <div class="chip chip-invoice" id="live-chip">
-              <span class="chip-txt"><b class="gplus"><span class="gplus-name">Glance</span></b> can close this in <b class="file">3 steps</b> · Calendar · Drive · Slack</span>
-              <span class="chip-act">
-                <button type="button" class="chip-x" id="btn-dismiss" aria-label="Dismiss">×</button>
-                <button type="button" class="do-halo h21-doit" id="btn-doit" aria-label="Do It"><img class="chip-do" src="glance/do-it-flow-228.webp" alt="Do It"><span class="doit-dark" role="img" aria-label="Do It">[Do It]</span><i class="doit-ripple" aria-hidden="true"></i></button>
+    <div class="floor fade" id="floor" aria-hidden="true"></div>
+    <!-- Outlook for Mac (new Outlook): blue title bar with search, simplified ribbon, vibrancy sidebar, Focused/Other list, card-style reading pane -->
+    <div class="win fade" id="win" role="img">
+      <div class="otb">
+        <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="osearch"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg><span data-k="ui.search"></span></div>
+        <div class="otb-r" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="5.5" width="10" height="9" rx="2"/><path d="M12.5 9l5-3v8l-5-3"/></svg><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3a5 5 0 0 0-5 5v3l-1.5 3h13L15 11V8a5 5 0 0 0-5-5zM8 16a2 2 0 0 0 4 0"/></svg></div>
+      </div>
+      <div class="ribbon" aria-hidden="true">
+        <span class="ham"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5.5h14M3 10h14M3 14.5h14"/></svg></span>
+        <span class="newmail"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11.5 4.5H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9"/><path d="M14.6 2.8l2.6 2.6-6.9 6.9-3.2.6.6-3.2z"/></svg><span data-k="ui.newMail"></span></span>
+        <span class="cmds" id="cmds"></span>
+      </div>
+      <div class="ol">
+        <nav class="side" id="side" aria-hidden="true"></nav>
+        <div class="list" id="list" aria-hidden="true"></div>
+        <article class="read" id="read">
+          <div class="rcard">
+          <div class="inner" id="readInner">
+            <div class="shead">
+              <h2 class="subj" data-k="mail.subject"></h2>
+              <span class="ricons" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 4L1.5 8 6 12M1.5 8h7a5 5 0 0 1 5 5"/></svg>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 4L1 8l4 4M9 4L5 8l4 4M5 8h4a5 5 0 0 1 5 5"/></svg>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M10 4l4.5 4-4.5 4M14.5 8h-7a5 5 0 0 0-5 5"/></svg>
+                <svg viewBox="0 0 16 16" fill="currentColor" stroke="none"><circle cx="3.5" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="12.5" cy="8" r="1.2"/></svg>
               </span>
             </div>
-            <div class="parked-banner" id="parked-banner">
-              <span class="receipt-dot"></span>
-              <span><b>Held</b> · still open · nothing prepared · <em class="js-unpark" id="btn-unpark">Bring back</em></span>
+            <div class="from">
+              <div class="av" aria-hidden="true" data-k="mail.initials"></div>
+              <div class="who"><b data-k="mail.fromName"></b> <bdi dir="ltr" id="fromAddr"></bdi><br><span data-k="mail.to"></span></div>
+              <time data-k="mail.date"></time>
             </div>
-            <div class="receipt-stack" id="live-receipt"></div>
+            <div class="body" id="body"></div>
           </div>
-        </div>
+          </div>
+        </article>
       </div>
-      <svg class="h21-beams" aria-hidden="true"></svg>
     </div>
 
-    <div class="h21-cap" aria-live="polite">
-      <ol class="h21-steps">
-        <li data-s="0">Detect</li><li data-s="1">Do It</li><li data-s="2">Prepared</li><li data-s="3">Approve</li><li data-s="4">Closed</li>
-      </ol>
-      <p class="h21-cap-txt">Glance reads the ask. Nothing happens yet.</p>
+    <aside class="addin fade" id="addin">
+      <header><span class="slot-ico" id="cardIco" aria-hidden="true"></span><span class="ttl"><b>Glance</b><span data-k="card.sub"></span></span><span class="count" id="count" aria-live="polite">0/5</span></header>
+      <section class="intent-box" id="intentBox">
+        <div class="lbl" data-k="card.intentLabel"></div>
+        <p class="intent-s"><span id="intentTxt"></span><span class="caret" id="caret"></span><span class="ghost" id="intentGhost" aria-hidden="true"></span></p>
+        <div class="src" id="intentSrc"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 3h8M2 6h8M2 9h5"/></svg><q data-k="card.quote"></q><span data-k="card.quoteFrom"></span></div>
+      </section>
+      <div class="lbl plbl" id="proposeLbl" data-k="card.proposeLabel"></div>
+      <ol class="steps" id="steps"></ol>
+      <div class="foot" id="foot">
+        <div class="acts-doit" id="actsDoit"><button type="button" class="gx-hold" tabindex="-1" data-k="card.hold"></button>
+          <button type="button" class="doit" id="cardDoit" tabindex="-1"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span data-k="card.doit"></span></button>
+        </div>
+        <div class="acts-done" id="actsDone">
+          <div class="dline"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.6 6.3l2.2 2.2 4.6-4.9"/></svg><b data-k="card.done"></b><span aria-hidden="true">·</span><a data-k="card.undo"></a></div>
+          <p class="note" id="note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="10" height="7" rx="1.6"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg><span data-k="card.note"></span></p>
+        </div>
+      </div>
+    </aside>
+    <p class="trust" id="trust"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.6"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg><span data-k="trust"></span></p>
     </div>
+
+    <div id="css3d"></div>
   </div>
 </section>
+<section class="r8-intro a2 gx-end gxh" id="intro1a" aria-labelledby="gxT">
+ <div class="a2-wrap"><div class="i1-copy">
+   <h2 class="i1-hl" id="gxT"><span class="i1-ln i1-g"><span data-k="gx.h1"></span></span><span class="i1-ln"><span data-k="gx.h2"></span></span></h2>
+   <p class="i1-sub" data-k="gx.sub"></p>
+   <div class="gx-cta"><a class="doit" href="#get-glance"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="gx.cta"></span></a></div>
+ </div></div>
+</section>
+<div id="hud" class="gxh" aria-hidden="true"></div>
 
 <!-- Works where the loop lives, A · Orbiting Circles (upper overview · Magic UI · https://21st.dev/@dillionverma/components/orbiting-circles) -->
 <section class="ints o20sec" id="integrations" aria-label="Works where the loop lives">
@@ -808,12 +787,14 @@
 <!-- perf 2026-11-13: the 10 glance/*.js, same order, whitespace/syntax-minified and concatenated -->
 <script src="glance/glance-i18n.js"></script>
 <!-- 19.11 scroll port: Flow home hero engine (GSAP ScrollTrigger scrub .35 + Lenis lerp .1). Original engine kept as glance/glance-all.min.js -->
+<script src="glance/glance-hero-data-20261120.js"></script>
 <script src="assets/js/gsap.min.js"></script>
 <script src="assets/js/ScrollTrigger.min.js"></script>
 <script src="assets/js/lenis.min.js"></script>
 <script src="glance/glance-all-scroll-20261119.js"></script>
-<script>/* hero Get Glance (13.11): smooth scroll to #get-glance, same as the header CTA */
-document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('.h21-get');if(!a)return;var el=document.getElementById('get-glance');if(!el)return;e.preventDefault();var y=el.getBoundingClientRect().top+(window.scrollY||0)-56;if(window.__lenis)window.__lenis.scrollTo(y,{duration:1.6});else scrollTo({top:y,behavior:'smooth'})});</script>
+<script src="assets/home-hero-wow.js?b=4d"></script>
+<script type="module" src="glance/glance-hero-engine-20261120.js"></script>
+<script src="glance/glance-hero-glue-20261120.js"></script>
 
 <style>.gz-off,.gz-off::before,.gz-off::after{animation-play-state:paused!important}</style>
 <script>/* perf 2026-11-13: looping CSS animations pause while their element is off screen (they kept running offscreen, ~650 ms main thread per 3 s at 4x CPU). On screen nothing changes; finite animations are never touched. */

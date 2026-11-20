@@ -936,7 +936,7 @@
   function seg(t, a, b) { return clamp((t - a) / (b - a)); }
   var hero = document.getElementById('hero');
   var H = null;
-  if (hero) H = initHero();
+  if (hero && hero.classList.contains('h21')) H = initHero(); /* 20.11: the Glance page hero is now the Flow hero clone (own engine) */
 
   var RTL = document.documentElement.dir === 'rtl';
   function initHero() {

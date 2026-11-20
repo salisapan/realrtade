@@ -70,7 +70,28 @@ window.OPV=function(el,K,lang,X){
  let G=null,cur=0;
  const f1=n=>n.toFixed(1);
  /* every coordinate below is a measure of the 1024x530 reference, times u */
- function layout(){const W=box.offsetWidth,H=box.offsetHeight;if(!W)return;const u=W/1024;
+ /* r10: phone (max-width 760px) uses a vertical 446-wide unit space, Glance phone proportions. The desktop branch below is unchanged. */
+ const PH=()=>matchMedia('(max-width:760px)').matches;
+ function layoutPhone(){const W=box.offsetWidth,H=box.offsetHeight;if(!W)return;const u=W/446,dy=(H/u-446)/2;
+  root.style.setProperty('--u',u.toFixed(5));root.style.setProperty('--pla',(26+dy).toFixed(2));root.style.setProperty('--plb',(412+dy).toFixed(2));root.classList.add('ph');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const rtl=getComputedStyle(root).direction==='rtl',hx=W/2,hy=(210+dy)*u,R=48*u;
+  const cw=133.3*u,gp=9*u,ch=72*u,st=(42+dy)*u,sb=st+ch;
+  const cx=i=>{const c=14*u+cw/2+i*(cw+gp);return rtl?W-c:c};
+  const tw=50*u,tg=(446-28-7*50)/6*u,tt=(330+dy)*u;
+  const tx=i=>{const c=14*u+tw/2+i*(tw+tg);return rtl?W-c:c};
+  CS.forEach((c,i)=>{c.style.cssText=`left:${cx(i)-cw/2}px;top:${st}px;width:${cw}px;height:${ch}px`});
+  CD.forEach((c,i)=>{c.style.cssText=`left:${tx(i)-tw/2}px;top:${tt}px;width:${tw}px;height:${tw}px`});
+  const ht=hy-R,hb=hy+R;
+  const PS=i=>{const x=cx(i),k=(ht-sb)*.62;return `M${f1(x)} ${f1(sb)}C${f1(x)} ${f1(sb+k)} ${f1(hx)} ${f1(ht-k)} ${f1(hx)} ${f1(ht)}`};
+  const PD=i=>{const x=tx(i),k=(tt-hb)*.62;return `M${f1(hx)} ${f1(hb)}C${f1(hx)} ${f1(hb+k)} ${f1(x)} ${f1(tt-k)} ${f1(x)} ${f1(tt)}`};
+  const p1=[0,1,2].map(PS),p2=[0,1,2,3,4,5,6].map(PD);
+  gf.innerHTML=p1.concat(p2).map(d=>`<path class="f" d="${d}"/>`).join('');
+  halo.style.cssText=`left:${hx}px;top:${hy}px`;live.style.cssText=`left:${hx}px;top:${hy}px`;
+  hubT.style.cssText=rtl?`right:${W-hx+72*u}px;top:${hy}px`:`left:${hx+72*u}px;top:${hy}px`;
+  G={p1,p2};setCur(cur)}
+ function layout(){if(PH())return layoutPhone();if(root.classList.contains('ph')){root.classList.remove('ph');root.style.removeProperty('--pla');root.style.removeProperty('--plb')}
+  const W=box.offsetWidth,H=box.offsetHeight;if(!W)return;const u=W/1024;
   root.style.setProperty('--u',u.toFixed(5));
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
   const rtl=getComputedStyle(root).direction==='rtl',s=rtl?1:-1;/* s=+1: sources on the right */
