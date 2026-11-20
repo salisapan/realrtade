@@ -343,7 +343,9 @@ const FlowIncomingJudge = (() => {
       const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)) || modal);
       if (!work && !back) continue;
       const d = dayOf(x1, now0).date;
-      if (d ? d < ymdOf(now0) : !(framed || nominal)) continue;
+      // A bare imperative with no day, to the reader alone or with one other («תעדכן אותי», «דבר איתי», «לא לשכוח את החשבונית בבקשה»): addressed straight to the reader, so it is the ask (real-mail dev set, 2026-11-19).
+      const oneToOne = (i.to || []).length <= 2 && !greetsOther && (DIRECT_IMP_SEND_HE.test(x1) || /^דבר\s+איתי(?![\u0590-\u05FF])/.test(x1));
+      if (d ? d < ymdOf(now0) : !(framed || nominal || oneToOne)) continue;
       return { kind: work ? 'task' : 'reply', what: x.slice(0, 200), title: x.replace(/[.!?\s]+$/, '').slice(0, 80), dateIso: d, lang: 'he' };
     }
     // 1. plain information questions
