@@ -3,11 +3,13 @@
 <head><meta charset="utf-8"><title>DMs - Slack</title></head>
 <body>
 <button type="button" data-qa="user-button" data-user-id="UFLOW123">Flow</button>
-<div role="treeitem" aria-selected="true" data-qa-channel-sidebar-channel-id="D0C9BS6UD9A">Flow</div>
-<div class="p-message_pane__header">
+<div class="p-channel_sidebar">
+  <div data-qa="virtual-list-item" aria-selected="true" class="p-channel_sidebar__channel--selected" data-qa-channel-sidebar-channel-id="D0C9BS6UD9A">Flow</div>
+</div>
+<div class="p-view_header">
   <button type="button" data-qa="channel_name" data-user-id="UFLOW123">Flow</button>
 </div>
-<div data-qa="message_pane" data-qa-channel-id="D0C9BS6UD9A" role="main"></div>
+<div data-qa="message_pane" role="main"></div>
 <div data-qa="message_input">
   <div class="ql-editor" contenteditable="true" role="textbox" aria-label="Message to Flow"></div>
   <div class="ql-placeholder">Jot something down</div>

@@ -8052,7 +8052,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:slack-trace' || msg.type === 'flow:telegram-trace') {
     if (!sender || sender.id !== chrome.runtime.id) return;
-    const line = String(msg.line || '').slice(0, 400);
+    const line = String(msg.line || '').slice(0, 1600);
     if (line.indexOf('[Glance] slack ') === 0 || line.indexOf('[Glance] telegram ') === 0) {
       try { console.info(line); } catch (e) { /* no console */ }
       try {

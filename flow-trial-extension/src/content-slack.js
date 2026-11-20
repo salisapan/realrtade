@@ -29,14 +29,65 @@
     try { return location.hostname === 'app.slack.com'; } catch (e) { return false; }
   }
 
+  const PROBE_SELECTORS = [
+    '[data-qa="message_pane"]',
+    '[data-qa="virtual-list-item"]',
+    '[data-qa="message_content"]',
+    '.c-message_kit__blocks',
+    '[data-qa="message-text"]',
+    '[data-msg-ts]',
+    '[data-item-key]',
+    '[data-qa="message_sender_name"]',
+    '[data-qa="channel_name"]',
+    '.p-view_header',
+    '[data-qa="virtual-list-item"][aria-selected="true"]',
+    '.p-channel_sidebar__channel--selected',
+    '[data-qa-channel-sidebar-channel-id]'
+  ];
+
   function pane() { return document.querySelector('[data-qa="message_pane"], [data-qa="slack_kit_list"], .p-workspace__primary_view_body'); }
-  function rows() {
-    const root = pane() || document;
-    return Array.from(root.querySelectorAll('[data-qa="message_container"][data-msg-ts]')).filter((n) => P.parseTs(n.getAttribute('data-msg-ts'))).slice(-MAX_ROWS);
+
+  function tsMatch(raw) {
+    const m = String(raw || '').match(/(\d{9,11}\.\d{6})/);
+    return m ? m[1] : '';
   }
+
+  function messageIdOf(n) {
+    if (!n || !n.getAttribute) return '';
+    const own = tsMatch(n.getAttribute('data-msg-ts') || n.getAttribute('data-item-key'));
+    if (own && P.parseTs(own)) return own;
+    const child = n.querySelector && n.querySelector('[data-msg-ts], [data-item-key]');
+    const nested = child ? tsMatch(child.getAttribute('data-msg-ts') || child.getAttribute('data-item-key')) : '';
+    return nested && P.parseTs(nested) ? nested : '';
+  }
+
+  function rowScore(n) {
+    let score = 0;
+    if (n.getAttribute('data-msg-ts') || n.getAttribute('data-item-key')) score += 2;
+    const qa = n.getAttribute('data-qa') || '';
+    if (qa === 'message_container' || qa === 'virtual-list-item') score += 2;
+    if (n.querySelector && n.querySelector('[data-qa="message-text"], [data-qa="message_content"], .c-message_kit__blocks')) score += 1;
+    return score;
+  }
+
+  function rows() {
+    const root = pane() || document.body || document;
+    const nodes = Array.from(root.querySelectorAll('[data-qa="message_container"], [data-qa="virtual-list-item"], [data-qa="message_content"], .c-message_kit__blocks'));
+    const byTs = new Map();
+    nodes.forEach((n) => {
+      const ts = messageIdOf(n);
+      if (!ts) return;
+      const prev = byTs.get(ts);
+      if (!prev || rowScore(n) > rowScore(prev)) byTs.set(ts, n);
+    });
+    return Array.from(byTs.values()).slice(-MAX_ROWS);
+  }
+
   function title() {
     const h = document.querySelector('[data-qa="channel_name"], [data-qa="channel_header_title"], [data-qa="conversation_header_title"]');
-    return h ? (h.textContent || '').trim() : '';
+    if (h && (h.textContent || '').trim()) return (h.textContent || '').trim();
+    const header = document.querySelector('.p-view_header [data-qa="channel_name"], .p-view_header');
+    return header ? (header.textContent || '').trim() : '';
   }
   function senderOf(n) { const s = n.querySelector('[data-qa="message_sender_name"], [data-qa="message_sender"]'); return s ? (s.textContent || '').trim() : ''; }
   function textOf(n) {
@@ -72,15 +123,38 @@
     return '';
   }
 
+  function idsOn(node) {
+    const out = [];
+    if (!node) return out;
+    if (node.attributes) {
+      for (let i = 0; i < node.attributes.length; i++) {
+        const found = String(node.attributes[i].value || '').match(/\b(D[A-Z0-9]{6,})\b/);
+        if (found) out.push(found[1]);
+      }
+    }
+    const link = node.querySelector && node.querySelector('a[href*="/D"], [data-qa-channel-sidebar-channel-id]');
+    if (link) {
+      const href = link.getAttribute('href') || '';
+      const fromHref = href.match(/\/(D[A-Z0-9]{6,})/);
+      if (fromHref) out.push(fromHref[1]);
+      if (link.getAttribute('data-qa-channel-sidebar-channel-id')) out.push(link.getAttribute('data-qa-channel-sidebar-channel-id'));
+    }
+    return out;
+  }
+
   function domConversationId() {
-    const selected = document.querySelector('[aria-selected="true"][data-qa-channel-sidebar-channel-id], [aria-current="page"][data-qa-channel-sidebar-channel-id]');
+    const selected = document.querySelector('[data-qa="virtual-list-item"][aria-selected="true"], .p-channel_sidebar__channel--selected, [aria-selected="true"][data-qa-channel-sidebar-channel-id], [aria-current="page"][data-qa-channel-sidebar-channel-id]');
     const main = pane();
-    return P.conversationIdFrom([
-      selected && selected.getAttribute('data-qa-channel-sidebar-channel-id'),
-      main && main.getAttribute('data-qa-channel-id'),
-      main && main.getAttribute('data-channel-id'),
-      main && main.getAttribute('data-conversation-id')
-    ]);
+    return P.conversationIdFrom([].concat(
+      idsOn(selected),
+      idsOn(main),
+      [
+        selected && selected.getAttribute('data-qa-channel-sidebar-channel-id'),
+        main && main.getAttribute('data-qa-channel-id'),
+        main && main.getAttribute('data-channel-id'),
+        main && main.getAttribute('data-conversation-id')
+      ]
+    ));
   }
 
   function signedInId(team) {
@@ -109,7 +183,7 @@
   }
 
   function trace(line) {
-    const text = String(line || '').slice(0, 400);
+    const text = String(line || '').slice(0, 1600);
     try { console.info(text); } catch (e) { /* no console */ }
     try {
       chrome.runtime.sendMessage({ type: 'flow:slack-trace', line: text }, () => { void chrome.runtime.lastError; });
@@ -203,7 +277,7 @@
       strict: true,
       messages: list,
       isOwn: (n) => own[idx.get(n)] === true,
-      messageId: (n) => n.getAttribute('data-msg-ts'),
+      messageId: messageIdOf,
       counterpart: () => party,
       partyOf: () => party,
       extractSender: (n) => (own[idx.get(n)] === true ? { email: null, name: null, phone: null } : { email: null, name: t, phone: null }),
@@ -220,22 +294,62 @@
   let seenHref = '';
   let listRoot = null;
   let listObserver = null;
+  let bodyObserver = null;
+  let lastProbeAt = 0;
 
-  function schedule() { clearTimeout(timer); timer = setTimeout(() => { scan().catch((e) => console.error('[Glance] Slack scan failed', e)); }, DEBOUNCE_MS); }
+  function targetName(node) {
+    if (!node) return 'none';
+    if (node === document.body) return 'document.body';
+    const qa = node.getAttribute && node.getAttribute('data-qa');
+    if (qa) return '[data-qa="' + qa + '"]';
+    if (node.classList && node.classList.contains('p-view_header')) return '.p-view_header';
+    return (node.nodeName || 'node').toLowerCase();
+  }
+
+  function probe(reason) {
+    const now = Date.now();
+    if (now - lastProbeAt < 2000) return;
+    lastProbeAt = now;
+    const parts = PROBE_SELECTORS.map((sel) => {
+      let count = 0;
+      try { count = document.querySelectorAll(sel).length; } catch (e) { count = -1; }
+      return sel + ':' + count;
+    });
+    trace('[Glance] slack probe url=' + here() + ' sel=' + parts.join(' '));
+    trace('[Glance] slack rescan reason=' + (reason || 'mutation'));
+  }
+
+  function schedule(reason) {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      ensureObservers();
+      probe(reason || 'mutation');
+      scan().catch((e) => console.error('[Glance] Slack scan failed', e));
+    }, DEBOUNCE_MS);
+  }
 
   function onNav() {
     seenWhy.clear();
     lastReportedHealth = null;
-    schedule();
+    schedule('nav');
   }
 
-  function watchList() {
+  function attach(node) {
+    const obs = new MutationObserver(() => { ensureObservers(); schedule('mutation'); });
+    obs.observe(node, { childList: true, subtree: true });
+    trace('[Glance] slack observer attached target=' + targetName(node));
+    return obs;
+  }
+
+  function ensureObservers() {
+    const body = document.body;
+    if (body && !bodyObserver) bodyObserver = attach(body);
     const root = pane();
-    if (!root || root === listRoot) return;
-    if (listObserver) listObserver.disconnect();
-    listRoot = root;
-    listObserver = new MutationObserver(schedule);
-    listObserver.observe(root, { childList: true, subtree: true });
+    if (root && root !== listRoot) {
+      if (listObserver) listObserver.disconnect();
+      listRoot = root;
+      listObserver = attach(root);
+    }
   }
 
   function watchHref() {
@@ -247,14 +361,13 @@
   }
 
   markLane();
-  const watch = document.documentElement || document.body;
-  if (watch) new MutationObserver(() => { watchList(); schedule(); }).observe(watch, { childList: true, subtree: true });
-  watchList();
+  ensureObservers();
   try { window.addEventListener('popstate', onNav); } catch (e) { /* no window */ }
   try { window.addEventListener('hashchange', onNav); } catch (e) { /* no window */ }
   seenHref = here();
   setInterval(watchHref, 500);
-  schedule();
+  setInterval(() => schedule('mutation'), 2000);
+  schedule('nav');
   globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
   globalThis.__glanceChatSurfaces.slack = { scan: () => scan() };
 })();

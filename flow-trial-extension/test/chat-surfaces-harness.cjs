@@ -249,28 +249,53 @@ const baseWatch = (channel, threadId, id, name) => ({ id: threadId, threadId, ch
   check('Telegram Web K fixture: a self-chat ask shows Do It', (await t.p.locator('[data-glance-do-it]').count()) === 1);
   await t.ctx.close();
 
+  function liveRow(ts, text) {
+    return '<div data-qa="virtual-list-item" data-item-key="' + ts + '"><div data-qa="message_content" class="c-message_kit__blocks"><button type="button" data-qa="message_sender_name">Flow</button><div data-qa="message-text"><div class="p-rich_text_section">' + text + '</div></div></div></div>';
+  }
+  async function addLiveRow(page, ts, text) {
+    await page.evaluate((html) => {
+      const list = document.querySelector('[data-qa="message_pane"]');
+      const row = document.createElement('div');
+      row.innerHTML = html;
+      list.appendChild(row.firstChild);
+    }, liveRow(ts, text));
+  }
   const dmsHtml = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/slack-web-dms.html'), 'utf8');
-  t = await open(browser, 'slack', 'https://app.slack.com/client/T01ABC/dms', dmsHtml, {
-    prepare: async (p) => {
-      await p.evaluate(() => localStorage.setItem('localConfig_v2', JSON.stringify({ teams: { T01ABC: { user_id: 'UFLOW123', token: 'xoxc-secret' } } })));
-    },
-    wait: 500
-  });
+  const liveHtml = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/slack-web-live.html'), 'utf8');
+  const storeSelf = async (p) => {
+    await p.evaluate(() => localStorage.setItem('localConfig_v2', JSON.stringify({ teams: { T01ABC: { user_id: 'UFLOW123', token: 'xoxc-secret' } } })));
+  };
+  t = await open(browser, 'slack', 'https://app.slack.com/client/T01ABC/dms', dmsHtml, { prepare: storeSelf, wait: 400 });
   check('Slack /dms before render: no Do It yet', (await t.p.locator('[data-glance-do-it]').count()) === 0);
-  await t.p.evaluate(() => {
-    const list = document.querySelector('[data-qa="message_pane"]');
-    const row = document.createElement('div');
-    row.innerHTML = '<div data-qa="message_container" data-msg-ts="1732100000.000100"><button type="button" data-qa="message_sender_name">Flow</button><div data-qa="message-text"><div class="p-rich_text_section">Can you send the invoice by Friday?</div></div></div>';
-    list.appendChild(row.firstChild);
-  });
-  await t.p.waitForTimeout(1800);
+  await t.p.waitForTimeout(2000);
+  await addLiveRow(t.p, '1732100000.000100', 'Can you send the invoice by Friday?');
+  await t.p.waitForTimeout(2500);
   check('Slack /dms late render: self DM by user id shows Do It', (await t.p.locator('[data-glance-do-it]').count()) === 1);
   check('Slack /dms names the signed-in user, not only the title', await t.p.locator('html').getAttribute('data-glance-sender') === 'UFLOW123');
   check('Slack /dms thread is the DOM conversation', await t.p.locator('html').getAttribute('data-glance-chat') === 'slack:T01ABC:D0C9BS6UD9A');
+  const dmsNotes = await t.p.evaluate(() => (window.__msgs || []).filter((m) => m && m.type === 'flow:slack-trace').map((m) => m.line || ''));
+  check('Slack /dms logs a selector probe and that the observer attached', dmsNotes.some((line) => line.indexOf('[Glance] slack probe url=') === 0 && line.indexOf('[data-qa="message_pane"]:') >= 0) && dmsNotes.some((line) => line.indexOf('[Glance] slack observer attached target=') === 0) && dmsNotes.some((line) => line.indexOf('[Glance] slack rescan reason=') === 0), dmsNotes);
   await t.p.locator('[data-glance-do-it]').click();
   const dmsBox = await t.p.locator('.ql-editor').innerText();
   const dmsSends = await t.p.evaluate(() => window.__glanceSendClicks || 0);
   check('Slack /dms Do It drafts and does not press Send', dmsBox.indexOf('Send the invoice by Friday.') >= 0 && dmsSends === 0, { dmsBox, dmsSends });
+  await addLiveRow(t.p, '1732100002.000100', 'Could you send the receipt by Monday?');
+  await t.p.waitForTimeout(2500);
+  check('Slack /dms a later message still shows a card', (await t.p.locator('[data-glance-do-it]').count()) === 1);
+  await t.ctx.close();
+
+  t = await open(browser, 'slack', 'https://app.slack.com/client/T01ABC/D0C9BS6UD9A', liveHtml, { prepare: storeSelf, wait: 400 });
+  check('Slack /D before render: no Do It yet', (await t.p.locator('[data-glance-do-it]').count()) === 0);
+  await t.p.waitForTimeout(2000);
+  await addLiveRow(t.p, '1732100000.000100', 'Can you send the invoice by Friday?');
+  await t.p.waitForTimeout(2500);
+  check('Slack /D late render without data-msg-ts shows Do It', (await t.p.locator('[data-glance-do-it]').count()) === 1);
+  check('Slack /D thread comes from the address', await t.p.locator('html').getAttribute('data-glance-chat') === 'slack:T01ABC:D0C9BS6UD9A');
+  await addLiveRow(t.p, '1732100003.000100', 'Please send the file by Thursday?');
+  await t.p.waitForTimeout(2500);
+  check('Slack /D a later message still shows a card', (await t.p.locator('[data-glance-do-it]').count()) === 1);
+  const liveSends = await t.p.evaluate(() => window.__glanceSendClicks || 0);
+  check('Slack /D never presses Send', liveSends === 0);
   await t.ctx.close();
 
   const tgAEmpty = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/telegram-a-empty.html'), 'utf8');
