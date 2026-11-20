@@ -62,6 +62,7 @@ function danaRoutes(readBack) {
 
 (async () => {
   check('Hebrew email ask is recognized', C.recognize('מה כתובת המייל של דנה כהן').mode === 'email' && C.recognize('מה כתובת המייל של דנה כהן').name.indexOf('דנה') >= 0);
+  check('a Hebrew ask stays Hebrew beside English page text', C.recognize('Contacts\nWhat is new\nמה כתובת המייל של דנה כהן').lang === 'he');
   check('English phone ask is recognized', C.recognize("send me Dana's phone").mode === 'phone');
   check('reversed Hebrew display is the same token set', C.nameMatches('דנה כהן', 'כהן דנה') === true);
   check('a longer name is not the same token set', C.nameMatches('דנה כהן', 'דנה כהן לוי') === false);

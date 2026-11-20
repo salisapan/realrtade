@@ -148,17 +148,19 @@ const FlowOutlookContacts = (() => {
   function recognize(text) {
     const s = String(text || '').slice(0, 4000);
     if (!s.trim()) return { kind: 'ignore' };
-    let m = s.match(ANSWER_EMAIL_HE) || s.match(ANSWER_EMAIL_EN) || s.match(ANSWER_EMAIL_EN2);
+    const heEmail = s.match(ANSWER_EMAIL_HE);
+    let m = heEmail || s.match(ANSWER_EMAIL_EN) || s.match(ANSWER_EMAIL_EN2);
     if (m) {
       const name = cleanName(m[1]);
       if (!name) return { kind: 'ignore' };
-      return { kind: 'clear', mode: 'email', name: name, lang: mailLang(s) };
+      return { kind: 'clear', mode: 'email', name: name, lang: heEmail ? 'he' : 'en' };
     }
-    m = s.match(NUMBER_ASK_HE) || s.match(NUMBER_ASK_EN) || s.match(ANSWER_PHONE_HE) || s.match(ANSWER_PHONE_EN) || s.match(ANSWER_PHONE_EN2);
+    const hePhone = s.match(NUMBER_ASK_HE) || s.match(ANSWER_PHONE_HE);
+    m = hePhone || s.match(NUMBER_ASK_EN) || s.match(ANSWER_PHONE_EN) || s.match(ANSWER_PHONE_EN2);
     if (m) {
       const name = cleanName(m[1]);
       if (!name) return { kind: 'ignore' };
-      return { kind: 'clear', mode: 'phone', name: name, lang: mailLang(s) };
+      return { kind: 'clear', mode: 'phone', name: name, lang: hePhone ? 'he' : 'en' };
     }
     m = s.match(LEGACY_LOOKUP);
     if (m) {
