@@ -31,7 +31,7 @@ test('Contacts.Read puts the contact into a reply draft and does not send', asyn
       box.setAttribute('role', 'textbox');
       box.setAttribute('contenteditable', 'true');
       box.setAttribute('data-glance-reply-body', '1');
-      reply.addEventListener('click', () => { box.hidden = false; });
+      reply.addEventListener('click', () => { window.__glanceReplyClicks = (window.__glanceReplyClicks || 0) + 1; box.hidden = false; });
       box.hidden = true;
       pane.appendChild(reply);
       pane.appendChild(box);
@@ -48,7 +48,8 @@ test('Contacts.Read puts the contact into a reply draft and does not send', asyn
     await card.locator('button.flow-lane-do').click();
     await expect(card.locator('.flow-lane-draft')).toContainText('dana.cohen.test@example.com');
     await expect(card.locator('.flow-lane-draft')).not.toContainText('dana.levi.test@example.com');
-    await expect(page.locator('[data-glance-reply-body]')).toContainText('dana.cohen.test@example.com');
+    expect(await page.evaluate(() => window.__glanceReplyClicks || 0)).toBe(0);
+    await expect(page.locator('[data-glance-reply-body]')).not.toContainText('dana.cohen.test@example.com');
     const calls = await glance.apiCalls();
     const looked = calls.filter((c) => c.url.indexOf('/me/contacts') >= 0 || c.url.indexOf('/me/people') >= 0);
     expect(looked.some((c) => c.method === 'GET' && c.url.indexOf('/me/contacts') >= 0)).toBe(true);
@@ -60,7 +61,8 @@ test('Contacts.Read puts the contact into a reply draft and does not send', asyn
     await expect(card.locator('.flow-lane-undo')).toBeVisible();
     await expect(card.locator('button.flow-lane-do')).toBeHidden();
     const drafted = (await glance.apiCalls()).filter((c) => c.method === 'POST' && c.url.indexOf('/createReply') >= 0);
-    expect(drafted.length).toBeGreaterThan(0);
+    expect(drafted.length).toBe(1);
+    await expect(card.locator('.flow-lane-undo')).toHaveText('בטל');
     await card.locator('.flow-lane-undo').click();
     await expect(card.locator('button.flow-lane-do')).toBeVisible();
     await expect(card.locator('button.flow-lane-do')).toContainText('הכנס לטיוטה');

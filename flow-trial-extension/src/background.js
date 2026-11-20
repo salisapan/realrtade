@@ -6418,10 +6418,13 @@ function outlookPageFromSource(p) {
   return { from: '', field: 'none' };
 }
 
-function logContactsBranch(how, listStatus, rows, why, fromField) {
+function logContactsBranch(how, listStatus, rows, why, fromField, page) {
   const fromBit = fromField ? ' from=' + fromField : '';
+  const skipBit = fromField === 'none'
+    ? ' headerHasAt=' + (page && page.headerHasAt ? 1 : 0) + ' skip=' + ((page && page.senderSkip) || 'none')
+    : '';
   try {
-    console.info('[Glance] contacts draft branch how=' + (how || '') + ' list=' + (listStatus == null ? '' : listStatus) + ' rows=' + (rows == null ? '' : rows) + ' why=' + (why || '') + fromBit);
+    console.info('[Glance] contacts draft branch how=' + (how || '') + ' list=' + (listStatus == null ? '' : listStatus) + ' rows=' + (rows == null ? '' : rows) + ' why=' + (why || '') + fromBit + skipBit);
   } catch (e) { /* no console */ }
 }
 
@@ -6541,7 +6544,7 @@ async function outlookLookupOpenMessage(p, gets) {
   const subject = String((p && p.subject) || '').trim();
   const src = outlookPageFromSource(p);
   if (!subject) {
-    logContactsBranch('subject-from', '', 0, 'missing-subject', src.field);
+    logContactsBranch('subject-from', '', 0, 'missing-subject', src.field, p);
     return null;
   }
   const from = src.from;
@@ -6558,19 +6561,42 @@ async function outlookLookupOpenMessage(p, gets) {
     return outlookSameMailbox(who.from, from, known) || outlookSameMailbox(who.sender, from, known);
   }) : rows.slice();
   const why = !from ? 'missing-from' : (hits.length ? '' : 'empty-list');
-  logContactsBranch('subject-from', listStatus, hits.length, why || (hits.length > 1 ? 'ambiguous' : ''), src.field);
+  logContactsBranch('subject-from', listStatus, hits.length, why || (hits.length > 1 ? 'ambiguous' : ''), src.field, p);
   const narrowed = await outlookNarrowCopies(hits, p);
   if (narrowed.length > 1) return { ambiguous: true, how: 'subject-from' };
   if (narrowed.length === 1 && narrowed[0] && narrowed[0].id) {
     const proven = await outlookProveMessage([narrowed[0].id], gets);
     if (proven && proven.id) return { id: proven.id, immutable: proven.immutable === true, how: 'subject-from' };
-    logContactsBranch('subject-from', listStatus, 1, 'prove-failed', src.field);
+    logContactsBranch('subject-from', listStatus, 1, 'prove-failed', src.field, p);
     return null;
   }
   return null;
 }
 
+const outlookDraftFlights = new Map();
+
+function outlookFlightKey(p) {
+  if (!p || p.requireProvenId !== true) return '';
+  const ids = [];
+  if (p.outlookIncomingId) ids.push(p.outlookIncomingId);
+  if (p.messageId) ids.push(p.messageId);
+  (p.outlookCandidates || []).forEach((id) => { if (id) ids.push(id); });
+  return [String(p.subject || ''), String(p.internetMessageId || ''), ids.join(',')].join('|');
+}
+
 async function outlookDraftWrite(p) {
+  const flightKey = outlookFlightKey(p);
+  if (flightKey && outlookDraftFlights.has(flightKey)) return outlookDraftFlights.get(flightKey);
+  const job = outlookDraftWriteJob(p);
+  if (flightKey) outlookDraftFlights.set(flightKey, job);
+  try {
+    return await job;
+  } finally {
+    if (flightKey && outlookDraftFlights.get(flightKey) === job) outlookDraftFlights.delete(flightKey);
+  }
+}
+
+async function outlookDraftWriteJob(p) {
   let incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
   let immutable = p && p.outlookImmutableId === true;
   let how = (p && p.outlookIdHow) || '';

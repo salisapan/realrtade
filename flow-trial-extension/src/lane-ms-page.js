@@ -347,6 +347,7 @@
     const box = composeBox();
     if (!box) return true;
     const cur = flatText(box.textContent || box.innerText || '');
+    if (!cur) return true;
     if (cur !== flatText(text)) return false;
     box.textContent = '';
     return true;
@@ -445,10 +446,20 @@
   }
 
   let holdMail = '';
+  let heldDraft = null;
+
+  function keepDraftCard() {
+    if (!heldDraft || heldDraft.isConnected) return;
+    const state = heldDraft.getAttribute && heldDraft.getAttribute('data-glance-draft-state');
+    const hold = heldDraft.getAttribute && heldDraft.getAttribute('data-glance-draft-hold');
+    if (state !== 'in-draft' && hold !== '1') return;
+    place(heldDraft);
+  }
 
   function finishContactsDraft(card, pane, offer, res, button) {
     const lang = offer && offer.params && offer.params.lang === 'he' ? 'he' : 'en';
     if (card) card.setAttribute('data-glance-draft-hold', '1');
+    heldDraft = card || null;
     holdMail = mailIdentity(pane);
     if (!res || res.ok !== true || !res.draft) {
       button.disabled = false;
@@ -476,6 +487,8 @@
           conversationId: (pane && pane.conversationId) || '',
           receivedDateTime: (pane && pane.receivedDateTime) || '',
           openFolder: (pane && pane.openFolder) || '',
+          headerHasAt: pane && pane.headerHasAt ? 1 : 0,
+          senderSkip: (pane && pane.senderSkip) || '',
           explicitClick: true
         }
       }, (graph) => {
@@ -504,7 +517,6 @@
           button.disabled = false;
           return;
         }
-        const opened = insertCompose(res.draft);
         let draft = card.querySelector('.flow-lane-draft');
         if (!draft) {
           draft = document.createElement('div');
@@ -513,9 +525,10 @@
         }
         draft.textContent = res.draft;
         draft.setAttribute('data-glance-draft-id', String(graph.ref));
-        if (!opened.ok) abandonCompose(res.draft);
         markInDraft(card, button, lang);
         showDraftUndo(card, graph, res.draft, lang, button, target.immutable === true);
+        heldDraft = card;
+        if (!card.isConnected) keepDraftCard();
       });
     });
   }
@@ -526,9 +539,9 @@
       undo = document.createElement('button');
       undo.type = 'button';
       undo.className = 'flow-lane-undo';
-      undo.textContent = 'Undo';
       card.appendChild(undo);
     }
+    undo.textContent = lang === 'he' ? 'בטל' : 'Undo';
     undo.hidden = false;
     undo.onclick = () => {
       if (clearComposeIfUnchanged(text) === false) {
@@ -783,6 +796,7 @@
   }
 
   async function tick() {
+    keepDraftCard();
     if (busy) return;
     let pane = readPane();
     if (!pane || (!pane.subject && !pane.text)) return;
@@ -903,4 +917,6 @@
 
   globalThis.FlowLaneMsPage = { attach: attach };
   globalThis.FlowLaneMsPage.draftCardStays = draftCardStays;
+  globalThis.FlowLaneMsPage.finishContactsDraft = finishContactsDraft;
+  globalThis.FlowLaneMsPage.keepDraftCard = keepDraftCard;
 })();

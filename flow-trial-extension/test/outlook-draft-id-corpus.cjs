@@ -100,6 +100,17 @@ function background(routes) {
   check('createReply does not use the conversation id without a matching Prefer',
     !alias.calls.some((c) => c.method === 'POST' && c.url.indexOf(CONV) >= 0 && !/ImmutableId/.test(c.prefer || '')),
     alias.calls.filter((c) => c.method === 'POST').map((c) => c.url));
+  const again = await alias.fn('outlookDraftWrite')({
+    requireProvenId: true,
+    outlookIdHow: 'self-alias',
+    outlookIncomingId: CONV,
+    outlookCandidates: [CONV, PROVEN],
+    body: 'דנה כהן\nדוא"ל: dana.cohen.test@example.com',
+    comment: 'דנה כהן\nדוא"ל: dana.cohen.test@example.com'
+  });
+  check('a second insert reuses the mapped Graph draft and does not createReply again',
+    again.ok === true && again.reused === true && alias.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url)).length === 1,
+    { ok: again.ok, reused: again.reused, posts: alias.calls.filter((c) => c.method === 'POST').map((c) => c.url) });
 
   const raw = background([
     { method: 'GET', test: /\/me\/messages\//, reply: () => ({ ok: false, status: 400, json: async () => ({}), text: async () => JSON.stringify({ error: { code: 'ErrorInvalidIdMalformed', message: 'Id is malformed.' } }) }) }
@@ -469,6 +480,59 @@ function background(routes) {
     check('the selected Inbox folder is used when the address has no folder',
       fromTree && fromTree.openFolder === 'inbox' && fromTree.ownSenderEmail === ALIAS,
       fromTree && fromTree.openFolder);
+    const pad = 'נושא ארוך של הודעה שנשלחה לעצמי '.repeat(12);
+    const longHtml = '<!doctype html><body><div id="ReadingPaneContainerId" role="main">' +
+      '<div role="heading">שאלה קטנה 317b</div>' +
+      '<div class="owahdr">' + pad + '\u200f sali sapan &lt;glance.salisapan@outlook.com&gt;\u200e' + pad + '</div>' +
+      '<div role="document">מה כתובת המייל של דנה כהן?</div></div></body>';
+    const longPane = FlowOwaParse.readPane(new JSDOM(longHtml, { url: href }).window.document, href, { own: [CID] });
+    check('a long bidi-wrapped address in a header div sets ownSenderEmail',
+      longPane && longPane.senderEmail === '' && longPane.ownSenderEmail === ALIAS && longPane.openSenderEmail === ALIAS &&
+      longPane.headerHasAt === 1 && !longPane.senderSkip && pad.length > 180,
+      longPane && { senderEmail: longPane.senderEmail, ownSenderEmail: longPane.ownSenderEmail, headerHasAt: longPane.headerHasAt, senderSkip: longPane.senderSkip, len: pad.length });
+
+    const cardHtml = '<!doctype html><body><div id="ReadingPaneContainerId">' +
+      '<button type="button" aria-label="השב">השב</button>' +
+      '<div id="mailMessageBodyContainer"></div>' +
+      '<div role="textbox" contenteditable="true"></div></div></body>';
+    const cardDom = new JSDOM(cardHtml, { url: 'https://outlook.live.com/mail/0/inbox/', runScripts: 'dangerously' });
+    const w = cardDom.window;
+    let replyClicks = 0;
+    w.chrome = {
+      runtime: {
+        sendMessage(msg, cb) {
+          if (msg && msg.type === 'flow:execute-action') cb({ ok: true, ref: 'AAMkGRAPH', fetchedBack: true, created: { body: { content: 'דנה כהן' } } });
+          else if (cb) cb({ ok: true, deleted: true });
+        },
+        lastError: null
+      },
+      storage: { onChanged: { addListener() {} } }
+    };
+    w.eval(fs.readFileSync(path.join(__dirname, '../src/lane-ms-page.js'), 'utf8'));
+    w.document.querySelector('button[aria-label="השב"]').addEventListener('click', () => { replyClicks += 1; });
+    const card = w.document.createElement('div');
+    card.className = 'flow-lane-ms';
+    const button = w.document.createElement('button');
+    button.className = 'flow-lane-do';
+    button.textContent = 'הכנס לטיוטה';
+    card.appendChild(button);
+    w.document.getElementById('ReadingPaneContainerId').appendChild(card);
+    w.FlowOutlookDraftTarget = () => ({ id: '', immutable: false, how: 'unproven' });
+    await new Promise((resolve) => {
+      const send = w.chrome.runtime.sendMessage;
+      w.chrome.runtime.sendMessage = (msg, cb) => { send(msg, cb); resolve(); };
+      w.FlowLaneMsPage.finishContactsDraft(card, { subject: 'שאלה קטנה 317b' }, { params: { lang: 'he' } }, { ok: true, draft: 'דנה כהן\nדוא"ל: dana.cohen.test@example.com' }, button);
+    });
+    check('a successful insert does not click Reply and leaves one in-draft card',
+      replyClicks === 0 && card.getAttribute('data-glance-draft-state') === 'in-draft' &&
+      card.textContent.indexOf('בטיוטה') >= 0 && card.querySelector('.flow-lane-undo').textContent === 'בטל',
+      { clicks: replyClicks, text: card.textContent });
+    w.document.getElementById('ReadingPaneContainerId').innerHTML = '<div id="mailMessageBodyContainer"></div>';
+    check('replacing the reading pane disconnects the card', card.isConnected === false);
+    w.FlowLaneMsPage.keepDraftCard();
+    check('the same in-draft card comes back with בטל',
+      card.isConnected === true && card.textContent.indexOf('בטיוטה') >= 0 && card.querySelector('.flow-lane-undo').textContent === 'בטל');
+    w.close();
   }
 
   if (failures) process.exit(1);

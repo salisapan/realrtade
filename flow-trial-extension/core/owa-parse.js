@@ -778,10 +778,58 @@ const FlowOwaParse = (() => {
       email = normEmail(email);
       if (!EMAIL_RE.test(email)) continue;
       const clean = looksLikeDateTime(name) ? '' : name.slice(0, 80);
-      if (!isOwnAddress(email)) return { email, name: clean, ownEmail: '' };
+      if (!isOwnAddress(email)) return { email, name: clean, ownEmail: '', headerHasAt: 1, skip: '' };
       if (!ownEmail) ownEmail = email;
     }
-    return { email: '', name: '', ownEmail: ownEmail };
+    return headerSender(container, bodyRoot, ownEmail, isOwnAddress);
+  }
+
+  // The open-mail header as one string: body and the recipient well are left
+  // out, bidi marks are already stripped by textOf. No 180-character cap.
+  // Consumer OWA puts Name <email> on a div, and the header is longer than a chip.
+  function headerBlob(container, bodyRoot) {
+    if (!container || !container.querySelectorAll) return '';
+    let nodes = [];
+    try { nodes = Array.prototype.slice.call(container.querySelectorAll('div, span, a, button, p')); } catch (e) { nodes = []; }
+    if (container.nodeType === 1) nodes.push(container);
+    const bits = [];
+    nodes.forEach((n) => {
+      if (!n) return;
+      if (inRecipientBlock(n)) return;
+      if (bodyRoot && (n === bodyRoot || (bodyRoot.contains && bodyRoot.contains(n)) || (n.contains && n.contains(bodyRoot)))) return;
+      if (n.querySelector && n.querySelector('[data-testid="RecipientWell"]')) return;
+      const t = textOf(n);
+      if (t) bits.push(t);
+    });
+    return bits.join('\n').replace(BIDI_RE, '').replace(/\s+/g, ' ').trim();
+  }
+
+  function headerSender(container, bodyRoot, ownEmail, isOwnAddress) {
+    if (!container || !container.querySelectorAll) {
+      return { email: '', name: '', ownEmail: ownEmail || '', headerHasAt: 0, skip: 'no-header' };
+    }
+    const blob = headerBlob(container, bodyRoot);
+    const hasAt = blob.indexOf('@') >= 0 ? 1 : 0;
+    const found = blob.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/gi) || [];
+    const emails = [];
+    found.forEach((raw) => {
+      const e = normEmail(raw);
+      if (EMAIL_RE.test(e) && emails.indexOf(e) < 0) emails.push(e);
+    });
+    const angled = blob.match(/<\s*([^<>\s]+@[^<>\s]+)\s*>/i);
+    const name = angled ? blob.split('<')[0].replace(/[<>()"]/g, '').replace(/^(?:from|מאת)\s*:?\s*/i, '').trim().slice(0, 80) : '';
+    function pack(email, asOwn) {
+      const clean = looksLikeDateTime(name) ? '' : name;
+      if (asOwn) return { email: '', name: '', ownEmail: email, headerHasAt: 1, skip: '' };
+      return { email: email, name: clean, ownEmail: '', headerHasAt: 1, skip: '' };
+    }
+    const others = emails.filter((e) => !isOwnAddress(e));
+    const mine = emails.filter((e) => isOwnAddress(e));
+    if (others.length === 1) return pack(others[0], false);
+    if (!others.length && mine.length) return pack(mine[0], true);
+    if (ownEmail) return { email: '', name: '', ownEmail: ownEmail, headerHasAt: hasAt, skip: '' };
+    const skip = !hasAt ? 'no-at' : (emails.length > 1 ? 'many-addresses' : 'no-address');
+    return { email: '', name: '', ownEmail: '', headerHasAt: hasAt, skip: skip };
   }
 
   const HEADINGS = '[role="heading"], h1, h2, h3';
@@ -1032,6 +1080,8 @@ const FlowOwaParse = (() => {
       senderEmail: who.email,
       ownSenderEmail: ownSenderEmail,
       openSenderEmail: openSenderEmail,
+      headerHasAt: who.headerHasAt ? 1 : 0,
+      senderSkip: who.skip || '',
       senderName: senderName.slice(0, 80),
       text: stripReadingChrome(body),
       to: whoTo.to,
