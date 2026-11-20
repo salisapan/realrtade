@@ -485,7 +485,7 @@
 /* Undo is not a second Do It. Do It keeps shell/ring/shine. This is the
    sentence that names the record, as a text control, so the receipt has
    one hierarchy: Handled, what landed, how to take it back. */
-.flow-chip-undo, .flow-doc-update {
+.flow-chip-undo, .flow-doc-update, .flow-doc-thread-update {
   all: initial;
   display: inline-block;
   max-width: 100%;
@@ -508,7 +508,7 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.flow-chip-undo:hover, .flow-doc-update:hover { color: #083d26; }
+.flow-chip-undo:hover, .flow-doc-update:hover, .flow-doc-thread-update:hover { color: #083d26; }
 .flow-chip-reconnect {
   all: initial;
   display: inline-block;
@@ -545,8 +545,8 @@
   overflow-wrap: anywhere;
   text-align: start;
 }
-.flow-chip-undo:disabled, .flow-doc-update:disabled { opacity: .65; cursor: default; }
-.flow-chip-undo:focus-visible, .flow-doc-update:focus-visible { outline: 2px solid #0F6640; outline-offset: 2px; }
+.flow-chip-undo:disabled, .flow-doc-update:disabled, .flow-doc-thread-update:disabled { opacity: .65; cursor: default; }
+.flow-chip-undo:focus-visible, .flow-doc-update:focus-visible, .flow-doc-thread-update:focus-visible { outline: 2px solid #0F6640; outline-offset: 2px; }
 
 /* Appended to a multi-action receipt only when at least one of the actions
    in the group didn't complete — the receipt still shows what DID succeed
@@ -612,10 +612,12 @@
   .flow-chip-written,
   .flow-chip-undo,
   .flow-doc-update,
+  .flow-doc-thread-update,
   .flow-chip-reconnect,
   .flow-chip.flow-chip-done .flow-chip-label { color: #d8f3e4; }
   .flow-chip-undo:hover,
   .flow-doc-update:hover,
+  .flow-doc-thread-update:hover,
   .flow-chip-link:hover { color: #f3faf6; }
   .flow-chip-link,
   .flow-chip-first-close { color: #9be7c4; }
@@ -631,6 +633,7 @@
   .flow-chip-partial-note { color: #f0c36a; }
   .flow-chip-undo:focus-visible,
   .flow-doc-update:focus-visible,
+  .flow-doc-thread-update:focus-visible,
   .flow-chip-link:focus-visible { outline-color: #9be7c4; }
 }
 

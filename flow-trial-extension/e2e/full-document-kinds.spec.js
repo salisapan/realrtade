@@ -124,17 +124,25 @@ test('a created Doc keeps its receipt and Undo when the same message is scanned 
   await expect(host).toContainText('טיוטת הצעת מחיר', { timeout: 20000 });
   await clickDo(host);
   await expect(first.getByRole('button', { name: 'בטל' })).toBeVisible({ timeout: 20000 });
-  await expect(first.getByRole('button', { name: 'עדכן מסמך קיים' })).toBeVisible();
+  await expect(first.getByRole('link', { name: 'פתח ב-Docs' })).toBeVisible();
+  await expect(first.getByRole('button', { name: 'עדכן', exact: true })).toBeVisible();
+  await expect(first.getByRole('button', { name: 'עדכן מסמך קיים' })).toHaveCount(0);
   await expect.poll(() => logs.some((line) => line.indexOf('full-document receipt stored') >= 0)).toBe(true);
+  const id = server.last.doc;
   await first.close();
 
   const again = await openMail(glance, { subject: subject, body: body, threadId: 't-receipt', messageId: 'm-receipt' });
   const card = again.locator('.flow-chip-host');
   await expect(card.getByRole('button', { name: 'בטל' })).toBeVisible({ timeout: 20000 });
-  await expect(card.getByRole('button', { name: 'עדכן מסמך קיים' })).toBeVisible();
+  await expect(card.getByRole('link', { name: 'פתח ב-Docs' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'עדכן', exact: true })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'עדכן מסמך קיים' })).toHaveCount(0);
   await expect(card).not.toContainText('כבר קיים מסמך מהשרשור הזה');
-  await expect(card.getByRole('button', { name: 'עדכן', exact: true })).toHaveCount(0);
   expect(docCreates()).toHaveLength(1);
+  await card.getByRole('button', { name: 'עדכן', exact: true }).click();
+  await expect.poll(() => server.calls.filter((c) => c.method === 'PATCH' && c.path.indexOf('/upload/drive/v3/files/' + id) === 0).length).toBeGreaterThan(0);
+  await card.getByRole('button', { name: 'בטל' }).click();
+  await expect(card).toContainText('המסמך חזר לגרסה הקודמת', { timeout: 20000 });
 });
 
 test('a mail that already attaches the document does not create one', async ({ glance }) => {

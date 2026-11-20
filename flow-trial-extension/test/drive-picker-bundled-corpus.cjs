@@ -29,6 +29,10 @@ check('build-stamp exports PICKER_BUNDLED on FlowBuild', /const PICKER_BUNDLED =
 check('gmail renders the Drive chip only when PICKER_BUNDLED', /if\s*\(\s*typeof FlowBuild !== 'undefined' && FlowBuild\.PICKER_BUNDLED\s*\)[\s\S]{0,400}flow-chip-attach-drive/.test(gmail));
 check('background gates picker on FlowBuild.PICKER_BUNDLED', /FlowBuild\.PICKER_BUNDLED/.test(bg) && /unavailable:\s*true/.test(bg));
 check('background does not ship user-facing picker-unavailable copy', !/not available in this version/i.test(bg));
+const { FlowBuild } = require(path.join(EXT, 'core', 'build-stamp.js'));
+check('a packaged build (PICKER_BUNDLED off) does not offer עדכן מסמך קיים', FlowBuild.pickerUpdateAvailable(false, 'AIzaRealKey') === false);
+check('a placeholder Picker key does not offer עדכן מסמך קיים', FlowBuild.pickerUpdateAvailable(true, FlowBuild.PICKER_KEY_PLACEHOLDER) === false && FlowBuild.pickerUpdateAvailable(true, '') === false);
+check('a bundled build with a real Picker key offers עדכן מסמך קיים', FlowBuild.pickerUpdateAvailable(true, 'AIzaRealKey') === true);
 
 function extractOpenDrivePicker(source) {
   const start = source.indexOf('async function openDrivePicker');

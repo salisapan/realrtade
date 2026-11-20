@@ -5987,6 +5987,53 @@ function glanceUiCopy(kind) {
       .catch(() => {});
   }
 
+  // The Picker button exists only when picker/ is in this build and its key is
+  // not the placeholder. A missing key resolves the click to nothing, so the
+  // button is not drawn. No disabled control and no retry line.
+  function maybePickerDocUpdate(actionsRow, done, response, he, ctx) {
+    if (!response || !response.html) return;
+    if (typeof FlowBuild === 'undefined' || FlowBuild.PICKER_BUNDLED !== true || typeof FlowBuild.pickerUpdateAvailable !== 'function') return;
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.getURL !== 'function') return;
+    let text = '';
+    try { text = chrome.runtime.getURL('picker/picker.js'); } catch (e) { text = ''; }
+    if (!text) return;
+    fetch(text).then((res) => (res && res.ok ? res.text() : '')).then((src) => {
+      const found = String(src || '').match(/GOOGLE_PICKER_API_KEY\s*=\s*'([^']*)'/);
+      if (!FlowBuild.pickerUpdateAvailable(true, found && found[1])) return;
+      if (!actionsRow.isConnected) return;
+      const updateBtn = el('button', 'flow-doc-update', he ? 'עדכן מסמך קיים' : 'Update an existing document');
+      updateBtn.type = 'button';
+      updateBtn.addEventListener('click', () => {
+        updateBtn.disabled = true;
+        openDrivePicker().then((file) => {
+          const picked = file && (file.id || file.documentId);
+          if (!picked) {
+            updateBtn.disabled = false;
+            return null;
+          }
+          return sendExecuteAction({
+            connectorId: 'driveDocFull',
+            params: {
+              title: response.title || 'Document',
+              html: response.html,
+              fullDocument: true,
+              documentId: picked,
+              origin: 'picked'
+            }
+          });
+        }).then((res) => {
+          if (!res) return;
+          updateBtn.disabled = false;
+          if (res.ok) {
+            const written = done.querySelector('.flow-chip-written');
+            if (written && res.written) written.textContent = res.written;
+          }
+        }).catch(() => { updateBtn.disabled = false; });
+      });
+      actionsRow.appendChild(updateBtn);
+    }).catch(() => {});
+  }
+
   function paintDocReceipt(host, chip, receipt, ctx) {
     const response = receipt || {};
     const done = el('div', 'flow-chip flow-chip-done');
@@ -6000,12 +6047,13 @@ function glanceUiCopy(kind) {
       link.rel = 'noopener';
       done.appendChild(link);
     }
+    let undoRef = response.ref;
     const undo = el('button', 'flow-chip-undo', glanceShow(glanceUiCopy('undo') || 'Undo'));
     undo.type = 'button';
     undo.addEventListener('click', () => {
       undo.disabled = true;
       undo.textContent = he ? 'מבטל…' : 'Undoing…';
-      sendLaneUndo('googleDocFull', response.ref).then((undone) => {
+      sendLaneUndo('googleDocFull', undoRef).then((undone) => {
         const word = (undone && undone.ok) ? (undone.reason || 'trashed') : ((undone && undone.reason) || 'failed');
         try { console.log('[Glance] full-document undo ' + word); } catch (e) {}
         if (undone && undone.ok) {
@@ -6034,58 +6082,54 @@ function glanceUiCopy(kind) {
     // expanded), which left this Undo invisible and unclickable.
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
-    if (response.html) {
-      const updateBtn = el('button', 'flow-doc-update', he ? 'עדכן מסמך קיים' : 'Update an existing document');
-      updateBtn.type = 'button';
-      updateBtn.addEventListener('click', () => {
-        updateBtn.disabled = true;
-        const previous = updateBtn.textContent;
-        updateBtn.textContent = he ? 'בוחרים מסמך…' : 'Choose a document…';
-        openDrivePicker().then((file) => {
-          const picked = file && (file.id || file.documentId);
-          if (!picked) {
-            updateBtn.disabled = false;
-            updateBtn.textContent = previous;
-            return null;
+    const threadId = response.documentId || (response.ref && (response.ref.documentId || response.ref.externalId)) || '';
+    if (response.html && threadId) {
+      const threadBtn = el('button', 'flow-doc-thread-update', he ? 'עדכן' : 'Update');
+      threadBtn.type = 'button';
+      threadBtn.addEventListener('click', () => {
+        threadBtn.disabled = true;
+        const previous = threadBtn.textContent;
+        threadBtn.textContent = he ? 'מעדכן…' : 'Updating…';
+        sendExecuteAction({
+          connectorId: 'driveDocFull',
+          params: {
+            title: response.title || 'Document',
+            html: response.html,
+            fullDocument: true,
+            documentId: threadId,
+            origin: 'created'
           }
-          updateBtn.textContent = he ? 'מעדכן…' : 'Updating…';
-          return sendExecuteAction({
-            connectorId: 'driveDocFull',
-            params: {
-              title: response.title || 'Document',
-              html: response.html,
-              fullDocument: true,
-              documentId: picked,
-              origin: 'picked'
-            }
-          });
         }).then((res) => {
-          if (!res) return;
-          if (res.ok) {
+          if (res && res.ok) {
+            if (res.ref) undoRef = res.ref;
             const written = done.querySelector('.flow-chip-written');
-            if (written) written.textContent = res.written || (he ? 'המסמך הקיים עודכן.' : 'The existing document was updated.');
-            updateBtn.disabled = false;
-            updateBtn.textContent = he ? 'עדכן מסמך קיים' : 'Update an existing document';
+            if (written && res.written) written.textContent = res.written;
+            threadBtn.disabled = false;
+            threadBtn.textContent = previous;
+            rememberDocReceipt(Object.assign({}, ctx, { googleBuilt: { html: response.html, title: response.title || '' } }), res);
             return;
           }
-          updateBtn.disabled = false;
-          updateBtn.textContent = previous;
+          threadBtn.disabled = false;
+          threadBtn.textContent = previous;
         }).catch(() => {
-          updateBtn.disabled = false;
-          updateBtn.textContent = previous;
+          threadBtn.disabled = false;
+          threadBtn.textContent = previous;
         });
       });
-      actionsRow.appendChild(updateBtn);
+      actionsRow.appendChild(threadBtn);
     }
+    maybePickerDocUpdate(actionsRow, done, response, he, ctx);
     done.appendChild(actionsRow);
     if (host) placeReceipt(host, chip, done);
     return done;
   }
 
   function showDocPreviewReceipt(host, chip, result, ctx) {
+    const ref = (result.response && result.response.ref) || {};
     const response = Object.assign({}, result.response || {}, {
       html: (ctx && ctx.googleBuilt && ctx.googleBuilt.html) || '',
-      title: (ctx && ctx.googleBuilt && ctx.googleBuilt.title) || ''
+      title: (ctx && ctx.googleBuilt && ctx.googleBuilt.title) || '',
+      documentId: ref.documentId || ref.externalId || ''
     });
     rememberDocReceipt(ctx, result.response || {});
     paintDocReceipt(host, chip, response, ctx);
