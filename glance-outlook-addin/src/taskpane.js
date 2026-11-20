@@ -2,14 +2,17 @@
 // Glance task pane for Outlook.
 //
 // Rules this file keeps (behavior.test.cjs holds each one):
-//  - It reads the WHOLE conversation or shows no card. No latest-message-only fallback. Every gap is a quiet card with a why.
-//  - It never writes until the person clicks "Insert draft" in a reply they are composing. Opening the pane writes nothing.
-//  - It never sends. No send call exists in this file or in thread.js, and the manifest declares no send surface.
-//  - Every write is read back from the open message, shows its proof, and has an Undo that only runs if the person has not
-//    edited the text since.
-//  - A reply draft is a draft, not a close. The proof says "inserted and read back". It never says "handled".
-// Microsoft scopes: none declared here. The thread read asks GlanceOutlookAuth.getToken() for a Mail.Read token. Without one
-// (the shipped state until a sign-in is wired) the pane shows no card and says so.
+//  - When GlanceOutlookAuth.getToken exists, it reads the WHOLE conversation or shows no card. No latest-message fallback.
+//  - When that sign-in is not in the bundle, it reads the open item with Office.js (body, subject, from, to, cc,
+//    conversationId) and judges that message. It does not call Graph.
+//  - It never writes until the person clicks "Insert draft". Opening the pane writes nothing.
+//  - It never sends. No send call exists in this file, in item.js, or in thread.js, and the manifest declares no send surface.
+//  - A compose write is read back from the open reply, shows its proof, and Undo runs only if the person has not edited it.
+//  - A read-mode Insert opens a reply form (displayReplyForm, or displayReplyAllForm when the message has Cc). Undo does not
+//    change the open message. Closing that reply discards the draft.
+//  - A reply draft is a draft, not a close. The compose proof says "inserted and read back". It never says "handled".
+// Microsoft scopes: none declared here. The whole-thread read asks GlanceOutlookAuth.getToken() for a Mail.Read token.
+// That object is not in this bundle. The open message does not need it.
 (function () {
   'use strict';
 
@@ -25,6 +28,11 @@
     'bad-shape': 'The thread read returned something Glance does not understand.',
     'network': 'The thread read failed.',
     'no-item': 'There is no open message.',
+    'body-unreadable': 'The open message could not be read.',
+    'empty-item': 'The open message has no body.',
+    'no-quoted-message': 'This reply does not include the message it answers, so Glance stays out of it.',
+    'no-reply-form': 'This message cannot open a reply draft.',
+    'reply-form-refused': 'Outlook did not open the reply draft.',
     'last-message-is-mine': 'Your message is the last one in the thread. Nothing is waiting on you.',
     'no-draft-step': 'This asks for something other than a reply draft, which Glance does not write here.',
     'quiet:marketing': 'This looks like a bulk or marketing message.',
@@ -108,15 +116,36 @@
     return GlanceOutlookThread.read(opts).then(function (res) { return { res: res, me: me, name: name }; });
   }
 
+  // The open item only. Used when GlanceOutlookAuth is not in the bundle. No Graph.
+  function loadOpenItem(item, compose) {
+    var mailbox = Office.context.mailbox;
+    var me = mailbox.userProfile && mailbox.userProfile.emailAddress ? mailbox.userProfile.emailAddress : '';
+    var name = mailbox.userProfile && mailbox.userProfile.displayName ? mailbox.userProfile.displayName : '';
+    return GlanceOutlookItem.read(item, {
+      me: me,
+      compose: compose,
+      asyncCall: asyncCall,
+      coercionText: Office.CoercionType.Text
+    }).then(function (res) {
+      if (!res.ok) return { res: res, me: me, name: name };
+      var messages = [res.message];
+      messages.source = 'office-item';
+      return { res: { ok: true, messages: messages, source: 'office-item' }, me: me, name: name };
+    });
+  }
+
   function judgeThread(messages, me, name) {
     var last = messages[messages.length - 1];
+    var office = messages.source === 'office-item';
     if (last.isMine) return { show: false, reason: 'last-message-is-mine' };
     var sender = { email: last.from || null, name: last.fromName };
-    var judged = GlanceOutlookEngine.judge({
+    var to = office ? (Array.isArray(last.to) ? last.to : []) : (me ? [me] : []);
+    var cc = office ? (Array.isArray(last.cc) ? last.cc : []) : [];
+    var judgedInput = {
       text: last.text,
       subject: last.subject,
       sender: sender,
-      to: me ? [me] : [],
+      to: to,
       ownAddresses: me ? [me] : [],
       userName: name || null,
       ownNames: name ? [name] : null,
@@ -124,20 +153,51 @@
       now: now(),
       surface: 'outlook',
       attachmentCount: 0
-    });
+    };
+    if (office) judgedInput.cc = cc;
+    var judged = GlanceOutlookEngine.judge(judgedInput);
     if (!judged || !judged.show || !judged.process) return { show: false, reason: (judged && judged.reason) || 'intent-null' };
     var draft = GlanceOutlookEngine.draftText(judged.process, { sender: sender, subject: last.subject });
     if (!draft) return { show: false, reason: 'no-draft-step' };
-    return { show: true, draft: draft, sender: sender, count: messages.length };
+    return {
+      show: true,
+      draft: draft,
+      sender: sender,
+      count: messages.length,
+      source: office ? 'office-item' : 'thread',
+      to: to,
+      cc: cc,
+      subject: last.subject || '',
+      conversationId: last.conversationId || ''
+    };
   }
 
   function renderCard(root, verdict, compose) {
     root.replaceChildren();
     root.setAttribute('data-glance-state', 'card');
     root.removeAttribute('data-glance-why');
-    root.appendChild(el('p', 'Read ' + verdict.count + ' message' + (verdict.count === 1 ? '' : 's') + ' in this thread.'));
+    if (verdict.source === 'office-item') {
+      root.setAttribute('data-glance-source', 'office-item');
+      root.setAttribute('data-glance-conversation', verdict.conversationId || '');
+      root.setAttribute('data-glance-from', (verdict.sender && verdict.sender.email) || '');
+      root.setAttribute('data-glance-to', (verdict.to || []).join(','));
+      root.setAttribute('data-glance-cc', (verdict.cc || []).join(','));
+      root.setAttribute('data-glance-subject', verdict.subject || '');
+      root.appendChild(el('p', 'Read this message.'));
+    } else {
+      root.setAttribute('data-glance-source', 'thread');
+      root.appendChild(el('p', 'Read ' + verdict.count + ' message' + (verdict.count === 1 ? '' : 's') + ' in this thread.'));
+    }
     root.appendChild(el('p', verdict.draft.slice(0, 280)));
     if (!compose) {
+      if (verdict.source === 'office-item') {
+        var open = el('button', 'Insert draft');
+        open.type = 'button';
+        open.setAttribute('data-glance-action', 'insert');
+        open.addEventListener('click', function () { openReplyForm(root, verdict); });
+        root.appendChild(open);
+        return;
+      }
       root.appendChild(el('p', 'To use it, open a reply, then open Glance there and click Insert draft.'));
       return;
     }
@@ -146,6 +206,38 @@
     btn.setAttribute('data-glance-action', 'insert');
     btn.addEventListener('click', function () { insertDraft(root, verdict.draft); });
     root.appendChild(btn);
+  }
+
+  // Read mode. Opens a reply form with the draft and does not send. Cc on the open message uses reply-all.
+  function openReplyForm(root, verdict) {
+    var item = Office.context.mailbox && Office.context.mailbox.item;
+    if (!item || typeof GlanceOutlookItem === 'undefined') return failWrite(root, 'no-reply-form');
+    var kind = GlanceOutlookItem.replyFormKind(verdict.cc);
+    var fn = kind === 'reply-all' && typeof item.displayReplyAllForm === 'function' ? 'displayReplyAllForm' : 'displayReplyForm';
+    if (typeof item[fn] !== 'function') return failWrite(root, 'no-reply-form');
+    var html = GlanceOutlookItem.draftHtml(verdict.draft);
+    try {
+      item[fn]({ htmlBody: html });
+    } catch (err) {
+      return failWrite(root, 'reply-form-refused');
+    }
+    root.replaceChildren();
+    root.setAttribute('data-glance-state', 'reply-opened');
+    root.setAttribute('data-glance-reply-form', fn);
+    root.appendChild(el('p', 'Reply draft opened. Not sent.'));
+    var undo = el('button', 'Undo');
+    undo.type = 'button';
+    undo.setAttribute('data-glance-action', 'undo');
+    undo.addEventListener('click', function () { discardReplyForm(root); });
+    root.appendChild(undo);
+  }
+
+  // The reply form is a separate window. Office.js does not hand it back, so Undo leaves the open message as it was.
+  // Closing that reply discards the draft. Nothing is sent.
+  function discardReplyForm(root) {
+    root.replaceChildren();
+    root.setAttribute('data-glance-state', 'discarded');
+    root.appendChild(el('p', 'Nothing was sent. Close the reply to discard the draft.'));
   }
 
   function failWrite(root, why, extra) {
@@ -241,7 +333,10 @@
     var item = Office.context.mailbox && Office.context.mailbox.item;
     if (!item) return Promise.resolve(renderQuiet(root, 'no-item'));
     var compose = isCompose(item);
-    return loadThread(item, compose).then(function (t) {
+    var auth = typeof GlanceOutlookAuth !== 'undefined' ? GlanceOutlookAuth : null;
+    var authed = Boolean(auth && typeof auth.getToken === 'function');
+    var pending = authed ? loadThread(item, compose) : loadOpenItem(item, compose);
+    return pending.then(function (t) {
       if (!t.res.ok) return renderQuiet(root, t.res.why);
       var verdict = judgeThread(t.res.messages, t.me, t.name);
       if (!verdict.show) return renderQuiet(root, verdict.reason);
