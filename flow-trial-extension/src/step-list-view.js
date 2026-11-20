@@ -213,8 +213,10 @@ const FlowStepListView = (() => {
       const n = required.length;
       return {
         disabled: true,
-        title: n === 1 ? 'Still open · 1 step unconfirmed' : 'Still open · ' + n + ' steps unconfirmed',
-        sub: 'Approve unlocks once it verifies'
+        title: he
+          ? (n === 1 ? 'עדיין פתוח · השלב לא אומת' : 'עדיין פתוח · ' + n + ' שלבים לא אומתו')
+          : (n === 1 ? 'Still open · 1 step unconfirmed' : 'Still open · ' + n + ' steps unconfirmed'),
+        sub: he ? 'האישור ייפתח אחרי שהשלב יאומת' : 'Approve unlocks once it verifies'
       };
     }
     const verified = (rows || []).filter(function (r) { return r && r.state === 'verified'; }).length;
@@ -222,8 +224,10 @@ const FlowStepListView = (() => {
     const app = toolOf(failed[0], 'outlook').app || 'step';
     return {
       disabled: false,
-      title: 'Still open · waiting for your approval',
-      sub: 'Prepared ≠ closed · ' + verified + ' of ' + total + ' verified · ' + app + ' left out'
+      title: he ? 'עדיין פתוח · ממתין לאישור' : 'Still open · waiting for your approval',
+      sub: he
+        ? ('הכנה אינה סגירה · ' + verified + ' מתוך ' + total + ' אומתו')
+        : ('Prepared ≠ closed · ' + verified + ' of ' + total + ' verified · ' + app + ' left out')
     };
   }
 

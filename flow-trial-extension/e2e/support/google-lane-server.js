@@ -219,7 +219,8 @@ function startGoogleLaneServer() {
     driveHits: [],
     lagGets: [],
     forbids: [],
-    tokenScopes: null
+    tokenScopes: null,
+    wallTimes: false
   };
   seedLists();
 
@@ -253,6 +254,7 @@ function startGoogleLaneServer() {
     state.lagGets = [];
     state.forbids = [];
     state.tokenScopes = null;
+    state.wallTimes = false;
     state.noMeetLink = false;
     state.tasks401AfterRefresh = false;
     state.tasks403Insufficient = false;
@@ -640,7 +642,11 @@ function startGoogleLaneServer() {
           eventType: 'default'
         });
         ['start', 'end'].forEach((k) => {
-          if (event[k] && event[k].dateTime) event[k] = { dateTime: offsetForm(event[k].dateTime, event[k].timeZone), timeZone: event[k].timeZone };
+          if (event[k] && event[k].dateTime) {
+            const shifted = offsetForm(event[k].dateTime, event[k].timeZone);
+            const dateTime = state.wallTimes ? String(shifted).replace(/(?:Z|[+-]\d{2}:\d{2})$/i, '') : shifted;
+            event[k] = { dateTime: dateTime, timeZone: event[k].timeZone };
+          }
         });
         delete event.attendees;
         // Like Calendar: a conference request is honoured only with conferenceDataVersion=1,
@@ -854,6 +860,7 @@ function startGoogleLaneServer() {
         forbid: (part, method, body) => { state.forbids.push({ part: part, method: method || '', body: body }); },
         clearForbids: () => { state.forbids = []; },
         setTokenScopes: (scope) => { state.tokenScopes = scope; },
+        setWallTimes: (on) => { state.wallTimes = on === true; },
         clearFailGets: () => { state.failGets = []; },
         events: () => state.events,
         tasks: () => state.tasks,
