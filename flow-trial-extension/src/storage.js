@@ -527,6 +527,7 @@ const FlowStorage = (() => {
       }
     }
 
+    stampLedgerIds(state, row);
     patch.log = trimLog([row, ...state.log], resolved);
     const proofs = mergeGlanceProof(state, row);
     if (proofs) patch.glanceProofs = proofs;
@@ -534,6 +535,28 @@ const FlowStorage = (() => {
     await Promise.resolve(noteClosedIntent(state, row)).catch(function () {});
     return patch.log;
   });
+
+  function stampLedgerIds(state, row) {
+    if (!row) return;
+    const api = typeof FlowClosedIntentLedger !== 'undefined' ? FlowClosedIntentLedger : null;
+    const make = api && typeof api.uuidv7 === 'function' ? function () { return api.uuidv7(); } : function () { return ''; };
+    let decisionId = '';
+    let intentId = '';
+    const id = row.messageId;
+    const log = (state && state.log) || [];
+    if (id) {
+      for (let i = 0; i < log.length; i++) {
+        const e = log[i];
+        if (e && e.messageId === id && e.ledgerDecisionId) {
+          decisionId = e.ledgerDecisionId;
+          intentId = e.ledgerIntentId || '';
+          break;
+        }
+      }
+    }
+    if (!row.ledgerDecisionId) row.ledgerDecisionId = decisionId || make();
+    if (!row.ledgerIntentId) row.ledgerIntentId = intentId || make();
+  }
 
   // A short token only. A subject, a name, or an address cannot pass.
   function ledgerToken(value) {
@@ -607,20 +630,30 @@ const FlowStorage = (() => {
       const proofFlag = row.proof && (row.proof.fetchedBack === true || row.proof.fetchedBack === false)
         ? row.proof.fetchedBack === true
         : undefined;
-      return api.noteActivity({
+      const hinted = typeof api.defaultSurface === 'function' ? api.defaultSurface() : '';
+      const input = {
         kind: row.kind,
         fetchedBack: row.fetchedBack === true ? true : (row.fetchedBack === false ? false : undefined),
         proofFetchedBack: proofFlag,
         undone: row.undone === true,
-        app: ledgerToken(row.app),
+        app: ledgerToken(row.channel) === 'teams' ? 'teams' : (ledgerToken(row.app) || hinted),
+        channel: ledgerToken(row.channel),
         connectorId: ledgerToken(row.connectorId),
         system: ledgerSystem(row.system),
         intentHint: ledgerIntentHint(state, row),
         score: ledgerScore(state, row),
         confidence: ledgerToken(row.confidence),
         latencyMs: ledgerLatency(state, row),
-        ts: row.ts
-      });
+        ts: row.ts,
+        decisionId: row.ledgerDecisionId,
+        intentId: row.ledgerIntentId,
+        engineVersion: ledgerToken(row.engineVersion) || 'dev'
+      };
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && chrome.runtime.sendMessage) {
+        try { chrome.runtime.sendMessage({ type: 'flow:ledger-append', input: input }); } catch (e) { /* the activity log already landed */ }
+        return null;
+      }
+      return api.noteActivity(input);
     } catch (e) {
       return null;
     }

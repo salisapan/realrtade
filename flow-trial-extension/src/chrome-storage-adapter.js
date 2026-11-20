@@ -33,7 +33,5 @@ if (typeof FlowCloseMemory !== 'undefined') {
   FlowCloseMemory.setStorageAdapter(glanceLocalAdapter());
 }
 
-// Closed-intent ledger. Same device store, its own key. Off until opt-in.
-if (typeof FlowClosedIntentLedger !== 'undefined') {
-  FlowClosedIntentLedger.setStorageAdapter(glanceLocalAdapter());
-}
+// The closed-intent event log lives in IndexedDB via closed-intent-ledger-idb.js.
+// This adapter is settings for other modules only.

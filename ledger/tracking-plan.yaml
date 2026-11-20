@@ -1,0 +1,123 @@
+# Tracking plan. Single source for the closed-intent ledger.
+# SchemaVer (MODEL-REVISION-ADDITION) versions the schemas. Code semver is separate.
+# pii is none on every field. legal_basis is consent. Nothing here is mail content.
+owner: Glance
+legal_basis: consent
+pii: none
+retention_days: 365
+k_anonymity: 5
+explore_epsilon: 0
+model: 1-0-0
+intent_types: [send_quote, create_event, create_task, draft_reply, create_document, save_file, other]
+surfaces: [gmail, outlook, teams, slack, telegram, addon, other]
+target_systems: [calendar, drive, onedrive, todo, tasks, drafts, docs, sheets, teams, other]
+confidence: [high, medium, low, unknown]
+hour_buckets: [h00, h06, h12, h18]
+weekdays: [sun, mon, tue, wed, thu, fri, sat]
+locales: [he, en, other]
+stages: [decision, shown, clicked, closed, undone, failed, dismissed, missed]
+taxonomy:
+  - id: send_quote
+    domain: document
+    type: send_quote
+    subtype: quote
+    deprecated: false
+    superseded_by: ""
+  - id: create_event
+    domain: schedule
+    type: create_event
+    subtype: hold
+    deprecated: false
+    superseded_by: ""
+  - id: create_task
+    domain: work
+    type: create_task
+    subtype: task
+    deprecated: false
+    superseded_by: ""
+  - id: draft_reply
+    domain: communicate
+    type: draft_reply
+    subtype: reply
+    deprecated: false
+    superseded_by: ""
+  - id: create_document
+    domain: document
+    type: create_document
+    subtype: doc
+    deprecated: false
+    superseded_by: ""
+  - id: save_file
+    domain: file
+    type: save_file
+    subtype: attachment
+    deprecated: false
+    superseded_by: ""
+  - id: other
+    domain: other
+    type: other
+    subtype: other
+    deprecated: false
+    superseded_by: ""
+events:
+  - name: decision
+    type: ai.theflow.glance.intent.decision.v1
+    schema: iglu:ai.theflow.glance/decision/jsonschema/1-0-0
+    purpose: The engine choice, emitted before a chip is shown.
+    fields:
+      - { name: decision_id, type: uuid, required: true, since: 1-0-0, purpose: Random id for this decision. }
+      - { name: policy_id, type: token, max_length: 64, required: true, since: 1-0-0, purpose: Engine version plus quantized threshold. }
+      - { name: chosen_intent_type, type: intent, required: false, since: 1-0-0, purpose: The type the policy chose, or empty when none. }
+      - { name: propensity, type: number, required: true, since: 1-0-0, purpose: 1 when the policy is deterministic. }
+      - { name: deterministic, type: boolean, required: true, since: 1-0-0, purpose: True while explore.epsilon is 0. }
+      - { name: explore_epsilon, type: number, required: true, since: 1-0-0, purpose: Exploration rate. Writer forces 0. }
+      - { name: engine_feature_hash, type: hex, max_length: 16, required: true, since: 1-0-0, purpose: Hash of the policy token, not of mail. }
+      - { name: engine_version, type: token, max_length: 32, required: true, since: 1-0-0, purpose: Build or model id token. }
+      - { name: surface, type: surface, required: true, since: 1-0-0, purpose: Where the decision was made. }
+      - { name: local_day, type: day, required: true, since: 1-0-0, purpose: The person's local calendar day. }
+      - { name: tz_offset_bucket, type: token, max_length: 8, required: true, since: 1-0-0, purpose: Whole-hour offset bucket, or unknown. }
+      - { name: weekday, type: weekday, required: true, since: 1-0-0, purpose: Local weekday. }
+      - { name: hour_bucket, type: hour, required: true, since: 1-0-0, purpose: Six-hour local bucket. }
+      - { name: locale, type: locale, required: true, since: 1-0-0, purpose: UI language bucket. }
+  - name: shown
+    type: ai.theflow.glance.intent.shown.v1
+    schema: iglu:ai.theflow.glance/stage/jsonschema/1-0-0
+    purpose: A chip was shown. References the decision.
+  - name: clicked
+    type: ai.theflow.glance.intent.clicked.v1
+    schema: iglu:ai.theflow.glance/stage/jsonschema/1-0-0
+    purpose: The person pressed Do It.
+  - name: closed
+    type: ai.theflow.glance.intent.closed.v1
+    schema: iglu:ai.theflow.glance/stage/jsonschema/1-0-0
+    purpose: A proved close. fetchedBack is true. Types only.
+  - name: undone
+    type: ai.theflow.glance.intent.undone.v1
+    schema: iglu:ai.theflow.glance/stage/jsonschema/1-0-0
+    purpose: The person undid a close. Links by decision_id.
+  - name: failed
+    type: ai.theflow.glance.intent.failed.v1
+    schema: iglu:ai.theflow.glance/stage/jsonschema/1-0-0
+    purpose: A write was not proved.
+  - name: dismissed
+    type: ai.theflow.glance.intent.dismissed.v1
+    schema: iglu:ai.theflow.glance/stage/jsonschema/1-0-0
+    purpose: The person dismissed the chip.
+  - name: missed
+    type: ai.theflow.glance.intent.missed.v1
+    schema: iglu:ai.theflow.glance/stage/jsonschema/1-0-0
+    purpose: Feedback that something was missed, with no chip shown.
+stage_fields:
+  - { name: decision_id, type: uuid, required: true, since: 1-0-0, purpose: The decision this stage belongs to. }
+  - { name: intent_type, type: intent, required: true, since: 1-0-0, purpose: Controlled intent type. }
+  - { name: surface, type: surface, required: true, since: 1-0-0, purpose: Surface token. }
+  - { name: target_system, type: target, required: true, since: 1-0-0, purpose: System that received the close. }
+  - { name: confidence_bucket, type: confidence, required: true, since: 1-0-0, purpose: Engine confidence bucket. }
+  - { name: latency_ms, type: integer, required: true, since: 1-0-0, purpose: Milliseconds from show to this stage, capped. }
+  - { name: local_day, type: day, required: true, since: 1-0-0, purpose: Local calendar day. }
+  - { name: tz_offset_bucket, type: token, max_length: 8, required: true, since: 1-0-0, purpose: Whole-hour offset bucket. }
+  - { name: weekday, type: weekday, required: true, since: 1-0-0, purpose: Local weekday. }
+  - { name: hour_bucket, type: hour, required: true, since: 1-0-0, purpose: Six-hour local bucket. }
+  - { name: engine_version, type: token, max_length: 32, required: true, since: 1-0-0, purpose: Engine token. }
+  - { name: locale, type: locale, required: true, since: 1-0-0, purpose: UI language bucket. }
+  - { name: negative, type: boolean, required: true, since: 1-0-0, purpose: Explicit negative feedback. Default false. }

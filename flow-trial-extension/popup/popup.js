@@ -1100,10 +1100,17 @@
     if (hint) hint.textContent = L.hint;
     if (exp) exp.textContent = L.export;
     if (del) del.textContent = L.deleteAll;
-    api.isEnabled().then((on) => {
-      if (!toggle) return;
-      toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
-      toggle.textContent = on ? L.toggleOn : L.toggleOff;
+    const store = typeof FlowClosedIntentStore !== 'undefined' ? FlowClosedIntentStore : null;
+    const enabled = store ? store.isEnabled() : api.isEnabled();
+    Promise.resolve(enabled).then(async (on) => {
+      if (toggle) {
+        toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+        toggle.textContent = on ? L.toggleOn : L.toggleOff;
+      }
+      const value = document.getElementById('closedIntentValue');
+      if (!value || typeof api.view !== 'function' || typeof api.valueLine !== 'function') return;
+      const view = store ? await store.view() : await api.view(Date.now());
+      value.textContent = api.valueLine(lang, view);
     }).catch(() => {});
   }
 
@@ -1123,23 +1130,26 @@
     const exp = document.getElementById('closedIntentExport');
     const del = document.getElementById('closedIntentDelete');
     if (!api || !toggle || !exp || !del) return;
+    const store = typeof FlowClosedIntentStore !== 'undefined' ? FlowClosedIntentStore : null;
     toggle.addEventListener('click', async () => {
       const L = api.copy(uiLang());
-      const on = await api.isEnabled();
-      await api.setEnabled(!on);
+      const on = store ? await store.isEnabled() : await api.isEnabled();
+      if (store) await store.setEnabled(!on);
+      else await api.setEnabled(!on);
       paintClosedIntent();
       closedIntentNote(on ? L.stopped : L.started, false);
     });
     exp.addEventListener('click', async () => {
       const L = api.copy(uiLang());
-      const doc = await api.exportAll();
+      const doc = store ? await store.exportAll() : await api.exportAll();
       downloadLedger(doc);
-      closedIntentNote(doc.records && doc.records.length ? L.exported : L.empty, false);
+      closedIntentNote(doc.events && doc.events.length ? L.exported : L.empty, false);
     });
     del.addEventListener('click', async () => {
       const L = api.copy(uiLang());
       if (!window.confirm(L.deleteConfirm)) return;
-      await api.deleteAll();
+      if (store) await store.deleteAll();
+      else await api.deleteAll();
       paintClosedIntent();
       closedIntentNote(L.deleted, false);
     });

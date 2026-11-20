@@ -2,6 +2,14 @@
 
 Glance closes open loops. Gmail is where it starts today.
 
+## Privacy
+
+What is stored: CloudEvents with intent type, surface, target system, confidence bucket, local day, a coarse timezone bucket, and random ids. Where: IndexedDB on the extension origin for events, and extension settings for the opt-in, the install id, and the sequence cursor. How to delete: Settings, Delete all. That clears the log and the rolled counts. Turning the toggle off stops new events and does not delete old ones. Nothing is uploaded. The aggregate sink and the local noise stub stay off.
+
+## פרטיות
+
+מה נשמר: אירועים עם סוג כוונה, משטח, מערכת יעד, דלי ביטחון, יום מקומי, דלי אזור גס, ומזהים אקראיים. איפה: מסד על מקור ההרחבה לאירועים, והגדרות ההרחבה להסכמה, למזהה ההתקנה, ולמונה. איך מוחקים: בהגדרות, מחק הכל. הכיבוי עוצר אירועים חדשים ולא מוחק ישנים. שום דבר לא עולה לרשת.
+
 This is a consented record of what actually got done. It is not a copy of the mail. Flow templates and Flow Shadow can read the same types later from `closed-intent-ledger.schema.json` (version 1). Nothing here is uploaded.
 
 ## English

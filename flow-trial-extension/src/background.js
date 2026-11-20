@@ -69,6 +69,8 @@ import '../core/planner-task.js'; // classic: sets globalThis.FlowPlannerTask (s
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
 import '../core/labs-seed.js'; // classic: sets globalThis.FlowLabsSeed (the first wave of Labs closes, on in a non-store install)
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
+import '../core/closed-intent-ledger.js'; // classic: types-only CloudEvents ledger
+import '../src/closed-intent-ledger-idb.js'; // extension-origin log, alarms, and ledger messages
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/outlook-word.js'; // classic: sets globalThis.FlowOutlookWord (an empty .docx for a new file)
 import '../core/outlook-excel.js'; // classic: sets globalThis.FlowOutlookExcel (an empty .xlsx for a new file)
@@ -282,8 +284,8 @@ if (typeof setTimeout === 'function') setTimeout(bootGoogleAuth, 0);
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
 // WhatsApp Web is not its own row. It turns on with the one Meta consent.
 const SURFACES = {
-  slack: { label: 'Slack', origins: ['https://app.slack.com/*'], extra: ['src/slack-parse.js', 'src/content-slack.js'] },
-  telegram: { label: 'Telegram Web', origins: ['https://web.telegram.org/*'], extra: ['src/telegram-parse.js', 'src/content-telegram.js'] },
+  slack: { label: 'Slack', origins: ['https://app.slack.com/*'], extra: ['core/closed-intent-ledger.js', 'src/closed-intent-ledger-wire.js', 'src/slack-parse.js', 'src/content-slack.js'] },
+  telegram: { label: 'Telegram Web', origins: ['https://web.telegram.org/*'], extra: ['core/closed-intent-ledger.js', 'src/closed-intent-ledger-wire.js', 'src/telegram-parse.js', 'src/content-telegram.js'] },
   // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
   outlook: {
     label: 'Outlook on the web',
