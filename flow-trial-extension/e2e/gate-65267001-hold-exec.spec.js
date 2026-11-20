@@ -117,6 +117,55 @@ test('the Calendar writer global is not published in the worker: no insert, a He
   }
 });
 
+test('Google reads the hold back as wall time in Asia/Jerusalem: the event stays, the card says טופל, Undo deletes it', async ({ glance }) => {
+  server.setWallTimes(true);
+  try {
+    const { page, host } = await openHold(glance);
+    await host.locator('button.flow-chip').click();
+    await expect(host.locator('.flow-chip-handled')).toContainText('טופל', { timeout: 20000 });
+    await expect(host).not.toContainText('unconfirmed');
+    await expect(host).not.toContainText('Still open');
+    expect(inserts()).toHaveLength(1);
+    const ev = events()[0];
+    expect(ev.start.dateTime).toMatch(/T10:00:00$/);
+    expect(ev.start.timeZone).toBeTruthy();
+    expect(String(ev.start.dateTime)).not.toMatch(/Z|[+-]\d{2}:\d{2}$/);
+    await page.locator(MAIN + ' button.flow-chip-undo').click();
+    await expect.poll(() => events().length).toBe(0);
+  } finally {
+    server.setWallTimes(false);
+  }
+});
+
+test('a grant without calendar.events does not insert, and the Hebrew card names the missing permission', async ({ glance }) => {
+  const partial = {
+    granted: [
+      'openid',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/drive.file',
+      'https://www.googleapis.com/auth/tasks'
+    ]
+  };
+  try {
+    const { host, lines } = await openHold(glance);
+    await glance.evaluateWorker((scopes) => chrome.storage.local.set({ googleGrantedScopes: scopes }), partial);
+    await host.locator('button.flow-chip').click();
+    const alert = host.locator('.flow-chip-hold-error');
+    await expect(alert).toBeVisible({ timeout: 20000 });
+    await expect(alert).toHaveAttribute('data-glance-hold-reason', 'calendar-scope-missing');
+    await expect(alert).toContainText('אין הרשאה ליומן');
+    await expect(host).not.toContainText('unconfirmed');
+    await expect(host).not.toContainText('Still open');
+    await expect(host.locator('.flow-chip-handled')).toHaveCount(0);
+    expect(inserts()).toHaveLength(0);
+    expect(events()).toHaveLength(0);
+    await expect.poll(() => lines.join('\n')).toContain('calendar-scope-missing');
+  } finally {
+    await glance.evaluateWorker(() => chrome.storage.local.remove('googleGrantedScopes'));
+  }
+});
+
 test('Google does not return the event after the insert: it is removed, and the card says so in Hebrew', async ({ glance }) => {
   server.failGet('/calendar/v3');
   const { host, lines } = await openHold(glance);

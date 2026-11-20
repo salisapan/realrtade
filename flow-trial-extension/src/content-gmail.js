@@ -4034,7 +4034,12 @@ function glanceUiCopy(kind) {
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
     if (response.reason === 'compose-closed') return response.error || 'Open Reply first. Glance does not press Send.';
     if (response.reason === 'user-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || glanceUiCopy('edited'));
-    if (response.reason === 'unconfirmed') return response.error || response.written || "Couldn't confirm it's unchanged. Undo left it alone.";
+    if (response.reason === 'unconfirmed') {
+      if (response.error || response.written) return response.error || response.written;
+      return glanceUiHebrew()
+        ? 'לא הצלחתי לאמת שלא השתנה — השארתי אותו כמו שהוא'
+        : "Couldn't confirm it's unchanged. Undo left it alone.";
+    }
     if (response.reason === 'range-edited') return glanceUiHebrew() ? glanceUiCopy('edited') : (response.error || 'Undo stopped. That text was edited, so nothing was deleted.');
     if (response.preview && response.reason === 'verify_failed') return response.error || 'The compose window is still empty.';
     if (response.reason === 'wrong-account' && !response.expected && response.error) return response.error;
@@ -5169,7 +5174,14 @@ function glanceUiCopy(kind) {
     }
     const raw = r && typeof r.reason === 'string' && r.reason ? r.reason : 'no-response';
     if (raw === 'unverified' || (r && r.unverified === true && r.ref)) {
-      return { result: 'unverified', reason: 'unverified', line: '', reconnect: false };
+      return {
+        result: 'failed',
+        reason: 'unverified',
+        reconnect: false,
+        line: lead + (he
+          ? 'Google עדיין לא החזיר את האירוע. הוא נשאר ביומן, ו«בטל» מסיר אותו.'
+          : 'Google has not returned the event yet. It stays on the calendar, and Undo removes it.')
+      };
     }
     const he = glanceUiHebrew();
     const lead = he ? 'לא נוצר אירוע ביומן — ' : 'No calendar event was created — ';

@@ -39,6 +39,7 @@ CORPORA=(
   "flow-trial-extension/test/intent-actions-corpus.cjs"
   "flow-trial-extension/test/scheduling-ask-corpus.cjs"
   "flow-trial-extension/test/hebrew-hold-corpus.cjs"
+  "flow-trial-extension/test/gate-290-hold-exec-corpus.cjs"
   "flow-trial-extension/test/close-families-corpus.cjs"
   "flow-trial-extension/test/google-closes-corpus.cjs"
   "flow-trial-extension/test/work-product-ask-corpus.cjs"
