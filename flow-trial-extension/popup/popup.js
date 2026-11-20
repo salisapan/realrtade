@@ -171,7 +171,7 @@
   } catch (e) { /* the open panel keeps the language it painted */ }
   try {
     chrome.storage.onChanged.addListener((ch, area) => {
-      if (area !== 'local' || nameStorageOnly(ch) || (!ch.googleReconnect && !ch.googleLaneWarning)) return;
+      if (area !== 'local' || nameStorageOnly(ch) || (!ch.googleReconnect && !ch.googleLaneWarning && !ch.googleTasksAuth)) return;
       refresh().catch(() => {});
     });
   } catch (e) { /* the pill refreshes the next time the popup opens */ }

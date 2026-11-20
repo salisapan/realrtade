@@ -1858,6 +1858,7 @@ async function runGoogleWebAuth(interactive) {
     throw partial;
   }
   const record = { accessToken: parsed.accessToken, source: 'web', obtainedAt: Date.now() };
+  if (interactive) record.interactiveAt = Date.now();
   if (parsed.expiresIn) record.expiresAt = Date.now() + parsed.expiresIn * 1000;
   const keptHint = parsed.email || hint;
   if (keptHint) record.loginHint = keptHint;
@@ -2158,7 +2159,7 @@ async function getGoogleAccessToken(interactive) {
     else if (!(await chromeTokenIsConsented(token))) throw new Error('Chrome is signed in as another Google account.');
     // Chrome's identity cache dies with the service worker. The panel
     // reads googleWebAuth from chrome.storage.local.
-    await persistGoogleAccessToken(token, 'chrome');
+    await persistGoogleAccessToken(token, 'chrome', wantUi ? { interactiveAt: Date.now() } : null);
     return { token, source: 'chrome' };
   } catch (err) {
     const message = err && err.message;
@@ -2382,6 +2383,8 @@ async function persistGoogleAccessToken(token, source, extra) {
   if (more.expiresAt) record.expiresAt = more.expiresAt;
   else if ((source || '') === 'chrome') record.expiresAt = Date.now() + CHROME_TOKEN_MS;
   const existing = await readGoogleWebAuth();
+  if (typeof more.interactiveAt === 'number') record.interactiveAt = more.interactiveAt;
+  else if (existing && typeof existing.interactiveAt === 'number') record.interactiveAt = existing.interactiveAt;
   const hint = more.loginHint || (existing && existing.loginHint) || '';
   if (hint) record.loginHint = hint;
   return commitGoogleWebAuth(record, googleWebAuthEpoch);
@@ -2391,7 +2394,7 @@ async function persistGoogleAccessToken(token, source, extra) {
 // Persist it on the same key the silent path already reads, and drop the
 // Reconnect flag in that same step. The panel reads this record.
 async function rememberUpgradedGoogleToken(token, source) {
-  const committed = await persistGoogleAccessToken(token, source);
+  const committed = await persistGoogleAccessToken(token, source, { interactiveAt: Date.now() });
   if (!committed) return false;
   await clearGoogleReconnect();
   return true;
@@ -2507,6 +2510,8 @@ async function googleLoginHint() {
 // the same scopes, and login_hint when one is known. That call uses the
 // Google session cookie. Reconnect is set only when both silent calls fail
 // on an account that had already connected.
+let lastRefresh = null;
+
 async function refreshGoogleSession() {
   const now = Date.now();
   const before = await chrome.storage.local.get([
@@ -2530,6 +2535,16 @@ async function refreshGoogleSession() {
   let chromeError = '';
   try { chromeToken = await getGoogleAuthToken(false); }
   catch (e) { chromeError = (e && e.message) || String(e); }
+  // After a reload Chrome's silent cache often misses once. One more silent
+  // try, still no window. A real "not granted" is not that miss.
+  if (!chromeToken && transientSilentAuth(chromeError)) {
+    try {
+      chromeToken = await getGoogleAuthToken(false);
+      chromeError = '';
+    } catch (e) {
+      chromeError = (e && e.message) || String(e);
+    }
+  }
   if (chromeToken && !(await chromeTokenIsConsented(chromeToken))) {
     chromeToken = '';
     chromeError = 'Chrome is signed in as another Google account.';
@@ -2555,6 +2570,7 @@ async function refreshGoogleSession() {
       state: 'connected',
       source: 'chrome'
     }, who));
+    lastRefresh = { at: Date.now(), token: chromeToken };
     return { ok: true, source: 'chrome', token: chromeToken };
   }
   if (chromeToken && !hadAccount) {
@@ -2565,6 +2581,7 @@ async function refreshGoogleSession() {
       state: 'connect',
       source: 'chrome'
     }, who));
+    lastRefresh = { at: Date.now(), token: chromeToken };
     return { ok: true, source: 'chrome', token: chromeToken };
   }
   const needsWeb = hadAccount && storedImplicitNeedsRefresh(stored, now);
@@ -2588,6 +2605,7 @@ async function refreshGoogleSession() {
       state: 'stored',
       source: 'stored'
     }, who));
+    lastRefresh = { at: Date.now(), token: stored.accessToken };
     return { ok: true, source: 'stored', token: stored.accessToken };
   }
   if (needsWeb) {
@@ -2614,6 +2632,7 @@ async function refreshGoogleSession() {
         state: 'connected',
         source: 'web'
       }, who));
+      lastRefresh = { at: Date.now(), token: saved.accessToken };
       return { ok: true, source: 'web', token: saved.accessToken };
     } catch (e) {
       webError = (e && e.message) || String(e);
@@ -2654,6 +2673,15 @@ async function refreshGoogleSession() {
 // Google ends a grant with invalid_grant / invalid_token, or says it was
 // revoked. Nothing else a refresh can say (no window, no session, offline)
 // ends it.
+// A cold Chrome identity cache says "not signed in" once. That is not a
+// revoked grant and not "OAuth2 not granted or revoked."
+function transientSilentAuth(message) {
+  const msg = String(message || '');
+  if (!msg) return false;
+  if (/not granted or revoked|did not approve|cancell?ed|closed or denied|access_denied/i.test(msg)) return false;
+  return /not signed in|interaction required|OAuth2 request failed/i.test(msg);
+}
+
 function googleRefreshRevoked(err) {
   return /invalid_grant|invalid_token|revoked/i.test(String((err && err.message) || err || ''));
 }
@@ -2684,6 +2712,17 @@ async function clearGoogleAuthForRevocation(reason) {
   return { cleared: true, reason: String(reason || 'revoked') };
 }
 
+async function googleTokenFreshlyGranted() {
+  try {
+    const bag = await chrome.storage.local.get(GOOGLE_WEB_AUTH_STORAGE_KEY);
+    const rec = bag && bag[GOOGLE_WEB_AUTH_STORAGE_KEY];
+    const at = rec && rec.interactiveAt;
+    return typeof at === 'number' && Number.isFinite(at) && Date.now() - at < 120000;
+  } catch (e) {
+    return false;
+  }
+}
+
 function googleTokenInfoSaysRevoked(data, status) {
   if (status === 401) return true;
   if (!data || typeof data !== 'object') return false;
@@ -2706,8 +2745,12 @@ async function probeGoogleAuthStillValid() {
   if (!googleHadAccount(bag)) return { ok: true, probed: false };
   let token = '';
   try {
-    const cred = await getGoogleAccessToken(false);
-    token = (cred && cred.token) || '';
+    if (lastRefresh && lastRefresh.token && Date.now() - lastRefresh.at < 3000) {
+      token = lastRefresh.token;
+    } else {
+      const cred = await getGoogleAccessToken(false);
+      token = (cred && cred.token) || '';
+    }
   } catch (e) {
     if (googleRefreshRevoked(e)) {
       await clearGoogleAuthForRevocation('revoked');
@@ -2717,8 +2760,10 @@ async function probeGoogleAuthStillValid() {
     return { ok: true, probed: true, softFail: true };
   }
   if (!token) {
-    await clearGoogleAuthForRevocation('not signed in');
-    return { ok: false, probed: true, cleared: true, reason: 'not signed in' };
+    // A silent miss with no token is not a revoke. Clearing here is what
+    // put «התחבר ל-Google» back up right after a grant. A dead tokeninfo
+    // below is the revoke.
+    return { ok: true, probed: true, softFail: true, reason: 'not signed in' };
   }
   try {
     const res = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(token));
@@ -2726,6 +2771,9 @@ async function probeGoogleAuthStillValid() {
     try { data = await res.json(); } catch (e) { data = null; }
     if (googleTokenInfoSaysRevoked(data, res.status) || (res.status === 400 && googleTokenInfoSaysRevoked(data, 401))) {
       const why = (data && (data.error || data.error_description)) || 'invalid_token';
+      // A grant from the last two minutes can race tokeninfo. Leave it.
+      // An older token that tokeninfo rejects is a real revoke.
+      if (await googleTokenFreshlyGranted()) return { ok: true, probed: true, softFail: true, reason: 'fresh-grant' };
       await clearGoogleAuthForRevocation(why);
       try { if (token) await removeCachedGoogleAuthToken(token); } catch (e) { /* already gone */ }
       return { ok: false, probed: true, cleared: true, reason: String(why) };
@@ -2981,9 +3029,14 @@ async function connectGoogleTasks(interactive, preset) {
   const cred = preset || await getGoogleAccessToken(interactive !== false);
   await rememberGoogleProfile(cred && cred.token);
   await clearGoogleReconnect();
-  const taskListId = await findGlanceTaskList();
+  let taskListId = '';
+  let listError = null;
+  try { taskListId = await findGlanceTaskList(); }
+  catch (e) { listError = e; }
+  const kept = await readGoogleWebAuth();
+  if (!taskListId && !webTokenUsable(kept)) throw (listError || new Error('Could not find or make the ' + GLANCE_TASK_LIST_TITLE + ' list in Google Tasks.'));
   await chrome.storage.local.set({
-    googleTasksAuth: { taskListId },
+    googleTasksAuth: { taskListId: taskListId || '' },
     [GOOGLE_EVER_CONNECTED_STORAGE_KEY]: { connected: true }
   });
   // «שלב אחד לא הושלם» belongs to a Do It on the grant this Connect replaced.
