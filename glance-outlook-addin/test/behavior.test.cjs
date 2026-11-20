@@ -61,7 +61,7 @@ function makeBody(initialHtml, faults, writes) {
   body.getAsync = (type, cb) => {
     writes.bodyReads++;
     if (faults.readFails) return done(cb, null, false);
-    done(cb, type === 'html' ? body.html : textOf(body.html), true);
+    done(cb, (type === 'html' || faults.returnHtml) ? body.html : textOf(body.html), true);
   };
   body.prependAsync = (html, opts, cb) => {
     writes.prepend++;
@@ -172,13 +172,16 @@ async function scenario(o) {
     };
   const item = guard(raw, 'item');
   const mailbox = guard({ item, userProfile: { emailAddress: ME, displayName: 'Sali Sapan' }, convertToRestId: (id) => String(id).replace(/^EWS:/, '') }, 'mailbox');
+  const handlers = [];
   const Office = {
     onReady: (cb) => cb({ host: 'Outlook' }),
     AsyncResultStatus: { Succeeded: 'succeeded', Failed: 'failed' },
     CoercionType: { Html: 'html', Text: 'text' },
     MailboxEnums: { RestVersion: { v2_0: 'v2.0' } },
+    EventType: { ItemChanged: 'itemChanged' },
     context: { mailbox }
   };
+  mailbox.addHandlerAsync = (type, cb) => { handlers.push({ type: type, cb: cb }); };
   const rootNode = new Node('main');
   const document = { createElement: (t) => new Node(t), getElementById: () => rootNode };
   class FixedDate extends Date {
@@ -196,7 +199,12 @@ async function scenario(o) {
   await sandbox.GlanceOutlookPane.ready;
   await settleAll();
   const state = () => rootNode.attrs['data-glance-state'];
-  return { root: rootNode, calls, trip, writes, body, state, why: () => rootNode.attrs['data-glance-why'], text: () => rootNode.textContent };
+  return {
+    root: rootNode, calls, trip, writes, body, mailbox, raw, state,
+    why: () => rootNode.attrs['data-glance-why'],
+    text: () => rootNode.textContent,
+    fireItemChanged: () => handlers.filter((h) => h.type === 'itemChanged').forEach((h) => h.cb())
+  };
 }
 
 const nonGet = (s) => s.calls.filter((c) => c.method !== 'GET' || SEND.test(c.url));
@@ -425,9 +433,9 @@ process.on('unhandledRejection', (e) => { if (!/send is not reachable/.test(Stri
       itemFrom: { emailAddress: ME, displayName: 'Sali Sapan' },
       itemTo: [{ emailAddress: 'dana@client.example', displayName: 'Dana' }]
     });
-    check('sideload read: the person\'s own message stays quiet',
-      mine.state() === 'quiet' && mine.why() === 'last-message-is-mine' && mine.calls.length === 0,
-      [mine.state(), mine.why()]);
+    check('sideload read: a message the person sent to someone else stays quiet',
+      mine.state() === 'quiet' && !mine.root.button('insert') && mine.calls.length === 0 && !/Thursday morning/.test(mine.text()),
+      [mine.state(), mine.why(), mine.text()]);
 
     const empty = await scenario({ mode: 'read', token: null, priorHtml: '   ', itemTo: readTo });
     check('sideload read: an empty body stays quiet',
@@ -463,6 +471,87 @@ process.on('unhandledRejection', (e) => { if (!/send is not reachable/.test(Stri
     check('sideload compose: a reply with no quoted message stays quiet and writes nothing',
       ownTyping.state() === 'quiet' && ownTyping.why() === 'no-quoted-message' && noWriteYet(ownTyping) && ownTyping.calls.length === 0,
       [ownTyping.state(), ownTyping.why()]);
+
+    const selfAsk = await scenario({
+      mode: 'read', token: null, priorHtml: ASK,
+      itemFrom: { emailAddress: ME, displayName: 'sali' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }],
+      itemCc: []
+    });
+    check('self-sent ask: the card names the ask and is not the empty template',
+      selfAsk.state() === 'card' && /Thursday morning/.test(selfAsk.text())
+      && !/Following up on your message below/.test(selfAsk.text())
+      && !/\[Write your reply here\]/.test(selfAsk.text()),
+      [selfAsk.state(), selfAsk.why(), selfAsk.text()]);
+
+    const fyi = 'רק לעדכנכם, הכול בסדר, אין צורך לעשות כלום.';
+    const fyiMail = await scenario({
+      mode: 'read', token: null, faults: { returnHtml: true },
+      priorHtml: '<html><body><div class="elementToProof">' + fyi + '</div></body></html>',
+      itemFrom: { emailAddress: ME, displayName: 'sali' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('FYI: no card and no Insert draft',
+      fyiMail.state() === 'quiet' && !fyiMail.root.button('insert') && !/Following up on your message below/.test(fyiMail.text()),
+      [fyiMail.state(), fyiMail.why(), fyiMail.text()]);
+
+    const htmlAsk = await scenario({
+      mode: 'read', token: null, faults: { returnHtml: true },
+      priorHtml: '<html><body><div class="elementToProof">' + ASK + '</div></body></html>',
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('HTML body: the ask reaches the card',
+      htmlAsk.state() === 'card' && /Thursday morning/.test(htmlAsk.text()) && !/Following up on your message below/.test(htmlAsk.text()),
+      [htmlAsk.state(), htmlAsk.why(), htmlAsk.text()]);
+
+    const owa = '<html><body><div>Thanks, looking now.</div><div id="appendonsend"></div>'
+      + '<div id="divRplyFwdMsg"><b>From:</b> Dana Cohen &lt;dana@client.example&gt;<br>'
+      + '<b>Sent:</b> Tuesday<br><b>To:</b> Sali<br><b>Subject:</b> Review</div><div>' + ASK + '</div></body></html>';
+    const reply = await scenario({ mode: 'compose', token: null, priorHtml: owa });
+    const replyBefore = reply.body.html;
+    check('OWA reply: the quoted original shows a card',
+      reply.state() === 'card' && /Thursday morning/.test(reply.text()) && reply.calls.length === 0,
+      [reply.state(), reply.why(), reply.text()]);
+    reply.root.button('insert').click(); await settleAll();
+    reply.root.button('undo').click(); await settleAll();
+    check('OWA reply: Insert then Undo restores the reply and sends nothing',
+      reply.state() === 'undone' && reply.body.html === replyBefore && reply.trip.length === 0 && reply.writes.replyForms.length === 0,
+      [reply.state(), reply.trip, reply.writes]);
+
+    const switched = await scenario({
+      mode: 'read', token: null, priorHtml: fyi,
+      itemFrom: { emailAddress: 'dana@client.example', displayName: 'Dana' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('before the selection changes, the FYI has no Insert', switched.state() === 'quiet' && !switched.root.button('insert'), [switched.state(), switched.why()]);
+    switched.body.html = ASK;
+    switched.raw.subject = 'Review';
+    switched.fireItemChanged();
+    await settleAll();
+    check('ItemChanged re-reads the selected message and drops the previous card',
+      switched.state() === 'card' && /Thursday morning/.test(switched.text()) && !/לעדכנכם/.test(switched.text()),
+      [switched.state(), switched.why(), switched.text()]);
+
+    const cached = await scenario({
+      mode: 'read', token: null, priorHtml: ASK,
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('the open ask is cached for the conversation', cached.state() === 'card' && /Thursday morning/.test(cached.text()));
+    const bare = makeBody('<div>Just my own reply.</div>', {}, { prepend: 0, set: 0, bodyReads: 0 });
+    cached.mailbox.item = {
+      subject: { getAsync: (cb) => cb({ status: 'succeeded', value: 'Re: Review' }) },
+      conversationId: CONV_EWS,
+      to: { getAsync: (cb) => cb({ status: 'succeeded', value: [] }) },
+      cc: { getAsync: (cb) => cb({ status: 'succeeded', value: [] }) },
+      body: bare,
+      displayReplyForm: () => {},
+      displayReplyAllForm: () => {}
+    };
+    cached.fireItemChanged();
+    await settleAll();
+    check('compose with no parseable quote uses the cached original',
+      cached.state() === 'card' && /Thursday morning/.test(cached.text()) && cached.calls.length === 0,
+      [cached.state(), cached.why(), cached.text()]);
   }
 
   // 11. The tests above bite: break the code on purpose, and the matching check must notice.

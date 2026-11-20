@@ -116,6 +116,28 @@
     return GlanceOutlookThread.read(opts).then(function (res) { return { res: res, me: me, name: name }; });
   }
 
+  // The open message, kept by conversation id, so a reply whose quoted original cannot be parsed
+  // still judges the message Glance already read.
+  var readCache = {};
+  function rememberItem(message) {
+    var key = GlanceOutlookItem.canonId(message && message.conversationId);
+    if (!key) return;
+    readCache[key] = {
+      text: message.text,
+      subject: message.subject,
+      from: message.from,
+      fromName: message.fromName,
+      to: message.to,
+      cc: message.cc,
+      conversationId: message.conversationId,
+      isMine: message.isMine
+    };
+  }
+  function recallItem(conversationId) {
+    var key = GlanceOutlookItem.canonId(conversationId);
+    return key && readCache[key] ? readCache[key] : null;
+  }
+
   // The open item only. Used when GlanceOutlookAuth is not in the bundle. No Graph.
   function loadOpenItem(item, compose) {
     var mailbox = Office.context.mailbox;
@@ -127,20 +149,69 @@
       asyncCall: asyncCall,
       coercionText: Office.CoercionType.Text
     }).then(function (res) {
+      if (!res.ok && compose && res.why === 'no-quoted-message') {
+        var cached = recallItem(item.conversationId);
+        if (cached) res = { ok: true, message: cached };
+      }
       if (!res.ok) return { res: res, me: me, name: name };
+      if (!compose) rememberItem(res.message);
       var messages = [res.message];
       messages.source = 'office-item';
       return { res: { ok: true, messages: messages, source: 'office-item' }, me: me, name: name };
     });
   }
 
+  // draftText with no draft step still returns "Following up on your message below. [Write your reply here]".
+  // That string names no ask. A real draft quotes the message. A task-only close (a self-sent ask) uses the task title.
+  function genericDraft(text) {
+    return /Following up on your message below|בהמשך להודעה שלך למטה/.test(text || '')
+      && /\[Write your reply here\]|\[כתוב כאן את התשובה\]/.test(text || '');
+  }
+
+  function draftForCard(judged, message, sender) {
+    var steps = (judged.process && judged.process.steps) || [];
+    var draftStep = null;
+    var taskStep = null;
+    for (var i = 0; i < steps.length; i++) {
+      var step = steps[i];
+      if (!step) continue;
+      if (step.kind === 'outlookDraft' || step.kind === 'gmailDraft') draftStep = step;
+      if (step.kind === 'outlookTask' || step.kind === 'googleTask') taskStep = step;
+    }
+    var process = judged.process;
+    if (draftStep && message && message.text) {
+      var params = Object.assign({}, draftStep.params || {});
+      if (!params.askText) params.askText = message.text;
+      if (!params.what) params.what = message.text;
+      var cloned = steps.map(function (step) {
+        return step === draftStep ? Object.assign({}, step, { params: params }) : step;
+      });
+      process = Object.assign({}, judged.process, { steps: cloned });
+    }
+    var drafted = GlanceOutlookEngine.draftText(process, { sender: sender, subject: message.subject });
+    if (drafted && !genericDraft(drafted)) return drafted;
+    var ask = message && message.text ? message.text : '';
+    if (ask) {
+      var synthetic = { steps: [{ kind: 'outlookDraft', id: 'draft', params: { what: ask, askText: ask } }] };
+      var built = GlanceOutlookEngine.draftText(synthetic, { sender: sender, subject: message.subject });
+      if (built && !genericDraft(built)) return built;
+    }
+    var title = taskStep && taskStep.params && (taskStep.params.title || taskStep.params.what);
+    if (title) return String(title);
+    var label = judged.intent && (judged.intent.label || (judged.intent.entities && judged.intent.entities.what));
+    return label || ask || '';
+  }
+
   function judgeThread(messages, me, name) {
     var last = messages[messages.length - 1];
     var office = messages.source === 'office-item';
-    if (last.isMine) return { show: false, reason: 'last-message-is-mine' };
+    // A whole thread whose newest message is the person's own stays quiet. The open item is different:
+    // a self-sent ask is still an ask, the same rule the shared judge uses for Gmail.
+    if (!office && last.isMine) return { show: false, reason: 'last-message-is-mine' };
     var sender = { email: last.from || null, name: last.fromName };
     var to = office ? (Array.isArray(last.to) ? last.to : []) : (me ? [me] : []);
     var cc = office ? (Array.isArray(last.cc) ? last.cc : []) : [];
+    var selfSent = office && last.from && me && String(last.from).toLowerCase() === String(me).toLowerCase();
     var judgedInput = {
       text: last.text,
       subject: last.subject,
@@ -155,10 +226,17 @@
       attachmentCount: 0
     };
     if (office) judgedInput.cc = cc;
+    if (selfSent) {
+      judgedInput.senderIsUser = true;
+      judgedInput.inSent = true;
+      judgedInput.inbound = false;
+    }
     var judged = GlanceOutlookEngine.judge(judgedInput);
     if (!judged || !judged.show || !judged.process) return { show: false, reason: (judged && judged.reason) || 'intent-null' };
-    var draft = GlanceOutlookEngine.draftText(judged.process, { sender: sender, subject: last.subject });
-    if (!draft) return { show: false, reason: 'no-draft-step' };
+    var draft = office
+      ? draftForCard(judged, last, sender)
+      : GlanceOutlookEngine.draftText(judged.process, { sender: sender, subject: last.subject });
+    if (!draft || genericDraft(draft)) return { show: false, reason: 'no-draft-step' };
     return {
       show: true,
       draft: draft,
@@ -328,7 +406,9 @@
     });
   }
 
-  function boot() {
+  var shownGeneration = 0;
+  function showCurrentItem() {
+    var token = ++shownGeneration;
     var root = document.getElementById('glance-card');
     var item = Office.context.mailbox && Office.context.mailbox.item;
     if (!item) return Promise.resolve(renderQuiet(root, 'no-item'));
@@ -337,13 +417,29 @@
     var authed = Boolean(auth && typeof auth.getToken === 'function');
     var pending = authed ? loadThread(item, compose) : loadOpenItem(item, compose);
     return pending.then(function (t) {
+      if (token !== shownGeneration) return;
       if (!t.res.ok) return renderQuiet(root, t.res.why);
       var verdict = judgeThread(t.res.messages, t.me, t.name);
       if (!verdict.show) return renderQuiet(root, verdict.reason);
       renderCard(root, verdict, compose);
     }).catch(function () {
+      if (token !== shownGeneration) return;
       renderQuiet(root, 'network');
     });
+  }
+
+  function watchItemChanges() {
+    var mailbox = Office.context && Office.context.mailbox;
+    if (!mailbox || typeof mailbox.addHandlerAsync !== 'function') return;
+    if (!Office.EventType || !Office.EventType.ItemChanged) return;
+    try {
+      mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () { showCurrentItem(); });
+    } catch (err) { /* the pane still reads the item it opened on */ }
+  }
+
+  function boot() {
+    watchItemChanges();
+    return showCurrentItem();
   }
 
   var ready = new Promise(function (resolve) {

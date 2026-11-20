@@ -167,6 +167,41 @@ function failed(a, b) {
   }
 
   {
+    const ASK = 'Hi Sali, could you reply to confirm you will be at the review on Thursday morning? Please let me know by Wednesday.';
+    const html = '<html><body><div class="elementToProof">' + ASK + '</div></body></html>';
+    const readItem = {
+      subject: 'Review',
+      from: { emailAddress: 'dana@client.example', displayName: 'Dana' },
+      to: [{ emailAddress: ME, displayName: 'Sali' }],
+      cc: [],
+      body: { getAsync: succeeded(html) }
+    };
+    const res = await item.read(readItem, { me: ME, compose: false, asyncCall: asyncCall, coercionText: 'text' });
+    check('read: an HTML body is the plain ask, with the tags gone',
+      res.ok && res.message.text.indexOf('Thursday morning') !== -1 && res.message.text.indexOf('<div') === -1,
+      res.message && res.message.text);
+  }
+
+  {
+    const ASK = 'Hi Sali, could you reply to confirm you will be at the review on Thursday morning? Please let me know by Wednesday.';
+    const owa = '<html><body><div>Thanks, looking now.</div><div id="appendonsend"></div>'
+      + '<div id="divRplyFwdMsg" dir="ltr"><b>From:</b> Dana Cohen &lt;dana@client.example&gt;<br>'
+      + '<b>Sent:</b> Tuesday, October 14, 2026 10:00 AM<br>'
+      + '<b>To:</b> Sali Sapan &lt;' + ME + '&gt;<br>'
+      + '<b>Subject:</b> Review</div><div>' + ASK + '</div></body></html>';
+    const parsed = item.quotedIncoming(owa);
+    check('quote: OWA appendonsend / divRplyFwdMsg keeps the original ask and the sender',
+      parsed && parsed.text.indexOf('Thursday morning') !== -1 && parsed.text.indexOf('looking now') === -1
+      && parsed.from === 'dana@client.example' && parsed.fromName === 'Dana Cohen',
+      parsed);
+    const hebrew = 'תודה.\n________________________________\nמאת: דנה כהן <dana@client.example>\nנשלח: יום שלישי\nאל: סאלי\nנושא: סקירה\n\n' + ASK;
+    const he = item.quotedIncoming(hebrew);
+    check('quote: a Hebrew From/Sent/To/Subject block keeps the original ask',
+      he && he.text.indexOf('Thursday morning') !== -1 && he.text.indexOf('תודה') === -1 && he.from === 'dana@client.example',
+      he);
+  }
+
+  {
     const html = item.draftHtml('Hi Dana,\n<script>alert(1)</script> & friends');
     check('draft html escapes markup and keeps line breaks',
       html === 'Hi Dana,<br>&lt;script&gt;alert(1)&lt;/script&gt; &amp; friends', html);
