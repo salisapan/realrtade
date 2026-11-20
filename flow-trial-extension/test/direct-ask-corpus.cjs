@@ -222,6 +222,18 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   for (const t of ['שלום,\n\nתודה בבקשה על הדיווח.\n\nבברכה', 'שלום,\n\nתוכנית העבודה בבקשה מצורפת לעיונך.\n\nבברכה', 'היי דנה,\n\nתדפיס בבקשה את הטבלה בצבעוני.']) {
     const r = judge(t); check('round-5 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
   }
+  // Round 9 (invented sentences): «אנא / בבקשה» + a plain imperative; a please-do-not stays quiet.
+  for (const x of ['היי סאלי,\n\nאנא פנה למזכירות לבירור המועד.\n\nתודה', 'שלום,\n\nבבקשה פרט קצת יותר על הרקע.\n\nתודה', 'שלום,\n\nאנא שלח/י במייל חוזר את הטופס החתום.\n\nתודה']) {
+    const r = judge(x); check('round-9 ask offers: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const x of ['שלום,\n\nאנא לא להפריע בשעות הערב.\n\nתודה']) {
+    const r = judge(x); check('round-9 contrast stays quiet: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
+  // Round 10 (invented sentences): a polite send verb with no reply channel could be a file ask or an answer ask: it stays as the engine left it (quiet); with the reply channel named it offers.
+  for (const x of ['היי,\n\nאנא העבר לי את הטבלה המעודכנת.\n\nתודה', 'שלום,\n\nבבקשה צרף לי את הנספח.\n\nתודה']) {
+    const r = judge(x); check('round-10 send verb without a channel stays quiet: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
+  const ch = judge('שלום,\n\nאנא שלח/י במייל חוזר את הטופס החתום.\n\nתודה'); check('round-10 send verb with the reply channel offers', ch.show, kinds(ch));
 }
 
 console.log('\nTOTAL FAILURES:', failures);
