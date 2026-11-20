@@ -398,6 +398,16 @@ console.log('\n--- real-mail dev set grammar (2026-11-18): bare Hebrew amount, s
 // A fee chase with no figure is a payment chase; a chase about something else stays a reply (invented sentences, 2026-11-18).
 for (const t of ['היי,\nנודה למענה שלכם על סגירת הסעיפים, ובפרט על עדכון תשלום הדמי קדימה.\nבברכה,', 'נהדר, תודה!\nממתינים לעדכון בנוגע לשכר טרחה.\nבברכה', 'היי, העבירו לנו בבקשה את אישור התשלום.']) { const r = classify(t); check('fee chase is a payment: ' + t.slice(0, 24), r && r.kind === 'payment', r && r.kind); }
 for (const t of ['היי,\nנודה למענה שלכם על סגירת הסעיפים.\nבברכה,', 'שלום, אשמח שתעדכנו אותי לגבי מועד הישיבה.']) { const r = classify(t); check('non-fee chase stays a reply: ' + t.slice(0, 24), !r || r.kind === 'reply', r && r.kind); }
+// Sent asks the fixed phrasings missed: a file to put somewhere, a meeting proposed at a clock, a Hebrew imperative with «בבקשה» (invented sentences, 2026-11-20). Contrast: a plain statement of the same words is not an ask.
+for (const t of ['Hi Dana, please save the attached report to the shared folder when you can.', "Let's hold a short budget review on Thursday at 11:00 on Zoom. Does that work for you?", 'היי רון, תפתח בבקשה את המסמך החדש ותעביר לי הערות.', 'שלום, מלא את הטופס, חתום והחזר עד מחר. תודה', 'בוא ניפגש ביום חמישי ב-09:30 במשרד לעבור על ההצעה.']) { const r = classify(t); check('sent ask is open: ' + t.slice(0, 24), r && r.kind === 'reply', r && r.kind); }
+for (const t of ['The team met on Thursday at 11:00 and reviewed the budget, nothing is needed from you.', 'I saved the report to the shared folder yesterday, it is there if you need it.', 'הפגישה התקיימה ביום חמישי ב-09:30 והכל הסתדר, תודה על הכל.']) { const r = classify(t); check('sent statement is not an ask: ' + t.slice(0, 24), !r, r && r.kind); }
+// Commitment recall (off by default; ctx.commitmentRecall): Hebrew promises of a closed verb list and a passive future with a time word (invented sentences, 2026-11-20). Contrast: a condition, a request frame, a done report, a question.
+{
+  const cm = (t, on) => F.classifyCommitment(t, { now: NOW, extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, commitmentRecall: on });
+  for (const t of ['שלום רב, המסמך החתום יועבר אליכם בהקדם. בברכה', 'היי דנה, הנספח יישלח אליכם ביום ראשון. תודה', 'שלום, אברר מול הספק ואחזור אליך מחר. בברכה', 'היי, נעביר לכם את הטפסים בהקדם. תודה רבה']) { const r = cm(t, true); check('commitment recall finds: ' + t.slice(0, 24), r && r.direction === 'mine', r); }
+  for (const t of ['שלום, במידה ויהיה צורך אשלח לכם עותק מהמסמך. בברכה', 'שלום, אבקש לקבל את המסמך החתום עד מחר. תודה', 'היי, כבר העברנו אליכם את הכל והטבלה עודכנה. בברכה', 'היי, האם יועבר אליכם הנספח בהקדם? תודה']) { const r = cm(t, true); check('commitment recall stays quiet: ' + t.slice(0, 24), !r, r && r.what); }
+  const off = cm('שלום רב, המסמך החתום יועבר אליכם בהקדם. בברכה', false); check('commitment recall is off by default', !off, off && off.what);
+}
 
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);
