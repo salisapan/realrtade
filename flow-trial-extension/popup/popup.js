@@ -238,14 +238,15 @@
   renderIdentityLinks().catch(() => {});
   renderCapture().catch(() => {});
   renderSurfaces().catch(() => {});
+  renderChatPageGrant().catch(() => {});
   renderLabs().catch(() => {});
   renderMetaChats().catch(() => {});
   try {
     if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
-      chrome.permissions.onAdded.addListener(() => { renderMetaChats().catch(() => {}); });
+      chrome.permissions.onAdded.addListener(() => { renderMetaChats().catch(() => {}); renderChatPageGrant().catch(() => {}); renderSurfaces().catch(() => {}); });
     }
     if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
-      chrome.permissions.onRemoved.addListener(() => { renderMetaChats().catch(() => {}); });
+      chrome.permissions.onRemoved.addListener(() => { renderMetaChats().catch(() => {}); renderChatPageGrant().catch(() => {}); renderSurfaces().catch(() => {}); });
     }
   } catch (e) { /* the row still refreshes the next time the popup opens */ }
   renderOutlookCards().catch(() => {});
@@ -2347,9 +2348,43 @@
   // nothing is asked at install), Glance registers its reader for it, and you can turn it off again at any time. A function
   // with a property for its wiring, not a let: it runs during init.
   const SURFACE_COPY = {
-    slack: 'קורא הודעות ישירות אחד-על-אחד, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. ערוצים, קבוצות ושרשורים לא נקראים. ניסיוני: Slack יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.',
-    telegram: 'קורא שיחות אחד-על-אחד עם אנשים, רק כדי לראות אם משהו שביקשת נענה. לא שולח, לא מקליד ולא פותח כלום. קבוצות, ערוצים ובוטים לא נקראים. ניסיוני: Telegram יכול לשנות את הדף בלי הודעה, ו-Glance שותק אם הוא לא מצליח לקרוא.'
+    slack: 'קורא את הצ׳אט הפתוח ב-Slack רק אחרי שמפעילים. טיוטה בתיבה בלבד, לא שולח. ערוצים, קבוצות ושרשורים לא נקראים. Glance שותק אם הוא לא מצליח לקרוא.',
+    telegram: 'קורא את הצ׳אט הפתוח ב-Telegram רק אחרי שמפעילים. טיוטה בתיבה בלבד, לא שולח. קבוצות, ערוצים ובוטים לא נקראים. Glance שותק אם הוא לא מצליח לקרוא.'
   };
+
+  function chatHostFromUrl(url) {
+    if (/^https:\/\/app\.slack\.com\//i.test(url || '')) return 'slack';
+    if (/^https:\/\/web\.telegram\.org\//i.test(url || '')) return 'telegram';
+    return '';
+  }
+
+  // The side panel is open on Slack or Telegram and that optional host is not granted.
+  // The button asks for that one origin. It does not add a scope.
+  async function renderChatPageGrant() {
+    const mount = document.getElementById('chat-page-grant');
+    if (!mount || typeof FlowChatHostPrompt === 'undefined') return;
+    let url = '';
+    try {
+      if (chrome.tabs && chrome.tabs.query) {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        url = (tabs && tabs[0] && tabs[0].url) || '';
+      }
+    } catch (e) { url = ''; }
+    const id = chatHostFromUrl(url);
+    if (!id) { mount.hidden = true; mount.replaceChildren(); return; }
+    const origins = FlowChatHostPrompt.hostsFor(id);
+    let granted = false;
+    try {
+      if (chrome.permissions && chrome.permissions.contains) granted = await chrome.permissions.contains({ origins: origins });
+    } catch (e) { granted = false; }
+    if (granted) { mount.hidden = true; mount.replaceChildren(); return; }
+    mount.hidden = false;
+    FlowChatHostPrompt.paint(document, {
+      root: mount,
+      request: () => chrome.permissions.request({ origins: origins.slice() }),
+      onGranted: () => { mount.hidden = true; renderSurfaces().catch(() => {}); }
+    });
+  }
   function paintNamesDiag() {
     const node = document.getElementById('namesDiag');
     if (!node || typeof FlowDisplay === 'undefined' || typeof FlowDisplay.namesDiagLine !== 'function') return;

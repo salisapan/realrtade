@@ -30,7 +30,35 @@ const FlowTelegramParse = (() => {
     return (pieces || []).filter((p) => p && !p.quoted).map((p) => String(p.text || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n').slice(0, 4000);
   }
 
-  return { parseHash, threadIdFor, messageId, joinText };
+  function norm(s) { return String(s || '').replace(/\s+/g, ' ').trim(); }
+
+  // Saved Messages is the self chat on Telegram Web A and Web K.
+  function isSelfTitle(blob) {
+    return /\(you\)|\byourself\b|saved messages|jot something down|הודעות שמורות|\(אתה\)|\(את\)|לעצמך/i.test(norm(blob));
+  }
+
+  function isFyi(text) {
+    return /\bfyi\b|for your information|no action needed|no need to reply|no need to do anything|לידיעתך|אין צורך/i.test(norm(text));
+  }
+
+  function isAsk(text) {
+    if (isFyi(text)) return false;
+    return /\b(?:can you|could you|would you|please|send me)\b|תוכל|תוכלי|תשלח|בבקשה|אפשר/i.test(norm(text));
+  }
+
+  function selfDraft(text) {
+    let body = norm(text)
+      .replace(/^(?:can you|could you|would you|please)\s+/i, '')
+      .replace(/^(?:תוכל|תוכלי|אפשר|בבקשה)\s+/, '')
+      .replace(/[?؟]\s*$/, '')
+      .trim();
+    if (!body) return /[\u0590-\u05FF]/.test(String(text || '')) ? 'אטפל בזה.' : "I'll take care of it.";
+    if (!/[\u0590-\u05FF]/.test(body)) body = body.charAt(0).toUpperCase() + body.slice(1);
+    if (!/[.!?]$/.test(body)) body += '.';
+    return body.slice(0, 500);
+  }
+
+  return { parseHash, threadIdFor, messageId, joinText, isSelfTitle, isFyi, isAsk, selfDraft };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowTelegramParse };

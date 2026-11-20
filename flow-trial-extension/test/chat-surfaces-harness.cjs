@@ -10,14 +10,32 @@ let chromium;
 try { ({ chromium } = require('playwright')); } catch (e) {
   try { ({ chromium } = require(path.join(process.env.NODE_PATH || '/opt/node22/lib/node_modules', 'playwright'))); } catch (e2) { console.log('SKIPPED: playwright not available'); process.exit(0); }
 }
-const EXE = process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium';
+let EXE = process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium';
+if (!fs.existsSync(EXE)) {
+  try {
+    const pw = require('playwright');
+    const alt = pw.chromium.executablePath();
+    if (alt && fs.existsSync(alt)) EXE = alt;
+  } catch (e) { /* playwright's browser is not installed */ }
+}
+if (!fs.existsSync(EXE)) {
+  try {
+    const pw = require('@playwright/test');
+    const alt = pw.chromium.executablePath();
+    if (alt && fs.existsSync(alt)) EXE = alt;
+  } catch (e2) { /* the test package is not installed */ }
+}
 if (!fs.existsSync(EXE)) { console.log('SKIPPED: no chromium at ' + EXE); process.exit(0); }
 const ROOT = path.join(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
 const GMAIL_ONLY = ['src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
 // Exactly what src/background.js registers for this app: the Gmail list minus the Gmail-only pieces, plus the two WhatsApp files.
 const BASE = manifest.content_scripts[0].js.filter((f) => GMAIL_ONLY.indexOf(f) < 0);
-const SCRIPTS = { slack: BASE.concat(['src/slack-parse.js', 'src/content-slack.js']), telegram: BASE.concat(['src/telegram-parse.js', 'src/content-telegram.js']) };
+const LANE = ['src/chat-compose.js', 'src/chat-host-prompt.js', 'src/chat-self-card.js'];
+const SCRIPTS = {
+  slack: BASE.concat(LANE).concat(['src/slack-parse.js', 'src/content-slack.js']),
+  telegram: BASE.concat(LANE).concat(['src/telegram-parse.js', 'src/content-telegram.js'])
+};
 const TMP = fs.mkdtempSync(path.join(require('os').tmpdir(), 'glance-chat-'));
 const { FlowIdentity } = require('../core/identity-graph.js');
 
@@ -192,6 +210,42 @@ const baseWatch = (channel, threadId, id, name) => ({ id: threadId, threadId, ch
   t = await open(browser, 'telegram', TG_DM, tgHtml('Dana Cole', [], { noRows: true }), { noRows: true });
   s = await t.state();
   check('Telegram: an unrecognised layout is silent and reported as such', s.card === null && s.watches.length === 0 && s.health && s.health.ok === false && /no-messages-recognised/.test(s.health.reason || ''), s.health);
+  await t.ctx.close();
+
+  const slackSelf = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/slack-web-self.html'), 'utf8');
+  const slackFyi = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/slack-web-fyi.html'), 'utf8');
+  const tgA = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/telegram-a-self.html'), 'utf8');
+  const tgK = fs.readFileSync(path.join(ROOT, 'e2e/fixtures/telegram-k-self.html'), 'utf8');
+  t = await open(browser, 'slack', 'https://app.slack.com/client/T01ABC/D02SELF', slackSelf, {});
+  s = await t.state();
+  const slackDraft = await t.p.locator('[data-glance-do-it]').count();
+  check('Slack web fixture: a self-chat ask shows Do It', slackDraft === 1, s);
+  await t.p.locator('[data-glance-do-it]').click();
+  const slackBox = await t.p.locator('.ql-editor').innerText();
+  const slackSends = await t.p.evaluate(() => window.__glanceSendClicks || 0);
+  check('Slack web fixture: Do It drafts and does not press Send', slackBox.indexOf('Send the invoice by Friday.') >= 0 && slackSends === 0, { slackBox, slackSends });
+  await t.p.locator('[data-glance-undo]').click();
+  const slackCleared = (await t.p.locator('.ql-editor').innerText()).trim();
+  check('Slack web fixture: Undo clears the draft', slackCleared === '', slackCleared);
+  await t.ctx.close();
+
+  t = await open(browser, 'slack', 'https://app.slack.com/client/T01ABC/D02FYI', slackFyi, {});
+  const slackFyiCount = await t.p.locator('[data-glance-do-it]').count();
+  check('Slack web fixture: FYI gets no Do It', slackFyiCount === 0, slackFyiCount);
+  await t.ctx.close();
+
+  t = await open(browser, 'telegram', 'https://web.telegram.org/a/#777000123', tgA, {});
+  check('Telegram Web A fixture: a self-chat ask shows Do It', (await t.p.locator('[data-glance-do-it]').count()) === 1);
+  await t.p.locator('[data-glance-do-it]').click();
+  const tgBox = await t.p.locator('#editable-message-text').innerText();
+  const tgSends = await t.p.evaluate(() => window.__glanceSendClicks || 0);
+  check('Telegram Web A fixture: Do It drafts and does not press Send', tgBox.indexOf('Send the invoice by Friday.') >= 0 && tgSends === 0, { tgBox, tgSends });
+  await t.p.locator('[data-glance-undo]').click();
+  check('Telegram Web A fixture: Undo clears the draft', (await t.p.locator('#editable-message-text').innerText()).trim() === '');
+  await t.ctx.close();
+
+  t = await open(browser, 'telegram', 'https://web.telegram.org/k/#777000123', tgK, {});
+  check('Telegram Web K fixture: a self-chat ask shows Do It', (await t.p.locator('[data-glance-do-it]').count()) === 1);
   await t.ctx.close();
 
   await browser.close();

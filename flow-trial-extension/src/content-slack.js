@@ -1,22 +1,33 @@
-// Slack on the web, read-only, one-to-one direct messages only, off until the person turns it on (popup: "Where Glance watches").
+// Slack on the web. Off until the person turns it on (optional host https://app.slack.com/*).
 //
-// What it does: when the newest message in the open direct message is yours and asks for something, the same small card as in Gmail
-// offers to stay on it; when the other person answers, the same rules close it (or not). An answer here can also settle a loop you
-// opened by email (core/cross-channel.js), and the other way round.
-// What it never does: type, send, react, mark as read, open a conversation, or touch a channel, a group direct message or a thread.
-//
-// Honesty: Slack's page structure is not a public interface and changes without notice. This file reads the address (which
-// conversation, and whether it is one-to-one), the data-msg-ts of each message, the sender and the text, and checks on every pass
-// that it can still make sense of the page. If it cannot, it says so once (popup) and stays silent. Chat is short and informal, so
-// this surface is as strict as WhatsApp: only requests that match a known wording create an offer. Built and tested against a page
-// that imitates Slack's markup; not verified on the real Slack (docs/multi-platform.md).
+// One-to-one direct messages only. A self-chat ask gets one Do It. Do It places a draft in the compose box.
+// Undo clears that draft only while it is still the same text. Glance never presses Send.
+// A channel, a group direct message, a thread, and an FYI stay quiet.
+// If the page cannot be read, the reason is logged once: [Glance] slack why-not …
 (() => {
-  if (typeof FlowFollow === 'undefined' || typeof FlowSlackParse === 'undefined') return;
+  if (typeof FlowSlackParse === 'undefined') return;
   const P = FlowSlackParse;
   const DEBOUNCE_MS = 1200;
   const MAX_ROWS = 40;
+  const ORIGINS = ['https://app.slack.com/*'];
   let timer = null;
   let lastReportedHealth = null;
+  const seenWhy = new Set();
+
+  function markLane() {
+    try {
+      if (document.documentElement) document.documentElement.setAttribute('data-glance-lane-slack', 'on');
+    } catch (e) { /* document not ready */ }
+    trace('[Glance] slack lane injected ' + here());
+  }
+
+  function here() {
+    try { return String(location.href || ''); } catch (e) { return ''; }
+  }
+
+  function onRealHost() {
+    try { return location.hostname === 'app.slack.com'; } catch (e) { return false; }
+  }
 
   function pane() { return document.querySelector('[data-qa="message_pane"], [data-qa="slack_kit_list"], .p-workspace__primary_view_body'); }
   function rows() {
@@ -29,9 +40,43 @@
   }
   function senderOf(n) { const s = n.querySelector('[data-qa="message_sender_name"], [data-qa="message_sender"]'); return s ? (s.textContent || '').trim() : ''; }
   function textOf(n) {
-    const pieces = Array.from(n.querySelectorAll('[data-qa="message-text"], .p-rich_text_section')).map((s) => ({ text: s.innerText || s.textContent || '', quoted: Boolean(s.closest('blockquote, [data-qa="message_attachment"]')) }));
+    let nodes = Array.from(n.querySelectorAll('[data-qa="message-text"]'));
+    if (!nodes.length) nodes = Array.from(n.querySelectorAll('.p-rich_text_section'));
+    const pieces = nodes.map((s) => ({ text: s.innerText || s.textContent || '', quoted: Boolean(s.closest('blockquote, [data-qa="message_attachment"]')) }));
     return P.joinText(pieces);
   }
+  function composerBox() {
+    const marked = document.querySelector('[data-glance-composer]');
+    if (marked) return marked;
+    const input = document.querySelector('[data-qa="message_input"]');
+    if (input) {
+      const editor = input.matches && input.matches('[contenteditable="true"]') ? input : input.querySelector('.ql-editor, [contenteditable="true"]');
+      if (editor) return editor;
+    }
+    return document.querySelector('.ql-editor[contenteditable="true"], [aria-label="Message yourself"]');
+  }
+  function selfBlob() {
+    const box = composerBox();
+    const aria = box ? ((box.getAttribute('aria-label') || '') + ' ' + (box.getAttribute('data-placeholder') || '') + ' ' + (box.getAttribute('placeholder') || '')) : '';
+    return title() + ' ' + aria;
+  }
+
+  function trace(line) {
+    const text = String(line || '').slice(0, 400);
+    try { console.info(text); } catch (e) { /* no console */ }
+    try {
+      chrome.runtime.sendMessage({ type: 'flow:slack-trace', line: text }, () => { void chrome.runtime.lastError; });
+    } catch (e) { /* the page may be closing */ }
+  }
+
+  function whyNot(reason, detail) {
+    const extra = detail ? ' ' + String(detail) : '';
+    const line = '[Glance] slack why-not ' + reason + extra;
+    if (seenWhy.has(line)) return;
+    seenWhy.add(line);
+    trace(line);
+  }
+
   function report(ok, reason) {
     const key = ok ? 'ok' : 'bad:' + reason;
     if (key === lastReportedHealth) return;
@@ -39,20 +84,71 @@
     try { chrome.runtime.sendMessage({ type: 'flow:surface-health', id: 'slack', ok, reason: reason || null }, () => void chrome.runtime.lastError); } catch (e) { /* the page may be closing */ }
   }
 
-  function scan() {
+  function remember(threadId, sender) {
+    try {
+      if (!document.documentElement) return;
+      document.documentElement.setAttribute('data-glance-chat', threadId || '');
+      document.documentElement.setAttribute('data-glance-sender', sender || '');
+    } catch (e) { /* gone */ }
+  }
+
+  async function hostOpen() {
+    if (!onRealHost()) return true;
+    if (typeof chrome === 'undefined' || !chrome.permissions || typeof chrome.permissions.contains !== 'function') return true;
+    let ok = false;
+    try { ok = await chrome.permissions.contains({ origins: ORIGINS }); } catch (e) { ok = false; }
+    if (!ok) {
+      if (!document.querySelector('[data-glance-host-prompt]') && typeof FlowChatHostPrompt !== 'undefined') {
+        FlowChatHostPrompt.paint(document, {
+          request: () => chrome.permissions.request({ origins: ORIGINS.slice() }),
+          onGranted: () => { schedule(); }
+        });
+      }
+      whyNot('host-not-granted');
+      return false;
+    }
+    const bar = document.querySelector('[data-glance-host-prompt]');
+    if (bar && bar.remove) bar.remove();
+    return true;
+  }
+
+  function offerSelf(list, own) {
+    if (typeof FlowChatSelfCard === 'undefined') return;
+    const last = list[list.length - 1];
+    const text = textOf(last);
+    const self = P.isSelfTitle(selfBlob());
+    const result = FlowChatSelfCard.paint({
+      self: self,
+      fyi: P.isFyi(text),
+      ask: P.isAsk(text),
+      text: text,
+      draft: (value) => P.selfDraft(value),
+      composer: composerBox,
+      whyNot: whyNot
+    });
+    if (self && result && result.reason === 'fyi') whyNot('fyi');
+    else if (self && own[own.length - 1] === null) whyNot('sender-not-identified');
+  }
+
+  async function scan() {
+    if (!(await hostOpen())) return;
     const where = P.parseUrl(location.href);
-    if (!where) return;                                   // not a conversation view: nothing to read
-    if (!where.oneToOne || where.inThread) { report(true); return; }   // a channel, a group message or a thread: left alone, on purpose
+    if (!where) { whyNot('chat-not-identified', 'url=missing'); return; }
+    if (!where.oneToOne || where.inThread) { report(true); whyNot('not-one-to-one'); return; }
     const list = rows();
-    if (!list.length) { report(false, 'no-messages-recognised'); return; }
+    if (!list.length) { report(false, 'no-messages-recognised'); whyNot('no-messages-recognised', 'bubbles=0'); return; }
     const t = title();
-    if (!t) { report(false, 'chat-not-identified'); return; }
+    if (!t) { report(false, 'chat-not-identified'); whyNot('chat-not-identified', 'title=missing'); return; }
     const filled = P.fillSenders(list.map((n) => ({ sender: senderOf(n) })));
     const own = filled.map((r) => P.isOwn(r.sender, t));
-    if (own.some((x) => x === null)) { report(false, 'sender-not-identified'); return; }
+    if (own.some((x) => x === null) && !P.isSelfTitle(selfBlob())) { report(false, 'sender-not-identified'); whyNot('sender-not-identified'); return; }
     report(true);
-    const idx = new Map(list.map((n, i) => [n, i]));
     const threadId = P.threadIdFor(where);
+    const last = list[list.length - 1];
+    remember(threadId, senderOf(last) || (own[own.length - 1] === true ? 'me' : 'them'));
+    offerSelf(list, own);
+    if (typeof FlowFollow === 'undefined') return;
+    const idx = new Map(list.map((n, i) => [n, i]));
     const party = { name: t, phone: null, email: null };
     const ctx = {
       channel: 'slack',
@@ -73,7 +169,11 @@
     FlowFollow.consider(ctx).catch((e) => console.error('[Glance] Slack follow-up check failed', e));
   }
 
-  function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
-  new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+  function schedule() { clearTimeout(timer); timer = setTimeout(() => { scan().catch((e) => console.error('[Glance] Slack scan failed', e)); }, DEBOUNCE_MS); }
+  markLane();
+  const watch = document.documentElement || document.body;
+  if (watch) new MutationObserver(schedule).observe(watch, { childList: true, subtree: true });
   schedule();
+  globalThis.__glanceChatSurfaces = globalThis.__glanceChatSurfaces || {};
+  globalThis.__glanceChatSurfaces.slack = { scan: () => scan() };
 })();

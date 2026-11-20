@@ -29,5 +29,20 @@ check('the thread id names the peer; a group has none', T.threadIdFor('https://w
 check('a message id is read from "message-N" or a bare number', T.messageId('message-4242') === '4242' && T.messageId('4242') === '4242' && T.messageId('x') === null);
 check('a quoted message is not part of the text', T.joinText([{ text: 'quoted', quoted: true }, { text: ' my   ask ' }]) === 'my ask');
 
+console.log('\n--- self-chat, FYI, and the draft ---');
+check('Slack (you) is a self chat', S.isSelfTitle('Sali Sapan (you)') === true && S.isSelfTitle('Message yourself') === true);
+check('Telegram Saved Messages is a self chat', T.isSelfTitle('Saved Messages') === true && T.isSelfTitle('הודעות שמורות') === true);
+check('another person is not a self chat', S.isSelfTitle('Dana Cole') === false && T.isSelfTitle('Dana Cole') === false);
+check('an ask is an ask', S.isAsk('Can you send the invoice by Friday?') === true && T.isAsk('תוכל לשלוח לי את הקובץ עד יום חמישי?') === true);
+check('FYI is not an ask', S.isAsk('fyi, no action needed') === false && S.isFyi('fyi, no action needed') === true && T.isFyi('לידיעתך') === true && T.isAsk('לידיעתך') === false);
+check('the draft is the ask without the question, and it is not a send', S.selfDraft('Can you send the invoice by Friday?') === 'Send the invoice by Friday.' && T.selfDraft('תוכל לשלוח לי את הקובץ עד יום חמישי?') === 'לשלוח לי את הקובץ עד יום חמישי.');
+const fs = require('fs');
+const path = require('path');
+const bg = fs.readFileSync(path.join(__dirname, '../src/background.js'), 'utf8');
+const popup = fs.readFileSync(path.join(__dirname, '../popup/popup.js'), 'utf8');
+const popupHtml = fs.readFileSync(path.join(__dirname, '../popup/popup.html'), 'utf8');
+check('the worker repeats slack and telegram why-not lines', bg.indexOf("msg.type === 'flow:slack-trace'") >= 0 && bg.indexOf("msg.type === 'flow:telegram-trace'") >= 0 && bg.indexOf("line.indexOf('[Glance] slack ')") >= 0 && bg.indexOf("line.indexOf('[Glance] telegram ')") >= 0);
+check('the panel asks for the open Slack or Telegram chat when the host is not granted', popup.indexOf('renderChatPageGrant') >= 0 && popupHtml.indexOf('id="chat-page-grant"') >= 0);
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

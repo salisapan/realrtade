@@ -282,8 +282,18 @@ if (typeof setTimeout === 'function') setTimeout(bootGoogleAuth, 0);
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
 // WhatsApp Web is not its own row. It turns on with the one Meta consent.
 const SURFACES = {
-  slack: { label: 'Slack', origins: ['https://app.slack.com/*'], extra: ['src/slack-parse.js', 'src/content-slack.js'] },
-  telegram: { label: 'Telegram Web', origins: ['https://web.telegram.org/*'], extra: ['src/telegram-parse.js', 'src/content-telegram.js'] },
+  slack: {
+    label: 'Slack',
+    origins: ['https://app.slack.com/*'],
+    extra: ['src/chat-compose.js', 'src/chat-host-prompt.js', 'src/chat-self-card.js', 'src/slack-parse.js', 'src/content-slack.js'],
+    css: ['src/follow.css', 'src/chip.css']
+  },
+  telegram: {
+    label: 'Telegram Web',
+    origins: ['https://web.telegram.org/*'],
+    extra: ['src/chat-compose.js', 'src/chat-host-prompt.js', 'src/chat-self-card.js', 'src/telegram-parse.js', 'src/content-telegram.js'],
+    css: ['src/follow.css', 'src/chip.css']
+  },
   // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
   outlook: {
     label: 'Outlook on the web',
@@ -624,6 +634,36 @@ async function restoreSurfaces() {
     }
   } catch (e) { console.error('[Glance] could not restore the apps that were turned on', e); }
 }
+
+// Slack and Telegram are optional hosts. A grant registers the reader. A revoke removes it.
+const OPTIONAL_CHAT_SURFACES = ['slack', 'telegram'];
+async function restoreOptionalChatSurfaces() {
+  if (!chrome.permissions || !chrome.scripting || !chrome.scripting.registerContentScripts) return;
+  for (const id of OPTIONAL_CHAT_SURFACES) {
+    const def = SURFACES[id];
+    if (!def) continue;
+    let granted = false;
+    try { granted = await chrome.permissions.contains({ origins: def.origins }); } catch (e) { granted = false; }
+    if (!granted) {
+      try { await chrome.scripting.unregisterContentScripts({ ids: ['flow-' + id] }); } catch (e) { /* not registered */ }
+      continue;
+    }
+    try {
+      const r = await registerSurface(id);
+      if (!r || !r.ok) {
+        console.info('[Glance] ' + id + ' why-not ' + ((r && r.reason) || 'lane-not-registered'));
+        continue;
+      }
+      const all = await readSurfaces();
+      if (!all[id] || !all[id].enabled) {
+        all[id] = { enabled: true, at: Date.now() };
+        await chrome.storage.local.set({ surfaces: all });
+      }
+    } catch (e) {
+      console.info('[Glance] ' + id + ' why-not lane-not-registered');
+    }
+  }
+}
 // Builds from before the one Meta consent registered WhatsApp Web as
 // flow-whatsapp when that row was on. That registration can still be in
 // the browser after an update, and it would run beside glance-lane-whatsapp.
@@ -785,15 +825,16 @@ async function restoreLaneChats() {
 
 dropLegacyWhatsApp();
 restoreSurfaces();
+restoreOptionalChatSurfaces();
 restoreLaneChats();
-chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
-if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreLaneChats(); });
+chrome.runtime.onInstalled.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreOptionalChatSurfaces(); restoreLaneChats(); });
+if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { dropLegacyWhatsApp(); restoreSurfaces(); restoreOptionalChatSurfaces(); restoreLaneChats(); });
 try {
   if (chrome.permissions && chrome.permissions.onAdded && chrome.permissions.onAdded.addListener) {
-    chrome.permissions.onAdded.addListener(() => { restoreLaneChats(); });
+    chrome.permissions.onAdded.addListener(() => { restoreOptionalChatSurfaces(); restoreLaneChats(); });
   }
   if (chrome.permissions && chrome.permissions.onRemoved && chrome.permissions.onRemoved.addListener) {
-    chrome.permissions.onRemoved.addListener(() => { restoreLaneChats(); });
+    chrome.permissions.onRemoved.addListener(() => { restoreOptionalChatSurfaces(); restoreLaneChats(); });
   }
 } catch (e) { /* the next wake reads the grant again */ }
 
@@ -7953,6 +7994,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return reply(sendResponse, (async () => { scheduleOutlookKeepAlive(); const r = await outlookKeepAlive(); return { ok: Boolean(r && r.ok), error: (r && r.error) || null, how: (r && r.how) || null, needsSignIn: Boolean(r && r.needsSignIn) }; })());
   }
 
+  if (msg.type === 'flow:slack-trace' || msg.type === 'flow:telegram-trace') {
+    if (!sender || sender.id !== chrome.runtime.id) return;
+    const line = String(msg.line || '').slice(0, 400);
+    if (line.indexOf('[Glance] slack ') === 0 || line.indexOf('[Glance] telegram ') === 0) {
+      try { console.info(line); } catch (e) { /* no console */ }
+      try {
+        const bag = globalThis.__glanceLaneNotes || (globalThis.__glanceLaneNotes = []);
+        bag.push(line);
+        if (bag.length > 80) bag.shift();
+      } catch (e) { /* the console line already went out */ }
+    }
+    return;
+  }
   if (msg.type === 'flow:surface-status') return reply(sendResponse, surfaceStatus());
   if (msg.type === 'flow:surface-enable') return reply(sendResponse, enableSurface(msg.id));
   if (msg.type === 'flow:surface-disable') return reply(sendResponse, disableSurface(msg.id));
