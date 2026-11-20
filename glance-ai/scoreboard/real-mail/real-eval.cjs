@@ -34,8 +34,9 @@ function engineInbound(r, surface) {
     return MAP[rec.family] || (rec.family === 'none' ? 'none' : 'other');
   } catch (e) { return 'none'; }
 }
+// The product reads a sent mail as an ask or a promise (src/follow.js: classifyOutgoing || classifyCommitment); default is the asks-only reading every earlier number used; GLANCE_SENT_COMMIT=1 adds the promise reading.
 function engineSent(r) {
-  try { const a = F.classifyOutgoing(r.body || '', { now: NOW, lang: /[֐-׿]/.test(r.body || '') ? 'he' : 'en' }); return a ? (a.kind === 'payment' ? 'payment' : 'reply') : 'none'; } catch (e) { return 'none'; }
+  try { const cx = { now: NOW, lang: /[֐-׿]/.test(r.body || '') ? 'he' : 'en' }; const a = F.classifyOutgoing(r.body || '', cx) || (process.env.GLANCE_SENT_COMMIT === '1' ? F.classifyCommitment(r.body || '', cx) : null); return a ? (a.kind === 'payment' ? 'payment' : 'reply') : 'none'; } catch (e) { return 'none'; }
 }
 const out = {};
 function bump(group, key) { out[group] = out[group] || {}; out[group][key] = (out[group][key] || 0) + 1; }

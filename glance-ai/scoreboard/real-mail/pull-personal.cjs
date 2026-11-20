@@ -53,8 +53,32 @@ function pick(q, n) {
   return perThread.sort((a, b) => rank(a.threadId) - rank(b.threadId)).slice(0, n);
 }
 const BASE = ' newer_than:' + DAYS + 'd -in:spam -in:trash -in:chats';
-const inboxPick = pick('in:inbox -category:promotions -category:social -category:forums' + BASE, NIN);
-const sentPick = pick('in:sent' + BASE, NSENT);
+// --fish: a wider window (up to 12 months) used only to find threads that probably hold a real request: a human sender, no list or bulk headers, the owner in To or Cc.
+// New rows go to dev-inbox-x / heldout-inbox-x (never into the files the first pass labelled); a thread already in the manifest is skipped; the split stays by thread.
+const FISH = process.argv.includes('--fish'), FISHDAYS = arg('fishdays', 365);
+function fishPick(n) {
+  const known = new Set((() => { try { const m = JSON.parse(fs.readFileSync(path.join(OUT, 'manifest.json'), 'utf8')); return m.dev.concat(m.heldout); } catch (e) { return []; } })());
+  const q = 'in:inbox -category:promotions -category:social -category:forums -category:updates -in:spam -in:trash -in:chats newer_than:' + FISHDAYS + 'd -from:(noreply OR no-reply OR donotreply OR notifications OR newsletter OR mailer OR news OR marketing OR alerts OR updates) -unsubscribe';
+  const all = listIds(q, 4000), seen = {}, per = [];
+  for (const m of all) if (!seen[m.threadId] && !known.has(H('thread:' + m.threadId))) { seen[m.threadId] = 1; per.push(m); }
+  per.sort((a, b) => rank(a.threadId) - rank(b.threadId));
+  const keep = [];
+  for (const it of per.slice(0, 1500)) {
+    if (keep.length >= n) break;
+    let m; for (let k = 0; k < 3 && !m; k++) { try { m = api('messages/' + it.id + '?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=List-Unsubscribe&metadataHeaders=Precedence&metadataHeaders=Auto-Submitted'); } catch (e) { cp.spawnSync('sleep', [String(1 + k * 2)]); } }
+    if (!m) continue;
+    const h = (x) => { const y = (m.payload.headers || []).find((z) => z.name.toLowerCase() === x); return y ? y.value : ''; };
+    const local = (String(h('from')).match(/([\w.+-]+)@/) || [, ''])[1].toLowerCase();
+    if (h('list-unsubscribe') || /bulk|list|junk/i.test(h('precedence')) || /auto-/i.test(h('auto-submitted'))) continue;
+    if (/^(?:no-?reply|do-?not-?reply|notifications?|alerts?|mailer|news|newsletter|marketing|updates?|info|hello|team|support|billing|orders?)\b|no-?reply/.test(local)) continue;
+    if (addrs(h('from'))[0] === own) continue;
+    if (addrs(h('to') + ' ' + h('cc')).indexOf(own) < 0) continue;
+    keep.push(it);
+  }
+  return keep;
+}
+const inboxPick = FISH ? fishPick(arg('fishn', 300)) : pick('in:inbox -category:promotions -category:social -category:forums' + BASE, NIN);
+const sentPick = FISH ? [] : pick('in:sent' + BASE, NSENT);
 
 // --enrich: keep the masked rows and labels, add `fromKind` (automated | list | person) from the sender's local part and the bulk/auto headers, matched by the hashed message id. No text is touched.
 if (process.argv.includes('--enrich')) {
@@ -133,16 +157,20 @@ for (const [folder, list] of [['inbox', inboxPick], ['sent', sentPick]]) {
     if (folder === 'inbox' && from === own) continue; // this row is for what others sent
     const body = mask(textOf(m), m), subject = mask(hdr(m, 'subject'), m);
     if (body.replace(/\[[A-Z]+\]/g, '').trim().length < 3) continue;
-    const sp = split(m.threadId), id = (sp === 'dev' ? 'pd' : 'ph') + (folder === 'inbox' ? 'i' : 's') + '-' + String(rows[sp][folder].length + 1).padStart(3, '0');
-    const row = { id, folder, mid: H('mid:' + m.id), toN: to.length || 1, ccN: cc.length, ownInTo: to.indexOf(own) >= 0, subject, body, label: null };
+    const sp = split(m.threadId), id = (sp === 'dev' ? 'pd' : 'ph') + (folder === 'inbox' ? 'i' : 's') + (FISH ? 'x' : '') + '-' + String(rows[sp][folder].length + 1).padStart(3, '0');
+    const row = { id, folder, mid: H('mid:' + m.id), toN: to.length || 1, ccN: cc.length, ownInTo: to.indexOf(own) >= 0, subject, body, label: null, fromKind: FISH ? 'person' : undefined };
     rows[sp][folder].push(row); manifest[sp].push(H('thread:' + m.threadId)); n++;
   }
 }
 // the mask is applied before anything is written; tokens were collected from the whole sample, so mask the rows once more with the full set
 for (const sp of ['dev', 'heldout']) for (const f of ['inbox', 'sent']) {
   for (const r of rows[sp][f]) { r.body = mask(r.body, null); r.subject = mask(r.subject, null); }
-  fs.writeFileSync(path.join(OUT, sp + '-' + f + '.jsonl'), rows[sp][f].map((r) => JSON.stringify(r)).join('\n') + (rows[sp][f].length ? '\n' : ''));
+  if (FISH && f === 'sent') continue;
+  fs.writeFileSync(path.join(OUT, sp + '-' + f + (FISH ? '-x' : '') + '.jsonl'), rows[sp][f].map((r) => JSON.stringify(r)).join('\n') + (rows[sp][f].length ? '\n' : ''));
 }
-fs.writeFileSync(path.join(OUT, 'tokens.json'), JSON.stringify({ own: [...ownTokens], names: [...tokens], org: [...orgTokens], ownAddr: own }));
-fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({ made: new Date().toISOString().slice(0, 10), salted: true, dev: manifest.dev, heldout: manifest.heldout }));
+// a fishing run keeps what the first pass collected: tokens and the manifest are merged, never replaced
+let oldTk = { own: [], names: [], org: [] }, oldMf = { dev: [], heldout: [] };
+if (FISH) { try { oldTk = JSON.parse(fs.readFileSync(path.join(OUT, 'tokens.json'), 'utf8')); oldMf = JSON.parse(fs.readFileSync(path.join(OUT, 'manifest.json'), 'utf8')); } catch (e) {} }
+fs.writeFileSync(path.join(OUT, 'tokens.json'), JSON.stringify({ own: [...new Set([...oldTk.own, ...ownTokens])], names: [...new Set([...oldTk.names, ...tokens])], org: [...new Set([...oldTk.org, ...orgTokens])], ownAddr: own }));
+fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({ made: new Date().toISOString().slice(0, 10), salted: true, dev: oldMf.dev.concat(manifest.dev), heldout: oldMf.heldout.concat(manifest.heldout) }));
 console.log('fetch errors', errs, '| rows', n, JSON.stringify({ dev: { inbox: rows.dev.inbox.length, sent: rows.dev.sent.length }, heldout: { inbox: rows.heldout.inbox.length, sent: rows.heldout.sent.length } }));
