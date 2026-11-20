@@ -110,6 +110,13 @@ const FlowIntent = (() => {
     if (SELF_CALENDAR_NEGATED.test(t)) return false;
     return SELF_CALENDAR_ASK_HE.test(t) || SELF_CALENDAR_ASK_EN.test(t);
   }
+  // «שריין ג׳ 10:00 ביומן» and «תשריין ביומן». Words may sit between the verb and ביומן.
+  // «תכניס ליומן» is a different ask (a webinar stays a schedule, not this hold).
+  const CALENDAR_RESERVE_HE = /(?:^|[^\u0590-\u05FF])(?:ת|ל)?(?:שריי?ן|שמור)(?![\u0590-\u05FF])[\s\S]{0,80}?(?:ל|ב)יומן(?![\u0590-\u05FF])/;
+  const TALK_OR_MEET_HE = /(?:^|[^\u0590-\u05FF])(?:שיחה|שיחת|פגישה|פגישת)(?![\u0590-\u05FF])/;
+  function calendarReservePhrase(text) {
+    return CALENDAR_RESERVE_HE.test(String(text || ''));
+  }
 
   // "This is not happening at the time this message names."
   //
@@ -1650,7 +1657,7 @@ const FlowIntent = (() => {
         const familyMeet = Boolean(held && held.family === 'D' && held.type === 'event' && held.personalClose === 'calendar-hold');
         // «שריין ג׳ 10:00 ביומן» is the same explicit hold when the words between
         // the verb and ביומן kept it out of EXPLICIT_MEETING_ASK_HE.
-        if (!fileHold && (familyMeet || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text) || selfCalendarAsk(text))) {
+        if (!fileHold && (familyMeet || EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text) || calendarReservePhrase(text))) {
           intent.explicitHold = true;
         }
       }
@@ -2080,7 +2087,7 @@ const FlowIntent = (() => {
     // ask for the calendar. The meeting noun and the clock can sit in different sentences, and
     // שריין need not be adjacent to ביומן. That is the hold, not a self-sent task.
     const calendarReserveAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge && !attachToInvite && !phoneSomeone
-      && selfCalendarAsk(text) && hasMeetingNoun;
+      && calendarReservePhrase(text) && TALK_OR_MEET_HE.test(text);
 
     // Drive / Doc / Sheet closes. Silence here is a decision, not a miss:
     // the remote fallback must not turn it into a different chip. A wait
