@@ -70,6 +70,16 @@ jobs:
       - name: Install Chromium
         working-directory: flow-trial-extension
         run: npx playwright install --with-deps chromium
+      - name: Slack and Telegram chat surfaces
+        if: matrix.shard == 1 && matrix.tz == 'UTC'
+        working-directory: flow-trial-extension
+        run: |
+          export PW_CHROMIUM="$(node -e "process.stdout.write(require('playwright').chromium.executablePath())")"
+          node test/chat-surfaces-harness.cjs | tee /tmp/glance-chat-surfaces.txt
+          if grep -q '^SKIPPED:' /tmp/glance-chat-surfaces.txt; then
+            echo "chat-surfaces harness skipped in CI"
+            exit 1
+          fi
       - name: Run the headless suite
         working-directory: flow-trial-extension
         run: xvfb-run -a npx playwright test --shard=${{ matrix.shard }}/3

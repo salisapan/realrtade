@@ -324,10 +324,15 @@ test('the side panel keeps its scroll across a re-render', async ({ glance }) =>
   await popup.setViewportSize({ width: 380, height: 420 });
   await popup.locator('button[data-tab="log"]').click();
   await expect(popup.locator('#log-list .log-item').first()).toBeVisible();
-  const before = await popup.locator('main').evaluate((el) => {
+  // The tab click paints the list after the click returns. A scroll set
+  // during that paint is put back at the top when the paint finishes, and
+  // the check below would then be waiting on a position the paint discarded.
+  // Re-apply 160 until it is still there on the next frame.
+  await expect.poll(async () => popup.locator('main').evaluate((el) => new Promise((resolve) => {
     el.scrollTop = 160;
-    return el.scrollTop;
-  });
+    requestAnimationFrame(() => resolve(el.scrollTop));
+  }))).toBe(160);
+  const before = await popup.locator('main').evaluate((el) => el.scrollTop);
   expect(before).toBe(160);
   await popup.evaluate(() => new Promise((resolve) => {
     chrome.storage.local.get({ log: [] }, (bag) => {

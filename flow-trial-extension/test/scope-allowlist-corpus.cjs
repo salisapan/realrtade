@@ -34,8 +34,6 @@ const FORBIDDEN_V1_OPTIONAL_HOSTS = [
   /business\.facebook\.com\/latest\/inbox/i,
   /instagram\.com\/direct/i,
   /web\.whatsapp\.com/i,
-  /app\.slack\.com/i,
-  /web\.telegram\.org/i,
   /teams\.microsoft\.com/i
 ];
 const ALLOWED_V1_OPTIONAL_HOSTS = [
@@ -45,7 +43,9 @@ const ALLOWED_V1_OPTIONAL_HOSTS = [
   'http://localhost/*',
   'https://outlook.live.com/*',
   'https://outlook.office.com/*',
-  'https://outlook.office365.com/*'
+  'https://outlook.office365.com/*',
+  'https://app.slack.com/*',
+  'https://web.telegram.org/*'
 ];
 const RESTRICTED = [
   /\/auth\/gmail(\.|$)/, /mail\.google\.com/, /\/auth\/drive$/, /\/auth\/drive\.(readonly|metadata|metadata\.readonly|appdata|photos\.readonly|scripts|activity|activity\.readonly)$/,

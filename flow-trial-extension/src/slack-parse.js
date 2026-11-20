@@ -9,9 +9,110 @@ const FlowSlackParse = (() => {
     let u;
     try { u = new URL(String(href || '')); } catch (e) { return null; }
     if (!/(^|\.)slack\.com$/.test(u.hostname)) return null;
+    // /client/<team>/dms is the DMs view. The open conversation id is not in the path.
+    const dms = /^\/client\/([A-Z0-9]+)\/dms\/?$/i.exec(u.pathname);
+    if (dms) return { team: dms[1], conversation: null, oneToOne: false, inThread: false, needsDom: true, view: 'dms' };
     const m = /^\/client\/([A-Z0-9]+)\/([A-Z0-9]+)(\/thread\/.*)?\/?$/.exec(u.pathname);
     if (!m) return null;
-    return { team: m[1], conversation: m[2], oneToOne: /^D/.test(m[2]), inThread: Boolean(m[3]) };
+    return { team: m[1], conversation: m[2], oneToOne: /^D/.test(m[2]), inThread: Boolean(m[3]), needsDom: false, view: 'client' };
+  }
+
+  // A direct-message id from the selected sidebar row or the message pane. Channels and groups are not taken.
+  function conversationIdFrom(ids) {
+    const list = Array.isArray(ids) ? ids : [ids];
+    for (let i = 0; i < list.length; i++) {
+      const id = String(list[i] || '').trim();
+      if (/^D[A-Z0-9]+$/.test(id)) return id;
+    }
+    return '';
+  }
+
+  // The DMs view borrows the open conversation from the DOM. A /D… address already has it.
+  function resolveConversation(parsed, domId) {
+    if (!parsed) return null;
+    if (!parsed.needsDom) return parsed;
+    const id = conversationIdFrom(domId);
+    if (!id) return Object.assign({}, parsed, { conversation: null, oneToOne: false, unresolved: true });
+    return Object.assign({}, parsed, { conversation: id, oneToOne: true, unresolved: false, needsDom: false });
+  }
+
+  // The probe and the reader both count these, on the same root, with querySelectorAll.
+  const PROBE_SELECTORS = [
+    '[data-qa="message_pane"]',
+    '[data-qa="virtual-list-item"]',
+    '[data-qa="message_content"]',
+    '.c-message_kit__blocks',
+    '[data-qa="message-text"]',
+    '[data-msg-ts]',
+    '[data-item-key]',
+    '[data-qa="message_sender_name"]',
+    '[data-qa="channel_name"]',
+    '.p-view_header',
+    '[data-qa="virtual-list-item"][aria-selected="true"]',
+    '.p-channel_sidebar__channel--selected',
+    '[data-qa-channel-sidebar-channel-id]'
+  ];
+  const BUBBLE_SELECTOR = '[data-qa="message-text"]';
+
+  function readLive(root) {
+    const doc = root && typeof root.querySelectorAll === 'function' ? root : null;
+    const counts = {};
+    for (let i = 0; i < PROBE_SELECTORS.length; i++) {
+      const sel = PROBE_SELECTORS[i];
+      let n = 0;
+      try { n = doc ? doc.querySelectorAll(sel).length : 0; } catch (e) { n = -1; }
+      counts[sel] = n;
+    }
+    const bubbles = doc ? Array.from(doc.querySelectorAll(BUBBLE_SELECTOR)) : [];
+    return { counts: counts, bubbles: bubbles, bubbleCount: bubbles.length };
+  }
+
+  function headerName(root) {
+    if (!root || !root.querySelector) return '';
+    const named = root.querySelector('[data-qa="channel_name"]');
+    if (named && norm(named.textContent)) return norm(named.textContent);
+    const header = root.querySelector('.p-view_header');
+    return header ? norm(header.textContent) : '';
+  }
+
+  function dIdInOpenPane(root) {
+    if (!root || !root.querySelector) return '';
+    const scopes = [root.querySelector('[data-qa="message_pane"]'), root.querySelector('.p-view_header'), root.querySelector('[data-qa="channel_name"]')].filter(Boolean);
+    const ids = [];
+    const wanted = /^(data-qa-channel-sidebar-channel-id|data-channel-id|data-item-key|href|data-conversation-id|data-qa-channel-id)$/;
+    scopes.forEach((scope) => {
+      const nodes = [scope].concat(scope.querySelectorAll ? Array.from(scope.querySelectorAll('*')) : []);
+      nodes.forEach((el) => {
+        if (!el.attributes) return;
+        for (let i = 0; i < el.attributes.length; i++) {
+          if (!wanted.test(el.attributes[i].name)) continue;
+          const found = String(el.attributes[i].value || '').match(/\bD[A-Z0-9]{6,}\b/g);
+          if (found) found.forEach((id) => ids.push(id));
+        }
+      });
+    });
+    return conversationIdFrom(ids);
+  }
+
+  // URL D id, then a D id on the open pane, then the signed-in user when the header is their name.
+  // A /dms page that already has bubbles is a chat. It is not dom=missing.
+  function identify(href, root, who, live) {
+    const parsed = typeof href === 'string' ? parseUrl(href) : href;
+    if (!parsed) return null;
+    if (parsed.inThread || !parsed.needsDom) return Object.assign({}, parsed, { unresolved: false });
+    const domId = dIdInOpenPane(root);
+    if (domId) return Object.assign({}, parsed, { conversation: domId, oneToOne: true, unresolved: false, needsDom: false });
+    const reading = live || readLive(root);
+    const header = headerName(root);
+    const selfName = who && who.name ? norm(who.name) : '';
+    const selfId = who && who.id ? String(who.id) : '';
+    if (reading.bubbleCount > 0 && selfName && header && header.toLowerCase() === selfName.toLowerCase()) {
+      return Object.assign({}, parsed, { conversation: 'self-' + (selfId || selfName), oneToOne: true, unresolved: false, needsDom: false, self: true });
+    }
+    if (reading.bubbleCount > 0) {
+      return Object.assign({}, parsed, { conversation: 'open-' + (header || 'dms'), oneToOne: true, unresolved: false, needsDom: false });
+    }
+    return Object.assign({}, parsed, { conversation: null, oneToOne: false, unresolved: true });
   }
 
   // Slack's message timestamp "1700000000.000100": seconds since the epoch, then a counter that makes it unique in its conversation.
@@ -23,7 +124,36 @@ const FlowSlackParse = (() => {
   // A stable thread id for the conversation.
   function threadIdFor(url) {
     const p = typeof url === 'string' ? parseUrl(url) : url;
-    return p && p.oneToOne ? 'slack:' + p.team + ':' + p.conversation : null;
+    return p && p.oneToOne && p.conversation ? 'slack:' + p.team + ':' + p.conversation : null;
+  }
+
+  // localConfig_v2 or a boot blob. Only a user id comes back. Tokens stay in the object.
+  function selfIdFromStore(raw, team) {
+    let data = raw;
+    if (typeof raw === 'string') {
+      try { data = JSON.parse(raw); } catch (e) { data = null; }
+    }
+    if (!data || typeof data !== 'object') return '';
+    const teams = data.teams && typeof data.teams === 'object' ? data.teams : data;
+    const row = team && teams[team] && typeof teams[team] === 'object' ? teams[team] : null;
+    const candidates = [];
+    if (row) candidates.push(row.user_id, row.userId, row.user && row.user.id, row.user && row.user.user_id);
+    candidates.push(data.user_id, data.userId);
+    for (let i = 0; i < candidates.length; i++) {
+      const id = String(candidates[i] || '').trim();
+      if (/^U[A-Z0-9]+$/.test(id)) return id;
+    }
+    return '';
+  }
+
+  // Primary: the open DM's counterpart is the signed-in user. Title text is only a backup.
+  function isSelfDm(signals) {
+    const s = signals || {};
+    const selfId = String(s.selfId || '').trim();
+    const otherId = String(s.counterpartId || '').trim();
+    if (selfId && otherId && selfId === otherId) return true;
+    if (s.titleBlob && isSelfTitle(s.titleBlob)) return true;
+    return false;
   }
 
   // Slack shows the sender once and then leaves it out of the messages that follow from the same person. Fill the blanks forward.
@@ -44,7 +174,36 @@ const FlowSlackParse = (() => {
     return (pieces || []).filter((p) => p && !p.quoted).map((p) => String(p.text || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n').slice(0, 4000);
   }
 
-  return { parseUrl, parseTs, threadIdFor, fillSenders, isOwn, joinText };
+  function norm(s) { return String(s || '').replace(/\s+/g, ' ').trim(); }
+
+  // A self direct message: Slack's header suffix "(you)", or the compose box that says you are writing to yourself.
+  function isSelfTitle(blob) {
+    return /\(you\)|\byourself\b|saved messages|jot something down|הודעות שמורות|\(אתה\)|\(את\)|לעצמך/i.test(norm(blob));
+  }
+
+  function isFyi(text) {
+    return /\bfyi\b|for your information|no action needed|no need to reply|no need to do anything|לידיעתך|אין צורך/i.test(norm(text));
+  }
+
+  function isAsk(text) {
+    if (isFyi(text)) return false;
+    return /\b(?:can you|could you|would you|please|send me)\b|תוכל|תוכלי|תשלח|בבקשה|אפשר/i.test(norm(text));
+  }
+
+  // The words Do It places in the compose box. Not a send.
+  function selfDraft(text) {
+    let body = norm(text)
+      .replace(/^(?:can you|could you|would you|please)\s+/i, '')
+      .replace(/^(?:תוכל|תוכלי|אפשר|בבקשה)\s+/, '')
+      .replace(/[?؟]\s*$/, '')
+      .trim();
+    if (!body) return /[\u0590-\u05FF]/.test(String(text || '')) ? 'אטפל בזה.' : "I'll take care of it.";
+    if (!/[\u0590-\u05FF]/.test(body)) body = body.charAt(0).toUpperCase() + body.slice(1);
+    if (!/[.!?]$/.test(body)) body += '.';
+    return body.slice(0, 500);
+  }
+
+  return { parseUrl, parseTs, threadIdFor, fillSenders, isOwn, joinText, isSelfTitle, isFyi, isAsk, selfDraft, conversationIdFrom, resolveConversation, selfIdFromStore, isSelfDm, PROBE_SELECTORS, BUBBLE_SELECTOR, readLive, identify, headerName, dIdInOpenPane };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowSlackParse };

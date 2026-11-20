@@ -6,7 +6,6 @@ const { copyExtension } = require('./support/launch');
 
 const HE_BUTTON = 'הפעל צ׳אטים של Meta';
 const CHAT_LANE_IDS = ['glance-lane-whatsapp', 'glance-lane-messenger', 'glance-lane-instagram'];
-const CHAT_FLOW_SURFACE_IDS = ['flow-slack', 'flow-telegram', 'flow-whatsapp'];
 
 function launch(extDir, userData) {
   return chromium.launchPersistentContext(userData, {
@@ -51,9 +50,9 @@ async function mailLanesFromManifest(worker) {
   });
 }
 
-function assertNoChatLaneScripts(ids) {
+function assertNoMetaLaneScripts(ids) {
   for (const id of CHAT_LANE_IDS) expect(ids, 'dynamic chat lane ' + id).not.toContain(id);
-  for (const id of CHAT_FLOW_SURFACE_IDS) expect(ids, 'dynamic chat surface ' + id).not.toContain(id);
+  expect(ids, 'dynamic chat surface flow-whatsapp').not.toContain('flow-whatsapp');
 }
 
 function grantOrigins(userData, id, origins) {
@@ -73,7 +72,7 @@ function grantOrigins(userData, id, origins) {
   fs.writeFileSync(prefsPath, JSON.stringify(prefs));
 }
 
-test('v1 bare manifest: Gmail and Outlook mail lanes are declared; chat lanes never register', async () => {
+test('v1 bare manifest: Gmail and Outlook mail lanes are declared; Meta stays unregistered; Slack and Telegram register only after their grant', async () => {
   test.setTimeout(120000);
   const extDir = copyExtension({ bare: true });
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'glance-lanes-'));
@@ -88,7 +87,10 @@ test('v1 bare manifest: Gmail and Outlook mail lanes are declared; chat lanes ne
     const lanes = await mailLanesFromManifest(worker);
     expect(lanes.gmail, 'Gmail content_scripts lane').toBe(true);
     expect(lanes.outlook, 'Outlook content_scripts lane').toBe(true);
-    assertNoChatLaneScripts(await registeredScriptIds(worker));
+    const beforeGrant = await registeredScriptIds(worker);
+    assertNoMetaLaneScripts(beforeGrant);
+    expect(beforeGrant).not.toContain('flow-slack');
+    expect(beforeGrant).not.toContain('flow-telegram');
 
     const popup = await context.newPage();
     await popup.goto('chrome-extension://' + extensionId + '/popup/popup.html', { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -117,7 +119,11 @@ test('v1 bare manifest: Gmail and Outlook mail lanes are declared; chat lanes ne
     const lanesAfter = await mailLanesFromManifest(worker);
     expect(lanesAfter.gmail).toBe(true);
     expect(lanesAfter.outlook).toBe(true);
-    assertNoChatLaneScripts(await registeredScriptIds(worker));
+    await expect.poll(async () => {
+      const ids = await registeredScriptIds(worker);
+      return ids.indexOf('flow-slack') >= 0 && ids.indexOf('flow-telegram') >= 0 ? 'slack-telegram' : ids.join(',');
+    }, { timeout: 20000 }).toBe('slack-telegram');
+    assertNoMetaLaneScripts(await registeredScriptIds(worker));
   } finally {
     if (context) await context.close().catch(() => {});
     fs.rmSync(extDir, { recursive: true, force: true });
@@ -140,7 +146,9 @@ test('a WhatsApp-only grant registers no lane', async () => {
     context = await launch(extDir, userData);
     worker = await readyWorker(context);
     const ids = await registeredScriptIds(worker);
-    assertNoChatLaneScripts(ids);
+    assertNoMetaLaneScripts(ids);
+    expect(ids).not.toContain('flow-slack');
+    expect(ids).not.toContain('flow-telegram');
     const full = await worker.evaluate(async () => chrome.permissions.contains({ origins: globalThis.FlowMetaConsent.ORIGINS.slice() }));
     expect(full).toBe(false);
   } finally {
