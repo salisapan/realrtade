@@ -53,7 +53,10 @@ for (const [text, why] of holds) {
 }
 check('payment loop, "שולם": a claim, not a close', (() => { const r = p(loop({ kind: 'payment' }), thread(msg('m1', 'שולם'))); return r.action === 'hold' && r.reason === 'claimed'; })());
 check('payment loop, "Paid via Bit just now": a claim', p(loop({ kind: 'payment' }), thread(msg('m1', 'Paid via Bit just now'))).reason === 'claimed');
-check('file loop: closes as delivered', p(loop({ file: 'contract.pdf' }), thread(msg('m1', 'Attached is the signed contract.'))).closedAs === 'delivered');
+// Red team 2026-11-20: a file is delivered only when a file is on their message; the words alone hold the loop.
+check('file loop: closes as delivered when the file is on the message', p(loop({ file: 'contract.pdf' }), thread(Object.assign(msg('m1', 'Attached is the signed contract.'), { attachments: [{ filename: 'contract_signed.pdf' }] }))).closedAs === 'delivered');
+check('file loop: "Attached is…" with no file on the message holds', p(loop({ file: 'contract.pdf' }), thread(Object.assign(msg('m1', 'Attached is the signed contract.'), { attachments: [] }))).reason === 'file-not-attached');
+check('file loop: "Attached is…" when the host cannot see attachments holds', p(loop({ file: 'contract.pdf' }), thread(msg('m1', 'Attached is the signed contract.'))).reason === 'file-unproven');
 check('quoted "approved" under a question does not close', p(loop(), thread(msg('m1', 'Which version?\n\nOn Mon, Nov 9 Sali wrote:\n> Approved?'))).action !== 'close');
 
 // ---- 2. who, where, when -----------------------------------------------------------

@@ -63,7 +63,7 @@ console.log('--- the loop is still the judge ---');
 const sent = Object.assign({}, L1(), C.remindedPatch(L1(), NOW));
 check('a sent reminder is counted with its day', sent.reminders === 1 && sent.lastReminderIso === '2026-11-15');
 check('a draft does not close the loop', sent.status === 'open' && !sent.closedAs);
-check('…only the credit does (refund-loop judge)', (R.judge([Object.assign({}, sent, { id: 'L' })], { fromEmail: 'alerts@isracard.co.il', text: 'זיכוי בסך 189 ₪ מבית העסק שופ נקלט בכרטיסך.' }, { enabled: true }) || {}).verdict === 'close');
+check('…only the credit does (refund-loop judge)', (R.judge([Object.assign({}, sent, { id: 'L' })], { fromEmail: 'alerts@isracard.co.il', authPass: true, text: 'זיכוי בסך 189 ₪ מבית העסק שופ נקלט בכרטיסך.' }, { enabled: true }) || {}).verdict === 'close'); // authPass: only an authenticated notice counts (red team 2026-11-13)
 check('the same input gives the same draft', JSON.stringify(C.plan(L1(), ON)) === JSON.stringify(C.plan(L1(), ON)));
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nall refund-chase checks passed');

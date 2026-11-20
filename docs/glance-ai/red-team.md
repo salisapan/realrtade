@@ -346,3 +346,61 @@ An amount in a sentence about a budget, a cap, a past price, a deposit or a pena
 - The e2e workflow's 25-minute limit cancels every PR's run on this base (run 4).
 
 Tests: `node flow-trial-extension/test/red-team-corpus.cjs` (sections 15–18 are run 5; 221 checks in all).
+
+## Run 6: 2026-11-20
+
+**Branch** `claude/redteam-2026-11-20`, built on the latest working branch (`75496dce`) with runs 1–5 merged in. Run 5's draft PR #291 is still open and unmerged. #184, the stack the 25/10 freeze waits on, is still open. This run carries all six runs and stays a draft. Targets this week are what shipped since run 5 and is not in an open PR:
+- `core/their-reply.js` (`THEIR_REPLY_PROOF` off): their reply finishes your wait, proven.
+- `core/calendar-cancel.js` (`CALENDAR_CANCEL_PROOF` off): cancel a meeting, proven.
+- `core/loop-answer.js` (`aiAskV1` off): «Ask Glance» about your own loops.
+
+Merging run 5 onto the new base needed two small resolutions. In `full-document-close.js`, the base added a `lang` line next to run 5's `priceAmount`, and both are kept. The base also changed the price placeholder's wording (`[price not given]` / `[לא צוין מחיר]`), so the red team check now asserts "a bracketed placeholder with no digits" instead of one exact string.
+
+### Attacks run: 24. Broke Glance: 13. Fixed: 13. Still open: none new
+
+| Area | Run | Broke | Fixed | Where |
+|---|---|---|---|---|
+| Their reply: a file named but not on the message, one item of several | 12 | 5 | 5 | `core/their-reply.js` |
+| Cancelling an event that is not an ordinary event of the person's own | 7 | 6 | 6 | `core/calendar-cancel.js` |
+| Ask Glance: one name that fits two people | 5 | 2 | 2 | `core/loop-answer.js` |
+
+**The worst one.** `their-reply` closed a loop that waited on a file as **delivered**, with a fetched-back proof and the line "They sent what you were waiting for." The trigger was only the words "Attached is the signed contract." or «מצורף החוזה החתום». No file was on the message, and it closed even when the host said so outright (an empty attachment list). "Done, sent it on WhatsApp" did the same. On a wait for two items (the signed agreement and an ID copy), the first item arriving closed the whole wait. Close behind: `calendar-cancel` would delete a flight Gmail put on the calendar, an out-of-office block, or a meeting whose guest list the calendar left out. These are the same holes run 4 closed in `calendar-move`.
+
+### 1. Their reply
+
+| Their message, on a wait for "the signed contract" | Before | After |
+|---|---|---|
+| "Attached is the signed contract." and the host cannot see attachments | close (delivered) | hold (`file-unproven`) |
+| The same with an empty attachment list, or «מצורף החוזה החתום» with Graph `hasAttachments: false` | close (delivered) | hold (`file-not-attached`) |
+| "Done, sent it on WhatsApp" | close (delivered) | hold |
+| A file on the message (attachments list, or a Gmail payload part with an attachment id) | close (delivered) | still closes |
+| One item of two arriving on an items wait | close (replied) | hold (`items-mode`): core/follow-up.js items mode decides |
+| "Perfect", "waiting for the CFO", their out-of-office, an injection with "Done.", their forward | hold | unchanged |
+
+The read-back (`close`) checks the file and the items mode again. `test/their-reply-corpus.cjs` had pinned "delivered on the words alone". It now pins the file on the message, and a hold when the host cannot see one (`docs/true-close.md` §1: a file named and not attached is not a close).
+
+### 2. Cancelling a meeting
+
+These now stay silent, the rule `calendar-move` got in run 4:
+- no organizer on the event;
+- a hidden guest list (`attendeesOmitted`);
+- `eventType` other than default (a Gmail flight, an out-of-office or focus-time block);
+- a locked event;
+- a private copy of someone else's event.
+
+The person's own plain event with no guests can still be cancelled.
+
+### 3. Ask Glance
+
+"What do I owe Dana?" answered with Dana Cohen's loop when the loops also had Dana Levi. «מה דנה חייבת לי?» already refused, so only the English path broke. "What do I owe Levi?" (Dana Levi and Avi Levi) answered "Nothing open that fits with Dana". Now any word of the question that the full name did not settle is kept only when it names exactly one person. Two people is `ambiguous-person`, the same rule the cross-script sound match already had. "Dana Cohen" and "Avi" still answer.
+
+Held: a question about a name no loop knows is refused, and a loop whose text carries an injection is shown as the person's own loop text, never acted on.
+
+### 4. Still open
+
+- From run 2: the chat judge (`core/incoming-judge.js`, still changed by open PRs) offers on an injected ask, an ask aimed at @someone else, and a «Forwarded message» line. This is already on PR #77.
+- From run 1: the by-design text-only closes («בוצע», «סגור», "Sent it on WhatsApp") on the plain follow loop are still waiting for the owner. `their-reply` no longer closes a file wait on them.
+- `calendar-cancel` matches the event by its slot only, so "the Thursday 4pm call with Dana is cancelled" would offer to delete whatever event is at Thursday 16:00. The card names the event's title and needs a click. Matching the event's title or guest to the mail is the next step.
+- The hosts must pass attachments (`their-reply`), `authPass` (money, refunds) and recipients (`reply-sent`) when they are wired.
+
+Tests: `node flow-trial-extension/test/red-team-corpus.cjs` (sections 19–21 are run 6; 240 checks in all).

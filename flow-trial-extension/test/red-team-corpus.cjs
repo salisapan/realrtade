@@ -395,6 +395,59 @@ const { FlowIntentDecompose: Decompose } = require('../core/intent-decompose.js'
   const ok2 = Decompose.decompose({ aiDecomposeV1: true }, { text: 'Hi Sali. Please pay invoice 552 by Friday. Also, can we meet Monday at 10:00?', whole: { show: false, reason: 'intent-null' } }, { judgeText: pays });
   check('an ordinary two-clause mail still gets its clause pass', (ok2.intentions || []).length >= 1, ok2.reason);
 
+
+  // -------------------------------------------------------------------------------------------------------------------------
+  // Run 6 (2026-11-20)
+  // -------------------------------------------------------------------------------------------------------------------------
+  const { FlowTheirReply: Their } = require('../core/their-reply.js');
+  const { FlowCalendarCancel: Cancel } = require('../core/calendar-cancel.js');
+  const { FlowLoopAnswer: Ask } = require('../core/loop-answer.js');
+
+  console.log('--- 19. their reply closes your wait only when it is the thing you waited for (2026-11-20) ---');
+  const T0 = Date.parse('2026-11-16T09:00:00Z');
+  const wait = (extra) => Object.assign({ id: 'W1', status: 'waiting', direction: 'theirs', kind: 'reply', counterpart: { email: 'dana@acme.com' }, threadId: 'T1', createdAt: T0, lang: 'en' }, extra || {});
+  const theirs = (text, extra) => Object.assign({ id: 'M9', threadId: 'T1', from: 'Dana <dana@acme.com>', dateMs: T0 + 86400e3, text }, extra || {});
+  const verdict = (loop, m) => Their.plan({ flags: { THEIR_REPLY_PROOF: true }, loop, thread: { messages: [m] }, now: T0 + 4 * 86400e3 });
+  const fileWait = wait({ file: { object: 'contract', label: 'the signed contract' } });
+  [
+    ['"Attached is the signed contract." and the host cannot see attachments', theirs('Attached is the signed contract.')],
+    ['"Attached is the signed contract." with no file on the message', theirs('Attached is the signed contract.', { attachments: [] })],
+    ['«מצורף החוזה החתום» with Graph hasAttachments false', theirs('מצורף החוזה החתום', { hasAttachments: false })],
+    ['"Done, sent it on WhatsApp"', theirs('Done, sent it on WhatsApp')]
+  ].forEach(([name, m]) => check('a file wait stays open: ' + name, verdict(fileWait, m).action !== 'close', verdict(fileWait, m)));
+  check('a file wait closes as delivered when the file is on the message', verdict(fileWait, theirs('Attached is the signed contract.', { attachments: [{ filename: 'contract_signed.pdf' }] })).closedAs === 'delivered');
+  check('a Gmail payload part with an attachment id counts as the file', verdict(fileWait, theirs('Attached is the signed contract.', { payload: { parts: [{ filename: 'contract.pdf', body: { attachmentId: 'A1' } }] } })).closedAs === 'delivered');
+  const itemsWait = wait({ items: [{ key: 'signed-agreement', status: 'missing' }, { key: 'id-copy', status: 'missing' }] });
+  check('a wait on several items is left to the items mode: one item arriving never closes it', verdict(itemsWait, theirs('Here is the signed agreement. Thanks!', { attachments: [{ filename: 'signed_agreement.pdf' }] })).action !== 'close');
+  check('a real answer still closes a plain wait', verdict(wait(), theirs('Yes, approved. Go ahead with the Thursday slot.')).closedAs === 'replied');
+
+  console.log('--- 20. cancelling a meeting: only an ordinary event of the person\'s own (2026-11-20) ---');
+  const cancelIntent = { personalClose: 'calendar-cancel', entities: { dateIso: '2026-11-26', hour: 16, minute: 0 } };
+  const calEvt = (extra) => Object.assign({ id: 'E1', etag: '"1"', status: 'confirmed', summary: 'Sync', start: { dateTime: '2026-11-26T16:00:00+02:00', timeZone: 'Asia/Jerusalem' }, end: { dateTime: '2026-11-26T17:00:00+02:00' }, organizer: { email: ME, self: true } }, extra || {});
+  const cancelPlan = (e) => Cancel.plan({ flags: { CALENDAR_CANCEL_PROOF: true }, intent: cancelIntent, events: [e], now: T0 }).action;
+  [
+    ['the guest list is hidden (attendeesOmitted)', calEvt({ attendeesOmitted: true })],
+    ['no organizer on the event', calEvt({ organizer: undefined })],
+    ['a flight Gmail put on the calendar', calEvt({ eventType: 'fromGmail', summary: 'Flight LY 315' })],
+    ['an out-of-office block', calEvt({ eventType: 'outOfOffice' })],
+    ['a locked event', calEvt({ locked: true })],
+    ['a private copy of someone else\'s event', calEvt({ privateCopy: true })]
+  ].forEach(([name, e]) => check('not deleted: ' + name, cancelPlan(e) !== 'cancel', cancelPlan(e)));
+  check('my own plain event with no guests can still be cancelled', cancelPlan(calEvt()) === 'cancel');
+
+  console.log('--- 21. Ask Glance: one name that fits two people is a refusal, never a guess (2026-11-20) ---');
+  const AL = (id, o) => Object.assign({ id, status: 'waiting', direction: 'theirs', kind: 'reply', createdAt: Date.parse('2026-11-10') }, o);
+  const askLoops = [
+    AL('a', { direction: 'mine', counterpart: { name: 'Dana Cohen', email: 'dana.cohen@acme.co.il' }, what: 'Send the signed lease' }),
+    AL('b', { counterpart: { name: 'Dana Levi', email: 'dana.levi@x.com' }, what: 'The Q3 deck' }),
+    AL('c', { kind: 'payment', amount: { value: 4200, currency: 'ILS', raw: '4,200 ₪' }, counterpart: { name: 'Avi Levi', email: 'avi@levi.co.il' }, what: 'Payment of invoice 118' })
+  ];
+  const ask = (q) => Ask.answer({ [Ask.SWITCH]: true }, q, askLoops, { today: '2026-11-20', lang: 'en' });
+  check('"What do I owe Dana?" with Dana Cohen and Dana Levi: refused', ask('What do I owe Dana?').reason === 'ambiguous-person', ask('What do I owe Dana?'));
+  check('"What do I owe Levi?" with Dana Levi and Avi Levi: refused', ask('What do I owe Levi?').reason === 'ambiguous-person', ask('What do I owe Levi?'));
+  check('"What do I owe Dana Cohen?" still answers for her', /lease/.test(String(ask('What do I owe Dana Cohen?').text)), ask('What do I owe Dana Cohen?'));
+  check('"What does Avi owe me?" still answers (one Avi)', /invoice 118/.test(String(ask('What does Avi owe me?').text)), ask('What does Avi owe me?'));
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })();
