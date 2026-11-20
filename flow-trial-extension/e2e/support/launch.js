@@ -81,6 +81,8 @@ function copyExtension(opts) {
     'https://instagram.com/direct/*'
   ];
   const whatsappE2eHost = ['https://web.whatsapp.com/*'];
+  // E2E copy only: the specs set their own switches, so the first-wave seed (core/labs-seed.js) stays out of them.
+  manifest.glance_no_seed = true;
   manifest.host_permissions = Array.from(new Set((manifest.host_permissions || []).concat(hostExtra, whatsappE2eHost)));
   manifest.optional_host_permissions = Array.from(new Set((manifest.optional_host_permissions || []).concat(optionalChat)));
   // gate100 only: a fixed "now" for the content scripts. Their isolated world keeps the real

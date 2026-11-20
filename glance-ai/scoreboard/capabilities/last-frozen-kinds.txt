@@ -1,0 +1,45 @@
+rows 701 
+
+route (family/via): n | two-pass label of those rows
+none/judge                441 {"split":10,"calendar":15,"SILENT":293,"draft":53,"task":21,"CONTEXT":45,"UNSURE":2,"file_save":2}
+task/judge                 99 {"split":17,"task":42,"draft":14,"SILENT":20,"calendar":1,"CONTEXT":4,"file_save":1}
+draft/judge                77 {"task":26,"draft":25,"split":4,"SILENT":19,"CONTEXT":3}
+calendar/judge             36 {"calendar":34,"SILENT":1,"CONTEXT":1}
+file_save/judge            25 {"split":1,"file_save":19,"SILENT":3,"CONTEXT":2}
+pay/judge                  19 {"draft":12,"CONTEXT":2,"SILENT":2,"split":3}
+doc_create/reader           2 {"SILENT":2}
+word_create/reader          2 {"SILENT":1,"task":1}
+
+reader fired where the label says nothing to close (candidate wrong Do It): 3
+b003-166 | create_doc | doc_create | SILENT | Hello Sali, Following up on our call. Please create a new doc for the the Q4 plan notes. Cheers, Bil
+b004-73 | create_doc | doc_create | SILENT | Please create a new doc for the the campaign notes.
+b006-73 | create_doc | word_create | SILENT | Please create a new doc for the the campaign notes. Best, Sali
+
+scenario: engine families
+ack                          15 {"none":15}
+approx_amount                5 {"none":5}
+calendar_hold                6 {"calendar":6}
+cancelled                    17 {"none":17}
+commitment_reader            61 {"task":12,"draft":25,"none":24}
+conditional                  5 {"none":5}
+create_doc                   16 {"none":7,"draft":4,"doc_create":2,"task":1,"word_create":2}
+decision                     33 {"none":16,"task":17}
+drive_save                   12 {"file_save":10,"none":1,"task":1}
+file_place                   6 {"none":2,"draft":4}
+fyi                          29 {"none":29}
+hedge                        27 {"none":27}
+injection                    12 {"none":12}
+marketing                    23 {"none":23}
+meeting                      55 {"none":24,"calendar":27,"task":4}
+negation                     23 {"none":23}
+onedrive_save                28 {"file_save":15,"task":2,"none":11}
+ooo                          15 {"none":15}
+own_commitment_self          31 {"task":31}
+past                         22 {"none":22}
+payment                      50 {"task":8,"none":19,"pay":17,"draft":6}
+quoted_forward               6 {"task":3,"pay":2,"none":1}
+reply_with_file              11 {"none":8,"task":3}
+repo                         41 {"task":7,"draft":10,"calendar":2,"none":22}
+repo-test                    31 {"none":17,"draft":9,"task":4,"calendar":1}
+request_reply                112 {"none":87,"draft":19,"task":6}
+third_party                  9 {"none":9}

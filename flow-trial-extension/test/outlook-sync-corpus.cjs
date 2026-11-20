@@ -422,6 +422,16 @@ console.log('\n--- parts on Outlook (2026-11-13): a reply that answers only some
   check('Outlook: the person is told what is still open', r.lines.some((l) => /did not answer everything/.test(l)), r.lines);
 }
 
+console.log('\n--- several asks in one mail on Outlook: one card, behind decomposeOn (the Labs switch DECOMPOSE, off by default) ---\n');
+{
+  const MAIL = "Hi Sali, Could you send me the Q3 numbers by Wednesday, October 7? Also, let's meet on Monday, October 12 at 10:00 to go over the budget. Thanks, Dana";
+  const off = plan([theirs('cm', MAIL, 1, 'Next steps')]);
+  const on = plan([theirs('cm', MAIL, 1, 'Next steps')], [], { deps: Object.assign({}, deps, { decomposeOn: true }) });
+  const c0 = off.incoming[0], c1 = on.incoming[0];
+  check('Outlook sync: off by default, the mail is one intention as before', c0 && !c0.process.decomposed, c0 && c0.process.steps.map((x) => x.kind));
+  check('Outlook sync: on, one incoming card with the steps of both asks (Outlook draft, calendar), never two cards for one message', on.incoming.length === 1 && c1 && c1.process.decomposed === 2 && /outlookDraft/.test(c1.process.steps.map((x) => x.kind).join()) && c1.process.steps.some((x) => x.kind === 'calendar'), c1 && c1.process.steps.map((x) => x.kind));
+}
+
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
 console.log('TOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

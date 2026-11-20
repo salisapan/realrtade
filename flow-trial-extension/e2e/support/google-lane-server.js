@@ -71,6 +71,32 @@ function parseDriveUpload(buf) {
 // Drive answers only the fields it was asked for, and refuses a name it does
 // not know. The stand-in does the same, so a request for a field that does
 // not exist fails here the way it fails live.
+// Google's 403 bodies, as the live APIs send them.
+const GOOGLE_403_SCOPE = {
+  error: {
+    code: 403,
+    message: 'Request had insufficient authentication scopes.',
+    status: 'PERMISSION_DENIED',
+    details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'ACCESS_TOKEN_SCOPE_INSUFFICIENT', domain: 'googleapis.com', metadata: { service: 'drive.googleapis.com', method: 'google.apps.drive.v3.DriveFiles.Create' } }]
+  }
+};
+const GOOGLE_403_DOCS_DISABLED = {
+  error: {
+    code: 403,
+    message: 'Google Docs API has not been used in project 93977330357 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/docs.googleapis.com/overview?project=93977330357 then retry.',
+    status: 'PERMISSION_DENIED',
+    details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com', metadata: { service: 'docs.googleapis.com', consumer: 'projects/93977330357' } }]
+  }
+};
+const GOOGLE_403_DRIVE_DISABLED = {
+  error: {
+    code: 403,
+    message: 'Google Drive API has not been used in project 93977330357 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=93977330357 then retry.',
+    status: 'PERMISSION_DENIED',
+    details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com', metadata: { service: 'drive.googleapis.com', consumer: 'projects/93977330357' } }]
+  }
+};
+
 const DRIVE_FIELDS = ['id', 'name', 'mimeType', 'trashed', 'parents', 'md5Checksum', 'headRevisionId', 'version', 'modifiedTime', 'webViewLink'];
 
 function driveFields(file, param) {
@@ -99,6 +125,28 @@ function bumpFile(file) {
   file.headRevisionId = 'rev-' + file.id + '-' + n;
   file.modifiedTime = '2026-10-15T00:0' + String(n % 10) + ':00.000Z';
   return file;
+}
+
+function htmlPlainText(buf) {
+  const html = Buffer.from(buf || []).toString('utf8');
+  const out = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '* ')
+    .replace(/<\/(p|h1|h2|h3|li|div|tr|table|ul|ol)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n\s+/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+  // Real Drive text/plain of a Doc: BOM, CRLF, and "* " list prefixes.
+  return '\uFEFF' + out.replace(/\n/g, '\r\n');
 }
 
 function docBody(text, name) {
@@ -136,6 +184,7 @@ function startGoogleLaneServer() {
     events: {},
     files: {},
     docs: {},
+    docText: {},
     sheets: {},
     last: {},
     account: 'ai.local.flow@gmail.com',
@@ -147,7 +196,9 @@ function startGoogleLaneServer() {
     failGets: [],
     rejectOnce: [],
     driveHits: [],
-    lagGets: []
+    lagGets: [],
+    forbids: [],
+    tokenScopes: null
   };
   seedLists();
 
@@ -168,6 +219,7 @@ function startGoogleLaneServer() {
     state.files = {};
     state.forms = {};
     state.docs = {};
+    state.docText = {};
     state.sheets = {};
     state.last = {};
     state.account = 'ai.local.flow@gmail.com';
@@ -178,6 +230,8 @@ function startGoogleLaneServer() {
     state.rejectOnce = [];
     state.driveHits = [];
     state.lagGets = [];
+    state.forbids = [];
+    state.tokenScopes = null;
     state.noMeetLink = false;
     state.tasks401AfterRefresh = false;
     state.tasks403Insufficient = false;
@@ -239,6 +293,17 @@ function startGoogleLaneServer() {
       const bearer = /^Bearer\s+\S+/.test(String(req.headers.authorization || ''));
       if (!e2ePath && !bearer) { send(res, 401, GOOGLE_AUTH_401); return; }
       if (!e2ePath && state.unauthorized.some((part) => path.indexOf(part) >= 0)) { send(res, 401, GOOGLE_AUTH_401); return; }
+      // A 403 with Google's own body: a missing scope, or an API that is not
+      // enabled in the Cloud project. Matched by path part and method.
+      if (!e2ePath) {
+        const hit = state.forbids.find((f) => path.indexOf(f.part) >= 0 && (!f.method || f.method === method));
+        if (hit) { state.calls[state.calls.length - 1].denied = 403; send(res, 403, hit.body); return; }
+      }
+      if (method === 'GET' && path === '/oauth2/v3/tokeninfo') {
+        const all = 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks';
+        send(res, 200, { scope: state.tokenScopes == null ? all : state.tokenScopes, email: state.account });
+        return;
+      }
 
       if (method === 'GET' && path === '/v1/people:searchContacts') {
         const q = String(url.searchParams.get('query') || '').toLowerCase();
@@ -340,6 +405,18 @@ function startGoogleLaneServer() {
         return;
       }
 
+      const fileExport = path.match(/^\/drive\/v3\/files\/([^/]+)\/export$/);
+      if (fileExport && method === 'GET') {
+        const id = fileExport[1];
+        const file = state.files[id];
+        if (!file || file.trashed) { send(res, 404, { error: 'missing' }); return; }
+        const want = url.searchParams.get('mimeType') || '';
+        if (want !== 'text/plain') { send(res, 400, { error: { code: 400, message: 'Unsupported export mimeType' } }); return; }
+        const text = state.docText[id] != null ? state.docText[id] : '';
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end(text, 'utf8');
+        return;
+      }
       const oneFile = path.match(/^\/drive\/v3\/files\/([^/]+)$/);
       if (oneFile && method === 'GET') {
         const file = state.files[oneFile[1]];
@@ -376,16 +453,33 @@ function startGoogleLaneServer() {
       }
       if (path.indexOf('/upload/drive/v3/files') === 0 && method === 'POST') {
         const packed = parseDriveUpload(raw);
+        if (packed.meta && Object.keys(packed.meta).length) {
+          state.calls[state.calls.length - 1].body = packed.meta;
+          state.calls[state.calls.length - 1].media = Buffer.from(packed.bytes || []).toString('utf8');
+        }
         const id = 'e2e-upload-' + (state.seq++);
+        const mime = packed.meta.mimeType || 'application/octet-stream';
+        const isDoc = mime === 'application/vnd.google-apps.document';
         const file = stampFile({
           id: id,
-          name: packed.meta.name || 'upload.bin',
-          mimeType: packed.meta.mimeType || 'application/octet-stream',
+          name: packed.meta.name || (isDoc ? 'Untitled' : 'upload.bin'),
+          mimeType: mime,
           trashed: false,
-          md5Checksum: hashBytes(packed.bytes),
           parents: packed.meta.parents || null
         });
-        Object.defineProperty(file, '__settles', { value: true, writable: true, enumerable: false });
+        if (!isDoc) file.md5Checksum = hashBytes(packed.bytes);
+        if (/^application\/vnd\.google-apps\./.test(String(mime))) {
+          const kind = String(mime).split('.').pop();
+          file.webViewLink = 'https://docs.google.com/' + (kind === 'document' ? 'document' : kind) + '/d/' + id + '/edit';
+        }
+        if (isDoc) {
+          const plain = htmlPlainText(packed.bytes);
+          state.docs[id] = docBody(plain, '');
+          state.docText[id] = plain;
+          state.last.doc = id;
+        } else {
+          Object.defineProperty(file, '__settles', { value: true, writable: true, enumerable: false });
+        }
         state.files[id] = file;
         state.last.file = id;
         const echoed = driveFields(file, url.searchParams.get('fields'));
@@ -688,6 +782,9 @@ function startGoogleLaneServer() {
         driveHits: (files) => { state.driveHits = (files || []).slice(); },
         lagGets: (part, count) => { state.lagGets.push({ part: part, left: count }); },
         failGet: (part) => { state.failGets.push(part); },
+        forbid: (part, method, body) => { state.forbids.push({ part: part, method: method || '', body: body }); },
+        clearForbids: () => { state.forbids = []; },
+        setTokenScopes: (scope) => { state.tokenScopes = scope; },
         clearFailGets: () => { state.failGets = []; },
         events: () => state.events,
         tasks: () => state.tasks,
@@ -720,6 +817,9 @@ function startGoogleLaneServer() {
           if (!doc) return;
           const name = Object.keys(doc.namedRanges || {})[0] || '';
           state.docs[id] = docBody(text, name);
+          const next = String(text || '');
+          if (state.files[id]) state.files[id].docText = next;
+          state.docText[id] = next;
           bumpFile(state.files[id]);
         },
         editSheetRow: (id, row) => {
@@ -732,4 +832,4 @@ function startGoogleLaneServer() {
   });
 }
 
-module.exports = { startGoogleLaneServer };
+module.exports = { startGoogleLaneServer, GOOGLE_403_SCOPE, GOOGLE_403_DOCS_DISABLED, GOOGLE_403_DRIVE_DISABLED };

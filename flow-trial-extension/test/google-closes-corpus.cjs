@@ -55,6 +55,9 @@ function plan(text, extra) {
 const SIX = ['party', 'amount', 'date', 'title', 'what', 'reference'];
 
 console.log('--- detail mode: chat only above 4 ---\n');
+// A filing ask that names the case folder with «בתיק» and the nominal «אודה לשמירת…» (law-firm mailbox pass, 2026-11-18); a past tense and a bare mention stay out.
+for (const t of ['סאלי, נא לתייק את הנספח המצורף בתיק.', 'אודה לשמירת המסמך המצורף בתיק הלקוח.', 'תשמור את הנספח המצורף בתיק']) check('save-shaped (case folder): ' + t.slice(0, 36), FlowGoogleCloses.needsOneAttachment(t), t);
+for (const t of ['שמרתי את הנספח המצורף בתיק.', 'הנספח המצורף נמצא בתיק.', 'אודה לתשובה על המסמך המצורף.']) check('not save-shaped: ' + t.slice(0, 36), !FlowGoogleCloses.needsOneAttachment(t), t);
 check('0 missing is ready', FlowGoogleCloses.detailMode(0) === 'ready');
 check('1 missing is fields', FlowGoogleCloses.detailMode(1) === 'fields');
 check('4 missing is fields', FlowGoogleCloses.detailMode(4) === 'fields');
@@ -263,6 +266,15 @@ console.log('\n--- family C: create is the ask ---\n');
   check('a later Hebrew אל תשמור אותו refers back and stays quiet',
     laterHe.intent && !laterHe.intent.type && laterHe.intent.googleSilence === true && !laterHe.process,
     laterHe.intent && { type: laterHe.intent.type, personal: laterHe.intent.personalClose });
+  // A Hebrew save with the attachment named and a folder or the shared Drive as the place (a different verb set, a «בבקשה» or a noun between the verb and the attachment).
+  for (const t of ['תשמרי בבקשה את החשבונית המצורפת בתיקיית הנהלת החשבונות.', 'תשימי את הדוח המצורף בדרייב המשותף של הצוות.', 'נא לשמור את הקובץ המצורף בתיקייה שלנו.']) {
+    const he = plan(t, { attachmentCount: 1 });
+    check('Hebrew save of the attached file to a folder: ' + t.slice(0, 30), he.intent && he.intent.personalClose === 'drive-file' && he.process && he.process.steps.some((st) => st.kind === 'driveFile'), he.intent && he.intent.personalClose);
+  }
+  for (const t of ['סאלי, אל תשמרי את החשבונית המצורפת בתיקייה, היא לא נכונה.', 'תשים לב שהתיקייה ריקה, ראה את המצורף.', 'תשמור על קשר, המצורף בתיקייה הישנה.']) {
+    const he = plan(t, { attachmentCount: 1 });
+    check('no Hebrew save for: ' + t.slice(0, 30), !(he.intent && he.intent.personalClose === 'drive-file'), he.intent && he.intent.personalClose);
+  }
   const laterThis = plan("Please save the attached file to Drive. Don't save this.", { attachmentCount: 1 });
   const laterThat = plan("Please save the attached file to Drive. Don't save that.", { attachmentCount: 1 });
   const laterZe = plan('תשמור את הקובץ בדרייב. אל תשמור את זה', { attachmentCount: 1 });
