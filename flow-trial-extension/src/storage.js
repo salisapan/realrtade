@@ -531,8 +531,100 @@ const FlowStorage = (() => {
     const proofs = mergeGlanceProof(state, row);
     if (proofs) patch.glanceProofs = proofs;
     await set(patch);
+    await Promise.resolve(noteClosedIntent(state, row)).catch(function () {});
     return patch.log;
   });
+
+  // A short token only. A subject, a name, or an address cannot pass.
+  function ledgerToken(value) {
+    const s = typeof value === 'string' ? value.trim() : '';
+    return /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/.test(s) ? s : '';
+  }
+
+  function ledgerSystem(value) {
+    const s = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    return /^[a-z0-9][a-z0-9./-]{0,48}$/.test(s) ? s : '';
+  }
+
+  function ledgerIntentHint(state, row) {
+    const direct = ledgerToken(row && row.intentType)
+      || ledgerToken(row && row.intent && row.intent.type)
+      || ledgerToken(row && row.process && row.process.id)
+      || ledgerToken(row && row.processId);
+    if (direct) return direct;
+    const id = row && row.messageId;
+    const log = (state && state.log) || [];
+    if (id) {
+      for (let i = 0; i < log.length; i++) {
+        const e = log[i];
+        if (!e || e.messageId !== id) continue;
+        const fromProcess = ledgerToken(e.process && e.process.id);
+        if (fromProcess) return fromProcess;
+        const fromIntent = ledgerToken(e.intent && e.intent.type);
+        if (fromIntent) return fromIntent;
+      }
+    }
+    return ledgerToken(row && row.connectorId);
+  }
+
+  function ledgerScore(state, row) {
+    if (row && typeof row.score === 'number' && Number.isFinite(row.score)) return row.score;
+    const nested = row && row.signals && row.signals.score;
+    if (typeof nested === 'number' && Number.isFinite(nested)) return nested;
+    const id = row && row.messageId;
+    if (!id) return null;
+    const log = (state && state.log) || [];
+    for (let i = 0; i < log.length; i++) {
+      const e = log[i];
+      if (!e || e.messageId !== id) continue;
+      if (typeof e.score === 'number' && Number.isFinite(e.score)) return e.score;
+    }
+    return null;
+  }
+
+  function ledgerLatency(state, row) {
+    if (row && typeof row.latencyMs === 'number' && Number.isFinite(row.latencyMs)) return row.latencyMs;
+    const id = row && row.messageId;
+    const ts = row && row.ts;
+    if (!id || typeof ts !== 'number') return null;
+    let shownAt = null;
+    const log = (state && state.log) || [];
+    for (let i = 0; i < log.length; i++) {
+      const e = log[i];
+      if (!e || e.messageId !== id || e.kind !== 'shown' || typeof e.ts !== 'number') continue;
+      if (shownAt === null || e.ts < shownAt) shownAt = e.ts;
+    }
+    if (shownAt === null || ts < shownAt) return null;
+    return ts - shownAt;
+  }
+
+  // Types only. The ledger drops anything that is not on its allowlist.
+  // A missing module, or a failure here, must not block the activity log.
+  function noteClosedIntent(state, row) {
+    try {
+      const api = typeof FlowClosedIntentLedger !== 'undefined' ? FlowClosedIntentLedger : null;
+      if (!api || typeof api.noteActivity !== 'function' || !row) return null;
+      const proofFlag = row.proof && (row.proof.fetchedBack === true || row.proof.fetchedBack === false)
+        ? row.proof.fetchedBack === true
+        : undefined;
+      return api.noteActivity({
+        kind: row.kind,
+        fetchedBack: row.fetchedBack === true ? true : (row.fetchedBack === false ? false : undefined),
+        proofFetchedBack: proofFlag,
+        undone: row.undone === true,
+        app: ledgerToken(row.app),
+        connectorId: ledgerToken(row.connectorId),
+        system: ledgerSystem(row.system),
+        intentHint: ledgerIntentHint(state, row),
+        score: ledgerScore(state, row),
+        confidence: ledgerToken(row.confidence),
+        latencyMs: ledgerLatency(state, row),
+        ts: row.ts
+      });
+    } catch (e) {
+      return null;
+    }
+  }
 
   const markSeen = serialize(async function markSeen(messageId) {
     const state = await get();

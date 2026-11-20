@@ -92,6 +92,7 @@
         "core/meeting-debrief.js",
         "core/recurrence.js",
         "core/entitlements.js",
+        "core/closed-intent-ledger.js",
         "src/chrome-storage-adapter.js",
         "src/storage.js",
         "core/privacyShield.js",

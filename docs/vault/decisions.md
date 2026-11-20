@@ -9,6 +9,8 @@ updated: 2026-10-28
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-11-20 · Closed-intent ledger, types only, off until opt-in. A proved Do It or an Undo appends intent type, surface, target system, outcome, confidence bucket, latency, and the UTC day. No mail text, subject, name, address, or id. Export and delete stay on the device. Aggregate upload is a disabled stub with no endpoint and no new scope. Gate: not run live. Not merged. · Cursor · [[open-tasks]] row 88, `flow-trial-extension/core/closed-intent-ledger.README.md`
+
 - 2026-11-13 · Outlook add-in manifest: ItemRead DesktopSettings includes RequestedHeight 250 after SourceLocation. ItemEdit stays SourceLocation only, because RequestedHeight there fails the schema. TabletSettings and PhoneSettings stay omitted (optional). The previous sideload was rejected on Outlook.com. Gate: not run · Cursor agent · [[open-tasks]] row 87, `glance-outlook-addin/README.md`
 
 - 2026-11-13 · Outlook add-in test manifest: a local script writes a sideload copy whose SourceLocation, task pane, icon, and AppDomain URLs use a tester HTTPS base. The committed manifest stays on https://theflow-ai.com. Nothing is hosted or deployed. Sideload on Outlook on the web and on iOS is documented and not run. Gate: not run · Cursor agent · [[open-tasks]] row 87, `glance-outlook-addin/README.md`

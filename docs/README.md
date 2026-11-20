@@ -56,6 +56,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | How every agent saves tokens with Graphify and what counts as shared work | `docs/glance-ai/graphify.md` | `scripts/graphify-setup.sh`, `.cursor/rules/graphify.mdc` | - |
 | Value test on the test mailbox: which ask kinds Glance misses, for the ecosystems routines | `docs/glance-ai/real-mail-misses-2026-10-21.md` | `flow-trial-extension/core/judgment.js`, `flow-trial-extension/test/status-intro-ask-corpus.cjs` | - |
 | When Glance is worth paying for. The chief of staff reads the yaml. Flow is not this bar | `docs/glance-ai/paid-readiness-bar.md` | `core/pmf-metrics.js`, `core/close-quality-metrics.js`, `docs/human-eval.md`, `docs/real-mail-eval/2026-10-08.md` | - |
+| Closed-intent ledger: a consented, types-only record of what got done. Off until opt-in. Nothing leaves the device in this slice | `closed-intent-ledger.README.md` | `closed-intent-ledger.js`, `closed-intent-ledger.schema.json` | `closed-intent-ledger-corpus.cjs` |
 
 ## 2. When X changes, update these in the SAME commit
 

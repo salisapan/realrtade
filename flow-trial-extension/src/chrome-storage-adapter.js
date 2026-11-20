@@ -32,3 +32,8 @@ if (typeof FlowExecutionMemory !== 'undefined') {
 if (typeof FlowCloseMemory !== 'undefined') {
   FlowCloseMemory.setStorageAdapter(glanceLocalAdapter());
 }
+
+// Closed-intent ledger. Same device store, its own key. Off until opt-in.
+if (typeof FlowClosedIntentLedger !== 'undefined') {
+  FlowClosedIntentLedger.setStorageAdapter(glanceLocalAdapter());
+}
