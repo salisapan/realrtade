@@ -876,5 +876,6 @@
 
   bootWatch();
 
-  globalThis.FlowLaneMsPage = { attach: attach, draftCardStays: draftCardStays };
+  globalThis.FlowLaneMsPage = { attach: attach };
+  globalThis.FlowLaneMsPage.draftCardStays = draftCardStays;
 })();
