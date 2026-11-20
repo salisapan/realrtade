@@ -470,62 +470,65 @@ console.log('\n--- calendar hold reads the event back, then undo deletes it ---\
 
   console.log('\n--- one sheet row is read back, then undo clears or trashes it ---\n');
   const row = ['Ada', '100'];
+  const SHEET_FILE = Object.assign({ id: 'sheet1', name: 'Payments', mimeType: 'application/vnd.google-apps.spreadsheet', trashed: false }, SNAP);
   const sheet = scripted([
-    { status: 200, ok: true, json: { id: 'sheet1', trashed: false } },
-    { status: 200, ok: true, json: { id: 'sheet1', trashed: false } },
-    { status: 200, ok: true, json: { updates: { updatedRange: 'Sheet1!A1:B1', updatedRows: 1 } } },
-    { status: 200, ok: true, json: { values: [row] } },
-    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', trashed: false }, SNAP) }
+    { status: 200, ok: true, json: { files: [{ id: 'fld', name: 'Glance' }] } },
+    { status: 200, ok: true, json: SHEET_FILE },
+    { status: 200, ok: true, json: SHEET_FILE },
+    { status: 200, ok: true, text: 'Ada,100\n' }
   ]);
   const appended = await Sheets.write({ scopes: Cfg.SCOPES, name: 'Payments', row: row }, sheet.http, CLOCK);
-  check('sheet create append is proved', proved(appended) && appended.proof.system === 'google/sheets' && appended.ref.created === true && appended.ref.snapshot.version === '1' && sheet.calls[3].method === 'GET' && sheet.calls[4].method === 'GET', appended);
-  check('sheet calls stay off gmail', noGmail(sheet.calls));
+  check('sheet create append is proved', proved(appended) && appended.proof.system === 'google/sheets' && appended.ref.created === true && appended.ref.snapshot.version === '1' && sheet.calls[2].method === 'GET' && sheet.calls[3].method === 'GET', appended);
+  check('sheet calls stay on Drive and off the Sheets API', noGmail(sheet.calls) && sheet.calls.every((c) => c.url.indexOf('sheets.googleapis.com') < 0) && sheet.calls[1].url.indexOf('/upload/drive/v3/files') >= 0, sheet.calls.map((c) => c.url));
   check('a nested row is refused', Sheets.rowOf({ row: [['a']] }) === null && Sheets.rowOf({ row: ['only'] }) && Sheets.rowOf({ row: ['only'] }).length === 1);
   const sheetTrash = scripted([
-    { status: 200, ok: true, json: { values: [row] } },
-    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', trashed: false }, SNAP) },
+    { status: 200, ok: true, text: 'Ada,100\n' },
+    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', name: 'Payments', trashed: false }, SNAP) },
     { status: 200, ok: true, json: { trashed: true } }
   ]);
   const sheetUndo = await Sheets.undo(appended.ref, sheetTrash.http);
   check('undo of a created sheet reads the row and the file, then trashes it', sheetUndo.ok === true && sheetTrash.calls[0].method === 'GET' && sheetTrash.calls[1].method === 'GET' && sheetTrash.calls[2].method === 'PATCH', sheetUndo);
-  const sheetEdited = scripted([{ status: 200, ok: true, json: { values: [['Ada', '999']] } }]);
+  const sheetEdited = scripted([{ status: 200, ok: true, text: 'Ada,999\n' }]);
   const sheetRefused = await Sheets.undo(appended.ref, sheetEdited.http);
   check('sheet undo refuses a changed row and does not trash it', sheetRefused.ok === false && sheetRefused.reason === 'user-edited' && sheetRefused.error === 'You edited this. Undo left it alone.' && sheetEdited.calls.length === 1 && sheetEdited.calls[0].method === 'GET', sheetRefused);
   const sheetFileEdited = scripted([
-    { status: 200, ok: true, json: { values: [row] } },
-    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', trashed: false }, SNAP, { version: '9', headRevisionId: 'rev-9' }) }
+    { status: 200, ok: true, text: 'Ada,100\n' },
+    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', name: 'Payments', trashed: false }, SNAP, { version: '9', headRevisionId: 'rev-9' }) }
   ]);
   const sheetFileRefused = await Sheets.undo(appended.ref, sheetFileEdited.http);
   check('sheet undo refuses a changed file and does not trash it', sheetFileRefused.ok === false && sheetFileRefused.error === 'You edited this. Undo left it alone.' && sheetFileEdited.calls.length === 2 && sheetFileEdited.calls.every((c) => c.method === 'GET'), sheetFileRefused);
   const sheetDown = scripted([{ status: 500, ok: false, json: null }]);
   const sheetUnread = await Sheets.undo(appended.ref, sheetDown.http);
   check('sheet row undo refuses when the read fails and does not delete', sheetUnread.ok === false && sheetUnread.reason === 'unconfirmed' && sheetUnread.error === "Couldn't confirm it's unchanged. Undo left it alone." && sheetDown.calls.length === 1, sheetUnread);
-  const sheetNoRow = await Sheets.undo(Object.assign({}, appended.ref, { row: null }), scripted([]).http);
+  const sheetNoRow = await Sheets.undo(Object.assign({}, appended.ref, { row: null, rows: null }), scripted([]).http);
   check('sheet row undo without a row snapshot does not delete', sheetNoRow.ok === false && sheetNoRow.reason === 'unconfirmed' && sheetNoRow.error === "Couldn't confirm it's unchanged. Undo left it alone.", sheetNoRow);
   const sheetTimeOnly = scripted([
-    { status: 200, ok: true, json: { values: [row] } },
-    { status: 200, ok: true, json: { id: 'sheet1', trashed: false, headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } }
+    { status: 200, ok: true, text: 'Ada,100\n' },
+    { status: 200, ok: true, json: { id: 'sheet1', name: 'Payments', trashed: false, headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } }
   ]);
   const sheetTimeRefused = await Sheets.undo(Object.assign({}, appended.ref, { snapshot: { headRevisionId: 'rev-1', modifiedTime: SNAP.modifiedTime } }), sheetTimeOnly.http);
   check('sheet undo refuses a modifiedTime match when version is missing and does not trash', sheetTimeRefused.ok === false && sheetTimeRefused.reason === 'unconfirmed' && sheetTimeRefused.error === "Couldn't confirm it's unchanged. Undo left it alone." && sheetTimeOnly.calls.length === 2 && sheetTimeOnly.calls.every((c) => c.method === 'GET'), sheetTimeRefused);
   const sheetVersion = scripted([
-    { status: 200, ok: true, json: { values: [row] } },
-    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', trashed: false }, SNAP, { version: '3' }) }
+    { status: 200, ok: true, text: 'Ada,100\n' },
+    { status: 200, ok: true, json: Object.assign({ id: 'sheet1', name: 'Payments', trashed: false }, SNAP, { version: '3' }) }
   ]);
   const sheetVersionRefused = await Sheets.undo(appended.ref, sheetVersion.http);
   check('sheet undo refuses a version mismatch and does not trash', sheetVersionRefused.ok === false && sheetVersionRefused.reason === 'user-edited' && sheetVersionRefused.error === 'You edited this. Undo left it alone.' && sheetVersion.calls.length === 2, sheetVersionRefused);
   const picked = scripted([
+    { status: 200, ok: true, json: { sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }] } },
     { status: 200, ok: true, json: { updates: { updatedRange: 'Sheet1!A2:B2', updatedRows: 1 } } },
     { status: 200, ok: true, json: { values: [['Bea', '200']] } }
   ]);
-  const pickedRow = await Sheets.write({ scopes: Cfg.SCOPES, spreadsheetId: 'sheet9', origin: 'picked', row: ['Bea', '200'] }, picked.http, CLOCK);
-  check('a picked sheet append is proved', proved(pickedRow) && pickedRow.ref.created === false, pickedRow);
+  const pickedRow = await Sheets.write({ scopes: Cfg.SCOPES, spreadsheetId: 'sheet9', origin: 'picked', name: 'Ledger', row: ['Bea', '200'] }, picked.http, CLOCK);
+  check('a picked sheet append is proved', proved(pickedRow) && pickedRow.ref.created === false && pickedRow.ref.sheetId === 0 && picked.calls[1].url.indexOf(':append') >= 0 && picked.calls[1].url.indexOf('valueInputOption=USER_ENTERED') >= 0 && picked.calls[1].url.indexOf('insertDataOption=INSERT_ROWS') >= 0, pickedRow);
   const cleared = scripted([
     { status: 200, ok: true, json: { values: [['Bea', '200']] } },
-    { status: 200, ok: true, json: {} }
+    { status: 200, ok: true, json: {} },
+    { status: 200, ok: true, json: { values: [['Later', '1']] } }
   ]);
   const clear = await Sheets.undo(pickedRow.ref, cleared.http);
-  check('undo of an append reads the row, then clears that range', clear.ok === true && cleared.calls[0].method === 'GET' && cleared.calls[1].method === 'POST' && cleared.calls[1].url.indexOf(':clear') >= 0, clear);
+  const clearedBody = cleared.calls[1] && typeof cleared.calls[1].body === 'string' ? cleared.calls[1].body : '';
+  check('undo of an append reads the row, deletes that dimension, and reads again', clear.ok === true && cleared.calls.map((c) => c.method).join(',') === 'GET,POST,GET' && cleared.calls[1].url.indexOf(':batchUpdate') >= 0 && clearedBody.indexOf('deleteDimension') >= 0 && clearedBody.indexOf('"startIndex":1') >= 0 && clearedBody.indexOf('"endIndex":2') >= 0, { clear: clear, body: clearedBody });
 
   console.log('\n--- compose is filled, read back, and never sent ---\n');
   const state = { to: '', subject: '', body: '', sendClicks: 0 };

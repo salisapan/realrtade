@@ -906,3 +906,7 @@
   margin: 0;
 }
 .flow-chip-host.glance-peek-flash { box-shadow: 0 0 0 3px rgba(59,116,255,.4), 0 10px 26px -16px rgba(20,40,100,.35); transition: box-shadow 300ms ease; }
+.flow-sheet-choose { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.flow-sheet-choose-title, .flow-sheet-choose-note, .flow-sheet-choose-empty { margin: 0; }
+.flow-sheet-choose-link { width: 100%; box-sizing: border-box; }
+.flow-sheet-choose-row { display: flex; gap: 6px; align-items: center; }

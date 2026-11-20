@@ -2359,6 +2359,8 @@ function glanceUiCopy(kind) {
     // A new empty Google Doc, Sheet or Slides deck asked for by name ("Can you create a shared doc called
     // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
     // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
+    if (usingGoogle && await showSheetFromMailChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
+    if (usingGoogle && await showSlideDeckChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (usingGoogle && await showFullDocumentChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showGoogleContactsChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
@@ -2846,7 +2848,7 @@ function glanceUiCopy(kind) {
   let drivePickerSeq = 0;
   const pendingDrivePickerResolvers = new Map(); // requestId -> resolve(file|null)
 
-  function openDrivePicker() {
+  function openDrivePicker(kind) {
     const requestId = 'dp_' + Date.now() + '_' + (++drivePickerSeq);
     return new Promise((resolve) => {
       const settle = (result) => {
@@ -2857,7 +2859,7 @@ function glanceUiCopy(kind) {
       };
       const timer = setTimeout(() => settle(null), DRIVE_PICKER_TIMEOUT_MS);
       pendingDrivePickerResolvers.set(requestId, settle);
-      chrome.runtime.sendMessage({ type: 'flow:open-drive-picker', payload: { requestId } }, (response) => {
+      chrome.runtime.sendMessage({ type: 'flow:open-drive-picker', payload: { requestId, kind: kind === 'sheet' ? 'sheet' : '' } }, (response) => {
         if (response && response.ok) return; // the real result arrives later via flow:drive-file-result
         settle(null);
       });
@@ -3658,6 +3660,179 @@ function glanceUiCopy(kind) {
     return true;
   }
 
+  async function showSheetFromMailChip(message, c) {
+    const M = typeof FlowSheetMail !== 'undefined' ? FlowSheetMail : null;
+    if (!M || typeof M.plan !== 'function') return false;
+    const plan = M.plan({ text: c.text, subject: c.subject });
+    if (!plan || plan.action !== 'offer' || !plan.rows || plan.rows.length < 2) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'sheet-from-mail',
+      name: plan.title,
+      closingLine: he ? 'גיליון מהמייל' : 'Sheet from this mail',
+      closedLine: he ? 'הגיליון ב-Drive.' : 'The sheet is in Drive.',
+      steps: [{
+        id: 'sheet',
+        kind: 'driveSheet',
+        label: 'Sheet',
+        hint: he ? 'כותב את השורות לגיליון וקורא אותן בחזרה' : 'Write the rows to a sheet and read them back',
+        dependsOn: null,
+        params: {
+          title: plan.title,
+          rows: plan.rows,
+          pick: plan.mode === 'pick',
+          destinationText: (he ? 'גיליון · ' : 'Sheet · ') + plan.title
+        }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.title, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds,
+      intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.title, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    if (plan.mode === 'pick') mountSheetChooser(message, process.steps[0]);
+    return true;
+  }
+
+  function mountSheetChooser(message, step) {
+    const host = message.querySelector('.flow-chip-host');
+    const params = step && step.params;
+    if (!host || !params || host.querySelector('.flow-sheet-choose')) return;
+    const box = el('div', 'flow-sheet-choose');
+    box.setAttribute('dir', 'rtl');
+    const title = el('p', 'flow-sheet-choose-title', 'גיליון קיים');
+    const list = el('div', 'flow-sheet-choose-list');
+    const paste = el('input', 'flow-sheet-choose-link');
+    paste.type = 'text';
+    paste.placeholder = 'הדביקו קישור לגיליון';
+    paste.setAttribute('aria-label', 'קישור לגיליון');
+    const check = el('button', 'flow-sheet-choose-check', 'בדיקה');
+    check.type = 'button';
+    const note = el('p', 'flow-sheet-choose-note', '');
+    const create = el('button', 'flow-sheet-choose-new', 'גיליון חדש');
+    create.type = 'button';
+    function selectSheet(id, name) {
+      params.spreadsheetId = id;
+      params.origin = 'picked';
+      params.name = name || '';
+      params.createNew = false;
+      host.dataset.glanceSheetId = id;
+      host.dataset.glanceSheetName = name || '';
+      host.dataset.glanceSheetNew = '';
+      note.textContent = name ? ('נבחר: ' + name) : '';
+    }
+    function paint(files, lastId) {
+      list.textContent = '';
+      const rows = Array.isArray(files) ? files : [];
+      if (!rows.length) {
+        list.appendChild(el('p', 'flow-sheet-choose-empty', 'אין עדיין גיליון ש-Glance יצר.'));
+      }
+      rows.forEach((file, i) => {
+        const row = el('label', 'flow-sheet-choose-row');
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'glance-sheet';
+        radio.value = file.id;
+        const preferred = lastId ? file.id === lastId : i === 0;
+        if (preferred) {
+          radio.checked = true;
+          selectSheet(file.id, file.name);
+        }
+        radio.addEventListener('change', () => { if (radio.checked) selectSheet(file.id, file.name); });
+        row.appendChild(radio);
+        row.appendChild(document.createTextNode(' ' + (file.name || file.id)));
+        list.appendChild(row);
+      });
+    }
+    check.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      const Mail = typeof FlowSheetMail !== 'undefined' ? FlowSheetMail : null;
+      const id = Mail && Mail.parseSheetLink ? Mail.parseSheetLink(paste.value) : '';
+      if (!id) {
+        note.textContent = Mail && Mail.NO_ACCESS ? Mail.NO_ACCESS : '';
+        return;
+      }
+      const probed = await sendRuntime({ type: 'flow:google-sheet-probe', link: paste.value });
+      if (probed && probed.ok && probed.id) {
+        selectSheet(probed.id, probed.name);
+        return;
+      }
+      note.textContent = (probed && probed.message) || (Mail && Mail.NO_ACCESS) || '';
+    });
+    create.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      params.createNew = true;
+      params.spreadsheetId = '';
+      params.origin = '';
+      host.dataset.glanceSheetNew = '1';
+      host.dataset.glanceSheetId = '';
+      note.textContent = 'ייווצר גיליון חדש.';
+    });
+    box.appendChild(title);
+    box.appendChild(list);
+    box.appendChild(paste);
+    box.appendChild(check);
+    box.appendChild(note);
+    box.appendChild(create);
+    host.appendChild(box);
+    sendRuntime({ type: 'flow:google-sheet-list' }).then((res) => {
+      paint(res && res.files, res && res.lastId);
+    }).catch(() => paint([], ''));
+  }
+
+  async function showSlideDeckChip(message, c) {
+    const D = typeof FlowSlideDeck !== 'undefined' ? FlowSlideDeck : null;
+    if (!D || typeof D.plan !== 'function') return false;
+    const plan = D.plan({ text: c.text, subject: c.subject });
+    if (!plan || plan.action !== 'offer' || !plan.slides) return false;
+    const he = plan.lang === 'he';
+    const process = {
+      id: 'slide-deck',
+      name: plan.title,
+      closingLine: he ? 'מצגת מהסיכום' : 'Deck from this summary',
+      closedLine: he ? 'המצגת ב-Drive.' : 'The deck is in Drive.',
+      steps: [{
+        id: 'deck',
+        kind: 'driveSlides',
+        label: 'Slides',
+        hint: he ? 'יוצר מצגת וקורא אותה בחזרה' : 'Create the deck and read it back',
+        dependsOn: null,
+        params: {
+          title: plan.title,
+          slides: plan.slides,
+          bullets: plan.bullets,
+          destinationText: (he ? 'מצגת · ' : 'Slides · ') + plan.title
+        }
+      }]
+    };
+    const intent = Object.assign({}, c.intent, { label: plan.title, type: (c.intent && c.intent.type) || 'request' });
+    injectChip(message, {
+      messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds,
+      intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
+      threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail'
+    });
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
+    if (!shownAlready) {
+      FlowStorage.appendLog({
+        kind: 'shown', label: plan.title, messageId: c.messageId, score: (c.intent && c.intent.signals && c.intent.signals.score) || 0, signals: (c.intent && c.intent.signals) || {},
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(c.legacyId), threadId: c.threadId, sender: c.sender, subject: c.subject,
+        intent: compactIntent(intent), app: SOURCE_APP
+      });
+    }
+    return true;
+  }
+
   async function showNewFileChip(message, c) {
     let plan = null;
     try {
@@ -4161,13 +4336,48 @@ function glanceUiCopy(kind) {
     const base = { connectorId: action.kind, threadUrl: ctx.threadUrl };
     const priorUrl = prior && prior.url;
 
+    if (action.kind === 'driveSlides') {
+      const p = action.params || {};
+      if (!p.title || !p.slides) return null;
+      return Object.assign(base, {
+        params: {
+          title: p.title,
+          slides: p.slides,
+          bullets: p.bullets || null,
+          threadId: ctx.threadId || '',
+          glance: { threadId: ctx.threadId || '', titleKey: String(p.title || '').toLowerCase().slice(0, 60) }
+        }
+      });
+    }
+
     if (action.kind === 'driveDoc' || action.kind === 'driveDocFull' || action.kind === 'driveSheet') {
+      if (action.kind === 'driveSheet' && action.params && Array.isArray(action.params.rows) && action.params.rows.length) {
+        let spreadsheetId = action.params.spreadsheetId || '';
+        let origin = action.params.origin || '';
+        if (action.params.createNew === true) {
+          spreadsheetId = '';
+          origin = '';
+        } else if (action.params.pick === true && !spreadsheetId) {
+          return { fail: { reason: 'choose-sheet', error: 'Choose a sheet Glance created, or create a new one.' } };
+        }
+        return Object.assign(base, {
+          params: {
+            title: action.params.title || 'Sheet',
+            rows: action.params.rows,
+            spreadsheetId: spreadsheetId,
+            origin: origin,
+            threadId: ctx.threadId || '',
+            glance: { threadId: ctx.threadId || '', titleKey: String(action.params.title || '').toLowerCase().slice(0, 60) }
+          }
+        });
+      }
       const built = ctx.googleBuilt;
       if (!built || built.blank) return null;
       const params = {
         title: built.title,
         html: (action.kind === 'driveDoc' || action.kind === 'driveDocFull') ? built.html : null,
-        csv: action.kind === 'driveSheet' ? built.csv : null
+        csv: action.kind === 'driveSheet' ? built.csv : null,
+        threadId: ctx.threadId || ''
       };
       if (action.kind === 'driveDocFull' || (ctx && ctx.previewOnly)) params.fullDocument = true;
       return Object.assign(base, { params: params });
@@ -4412,6 +4622,7 @@ function glanceUiCopy(kind) {
     driveDoc: 'googleDoc',
     driveDocFull: 'googleDocFull',
     driveSheet: 'googleSheetAppend',
+    driveSlides: 'googleSlides',
     driveNewFile: 'googleNewFile',
     calendarCallLink: 'googleEventCallLink',
     calendarRecurring: 'googleRecurringReminder',
@@ -4422,7 +4633,7 @@ function glanceUiCopy(kind) {
 
   function laneConnectorId(kind) {
     if (LANE_BY_KIND[kind]) return LANE_BY_KIND[kind];
-    if (kind === 'googleHold' || kind === 'googleLaneTask' || kind === 'googleDriveSave' || kind === 'googleDoc' || kind === 'googleDocFull' || kind === 'googleSheetAppend' || kind === 'gmailCompose') return kind;
+    if (kind === 'googleHold' || kind === 'googleLaneTask' || kind === 'googleDriveSave' || kind === 'googleDoc' || kind === 'googleDocFull' || kind === 'googleSheetAppend' || kind === 'googleSlides' || kind === 'gmailCompose') return kind;
     return '';
   }
 
@@ -5400,6 +5611,7 @@ function glanceUiCopy(kind) {
     calendarRecurring: 'set a repeating reminder',
     driveDoc: 'wrote the doc',
     driveSheet: 'wrote the sheet',
+    driveSlides: 'wrote the deck',
     driveFile: 'saved the file'
   };
 
@@ -6444,6 +6656,21 @@ function glanceUiCopy(kind) {
     // reads to Execution Memory as a full rejection (onDismiss records it),
     // which is correct: the user saw the whole process and kept none of it.
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
+    if (host && host.dataset) {
+      liveSteps.forEach((step) => {
+        if (!step || step.kind !== 'driveSheet' || !step.params || step.params.pick !== true) return;
+        if (host.dataset.glanceSheetNew === '1') {
+          step.params.createNew = true;
+          step.params.spreadsheetId = '';
+          step.params.origin = '';
+        } else if (host.dataset.glanceSheetId) {
+          step.params.spreadsheetId = host.dataset.glanceSheetId;
+          step.params.origin = 'picked';
+          step.params.name = host.dataset.glanceSheetName || step.params.title || '';
+          step.params.createNew = false;
+        }
+      });
+    }
     if (host.dataset.collectorOpen === '1') return;
     const offered = ctx.app === 'gmail' && host.closest ? host.closest('[data-legacy-message-id], [role="listitem"], .adn') : null;
     if (offered && copiedOnlyNow(offered, ctx.bodyText || '', ownEmailFromThread() || lastOwnEmail || '')) {

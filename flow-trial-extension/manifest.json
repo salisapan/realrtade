@@ -126,6 +126,8 @@
         "core/google-compose.js",
         "src/google-compose-page.js",
         "src/chip-peek.js",
+        "core/sheet-mail.js",
+        "core/slide-deck.js",
         "src/content-gmail.js"
       ],
       "css": [

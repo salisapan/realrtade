@@ -9,6 +9,7 @@ import '../core/google-task-close.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
 import '../core/google-sheets.js';
+import '../core/google-slides.js';
 import '../core/google-compose.js';
 import '../core/google-drafts.js';
 import '../core/google-proof.js';

@@ -52,12 +52,31 @@ function hashBytes(buf) {
 
 function parseDriveUpload(buf) {
   const text = Buffer.from(buf || []).toString('binary');
-  const jsonStart = text.indexOf('{');
-  const jsonEnd = text.indexOf('}');
-  let meta = {};
-  if (jsonStart >= 0 && jsonEnd > jsonStart) {
-    try { meta = JSON.parse(text.slice(jsonStart, jsonEnd + 1)); } catch (e) { meta = {}; }
+  function readJsonObject(s, start) {
+    let depth = 0;
+    let quote = false;
+    let esc = false;
+    for (let i = start; i < s.length; i++) {
+      const ch = s[i];
+      if (quote) {
+        if (esc) { esc = false; continue; }
+        if (ch === '\\') { esc = true; continue; }
+        if (ch === '"') quote = false;
+        continue;
+      }
+      if (ch === '"') { quote = true; continue; }
+      if (ch === '{') depth += 1;
+      else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          try { return JSON.parse(s.slice(start, i + 1)); } catch (e) { return {}; }
+        }
+      }
+    }
+    return {};
   }
+  const jsonStart = text.indexOf('{');
+  const meta = jsonStart >= 0 ? readJsonObject(text, jsonStart) : {};
   const marker = '\r\n\r\n';
   const first = text.indexOf(marker);
   const second = first >= 0 ? text.indexOf(marker, first + marker.length) : -1;
@@ -186,6 +205,10 @@ function startGoogleLaneServer() {
     docs: {},
     docText: {},
     sheets: {},
+    sheetCsv: {},
+    slideText: {},
+    blankExports: 0,
+    deniedFiles: {},
     last: {},
     account: 'ai.local.flow@gmail.com',
     tokens: {},
@@ -221,6 +244,10 @@ function startGoogleLaneServer() {
     state.docs = {};
     state.docText = {};
     state.sheets = {};
+    state.sheetCsv = {};
+    state.slideText = {};
+    state.blankExports = 0;
+    state.deniedFiles = {};
     state.last = {};
     state.account = 'ai.local.flow@gmail.com';
     state.tokens = {};
@@ -397,6 +424,26 @@ function startGoogleLaneServer() {
           send(res, 200, { files: hits.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType })) });
           return;
         }
+        if (q.indexOf('appProperties') >= 0 || q.indexOf('glanceSheet') >= 0 || q.indexOf('glanceSlides') >= 0) {
+          const wantSheet = q.indexOf('glanceSheet') >= 0;
+          const wantSlides = q.indexOf('glanceSlides') >= 0;
+          const hits = Object.keys(state.files).map((k) => state.files[k]).filter((f) => {
+            if (!f || f.trashed) return false;
+            const props = f.appProperties || {};
+            if (wantSheet && props.glanceSheet !== '1') return false;
+            if (wantSlides && props.glanceSlides !== '1') return false;
+            return wantSheet || wantSlides;
+          });
+          send(res, 200, { files: hits.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, trashed: !!f.trashed, appProperties: f.appProperties || {} })) });
+          return;
+        }
+        if (q.indexOf('application/vnd.google-apps.spreadsheet') >= 0 && q.indexOf('glanceSheet') < 0) {
+          const hits = Object.keys(state.files).map((k) => state.files[k]).filter((f) => f && !f.trashed && f.mimeType === 'application/vnd.google-apps.spreadsheet');
+          hits.sort((a, b) => String(b.modifiedTime || '').localeCompare(String(a.modifiedTime || '')));
+          const page = Math.min(Number(url.searchParams.get('pageSize')) || 10, 10);
+          send(res, 200, { files: hits.slice(0, page).map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, trashed: false, modifiedTime: f.modifiedTime || '' })) });
+          return;
+        }
         if (q.indexOf('glance-pricing-q4.pdf') >= 0) {
           send(res, 200, { files: [{ id: 'pricing-pdf', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' }] });
           return;
@@ -411,6 +458,22 @@ function startGoogleLaneServer() {
         const file = state.files[id];
         if (!file || file.trashed) { send(res, 404, { error: 'missing' }); return; }
         const want = url.searchParams.get('mimeType') || '';
+        if (state.blankExports > 0) {
+          state.blankExports -= 1;
+          res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('', 'utf8');
+          return;
+        }
+        if (want === 'text/csv' && state.sheetCsv[id] != null) {
+          res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8' });
+          res.end(state.sheetCsv[id], 'utf8');
+          return;
+        }
+        if (want === 'text/plain' && state.slideText[id] != null) {
+          res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(state.slideText[id], 'utf8');
+          return;
+        }
         if (want !== 'text/plain') { send(res, 400, { error: { code: 400, message: 'Unsupported export mimeType' } }); return; }
         const text = state.docText[id] != null ? state.docText[id] : '';
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -419,6 +482,17 @@ function startGoogleLaneServer() {
       }
       const oneFile = path.match(/^\/drive\/v3\/files\/([^/]+)$/);
       if (oneFile && method === 'GET') {
+        if (state.deniedFiles && state.deniedFiles[oneFile[1]]) {
+          const status = state.deniedFiles[oneFile[1]];
+          send(res, status, {
+            error: {
+              code: status,
+              message: 'The user does not have sufficient permissions for this file.',
+              errors: [{ reason: status === 404 ? 'notFound' : 'insufficientFilePermissions' }]
+            }
+          });
+          return;
+        }
         const file = state.files[oneFile[1]];
         if (!file) { send(res, 404, { error: 'missing' }); return; }
         const picked = driveFields(file, url.searchParams.get('fields'));
@@ -451,32 +525,57 @@ function startGoogleLaneServer() {
         send(res, 200, file);
         return;
       }
-      if (path.indexOf('/upload/drive/v3/files') === 0 && method === 'POST') {
+      if (path.indexOf('/upload/drive/v3/files') === 0 && (method === 'POST' || method === 'PATCH')) {
         const packed = parseDriveUpload(raw);
         if (packed.meta && Object.keys(packed.meta).length) {
           state.calls[state.calls.length - 1].body = packed.meta;
           state.calls[state.calls.length - 1].media = Buffer.from(packed.bytes || []).toString('utf8');
         }
-        const id = 'e2e-upload-' + (state.seq++);
-        const mime = packed.meta.mimeType || 'application/octet-stream';
+        const uploadId = method === 'PATCH' ? ((path.match(/^\/upload\/drive\/v3\/files\/([^/?]+)/) || [])[1] || '') : '';
+        const id = uploadId || ('e2e-upload-' + (state.seq++));
+        const prior = uploadId ? state.files[uploadId] : null;
+        if (method === 'PATCH' && !prior) { send(res, 404, { error: 'missing' }); return; }
+        const mime = (packed.meta && packed.meta.mimeType) || (prior && prior.mimeType) || 'application/octet-stream';
         const isDoc = mime === 'application/vnd.google-apps.document';
-        const file = stampFile({
+        const isSheet = mime === 'application/vnd.google-apps.spreadsheet';
+        const isSlides = mime === 'application/vnd.google-apps.presentation';
+        const file = prior || stampFile({
           id: id,
-          name: packed.meta.name || (isDoc ? 'Untitled' : 'upload.bin'),
+          name: (packed.meta && packed.meta.name) || (isDoc ? 'Untitled' : 'upload.bin'),
           mimeType: mime,
           trashed: false,
-          parents: packed.meta.parents || null
+          parents: packed.meta && packed.meta.parents || null
         });
+        if (packed.meta && packed.meta.name) file.name = packed.meta.name;
+        if (packed.meta && packed.meta.appProperties) file.appProperties = packed.meta.appProperties;
+        if (packed.meta && packed.meta.parents) file.parents = packed.meta.parents;
+        file.mimeType = mime;
+        if (method === 'PATCH') bumpFile(file);
         if (!isDoc) file.md5Checksum = hashBytes(packed.bytes);
         if (/^application\/vnd\.google-apps\./.test(String(mime))) {
           const kind = String(mime).split('.').pop();
-          file.webViewLink = 'https://docs.google.com/' + (kind === 'document' ? 'document' : kind) + '/d/' + id + '/edit';
+          const page = kind === 'document' ? 'document' : (kind === 'spreadsheet' ? 'spreadsheets' : (kind === 'presentation' ? 'presentation' : kind));
+          file.webViewLink = 'https://docs.google.com/' + page + '/d/' + id + '/edit';
         }
         if (isDoc) {
           const plain = htmlPlainText(packed.bytes);
           state.docs[id] = docBody(plain, '');
           state.docText[id] = plain;
           state.last.doc = id;
+        } else if (isSheet) {
+          const csv = Buffer.from(packed.bytes || []).toString('utf8');
+          state.sheetCsv[id] = csv;
+          const grid = csv.replace(/^\uFEFF/, '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => line.split(',').map((c) => c.replace(/^"|"$/g, '')));
+          state.sheets[id] = { row: grid[0] || [], rows: grid, csv: csv, range: '', sheetId: 0, title: 'Sheet1' };
+          state.last.sheet = id;
+        } else if (isSlides) {
+          const xml = Buffer.from(packed.bytes || []).toString('utf8');
+          const bits = [];
+          const re = /<a:t>([^<]*)<\/a:t>/g;
+          let m;
+          while ((m = re.exec(xml))) bits.push(m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"'));
+          state.slideText[id] = bits.join('\n');
+          state.last.slides = id;
         } else {
           Object.defineProperty(file, '__settles', { value: true, writable: true, enumerable: false });
         }
@@ -730,19 +829,50 @@ function startGoogleLaneServer() {
         return;
       }
 
+      const sheetMeta = path.match(/^\/v4\/spreadsheets\/([^/:]+)$/);
+      if (sheetMeta && method === 'GET') {
+        const id = sheetMeta[1];
+        const file = state.files[id];
+        if (!file) { send(res, 404, { error: 'missing' }); return; }
+        const sheet = state.sheets[id] || { title: 'Sheet1', sheetId: 0 };
+        send(res, 200, { sheets: [{ properties: { sheetId: sheet.sheetId || 0, title: sheet.title || 'Sheet1' } }] });
+        return;
+      }
+      const sheetBatch = path.match(/^\/v4\/spreadsheets\/([^/:]+):batchUpdate$/);
+      if (sheetBatch && method === 'POST') {
+        const id = sheetBatch[1];
+        const body = readJson(raw);
+        const reqs = body.requests || [];
+        const sheet = state.sheets[id];
+        reqs.forEach((item) => {
+          const dim = item && item.deleteDimension && item.deleteDimension.range;
+          if (!dim || !sheet || !Array.isArray(sheet.rows)) return;
+          const from = Number(dim.startIndex) || 0;
+          const to = Number(dim.endIndex) || from;
+          sheet.rows.splice(from, Math.max(0, to - from));
+          sheet.row = sheet.rows[0] || [];
+        });
+        send(res, 200, { replies: [{}] });
+        return;
+      }
       const append = path.match(/^\/v4\/spreadsheets\/([^/]+)\/values\/(.+):append$/);
       const clear = path.match(/^\/v4\/spreadsheets\/([^/]+)\/values\/(.+):clear$/);
       const values = path.match(/^\/v4\/spreadsheets\/([^/]+)\/values\/(.+)$/);
       if (append && method === 'POST') {
         const id = append[1];
         const body = readJson(raw);
-        const row = (body.values && body.values[0]) || [];
-        const end = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.max(row.length - 1, 0)] || 'A';
-        const range = 'Sheet1!A1:' + end + '1';
-        state.sheets[id] = { row: row, range: range };
-        bumpFile(state.files[id]);
+        const add = Array.isArray(body.values) ? body.values : [];
+        const sheet = state.sheets[id] || (state.sheets[id] = { rows: [], row: [], sheetId: 0, title: 'Sheet1', range: '' });
+        if (!Array.isArray(sheet.rows)) sheet.rows = sheet.row && sheet.row.length ? [sheet.row] : [];
+        const start = sheet.rows.length + 1;
+        sheet.rows = sheet.rows.concat(add);
+        const width = add.reduce((m, r) => Math.max(m, (r && r.length) || 1), 1);
+        const end = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.max(width - 1, 0)] || 'A';
+        const range = (sheet.title || 'Sheet1') + '!A' + start + ':' + end + (start + Math.max(add.length, 1) - 1);
+        sheet.range = range;
+        sheet.row = add[0] || sheet.row;
         state.last.sheet = id;
-        send(res, 200, { updates: { updatedRange: range, updatedRows: 1 } });
+        send(res, 200, { updates: { updatedRange: range, updatedRows: add.length } });
         return;
       }
       if (clear && method === 'POST') {
@@ -753,8 +883,14 @@ function startGoogleLaneServer() {
       }
       if (values && method === 'GET') {
         const sheet = state.sheets[values[1]];
-        if (!sheet || !sheet.row) { send(res, 404, { error: 'missing' }); return; }
-        send(res, 200, { values: [sheet.row] });
+        if (!sheet) { send(res, 404, { error: 'missing' }); return; }
+        const rows = Array.isArray(sheet.rows) ? sheet.rows : (sheet.row ? [sheet.row] : []);
+        const spec = decodeURIComponent(values[2] || '');
+        const span = spec.match(/![A-Z]+(\d+)(?::[A-Z]+(\d+))?$/);
+        if (!span) { send(res, 200, { values: rows }); return; }
+        const from = Number(span[1]) - 1;
+        const to = Number(span[2] || span[1]);
+        send(res, 200, { values: rows.slice(from, to) });
         return;
       }
 
@@ -806,6 +942,8 @@ function startGoogleLaneServer() {
         event: (id) => state.events[id],
         file: (id) => state.files[id],
         files: () => state.files,
+        sheetCsv: (id) => state.sheetCsv[id],
+        slideText: (id) => state.slideText[id],
         doc: (id) => state.docs[id],
         sheet: (id) => state.sheets[id],
         editTask: (id, patch) => Object.assign(state.tasks[id], patch),
@@ -823,9 +961,19 @@ function startGoogleLaneServer() {
           bumpFile(state.files[id]);
         },
         editSheetRow: (id, row) => {
-          if (state.sheets[id]) state.sheets[id].row = row;
+          const sheet = state.sheets[id];
+          if (!sheet) return;
+          sheet.row = row;
+          const lines = String(sheet.csv || state.sheetCsv[id] || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
+          const line = (row || []).map((c) => String(c)).join(',');
+          if (lines.length) lines[lines.length - 1] = line;
+          else lines.push(line);
+          sheet.csv = lines.join('\n') + '\n';
+          state.sheetCsv[id] = sheet.csv;
           bumpFile(state.files[id]);
         },
+        blankNextExports: (n) => { state.blankExports = n || 1; },
+        denyFile: (id, status) => { state.deniedFiles[id] = status || 403; },
         close: () => new Promise((done) => server.close(() => done()))
       });
     });

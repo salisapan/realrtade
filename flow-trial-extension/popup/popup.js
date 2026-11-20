@@ -363,12 +363,14 @@
       attachmentSave: 'googleDriveSave',
       driveDoc: 'googleDoc',
       driveSheet: 'googleSheetAppend',
+      driveSlides: 'googleSlides',
       gmailDraft: 'gmailCompose',
       googleHold: 'googleHold',
       googleLaneTask: 'googleLaneTask',
       googleDriveSave: 'googleDriveSave',
       googleDoc: 'googleDoc',
       googleSheetAppend: 'googleSheetAppend',
+      googleSlides: 'googleSlides',
       gmailCompose: 'gmailCompose'
     };
     const lane = map[connectorId];
