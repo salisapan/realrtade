@@ -8,3 +8,8 @@ body {
   padding: 8px 14px;
   font-weight: 600;
 }
+#glance-build {
+  margin-top: 16px;
+  color: #666;
+  font-size: 12px;
+}

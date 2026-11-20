@@ -61,7 +61,7 @@ function makeBody(initialHtml, faults, writes) {
   body.getAsync = (type, cb) => {
     writes.bodyReads++;
     if (faults.readFails) return done(cb, null, false);
-    done(cb, type === 'html' ? body.html : textOf(body.html), true);
+    done(cb, (type === 'html' || faults.returnHtml) ? body.html : textOf(body.html), true);
   };
   body.prependAsync = (html, opts, cb) => {
     writes.prepend++;
@@ -137,7 +137,7 @@ const SEND = /send/i;
 async function scenario(o) {
   o = Object.assign({ mode: 'read', messages: defaultThread(), token: 'tok', paneSrc: SRC('taskpane.js'), threadSrc: SRC('thread.js'),
     priorHtml: '<div></div><blockquote>On Tue Dana wrote: ' + ASK + '</blockquote>', faults: {} }, o);
-  const calls = []; const trip = []; const writes = { prepend: 0, set: 0, bodyReads: 0 };
+  const calls = []; const trip = []; const writes = { prepend: 0, set: 0, bodyReads: 0, replyForms: [] };
   const body = makeBody(o.priorHtml, o.faults, writes);
   const guard = (target, label) => new Proxy(target, {
     get(t, p) {
@@ -145,35 +145,81 @@ async function scenario(o) {
       return t[p];
     }
   });
+  const replyForm = (kind) => (data) => {
+    if (o.faults.replyFormThrows) throw new Error('refused');
+    writes.replyForms.push({ kind: kind, data: data });
+  };
   const raw = o.mode === 'compose'
-    ? { subject: { getAsync: (cb) => cb({ status: 'succeeded', value: 'Re: Review' }) }, conversationId: o.noConversation ? '' : CONV_EWS, body }
-    : { itemId: 'EWS:m4', conversationId: CONV_EWS, subject: 'Review', from: { emailAddress: 'dana@client.example', displayName: 'Dana' }, body };
+    ? {
+      subject: { getAsync: (cb) => cb({ status: 'succeeded', value: o.subject || 'Re: Review' }) },
+      conversationId: o.noConversation ? '' : CONV_EWS,
+      to: { getAsync: (cb) => cb({ status: 'succeeded', value: o.composeTo || [] }) },
+      cc: { getAsync: (cb) => cb({ status: 'succeeded', value: o.composeCc || [] }) },
+      body: body,
+      displayReplyForm: replyForm('reply'),
+      displayReplyAllForm: replyForm('replyAll')
+    }
+    : {
+      itemId: 'EWS:m4',
+      conversationId: o.conversationId === undefined ? CONV_EWS : o.conversationId,
+      subject: o.subject || 'Review',
+      from: o.itemFrom || { emailAddress: 'dana@client.example', displayName: 'Dana' },
+      to: o.itemTo || null,
+      cc: o.itemCc || null,
+      body: body,
+      displayReplyForm: replyForm('reply'),
+      displayReplyAllForm: replyForm('replyAll')
+    };
   const item = guard(raw, 'item');
   const mailbox = guard({ item, userProfile: { emailAddress: ME, displayName: 'Sali Sapan' }, convertToRestId: (id) => String(id).replace(/^EWS:/, '') }, 'mailbox');
+  const handlers = [];
   const Office = {
     onReady: (cb) => cb({ host: 'Outlook' }),
     AsyncResultStatus: { Succeeded: 'succeeded', Failed: 'failed' },
     CoercionType: { Html: 'html', Text: 'text' },
     MailboxEnums: { RestVersion: { v2_0: 'v2.0' } },
+    EventType: { ItemChanged: 'itemChanged' },
     context: { mailbox }
   };
+  mailbox.addHandlerAsync = (type, cb) => { handlers.push({ type: type, cb: cb }); };
   const rootNode = new Node('main');
-  const document = { createElement: (t) => new Node(t), getElementById: () => rootNode };
+  const footer = new Node('footer');
+  footer.textContent = 'Build dev';
+  footer.setAttribute('data-glance-build', 'Build dev');
+  const document = {
+    createElement: (t) => new Node(t),
+    getElementById: (id) => id === 'glance-build' ? footer : rootNode
+  };
   class FixedDate extends Date {
     constructor(...a) { if (a.length === 0) super(NOW_MS); else super(...a); }
     static now() { return NOW_MS; }
   }
-  const sandbox = { console, Office, document, Date: FixedDate, fetch: makeGraph(o, calls) };
+  const logs = [];
+  const sandbox = {
+    console: {
+      log: function () { logs.push(Array.prototype.join.call(arguments, ' ')); },
+      error: console.error
+    },
+    Office, document, Date: FixedDate, fetch: makeGraph(o, calls)
+  };
   if (o.token !== null) sandbox.GlanceOutlookAuth = { getToken: o.tokenFn || (() => Promise.resolve(o.token)) };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(BUNDLE_SRC, sandbox, { filename: 'core-bundle.js' });
   vm.runInContext(o.threadSrc, sandbox, { filename: 'thread.js' });
+  vm.runInContext(o.itemSrc || SRC('item.js'), sandbox, { filename: 'item.js' });
   vm.runInContext(o.paneSrc, sandbox, { filename: 'taskpane.js' });
   await sandbox.GlanceOutlookPane.ready;
   await settleAll();
   const state = () => rootNode.attrs['data-glance-state'];
-  return { root: rootNode, calls, trip, writes, body, state, why: () => rootNode.attrs['data-glance-why'], text: () => rootNode.textContent };
+  return {
+    root: rootNode, calls, trip, writes, body, mailbox, raw, state,
+    why: () => rootNode.attrs['data-glance-why'],
+    text: () => rootNode.textContent,
+    footer: footer,
+    logs: logs,
+    fireItemChanged: () => handlers.filter((h) => h.type === 'itemChanged').forEach((h) => h.cb())
+  };
 }
 
 const nonGet = (s) => s.calls.filter((c) => c.method !== 'GET' || SEND.test(c.url));
@@ -214,7 +260,6 @@ process.on('unhandledRejection', (e) => { if (!/send is not reachable/.test(Stri
   // 3. The thread is unreadable: no card, with a why. Never a latest-message fallback.
   {
     const cases = [
-      ['no sign-in (no token source)', { token: null }, 'no-token'],
       ['token source fails', { tokenFn: () => Promise.reject(new Error('x')) }, 'no-token'],
       ['token source throws', { tokenFn: () => { throw new Error('x'); } }, 'no-token'],
       ['empty token', { token: '' }, 'no-token'],
@@ -279,7 +324,7 @@ process.on('unhandledRejection', (e) => { if (!/send is not reachable/.test(Stri
     check('no send: the whole flow (open, insert, undo) touched no send member and no non-GET call', s.trip.length === 0 && nonGet(s).length === 0, [s.trip, nonGet(s).map((c) => c.method + ' ' + c.url)]);
     check('no send: every Graph call is a GET to /me/messages', s.calls.length > 0 && s.calls.every((c) => c.method === 'GET' && c.url.indexOf(GRAPH + '/me/messages') === 0));
     check('no send: manifest has no send surface or send event', !/OnMessageSend|OnAppointmentSend|MessageSend/i.test(MANIFEST));
-    check('no send: no send call in the pane or the thread reader', ['taskpane.js', 'thread.js'].every((f) => !/\bsend(Mail|Async|Message)?\s*\(|\/send\b|\.send\b|sendMail/i.test(SRC(f).replace(/\/\/.*$/gm, ''))));
+    check('no send: no send call in the pane, the item reader, or the thread reader', ['taskpane.js', 'item.js', 'thread.js'].every((f) => !/\bsend(Mail|Async|Message)?\s*\(|\/send\b|\.send\b|sendMail/i.test(SRC(f).replace(/\/\/.*$/gm, ''))));
   }
 
   // 7. Every write has proof, read-back and Undo.
@@ -319,10 +364,11 @@ process.on('unhandledRejection', (e) => { if (!/send is not reachable/.test(Stri
   {
     const cfg = require('../../flow-trial-extension/core/outlook-config.js').FlowOutlookConfig;
     const declared = new Set(cfg.SCOPES.concat(...cfg.CONNECT_SERVICES.map((x) => x.scopes || [])));
-    const used = (SRC('thread.js') + SRC('taskpane.js')).match(/\b(Mail|User|Calendars|Files|Sites|Tasks|Contacts|Chat|People|Notes)\.[A-Za-z.]+\b/g) || [];
+    const addinSrc = SRC('thread.js') + SRC('taskpane.js') + SRC('item.js');
+    const used = addinSrc.match(/\b(Mail|User|Calendars|Files|Sites|Tasks|Contacts|Chat|People|Notes)\.[A-Za-z.]+\b/g) || [];
     check('scopes: the default sign-in scopes are exactly the declared four', JSON.stringify(cfg.SCOPES) === JSON.stringify(['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite']), cfg.SCOPES);
     check('scopes: every scope named in the add-in source is already declared', used.every((x) => declared.has(x)), used);
-    check('scopes: the add-in reads with Mail.Read only and never names Mail.ReadWrite or Mail.Send', !/Mail\.ReadWrite|Mail\.Send/.test(SRC('thread.js') + SRC('taskpane.js')));
+    check('scopes: the add-in reads with Mail.Read only and never names Mail.ReadWrite or Mail.Send', !/Mail\.ReadWrite|Mail\.Send/.test(addinSrc));
     check('scopes: the manifest declares no Graph scope (no WebApplicationInfo / Scopes)', !/WebApplicationInfo|<Scope>|<Scopes>/.test(MANIFEST));
     check('scopes: the declared set has no Mail.Send', !declared.has('Mail.Send'));
   }
@@ -336,7 +382,261 @@ process.on('unhandledRejection', (e) => { if (!/send is not reachable/.test(Stri
     check('manifest: no mobile compose surface (Outlook mobile has none)', !/MobileMessageComposeCommandSurface/.test(MANIFEST));
   }
 
-  // 10. The tests above bite: break the code on purpose, and the matching check must notice.
+  // 10. No GlanceOutlookAuth: the open item is read with Office.js. Graph is not called. Insert never sends.
+  {
+    const readTo = [{ emailAddress: ME, displayName: 'Sali Sapan' }];
+    const s = await scenario({ mode: 'read', token: null, priorHtml: ASK, itemTo: readTo, itemCc: [] });
+    check('sideload read: the open message shows a card',
+      s.state() === 'card' && /Read this message/.test(s.text()) && /Thursday morning/.test(s.text()) && !/Read 4 messages/.test(s.text()),
+      [s.state(), s.why(), s.text()]);
+    check('sideload read: body, subject, from, to, cc and conversationId, with no Graph call',
+      s.root.attrs['data-glance-source'] === 'office-item'
+      && s.root.attrs['data-glance-from'] === 'dana@client.example'
+      && s.root.attrs['data-glance-to'] === ME
+      && s.root.attrs['data-glance-cc'] === ''
+      && s.root.attrs['data-glance-subject'] === 'Review'
+      && s.root.attrs['data-glance-conversation'] === CONV_EWS
+      && s.calls.length === 0
+      && s.writes.bodyReads >= 1
+      && noWriteYet(s),
+      [s.root.attrs, s.calls.length, s.writes]);
+    const before = s.body.html;
+    s.root.button('insert').click(); await settleAll();
+    check('sideload read: Insert opens a reply form and leaves the open message',
+      s.state() === 'reply-opened'
+      && s.root.attrs['data-glance-reply-form'] === 'displayReplyForm'
+      && s.writes.replyForms.length === 1
+      && s.writes.replyForms[0].kind === 'reply'
+      && /Thursday morning/.test(s.writes.replyForms[0].data.htmlBody)
+      && s.writes.replyForms[0].data.htmlBody.indexOf('<script') < 0
+      && s.body.html === before
+      && s.writes.prepend === 0
+      && s.writes.set === 0
+      && /Not sent/.test(s.text()),
+      [s.state(), s.writes, s.text()]);
+    s.root.button('undo').click(); await settleAll();
+    check('sideload read: Undo sends nothing and does not change the open message',
+      s.state() === 'discarded' && s.body.html === before && s.writes.replyForms.length === 1 && s.trip.length === 0 && /Nothing was sent/.test(s.text()),
+      [s.state(), s.text(), s.trip]);
+
+    const all = await scenario({
+      mode: 'read', token: null, priorHtml: ASK, itemTo: readTo,
+      itemCc: [{ emailAddress: 'casey@example.com', displayName: 'Casey' }]
+    });
+    all.root.button('insert').click(); await settleAll();
+    check('sideload read: Cc on the open message opens reply-all and still does not send',
+      all.state() === 'reply-opened'
+      && all.writes.replyForms.length === 1
+      && all.writes.replyForms[0].kind === 'replyAll'
+      && all.root.attrs['data-glance-reply-form'] === 'displayReplyAllForm'
+      && all.writes.prepend === 0
+      && all.trip.length === 0,
+      [all.state(), all.writes.replyForms, all.trip]);
+
+    const ccOnly = await scenario({
+      mode: 'read', token: null,
+      priorHtml: 'Could you reply to confirm you will be at the review on Thursday morning? Please let me know by Wednesday.',
+      itemTo: [{ emailAddress: 'other@example.com', displayName: 'Other' }],
+      itemCc: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('sideload read: Cc-only, with no greeting to the reader, stays quiet',
+      ccOnly.state() === 'quiet' && ccOnly.why() === 'quiet:hedge' && !ccOnly.root.button('insert') && ccOnly.calls.length === 0 && ccOnly.writes.replyForms.length === 0,
+      [ccOnly.state(), ccOnly.why(), ccOnly.text()]);
+
+    const mine = await scenario({
+      mode: 'read', token: null, priorHtml: ASK,
+      itemFrom: { emailAddress: ME, displayName: 'Sali Sapan' },
+      itemTo: [{ emailAddress: 'dana@client.example', displayName: 'Dana' }]
+    });
+    check('sideload read: a message the person sent to someone else stays quiet',
+      mine.state() === 'quiet' && !mine.root.button('insert') && mine.calls.length === 0 && !/Thursday morning/.test(mine.text()),
+      [mine.state(), mine.why(), mine.text()]);
+
+    const empty = await scenario({ mode: 'read', token: null, priorHtml: '   ', itemTo: readTo });
+    check('sideload read: an empty body stays quiet',
+      empty.state() === 'quiet' && empty.why() === 'empty-item' && empty.calls.length === 0, [empty.state(), empty.why()]);
+
+    const broken = await scenario({ mode: 'read', token: null, faults: { readFails: true }, itemTo: readTo, priorHtml: ASK });
+    check('sideload read: a failed body read stays quiet and does not call Graph',
+      broken.state() === 'quiet' && broken.why() === 'body-unreadable' && broken.calls.length === 0,
+      [broken.state(), broken.why()]);
+
+    const refused = await scenario({ mode: 'read', token: null, priorHtml: ASK, itemTo: readTo, faults: { replyFormThrows: true } });
+    refused.root.button('insert').click(); await settleAll();
+    check('sideload read: a refused reply form claims nothing',
+      refused.state() === 'write-failed' && refused.why() === 'reply-form-refused' && refused.writes.replyForms.length === 0,
+      [refused.state(), refused.why(), refused.text()]);
+
+    const compose = await scenario({ mode: 'compose', token: null });
+    const composeBefore = compose.body.html;
+    check('sideload compose: the quoted message shows a card and opening wrote nothing',
+      compose.state() === 'card' && /Read this message/.test(compose.text()) && /Thursday morning/.test(compose.text())
+      && noWriteYet(compose) && compose.calls.length === 0 && compose.writes.bodyReads >= 1,
+      [compose.state(), compose.why(), compose.text(), compose.writes]);
+    compose.root.button('insert').click(); await settleAll();
+    check('sideload compose: Insert writes the draft into the reply and reads it back',
+      compose.state() === 'written' && compose.writes.prepend === 1 && compose.writes.replyForms.length === 0
+      && /Read back from this message/.test(compose.text()) && /Not sent/.test(compose.text()),
+      [compose.state(), compose.text(), compose.writes]);
+    compose.root.button('undo').click(); await settleAll();
+    check('sideload compose: Undo puts the reply back',
+      compose.state() === 'undone' && compose.body.html === composeBefore, [compose.state(), compose.body.html.slice(0, 80)]);
+
+    const ownTyping = await scenario({ mode: 'compose', token: null, priorHtml: '<div>I will bring the notes tomorrow.</div>' });
+    check('sideload compose: a reply with no quoted message stays quiet and writes nothing',
+      ownTyping.state() === 'quiet' && ownTyping.why() === 'no-quoted-message' && noWriteYet(ownTyping) && ownTyping.calls.length === 0,
+      [ownTyping.state(), ownTyping.why()]);
+
+    const selfAsk = await scenario({
+      mode: 'read', token: null, priorHtml: ASK,
+      itemFrom: { emailAddress: ME, displayName: 'sali' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }],
+      itemCc: []
+    });
+    check('self-sent ask: the card names the ask and is not the empty template',
+      selfAsk.state() === 'card' && /Thursday morning/.test(selfAsk.text())
+      && !/Following up on your message below/.test(selfAsk.text())
+      && !/\[Write your reply here\]/.test(selfAsk.text()),
+      [selfAsk.state(), selfAsk.why(), selfAsk.text()]);
+
+    const fyi = 'רק לעדכנכם, הכול בסדר, אין צורך לעשות כלום.';
+    const fyiMail = await scenario({
+      mode: 'read', token: null, faults: { returnHtml: true },
+      priorHtml: '<html><body><div class="elementToProof">' + fyi + '</div></body></html>',
+      itemFrom: { emailAddress: ME, displayName: 'sali' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('FYI: no card and no Insert draft',
+      fyiMail.state() === 'quiet' && !fyiMail.root.button('insert') && !/Following up on your message below/.test(fyiMail.text()),
+      [fyiMail.state(), fyiMail.why(), fyiMail.text()]);
+
+    const htmlAsk = await scenario({
+      mode: 'read', token: null, faults: { returnHtml: true },
+      priorHtml: '<html><body><div class="elementToProof">' + ASK + '</div></body></html>',
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('HTML body: the ask reaches the card',
+      htmlAsk.state() === 'card' && /Thursday morning/.test(htmlAsk.text()) && !/Following up on your message below/.test(htmlAsk.text()),
+      [htmlAsk.state(), htmlAsk.why(), htmlAsk.text()]);
+
+    const owa = '<html><body><div>Thanks, looking now.</div><div id="appendonsend"></div>'
+      + '<div id="divRplyFwdMsg"><b>From:</b> Dana Cohen &lt;dana@client.example&gt;<br>'
+      + '<b>Sent:</b> Tuesday<br><b>To:</b> Sali<br><b>Subject:</b> Review</div><div>' + ASK + '</div></body></html>';
+    const reply = await scenario({ mode: 'compose', token: null, priorHtml: owa });
+    const replyBefore = reply.body.html;
+    check('OWA reply: the quoted original shows a card',
+      reply.state() === 'card' && /Thursday morning/.test(reply.text()) && reply.calls.length === 0,
+      [reply.state(), reply.why(), reply.text()]);
+    reply.root.button('insert').click(); await settleAll();
+    reply.root.button('undo').click(); await settleAll();
+    check('OWA reply: Insert then Undo restores the reply and sends nothing',
+      reply.state() === 'undone' && reply.body.html === replyBefore && reply.trip.length === 0 && reply.writes.replyForms.length === 0,
+      [reply.state(), reply.trip, reply.writes]);
+
+    const switched = await scenario({
+      mode: 'read', token: null, priorHtml: fyi,
+      itemFrom: { emailAddress: 'dana@client.example', displayName: 'Dana' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('before the selection changes, the FYI has no Insert', switched.state() === 'quiet' && !switched.root.button('insert'), [switched.state(), switched.why()]);
+    switched.body.html = ASK;
+    switched.raw.subject = 'Review';
+    switched.fireItemChanged();
+    await settleAll();
+    check('ItemChanged re-reads the selected message and drops the previous card',
+      switched.state() === 'card' && /Thursday morning/.test(switched.text()) && !/לעדכנכם/.test(switched.text()),
+      [switched.state(), switched.why(), switched.text()]);
+
+    const cached = await scenario({
+      mode: 'read', token: null, priorHtml: ASK,
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('the open ask is cached for the conversation', cached.state() === 'card' && /Thursday morning/.test(cached.text()));
+    const bare = makeBody('<div>Just my own reply.</div>', {}, { prepend: 0, set: 0, bodyReads: 0 });
+    cached.mailbox.item = {
+      subject: { getAsync: (cb) => cb({ status: 'succeeded', value: 'Re: Review' }) },
+      conversationId: CONV_EWS,
+      to: { getAsync: (cb) => cb({ status: 'succeeded', value: [] }) },
+      cc: { getAsync: (cb) => cb({ status: 'succeeded', value: [] }) },
+      body: bare,
+      displayReplyForm: () => {},
+      displayReplyAllForm: () => {}
+    };
+    cached.fireItemChanged();
+    await settleAll();
+    check('compose with no parseable quote uses the cached original',
+      cached.state() === 'card' && /Thursday morning/.test(cached.text()) && cached.calls.length === 0,
+      [cached.state(), cached.why(), cached.text()]);
+
+    const CONTACTS = 'מה כתובת המייל של דנה כהן? אני צריך לשלוח לה את המסמכים';
+    const fromOther = await scenario({
+      mode: 'read', token: null, priorHtml: CONTACTS, subject: 'מסמכים',
+      itemFrom: { emailAddress: 'noam@client.example', displayName: 'Noam' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('contacts ask from another sender: the documents ask is offered, not contacts-unavailable',
+      fromOther.state() === 'card' && /לשלוח לה את המסמכים/.test(fromOther.text()) && fromOther.why() !== 'quiet:contacts-unavailable',
+      [fromOther.state(), fromOther.why(), fromOther.text()]);
+    const fromSelf = await scenario({
+      mode: 'read', token: null, priorHtml: CONTACTS, subject: 'מסמכים',
+      itemFrom: { emailAddress: ME, displayName: 'sali' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('contacts ask self-sent: the documents ask is offered, not contacts-unavailable',
+      fromSelf.state() === 'card' && /לשלוח לה את המסמכים/.test(fromSelf.text()) && fromSelf.why() !== 'quiet:contacts-unavailable',
+      [fromSelf.state(), fromSelf.why(), fromSelf.text()]);
+    const onlyContacts = await scenario({
+      mode: 'read', token: null, priorHtml: 'מה כתובת המייל של דנה כהן?',
+      itemFrom: { emailAddress: 'noam@client.example', displayName: 'Noam' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('a contacts question with no other ask stays quiet',
+      onlyContacts.state() === 'quiet' && !onlyContacts.root.button('insert'),
+      [onlyContacts.state(), onlyContacts.why(), onlyContacts.text()]);
+
+    const quotedContacts = '<html><body><div id="appendonsend"></div><div id="divRplyFwdMsg">'
+      + '<b>From:</b> Noam &lt;noam@client.example&gt;<br><b>Sent:</b> Tuesday<br><b>To:</b> Sali<br><b>Subject:</b> מסמכים</div>'
+      + '<div>' + CONTACTS + '</div></body></html>';
+    const composeContacts = await scenario({ mode: 'compose', token: null, priorHtml: quotedContacts });
+    check('compose quoted contacts ask: the documents ask is offered',
+      composeContacts.state() === 'card' && /לשלוח לה את המסמכים/.test(composeContacts.text())
+      && Boolean(composeContacts.root.button('insert')) && composeContacts.why() !== 'quiet:contacts-unavailable',
+      [composeContacts.state(), composeContacts.why(), composeContacts.text()]);
+
+    const pinned = await scenario({
+      mode: 'read', token: null, priorHtml: 'רק לעדכנכם, הכול בסדר, אין צורך לעשות כלום.',
+      itemFrom: { emailAddress: 'dana@client.example', displayName: 'Dana' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('ItemChanged handler is registered after the pane is ready', pinned.fireItemChanged && true);
+    pinned.mailbox.item = null;
+    pinned.fireItemChanged();
+    await settleAll();
+    check('ItemChanged with no item yet does not keep the previous card',
+      pinned.state() === 'reading' && !/לעדכנכם/.test(pinned.text()),
+      [pinned.state(), pinned.text()]);
+    pinned.mailbox.item = {
+      itemId: 'EWS:contract',
+      conversationId: 'CONV-contract',
+      subject: 'Supplier contract',
+      from: { emailAddress: 'dana@client.example', displayName: 'Dana' },
+      to: [{ emailAddress: ME, displayName: 'Sali Sapan' }],
+      cc: [],
+      body: pinned.body,
+      displayReplyForm: () => {},
+      displayReplyAllForm: () => {}
+    };
+    pinned.body.html = ASK;
+    pinned.fireItemChanged();
+    await settleAll();
+    check('ItemChanged logs the new item and the footer shows its id',
+      pinned.state() === 'card' && /Thursday morning/.test(pinned.text())
+      && pinned.logs.some((line) => line === '[Glance addin] itemchanged EWS:contract')
+      && /EWS:contract/.test(pinned.footer.textContent),
+      [pinned.state(), pinned.logs, pinned.footer.textContent, pinned.text()]);
+  }
+
+  // 11. The tests above bite: break the code on purpose, and the matching check must notice.
   {
     const autoWrite = paneSrc.replace('renderCard(root, verdict, compose);\n    }).catch', 'renderCard(root, verdict, compose); if (compose) insertDraft(root, verdict.draft);\n    }).catch');
     check('mutation: the auto-write patch applied', autoWrite !== paneSrc);

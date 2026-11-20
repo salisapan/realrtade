@@ -46,6 +46,11 @@ check('SupportUrl stays on the production privacy page',
 check('manifest id is unchanged', rewritten.indexOf('<Id>87851e39-e51b-439a-bbf5-459ab69b3615</Id>') !== -1);
 check('committed manifest bytes are unchanged after rewrite', fs.readFileSync(script.SOURCE).equals(sourceBefore));
 
+const cloudflare = script.rewriteManifest(sourceText, 'https://random-name.trycloudflare.com');
+check('a Cloudflare quick-tunnel origin is accepted',
+  cloudflare.indexOf('https://random-name.trycloudflare.com/glance-outlook-addin/src/taskpane.html') !== -1
+  && cloudflare.indexOf('<AppDomain>https://random-name.trycloudflare.com</AppDomain>') !== -1);
+
 const ported = script.rewriteManifest(sourceText, 'https://tunnel.example:8443/');
 check('a port is kept on every rewritten URL and on AppDomain',
   ported.indexOf('https://tunnel.example:8443/glance-outlook-addin/src/taskpane.html') !== -1
@@ -84,7 +89,8 @@ check('cli requires a base URL', noBase.status !== 0 && /usage/.test(noBase.stde
 const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
 check('readme documents web and iOS sideload and marks them unverified',
   /Outlook on the web/.test(readme) && /Outlook on iOS/.test(readme) && /Unverified from this commit/.test(readme)
-  && /aka\.ms\/olksideload/.test(readme) && /test-manifest\.js/.test(readme));
+  && /aka\.ms\/olksideload/.test(readme) && /outlook\.live\.com\/mail\/0\/inclientstore/.test(readme)
+  && /test-manifest\.js/.test(readme) && /trycloudflare\.com/.test(readme));
 check('readme keeps the production manifest on the production host',
   /manifest\.xml/.test(readme) && /theflow-ai\.com/.test(readme) && /does not edit `manifest\.xml`/.test(readme));
 

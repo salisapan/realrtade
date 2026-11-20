@@ -9,7 +9,7 @@
   <ProviderName>Flow AI</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Glance" />
-  <Description DefaultValue="Glance reads the whole thread and closes open loops inside Outlook. You insert the draft yourself. It never sends." />
+  <Description DefaultValue="Glance reads the open message and closes open loops inside Outlook. You insert the draft yourself. It never sends." />
   <IconUrl DefaultValue="https://theflow-ai.com/apple-touch-icon.png" />
   <HighResolutionIconUrl DefaultValue="https://theflow-ai.com/apple-touch-icon.png" />
   <SupportUrl DefaultValue="https://theflow-ai.com/privacy" />
@@ -112,7 +112,7 @@
         <bt:String id="Glance.Label" DefaultValue="Glance" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="Glance.Desc" DefaultValue="Read the whole thread, then close the open loop with a draft reply you insert yourself. Never send." />
+        <bt:String id="Glance.Desc" DefaultValue="Read the open message, then close the open loop with a draft reply you insert yourself. Never send." />
       </bt:LongStrings>
     </Resources>
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
@@ -141,6 +141,7 @@
                     </Icon>
                     <Action xsi:type="ShowTaskpane">
                       <SourceLocation resid="Taskpane.Url" />
+                      <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
                 </Group>
@@ -163,6 +164,7 @@
                     </Icon>
                     <Action xsi:type="ShowTaskpane">
                       <SourceLocation resid="Taskpane.Url" />
+                      <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
                 </Group>
@@ -206,7 +208,7 @@
           <bt:String id="Glance.Label" DefaultValue="Glance" />
         </bt:ShortStrings>
         <bt:LongStrings>
-          <bt:String id="Glance.Desc" DefaultValue="Read the whole thread, then close the open loop with a draft reply you insert yourself. Never send." />
+          <bt:String id="Glance.Desc" DefaultValue="Read the open message, then close the open loop with a draft reply you insert yourself. Never send." />
         </bt:LongStrings>
       </Resources>
     </VersionOverrides>
