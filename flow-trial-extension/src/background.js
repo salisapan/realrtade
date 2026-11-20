@@ -6280,9 +6280,93 @@ function logContactsDraftFail(status, err, how, immutable) {
   } catch (e) { /* no console */ }
 }
 
+function hashCandidate(value) {
+  let h = 5381;
+  const s = String(value || '');
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(16);
+}
+
+function logContactsDraftTrace(candidates, gets, how, status, err, immutable) {
+  const hashes = (candidates || []).map(hashCandidate).filter(Boolean).join(',');
+  const statuses = (gets || []).map((row) => (row && row.status) || 0).join(',');
+  try {
+    console.info('[Glance] contacts draft lookup candidates=' + hashes + ' gets=' + statuses + ' how=' + (how || 'unproven'));
+  } catch (e) { /* no console */ }
+  logContactsDraftFail(status, err, how || 'unproven', immutable);
+}
+
+function outlookOdataQuote(value) {
+  return String(value || '').replace(/'/g, "''");
+}
+
+function outlookSameMailbox(a, b, known) {
+  const x = String(a || '').trim().toLowerCase();
+  const y = String(b || '').trim().toLowerCase();
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const set = new Set();
+  (known || []).forEach((raw) => {
+    const e = String(raw || '').trim().toLowerCase();
+    if (e && e.indexOf('@') > 0) set.add(e);
+  });
+  if (set.has(x) && set.has(y)) return true;
+  const opaque = (addr) => /^outlook_[0-9a-f]+@outlook\.com$/i.test(addr);
+  if ((opaque(x) || opaque(y)) && (set.has(x) || set.has(y))) return true;
+  return false;
+}
+
+async function outlookOwnAddresses() {
+  const st = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
+  const auth = st && st[OUTLOOK_AUTH_KEY];
+  const out = [];
+  function add(raw) {
+    const e = String(raw || '').trim().toLowerCase();
+    if (e && e.indexOf('@') > 0 && out.indexOf(e) < 0) out.push(e);
+  }
+  if (!auth) return out;
+  if (auth.account) { add(auth.account.address); add(auth.account.mail); }
+  (auth.ownAddresses || []).forEach(add);
+  if (auth.profile) {
+    add(auth.profile.mail);
+    add(auth.profile.userPrincipalName);
+    (auth.profile.proxyAddresses || []).forEach((p) => {
+      const m = String(p || '').match(/^smtp:(.+)$/i);
+      if (m) add(m[1]);
+    });
+  }
+  return out;
+}
+
+function outlookRowAddress(row) {
+  const from = row && row.from && row.from.emailAddress && row.from.emailAddress.address;
+  const sender = row && row.sender && row.sender.emailAddress && row.sender.emailAddress.address;
+  return { from: String(from || '').trim().toLowerCase(), sender: String(sender || '').trim().toLowerCase() };
+}
+
+async function outlookListMessages(filter, gets) {
+  const url = OUTLOOK_GRAPH + '/me/messages?$filter=' + encodeURIComponent(filter) + '&$select=id,subject,from,sender,receivedDateTime,internetMessageId&$top=25';
+  outlookAssertNotSend(url);
+  let res = null;
+  try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
+  gets.push({ status: res && typeof res.status === 'number' ? res.status : 0 });
+  if (!res || !res.ok) return [];
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  return body && Array.isArray(body.value) ? body.value : [];
+}
+
+function outlookBracketInternetId(raw) {
+  let s = String(raw || '').trim();
+  if (!s || s.indexOf('@') < 1) return '';
+  if (s.charAt(0) !== '<') s = '<' + s;
+  if (s.charAt(s.length - 1) !== '>') s = s + '>';
+  return s;
+}
+
 // GET /me/messages/{id} with both spellings and both Prefer values. The id
 // createReply may use is the id in a 200 body, with the Prefer that got it.
-async function outlookProveMessage(candidates) {
+async function outlookProveMessage(candidates, gets) {
   const seen = new Set();
   const ids = [];
   (candidates || []).forEach((id) => {
@@ -6300,6 +6384,8 @@ async function outlookProveMessage(candidates) {
       outlookAssertNotSend(url);
       let res = null;
       try { res = await outlookFetch(url, { method: 'GET', headers: headers }); } catch (e) { res = null; }
+      const status = res && typeof res.status === 'number' ? res.status : 0;
+      if (gets) gets.push({ status: status });
       if (!res || !res.ok) continue;
       let body = null;
       try { body = await res.json(); } catch (e) { body = null; }
@@ -6311,22 +6397,70 @@ async function outlookProveMessage(candidates) {
   return null;
 }
 
+// Page and URL ids are not Graph ids on this mailbox. A list query is a
+// different read: internet message id first, then one subject+from row
+// from the last day. More than one row is not a guess.
+async function outlookLookupOpenMessage(p, gets) {
+  const net = outlookBracketInternetId(p && p.internetMessageId);
+  if (net) {
+    const rows = await outlookListMessages("internetMessageId eq '" + outlookOdataQuote(net) + "'", gets);
+    if (rows.length > 1) return { ambiguous: true, how: 'internetMessageId' };
+    if (rows.length === 1 && rows[0] && rows[0].id) {
+      const proven = await outlookProveMessage([rows[0].id], gets);
+      if (proven && proven.id) return { id: proven.id, immutable: proven.immutable === true, how: 'internetMessageId' };
+    }
+    return null;
+  }
+  const subject = String((p && p.subject) || '').trim();
+  const from = String((p && p.senderEmail) || '').trim().toLowerCase();
+  if (!subject || !from) return null;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const filter = "receivedDateTime ge " + since + " and subject eq '" + outlookOdataQuote(subject) + "'";
+  const rows = await outlookListMessages(filter, gets);
+  const known = await outlookOwnAddresses();
+  const hits = rows.filter((row) => {
+    const who = outlookRowAddress(row);
+    return outlookSameMailbox(who.from, from, known) || outlookSameMailbox(who.sender, from, known);
+  });
+  if (hits.length > 1) return { ambiguous: true, how: 'subject-from' };
+  if (hits.length === 1 && hits[0] && hits[0].id) {
+    const proven = await outlookProveMessage([hits[0].id], gets);
+    if (proven && proven.id) return { id: proven.id, immutable: proven.immutable === true, how: 'subject-from' };
+  }
+  return null;
+}
+
 async function outlookDraftWrite(p) {
   let incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
   let immutable = p && p.outlookImmutableId === true;
   let how = (p && p.outlookIdHow) || '';
+  let traceGets = null;
+  let traceCandidates = null;
   if (p && p.requireProvenId === true) {
     const candidates = [];
     if (incomingId) candidates.push(incomingId);
     (p.outlookCandidates || []).forEach((id) => { if (id) candidates.push(id); });
-    const proven = await outlookProveMessage(candidates);
-    if (!proven || !proven.id) {
-      logContactsDraftFail(0, { code: 'unproven', message: 'no GET accepted a message id' }, how || 'unproven', false);
-      return { ok: false, reason: 'unproven-id', status: 0, how: how || 'unproven', immutable: false, errorCode: 'unproven' };
+    traceCandidates = candidates;
+    traceGets = [];
+    const proven = await outlookProveMessage(candidates, traceGets);
+    if (proven && proven.id) {
+      incomingId = proven.id;
+      immutable = proven.immutable === true;
+      how = proven.how;
+    } else {
+      const looked = await outlookLookupOpenMessage(p, traceGets);
+      if (looked && looked.ambiguous) {
+        logContactsDraftTrace(candidates, traceGets, looked.how, 0, { code: 'ambiguous', message: 'more than one message' }, false);
+        return { ok: false, reason: 'ambiguous', status: 0, how: looked.how, immutable: false, errorCode: 'ambiguous' };
+      }
+      if (!looked || !looked.id) {
+        logContactsDraftTrace(candidates, traceGets, 'unproven', 0, { code: 'unproven', message: 'no GET accepted a message id' }, false);
+        return { ok: false, reason: 'unproven-id', status: 0, how: 'unproven', immutable: false, errorCode: 'unproven' };
+      }
+      incomingId = looked.id;
+      immutable = looked.immutable === true;
+      how = looked.how;
     }
-    incomingId = proven.id;
-    immutable = proven.immutable === true;
-    how = proven.how + (how ? '/' + how : '');
   }
   if (!incomingId) return { ok: false, reason: 'no-message' };
   const remembered = await outlookDraftMap();
@@ -6378,8 +6512,11 @@ async function outlookDraftWrite(p) {
   if (res.status === 403) return { ok: false, reason: 'consent', error: 'Outlook draft permission not granted yet: open Glance and reconnect Outlook once.' };
   if (!res.ok) {
     const err = await outlookReadError(res);
-    if (p && p.requireProvenId === true) logContactsDraftFail(err.status || res.status, err, how, immutable);
+    if (p && p.requireProvenId === true) logContactsDraftTrace(traceCandidates, traceGets, how, err.status || res.status, err, immutable);
     return { ok: false, reason: 'http-' + res.status, status: res.status, errorCode: err.code, errorMessage: err.message, how: how, immutable: immutable };
+  }
+  if (p && p.requireProvenId === true && (how === 'internetMessageId' || how === 'subject-from')) {
+    logContactsDraftTrace(traceCandidates, traceGets, how, res.status, { code: '', message: '' }, immutable);
   }
   const draft = await res.json();
   if (!draft || !draft.id) return { ok: false, reason: 'no-draft' };

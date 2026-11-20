@@ -127,13 +127,107 @@ function background(routes) {
     outlookCandidates: [PROVEN],
     body: 'x'
   });
-  const line = bad.notes.find((n) => n.indexOf('[Glance] contacts draft') >= 0) || '';
+  const line = bad.notes.join('\n');
   check('a Graph 400 is logged with the status and a short error body',
-    failed.ok === false && /http-400/.test(failed.reason) && line.indexOf('http=400') >= 0 && line.indexOf('ErrorInvalidIdMalformed') >= 0 && line.indexOf('Id is malformed') >= 0 && line.indexOf('immutable=') >= 0,
+    failed.ok === false && /http-400/.test(failed.reason) && line.indexOf('http=400') >= 0 && line.indexOf('ErrorInvalidIdMalformed') >= 0 && line.indexOf('Id is malformed') >= 0 && line.indexOf('immutable=') >= 0 && line.indexOf('gets=') >= 0,
     { reason: failed.reason, line: line, posts: bad.calls.filter((c) => c.method === 'POST').length });
   check('the 400 is retried once with the other IdType and nothing is sent',
     bad.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url)).length === 2 && !bad.calls.some((c) => /sendMail|\/send\b/.test(c.url)),
     bad.calls.filter((c) => c.method === 'POST').map((c) => c.prefer));
+
+  function hashCandidate(value) {
+    let h = 5381;
+    const s = String(value || '');
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(16);
+  }
+  const NET = '<317b@outlook.com>';
+  const REAL = 'AAMkFROMNET';
+  const byNet = background([
+    { method: 'GET', test: /\/me\/messages\/[^/?]+/, reply: (url, prefer) => {
+      if (url.indexOf(REAL) >= 0 && /ImmutableId/.test(prefer || '')) return { ok: true, status: 200, json: async () => ({ id: REAL }), text: async () => JSON.stringify({ id: REAL }) };
+      return { ok: false, status: 400, json: async () => ({}), text: async () => JSON.stringify({ error: { code: 'ErrorInvalidIdMalformed', message: 'Id is malformed.' } }) };
+    } },
+    { method: 'GET', test: /\$filter=/, reply: (url) => {
+      const filter = decodeURIComponent(url);
+      if (filter.indexOf("internetMessageId eq '" + NET + "'") < 0) return { ok: true, status: 200, json: async () => ({ value: [] }), text: async () => '{"value":[]}' };
+      return { ok: true, status: 200, json: async () => ({ value: [{ id: REAL, internetMessageId: NET, subject: 'שאלה קטנה 317b', from: { emailAddress: { address: CID } } }] }), text: async () => '' };
+    } },
+    { method: 'POST', test: /\/createReply$/, reply: () => ({ ok: true, status: 201, json: async () => ({ id: 'DRAFT-NET', isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) },
+    { method: 'PATCH', test: /\/me\/messages\/DRAFT-NET/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-NET' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/messages\/DRAFT-NET/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-NET', isDraft: true, subject: 'RE: שאלה קטנה 317b', body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) }
+  ]);
+  const netWrote = await byNet.fn('outlookDraftWrite')({
+    requireProvenId: true,
+    outlookCandidates: [CONV],
+    outlookIncomingId: CONV,
+    internetMessageId: '317b@outlook.com',
+    subject: 'שאלה קטנה 317b',
+    senderEmail: ALIAS,
+    body: 'x'
+  });
+  const netPosts = byNet.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url));
+  const netLog = byNet.notes.join('\n');
+  check('a self-alias mail is resolved by internetMessageId, then createReply uses the proved id',
+    netWrote.ok === true && netPosts.length === 1 && netPosts[0].url.indexOf(REAL) >= 0 && /ImmutableId/.test(netPosts[0].prefer) && netPosts[0].url.indexOf(CONV) < 0 &&
+    netLog.indexOf('how=internetMessageId') >= 0 && netLog.indexOf('candidates=' + hashCandidate(CONV)) >= 0 && netLog.indexOf(CONV) < 0 && netLog.indexOf(REAL) < 0,
+    { ok: netWrote.ok, posts: netPosts, log: netLog });
+
+  const BYSUB = 'AAMkFROMSUB';
+  const bySub = background([
+    { method: 'GET', test: /\/me\/messages\/[^/?]+/, reply: (url, prefer) => {
+      if (url.indexOf(BYSUB) >= 0 && /ImmutableId/.test(prefer || '')) return { ok: true, status: 200, json: async () => ({ id: BYSUB }), text: async () => JSON.stringify({ id: BYSUB }) };
+      return { ok: false, status: 404, json: async () => ({}), text: async () => JSON.stringify({ error: { code: 'ErrorItemNotFound', message: 'not found' } }) };
+    } },
+    { method: 'GET', test: /\$filter=/, reply: () => ({ ok: true, status: 200, json: async () => ({ value: [
+      { id: BYSUB, subject: 'שאלה קטנה 317b', from: { emailAddress: { address: CID } } },
+      { id: 'AAMkOTHER', subject: 'שאלה קטנה 317b', from: { emailAddress: { address: 'levi@example.com' } } }
+    ] }), text: async () => '' }) },
+    { method: 'POST', test: /\/createReply$/, reply: () => ({ ok: true, status: 201, json: async () => ({ id: 'DRAFT-SUB', isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) },
+    { method: 'PATCH', test: /\/me\/messages\/DRAFT-SUB/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-SUB' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/messages\/DRAFT-SUB/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-SUB', isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) }
+  ]);
+  const subWrote = await bySub.fn('outlookDraftWrite')({
+    requireProvenId: true,
+    outlookCandidates: [CONV],
+    outlookIncomingId: CONV,
+    subject: 'שאלה קטנה 317b',
+    senderEmail: ALIAS,
+    body: 'x'
+  });
+  const subPosts = bySub.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url));
+  const subLog = bySub.notes.join('\n');
+  check('without an internet message id, subject and the alias resolve the CID mail',
+    subWrote.ok === true && subPosts.length === 1 && subPosts[0].url.indexOf(BYSUB) >= 0 && subPosts[0].url.indexOf('AAMkOTHER') < 0 &&
+    subLog.indexOf('how=subject-from') >= 0 && subLog.indexOf(BYSUB) < 0,
+    { ok: subWrote.ok, posts: subPosts.map((c) => c.url), log: subLog });
+
+  const ambiguous = background([
+    { method: 'GET', test: /\/me\/messages\/[^/?]+/, reply: () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' }) },
+    { method: 'GET', test: /\$filter=/, reply: () => ({ ok: true, status: 200, json: async () => ({ value: [
+      { id: 'AAMkONE', subject: 'שאלה קטנה 317b', from: { emailAddress: { address: CID } } },
+      { id: 'AAMkTWO', subject: 'שאלה קטנה 317b', from: { emailAddress: { address: ALIAS } } }
+    ] }), text: async () => '' }) }
+  ]);
+  const many = await ambiguous.fn('outlookDraftWrite')({
+    requireProvenId: true,
+    outlookCandidates: [CONV],
+    outlookIncomingId: CONV,
+    subject: 'שאלה קטנה 317b',
+    senderEmail: ALIAS,
+    body: 'x'
+  });
+  const manyLog = ambiguous.notes.join('\n');
+  check('two subject and from matches fail closed and do not createReply',
+    many.ok === false && many.reason === 'ambiguous' && many.how === 'subject-from' &&
+    !ambiguous.calls.some((c) => c.method === 'POST') && manyLog.indexOf('code=ambiguous') >= 0 && manyLog.indexOf('how=subject-from') >= 0 &&
+    manyLog.indexOf('AAMkONE') < 0 && manyLog.indexOf('AAMkTWO') < 0,
+    { reason: many.reason, log: manyLog });
+
+  const unprovenLog = raw.notes.join('\n');
+  check('an unproven lookup logs hashed candidates and GET statuses, not the raw id',
+    unprovenLog.indexOf('candidates=' + hashCandidate(CONV)) >= 0 && unprovenLog.indexOf('gets=') >= 0 && unprovenLog.indexOf('how=unproven') >= 0 && unprovenLog.indexOf(CONV) < 0,
+    unprovenLog);
 
   const page = fs.readFileSync(path.join(__dirname, '../src/lane-ms-page.js'), 'utf8');
   const target = page.slice(page.indexOf('function draftTarget'), page.indexOf('function markInDraft'));

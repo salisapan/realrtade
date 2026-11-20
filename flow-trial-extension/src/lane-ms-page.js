@@ -442,6 +442,9 @@
           messageId: (target && target.id) || '',
           outlookImmutableId: !!(target && target.immutable),
           outlookIdHow: (target && target.how) || '',
+          internetMessageId: (pane && pane.internetMessageId) || '',
+          subject: (pane && pane.subject) || '',
+          senderEmail: (pane && pane.senderEmail) || '',
           explicitClick: true
         }
       }, (graph) => {

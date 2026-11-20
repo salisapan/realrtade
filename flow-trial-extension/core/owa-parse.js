@@ -990,6 +990,7 @@ const FlowOwaParse = (() => {
       }
     }
     const whoTo = recipientsOf(container, bodyRoot, Object.assign({}, opts, { senderEmail: who.email }));
+    const internetMessageId = internetMessageIdOf(header) || internetMessageIdOf(bodyRoot);
     const when = receivedInfo(container, bodyRoot);
     return {
       itemId: ids.itemId,
@@ -1007,6 +1008,7 @@ const FlowOwaParse = (() => {
       cc: whoTo.cc,
       rawToLine: whoTo.rawToLine || '',
       receivedDateTime: when.iso,
+      internetMessageId: internetMessageId,
       clockUnread: when.unread,
       clockAmbiguous: when.ambiguous === true,
       clockAlt: when.alt || '',
@@ -1014,6 +1016,23 @@ const FlowOwaParse = (() => {
       hourCycle: hourCycleOf(d),
       attachments: attachmentsOf(container, bodyRoot)
     };
+  }
+
+  function bracketInternetId(raw) {
+    let s = String(raw || '').trim();
+    if (!s || s.indexOf('@') < 1 || /\s/.test(s)) return '';
+    if (s.charAt(0) !== '<') s = '<' + s;
+    if (s.charAt(s.length - 1) !== '>') s = s + '>';
+    if (s.length > 240) return '';
+    return s;
+  }
+
+  function internetMessageIdOf(root) {
+    if (!root || !root.querySelector) return '';
+    let node = null;
+    try { node = root.querySelector('[data-internet-message-id], [data-rfc822msgid]'); } catch (e) { node = null; }
+    const attr = node && (node.getAttribute('data-internet-message-id') || node.getAttribute('data-rfc822msgid') || '');
+    return bracketInternetId(attr);
   }
 
   // OWA's "this message is in English" line is chrome, not the commitment.
