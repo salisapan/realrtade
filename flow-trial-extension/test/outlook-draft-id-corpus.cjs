@@ -229,11 +229,128 @@ function background(routes) {
     unprovenLog.indexOf('candidates=' + hashCandidate(CONV)) >= 0 && unprovenLog.indexOf('gets=') >= 0 && unprovenLog.indexOf('how=unproven') >= 0 && unprovenLog.indexOf(CONV) < 0,
     unprovenLog);
 
+  const OWN = 'AAMkOWNONLY';
+  const byOwn = background([
+    { method: 'GET', test: /\/me\/messages\/[^/?]+/, reply: (url, prefer) => {
+      if (url.indexOf(OWN) >= 0 && /ImmutableId/.test(prefer || '')) return { ok: true, status: 200, json: async () => ({ id: OWN }), text: async () => JSON.stringify({ id: OWN }) };
+      return { ok: false, status: 400, json: async () => ({}), text: async () => JSON.stringify({ error: { code: 'ErrorInvalidIdMalformed', message: 'Id is malformed.' } }) };
+    } },
+    { method: 'GET', test: /\$filter=/, reply: () => ({ ok: true, status: 200, json: async () => ({ value: [
+      { id: OWN, subject: 'שאלה קטנה 317b', from: { emailAddress: { address: CID } } }
+    ] }), text: async () => '' }) },
+    { method: 'POST', test: /\/createReply$/, reply: () => ({ ok: true, status: 201, json: async () => ({ id: 'DRAFT-OWN', isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) },
+    { method: 'PATCH', test: /\/me\/messages\/DRAFT-OWN/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-OWN' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/messages\/DRAFT-OWN/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-OWN', isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) }
+  ]);
+  const ownWrote = await byOwn.fn('outlookDraftWrite')({
+    requireProvenId: true,
+    outlookCandidates: [CONV],
+    outlookIncomingId: CONV,
+    internetMessageId: '',
+    senderEmail: '',
+    ownSenderEmail: ALIAS,
+    subject: 'שאלה קטנה 317b',
+    body: 'x'
+  });
+  const ownPosts = byOwn.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url));
+  const ownLog = byOwn.notes.join('\n');
+  check('empty senderEmail still lists by subject using ownSenderEmail and the CID',
+    ownWrote.ok === true && ownPosts.length === 1 && ownPosts[0].url.indexOf(OWN) >= 0 &&
+    byOwn.calls.some((c) => c.method === 'GET' && c.url.indexOf('$filter') >= 0) &&
+    ownLog.indexOf('why=no-internetMessageId') >= 0 && ownLog.indexOf('how=subject-from') >= 0 && ownLog.indexOf(CONV) < 0 && ownLog.indexOf(OWN) < 0,
+    { ok: ownWrote.ok, posts: ownPosts.map((c) => c.url), log: ownLog });
+
+  const SUBONLY = 'AAMkSUBONLY';
+  const bySubject = background([
+    { method: 'GET', test: /\/me\/messages\/[^/?]+/, reply: (url, prefer) => {
+      if (url.indexOf(SUBONLY) >= 0 && /ImmutableId/.test(prefer || '')) return { ok: true, status: 200, json: async () => ({ id: SUBONLY }), text: async () => JSON.stringify({ id: SUBONLY }) };
+      return { ok: false, status: 400, json: async () => ({}), text: async () => '' };
+    } },
+    { method: 'GET', test: /\$filter=/, reply: () => ({ ok: true, status: 200, json: async () => ({ value: [
+      { id: SUBONLY, subject: 'שאלה קטנה 317b', from: { emailAddress: { address: CID } } }
+    ] }), text: async () => '' }) },
+    { method: 'POST', test: /\/createReply$/, reply: () => ({ ok: true, status: 201, json: async () => ({ id: 'DRAFT-SUBONLY', isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) },
+    { method: 'PATCH', test: /\/me\/messages\/DRAFT-SUBONLY/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-SUBONLY' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/messages\/DRAFT-SUBONLY/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-SUBONLY', isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) }
+  ]);
+  const subjectOnly = await bySubject.fn('outlookDraftWrite')({
+    requireProvenId: true,
+    outlookCandidates: [CONV],
+    outlookIncomingId: CONV,
+    senderEmail: '',
+    ownSenderEmail: '',
+    subject: 'שאלה קטנה 317b',
+    body: 'x'
+  });
+  const subjectPosts = bySubject.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url));
+  check('a subject with no from address still uses one last-day row',
+    subjectOnly.ok === true && subjectPosts.length === 1 && subjectPosts[0].url.indexOf(SUBONLY) >= 0 &&
+    bySubject.notes.join('\n').indexOf('why=missing-from') >= 0,
+    { ok: subjectOnly.ok, posts: subjectPosts.map((c) => c.url) });
+
+  const MISS = 'AAMkAFTERMISS';
+  const missThen = background([
+    { method: 'GET', test: /\/me\/messages\/[^/?]+/, reply: (url, prefer) => {
+      if (url.indexOf(MISS) >= 0 && /ImmutableId/.test(prefer || '')) return { ok: true, status: 200, json: async () => ({ id: MISS }), text: async () => JSON.stringify({ id: MISS }) };
+      return { ok: false, status: 400, json: async () => ({}), text: async () => '' };
+    } },
+    { method: 'GET', test: /\$filter=/, reply: (url) => {
+      const filter = decodeURIComponent(url);
+      if (filter.indexOf('internetMessageId eq') >= 0) return { ok: true, status: 200, json: async () => ({ value: [] }), text: async () => '{"value":[]}' };
+      return { ok: true, status: 200, json: async () => ({ value: [
+        { id: MISS, subject: 'שאלה קטנה 317b', from: { emailAddress: { address: CID } } }
+      ] }), text: async () => '' };
+    } },
+    { method: 'POST', test: /\/createReply$/, reply: () => ({ ok: true, status: 201, json: async () => ({ id: 'DRAFT-MISS', isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) },
+    { method: 'PATCH', test: /\/me\/messages\/DRAFT-MISS/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-MISS' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/messages\/DRAFT-MISS/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-MISS', isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) }
+  ]);
+  const missedNet = await missThen.fn('outlookDraftWrite')({
+    requireProvenId: true,
+    outlookCandidates: [CONV],
+    outlookIncomingId: CONV,
+    internetMessageId: 'missing@outlook.com',
+    senderEmail: '',
+    ownSenderEmail: ALIAS,
+    subject: 'שאלה קטנה 317b',
+    body: 'x'
+  });
+  const missPosts = missThen.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url));
+  const missLog = missThen.notes.join('\n');
+  check('an internetMessageId miss continues to subject-from',
+    missedNet.ok === true && missPosts.length === 1 && missPosts[0].url.indexOf(MISS) >= 0 &&
+    missLog.indexOf('why=empty-list') >= 0 && missLog.indexOf('how=subject-from') >= 0 &&
+    missThen.calls.filter((c) => c.method === 'GET' && c.url.indexOf('$filter') >= 0).length >= 2,
+    { ok: missedNet.ok, log: missLog });
+
   const page = fs.readFileSync(path.join(__dirname, '../src/lane-ms-page.js'), 'utf8');
   const target = page.slice(page.indexOf('function draftTarget'), page.indexOf('function markInDraft'));
   check('a missing resolver does not hand createReply a raw item id',
     target.indexOf('resolver-missing') >= 0 && target.indexOf('immutable: false') >= 0 && target.indexOf('pane.itemId') < 0,
     target.slice(0, 240));
+  const tickAt = page.indexOf('async function tick');
+  const lookupAt = page.indexOf('paintLookup(offer', tickAt);
+  check('a failed insert holds the card so a later tick does not wipe it',
+    page.indexOf('data-glance-draft-hold') >= 0 && page.indexOf('function draftCardStays') >= 0 &&
+    tickAt >= 0 && lookupAt > tickAt && page.slice(tickAt, lookupAt).indexOf('draftCardStays') >= 0);
+  const fakeFail = {
+    attrs: { 'data-glance-draft-hold': '1' },
+    getAttribute(name) { return this.attrs[name] || ''; },
+    querySelector(sel) { return sel === '.flow-lane-draft-why' ? { textContent: 'לא הצלחתי להכניס לטיוטה' } : null; }
+  };
+  const pageBox = {
+    document: { documentElement: {}, getElementById() { return null; }, querySelector() { return null; }, querySelectorAll() { return []; }, createElement() { return { style: {}, setAttribute() {}, appendChild() {} }; } },
+    chrome: { runtime: { sendMessage() {}, lastError: null }, storage: { onChanged: { addListener() {} } } },
+    location: { href: 'https://outlook.live.com/mail/' },
+    setTimeout: () => 0,
+    clearTimeout: () => {}
+  };
+  pageBox.globalThis = pageBox;
+  vm.createContext(pageBox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../src/lane-ms-page.js'), 'utf8'), pageBox, { filename: 'lane-ms-page.js' });
+  const stays = pageBox.FlowLaneMsPage.draftCardStays;
+  check('the same open mail keeps the failure text when the DOM mutates',
+    stays(fakeFail, true) === true && stays(fakeFail, false) === false);
 
   if (failures) process.exit(1);
   console.log('outlook-draft-id-corpus: all passed');

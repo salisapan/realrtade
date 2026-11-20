@@ -6364,6 +6364,16 @@ function outlookBracketInternetId(raw) {
   return s;
 }
 
+function outlookPageFrom(p) {
+  return String((p && (p.senderEmail || p.ownSenderEmail || p.openSenderEmail)) || '').trim().toLowerCase();
+}
+
+function logContactsBranch(how, listStatus, rows, why) {
+  try {
+    console.info('[Glance] contacts draft branch how=' + (how || '') + ' list=' + (listStatus == null ? '' : listStatus) + ' rows=' + (rows == null ? '' : rows) + ' why=' + (why || ''));
+  } catch (e) { /* no console */ }
+}
+
 // GET /me/messages/{id} with both spellings and both Prefer values. The id
 // createReply may use is the id in a 200 body, with the Prefer that got it.
 async function outlookProveMessage(candidates, gets) {
@@ -6397,36 +6407,66 @@ async function outlookProveMessage(candidates, gets) {
   return null;
 }
 
-// Page and URL ids are not Graph ids on this mailbox. A list query is a
-// different read: internet message id first, then one subject+from row
-// from the last day. More than one row is not a guess.
+// Page and URL ids are not Graph ids on this mailbox. List by internet
+// message id first. A miss, or no id on the page, still tries subject.
+// One row in the last day is the mail. More than one is not a guess.
 async function outlookLookupOpenMessage(p, gets) {
   const net = outlookBracketInternetId(p && p.internetMessageId);
-  if (net) {
+  if (!net) {
+    logContactsBranch('internetMessageId', '', 0, 'no-internetMessageId');
+  } else {
+    const before = gets.length;
     const rows = await outlookListMessages("internetMessageId eq '" + outlookOdataQuote(net) + "'", gets);
-    if (rows.length > 1) return { ambiguous: true, how: 'internetMessageId' };
+    const listed = gets[gets.length - 1];
+    const listStatus = gets.length > before && listed ? listed.status : 0;
+    if (rows.length > 1) {
+      logContactsBranch('internetMessageId', listStatus, rows.length, 'ambiguous');
+      return { ambiguous: true, how: 'internetMessageId' };
+    }
     if (rows.length === 1 && rows[0] && rows[0].id) {
       const proven = await outlookProveMessage([rows[0].id], gets);
-      if (proven && proven.id) return { id: proven.id, immutable: proven.immutable === true, how: 'internetMessageId' };
+      if (proven && proven.id) {
+        logContactsBranch('internetMessageId', listStatus, 1, '');
+        return { id: proven.id, immutable: proven.immutable === true, how: 'internetMessageId' };
+      }
+      logContactsBranch('internetMessageId', listStatus, 1, 'prove-failed');
+    } else {
+      logContactsBranch('internetMessageId', listStatus, rows.length, rows.length ? 'prove-failed' : 'empty-list');
     }
-    return null;
   }
   const subject = String((p && p.subject) || '').trim();
-  const from = String((p && p.senderEmail) || '').trim().toLowerCase();
-  if (!subject || !from) return null;
+  if (!subject) {
+    logContactsBranch('subject-from', '', 0, 'missing-subject');
+    return null;
+  }
+  const from = outlookPageFrom(p);
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const filter = "receivedDateTime ge " + since + " and subject eq '" + outlookOdataQuote(subject) + "'";
+  const before = gets.length;
   const rows = await outlookListMessages(filter, gets);
+  const listed = gets[gets.length - 1];
+  const listStatus = gets.length > before && listed ? listed.status : 0;
   const known = await outlookOwnAddresses();
-  const hits = rows.filter((row) => {
+  if (from) known.push(from);
+  const hits = from ? rows.filter((row) => {
     const who = outlookRowAddress(row);
     return outlookSameMailbox(who.from, from, known) || outlookSameMailbox(who.sender, from, known);
-  });
-  if (hits.length > 1) return { ambiguous: true, how: 'subject-from' };
+  }) : rows.slice();
+  const why = !from ? 'missing-from' : (hits.length ? '' : 'empty-list');
+  if (hits.length > 1) {
+    logContactsBranch('subject-from', listStatus, hits.length, why || 'ambiguous');
+    return { ambiguous: true, how: 'subject-from' };
+  }
   if (hits.length === 1 && hits[0] && hits[0].id) {
     const proven = await outlookProveMessage([hits[0].id], gets);
-    if (proven && proven.id) return { id: proven.id, immutable: proven.immutable === true, how: 'subject-from' };
+    if (proven && proven.id) {
+      logContactsBranch('subject-from', listStatus, 1, why);
+      return { id: proven.id, immutable: proven.immutable === true, how: 'subject-from' };
+    }
+    logContactsBranch('subject-from', listStatus, 1, 'prove-failed');
+    return null;
   }
+  logContactsBranch('subject-from', listStatus, hits.length, why || 'empty-list');
   return null;
 }
 

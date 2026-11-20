@@ -422,8 +422,34 @@
     if (undo) undo.hidden = true;
   }
 
+  function mailIdentity(pane) {
+    return [pane && pane.itemId || '', pane && pane.rawUrlId || '', pane && pane.pathId || '', pane && pane.conversationId || '', pane && pane.subject || ''].join('|');
+  }
+
+  function draftCardStays(card, sameMail) {
+    if (!sameMail || !card) return false;
+    if (card.getAttribute && card.getAttribute('data-glance-draft-hold') === '1') return true;
+    if (card.getAttribute && card.getAttribute('data-glance-draft-state') === 'in-draft') return true;
+    if (card.querySelector && card.querySelector('.flow-lane-draft-why')) return true;
+    return false;
+  }
+
+  function glanceFreeText(text) {
+    let t = String(text || '');
+    const nodes = document.querySelectorAll('.flow-lane-ms');
+    for (let i = 0; i < nodes.length; i++) {
+      const chunk = String(nodes[i].innerText || nodes[i].textContent || '').trim();
+      if (chunk) t = t.split(chunk).join(' ');
+    }
+    return t.replace(/\s+/g, ' ').trim();
+  }
+
+  let holdMail = '';
+
   function finishContactsDraft(card, pane, offer, res, button) {
     const lang = offer && offer.params && offer.params.lang === 'he' ? 'he' : 'en';
+    if (card) card.setAttribute('data-glance-draft-hold', '1');
+    holdMail = mailIdentity(pane);
     if (!res || res.ok !== true || !res.draft) {
       button.disabled = false;
       paintResult(card, res);
@@ -445,6 +471,8 @@
           internetMessageId: (pane && pane.internetMessageId) || '',
           subject: (pane && pane.subject) || '',
           senderEmail: (pane && pane.senderEmail) || '',
+          ownSenderEmail: (pane && pane.ownSenderEmail) || '',
+          openSenderEmail: (pane && (pane.senderEmail || pane.ownSenderEmail)) || '',
           explicitClick: true
         }
       }, (graph) => {
@@ -735,12 +763,16 @@
     if (busy) return;
     const pane = readPane();
     if (!pane || (!pane.subject && !pane.text)) return;
-    const key = [pane.itemId || '', pane.rawUrlId || '', pane.subject || '', String(pane.text || '').slice(0, 240)].join('|');
+    const identity = mailIdentity(pane);
+    const held = document.querySelector('.flow-lane-ms');
+    if (draftCardStays(held, holdMail === identity)) return;
+    const body = glanceFreeText(pane.text);
+    const key = [pane.itemId || '', pane.rawUrlId || '', pane.subject || '', body.slice(0, 240)].join('|');
     if (key === paneKey) return;
     paneKey = key;
     busy = true;
     try {
-      const text = (pane.subject ? pane.subject + '\n' : '') + (pane.text || '');
+      const text = (pane.subject ? pane.subject + '\n' : '') + body;
       const ctx = { text: text, subject: pane.subject || '' };
       let state = null;
       const store = named('FlowStorage');
@@ -825,6 +857,7 @@
         if (!changes.glanceContactsChoice && !changes.outlookAuth) return;
         paneKey = '';
         whyKey = '';
+        holdMail = '';
         schedule();
       });
     }
@@ -843,5 +876,5 @@
 
   bootWatch();
 
-  globalThis.FlowLaneMsPage = { attach: attach };
+  globalThis.FlowLaneMsPage = { attach: attach, draftCardStays: draftCardStays };
 })();
