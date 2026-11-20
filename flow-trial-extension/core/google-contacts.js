@@ -105,13 +105,24 @@ const FlowGoogleContacts = (() => {
     return String(n || '').toLowerCase().replace(/\s+/g, ' ').trim();
   }
 
+  // Red team 2026-11-13 (docs/glance-ai/red-team.md): the recipient of a draft is matched by whole words. Before, any substring counted
+  // in either direction, so "Dan" filled Dana Cohen, "Noa" filled Noam, and "Dana Cohen" filled Dan Levi (the shorter name inside the
+  // longer). Now every word of the name asked for must be a whole word of the contact's name (or of the address's local part, split on
+  // . _ -), the same word or its Hebrew/Latin form (core/name-match.js).
+  function nameSibling() {
+    if (typeof FlowNameMatch !== 'undefined') return FlowNameMatch;
+    try { return typeof require !== 'undefined' ? require('./name-match.js').FlowNameMatch : null; } catch (e) { return null; }
+  }
+  function nameWords(n) { return normName(n).split(/[\s._-]+/).filter(Boolean); }
   function nameMatches(want, displayName) {
-    const w = normName(want);
-    const d = normName(displayName);
-    if (!w || !d) return false;
-    if (d === w || d.indexOf(w) >= 0 || w.indexOf(d) >= 0) return true;
-    const parts = w.split(' ').filter(Boolean);
-    return parts.length > 0 && parts.every((p) => d.indexOf(p) >= 0);
+    const w = nameWords(want);
+    const d = nameWords(displayName);
+    if (!w.length || !d.length) return false;
+    const nm = nameSibling();
+    // Hebrew against Latin only: within one script equivalent() is loose («dan» ~ «dana»), and a recipient needs the very word.
+    const he = (x) => /[\u0590-\u05FF]/.test(x);
+    const same = (a, b) => a === b || (he(a) !== he(b) && Boolean(nm && typeof nm.equivalent === 'function' && nm.equivalent(a, b)));
+    return w.every((p) => d.some((q) => same(p, q)));
   }
 
   function emailsFromPerson(person) {
@@ -172,7 +183,8 @@ const FlowGoogleContacts = (() => {
     const fromApi = flattenPeopleResults(res.json || {});
     const merged = dedupeCandidates(fromProfile.concat(fromApi));
     const filtered = merged.filter((c) => nameMatches(name, c.displayName) || nameMatches(name, c.address.split('@')[0]));
-    return { ok: true, candidates: filtered.length ? filtered : merged };
+    // No contact whose name is the name asked for: none, never the search's own nearest guess (red team 2026-11-13).
+    return { ok: true, candidates: filtered };
   }
 
   function pickCandidates(candidates, choiceIndex) {

@@ -58,7 +58,9 @@ const FlowExtract = (() => {
   const MULT = { k: 1e3, thousand: 1e3, אלף: 1e3, m: 1e6, mm: 1e6, million: 1e6, מיליון: 1e6, bn: 1e9, billion: 1e9 };
   const MONEY_RE = new RegExp(
     '(?:(\\$|€|£|₪|₹|US\\$|C\\$|A\\$|USD|EUR|GBP|NIS|ILS|INR|CAD|AUD)\\s?)?' +
-    '(\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)' +
+    // Dot thousands first (Israel and Europe write "3.850 ₪", "1.234,56 EUR"): read as the Anglo form, "3.850" became 3.85 and the
+    // currency then attached to the trailing "0", so a ₪3,850 payment was read as 0 (red team 2026-10-23).
+    '(?<![\\d.,])(\\d{1,3}(?:\\.\\d{3})+(?:,\\d{1,2})?(?![\\d.,]\\d)|\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)' +
     '(?:\\s?(k|m|mm|bn|thousand|million|billion|אלף|מיליון)(?![A-Za-z\\u0590-\\u05FF]))?' +
     // ש״ח / ש"ח / שח — the abbreviation Israeli business writing actually
     // uses for the shekel far more often than spelling out שקלים or reaching
@@ -80,7 +82,8 @@ const FlowExtract = (() => {
       // A bare number with no currency marker is not money — it's a floor number,
       // a version, a headcount. Refusing those is most of what keeps this honest.
       if (!code) continue;
-      let value = parseFloat(digits.replace(/,/g, ''));
+      const dotThousands = /^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(digits);
+      let value = dotThousands ? parseFloat(digits.replace(/\./g, '').replace(',', '.')) : parseFloat(digits.replace(/,/g, ''));
       if (mult) value *= (MULT[mult.toLowerCase()] || 1);
       // Percentages and years dressed up as money are almost always neither.
       const after = text.slice(m.index + raw.length, m.index + raw.length + 2);

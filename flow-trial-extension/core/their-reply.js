@@ -68,8 +68,27 @@ const FlowTheirReply = (() => {
       from: emailOf(m.from),
       draft: labels.indexOf('DRAFT') >= 0 || m.isDraft === true,
       dateMs: Number.isFinite(when) ? when : null,
-      text: m.text != null ? m.text : (m.bodyPreview || (m.body && m.body.content) || m.snippet || '')
+      text: m.text != null ? m.text : (m.bodyPreview || (m.body && m.body.content) || m.snippet || ''),
+      attached: attachedOf(m)
     };
+  }
+
+  // Red team 2026-11-20 (docs/glance-ai/red-team.md): a file you waited on is delivered only when a file is really on their message.
+  // true / false when the host says (attachments list, Graph hasAttachments, Gmail payload parts), null when it cannot tell.
+  function attachedOf(m) {
+    if (Array.isArray(m.attachments)) return m.attachments.some((a) => a && (a.filename || a.name));
+    if (typeof m.hasAttachments === 'boolean') return m.hasAttachments;
+    const parts = m.payload && Array.isArray(m.payload.parts) ? m.payload.parts : null;
+    if (parts) return parts.some((p) => p && p.filename && p.body && p.body.attachmentId);
+    return null;
+  }
+  // The loop waits on several items (core/follow-up.js items mode): that mode reads which item came; one reply never closes all of them.
+  function hasItems(loop) { return Boolean(loop && Array.isArray(loop.items) && loop.items.length); }
+  // A file loop's close needs the file: no file on the message holds the loop, and so does a message whose attachments the host cannot see.
+  function fileGate(loop, m, j) {
+    if (!j.close || j.close === 'declined' || !loop.file) return j;
+    if (m.attached === true) return j;
+    return { hold: m.attached === false ? 'file-not-attached' : 'file-unproven', outcome: j.outcome };
   }
 
   function waiting(loop) {
@@ -105,7 +124,8 @@ const FlowTheirReply = (() => {
       .sort((a, b) => a.dateMs - b.dateMs);
     if (!msgs.length) return silence('no-reply');
     const last = msgs[msgs.length - 1];
-    const j = judge(last.text, loop, input.now);
+    if (hasItems(loop)) return { action: 'hold', reason: 'items-mode', messageId: last.id };
+    const j = fileGate(loop, last, judge(last.text, loop, input.now));
     if (!j.close) return { action: 'hold', reason: j.hold, messageId: last.id };
     const he = loop.lang === 'he';
     const lines = {
@@ -137,7 +157,8 @@ const FlowTheirReply = (() => {
     if (m.threadId !== p.threadId) return miss('verify_failed', { why: 'other-thread' });
     if (m.from !== emailOf(loop.counterpart.email)) return miss('verify_failed', { why: 'not-from-them' });
     if (m.draft) return miss('verify_failed', { why: 'draft' });
-    const j = judge(m.text, loop, input.nowMs);
+    if (hasItems(loop)) return miss('verify_failed', { why: 'items-mode' });
+    const j = fileGate(loop, m, judge(m.text, loop, input.nowMs));
     if (j.close !== p.closedAs) return miss('verify_failed', { why: 'meaning-differs' });
     const verifiedAt = typeof input.now === 'string' ? input.now : new Date().toISOString();
     const system = input.surface === 'outlook' ? 'microsoft/mail' : 'gmail/message';

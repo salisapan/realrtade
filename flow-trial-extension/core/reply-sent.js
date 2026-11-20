@@ -43,6 +43,26 @@ const FlowReplySent = (() => {
   const HOLD_HE = /(?:אחזור אלי(?:ך|כם|ייך)|אחזור עם תשובה|אבדוק ו(?:אעדכן|אחזור|אחזיר)|בודק(?:ת)? ו(?:מעדכן|מעדכנת|חוזר|חוזרת)|נבדוק ונעדכן|אעדכן (?:בהמשך|מחר|בקרוב|אחרי)|רגע,? בודק|תן לי לבדוק|תני לי לבדוק|עוד לא יודע|עוד לא יודעת|אני על זה|מטפל(?:ת)? בזה|אחזיר לך תשובה|נחזור אליך)/;
   // A reply that only acknowledges. Nothing else in the message.
   const ACK_ONLY = /^(?:(?:thanks?|thank you|thx|ty|ok(?:ay)?|k|great|perfect|cool|noted|got it|received|sounds good|will do|sure|👍|🙏|תודה(?: רבה)?|אוקיי|אוקי|בסדר|סבבה|מעולה|קיבלתי|מצוין|יופי|רשמתי)[\s!.,…🙏👍]*)+$/i;
+  // Red team 2026-11-06 (docs/glance-ai/red-team.md). A message the person sent in the thread that still is not the answer they owed:
+  //   - their own out-of-office or other automatic reply (Gmail's vacation responder answers inside the thread, from their address);
+  //   - a forward of the ask to someone else, or a reply that goes only to someone else in the thread;
+  //   - a promise to deliver later ("I'll send it tomorrow", «אשלח מחר»), a hand-off ("forwarding to my accountant", «מעביר לרואה החשבון»),
+  //     and «בטיפול»: the plan says 'hold', as for "I'll get back to you";
+  //   - a thank-you the ACK_ONLY list did not spell ("Thanks a lot! 🙂", «תודה רבה רבה!!»).
+  const AUTO = /\b(?:automatic reply|auto(?:matic)?[- ]?(?:reply|response)|out of (?:the )?office|ooo\b|on (?:annual |parental |maternity |sick )?leave|away from (?:the office|my desk|email)|limited access to (?:e-?mail|my e-?mail)|i am (?:currently )?(?:away|travell?ing|on vacation))|(?:מענה אוטומטי|תשובה אוטומטית|מחוץ למשרד|אני בחופשה|נמצא(?:ת)? בחופשה|לא נמצא(?:ת)? במשרד|גישה מוגבלת למייל|אחזור לטפל בפניות)/i;
+  const FORWARD = /(?:^|\n)\s*(?:-{2,}\s*(?:Forwarded message|הודעה שהועברה|הודעה מועברת)\s*-{2,}|Begin forwarded message:|(?:Fwd?|FW|הועבר)\s*:)/i;
+  const HOLD_MORE_EN = /\b(?:i(?:'ll| will)|we(?:'ll| will)|will)\s+(?:try to\s+|be able to\s+)?(?:send|share|forward|email|e-mail|get|have|finish|prepare|do|handle|sort|take a look|look|review|draft|upload|sign|pay)\b|\b(?:working on it|on it now|taking a look|forwarding (?:this|it|that)\s+(?:on\s+)?to|passing (?:this|it) (?:on|along) to|looping in|asking (?:my|our|the)\b)/i;
+  const HOLD_MORE_HE = /(?:^|[\s,.!?])(?:אשלח|אעביר|אכין|אסיים|אצרף|אטפל|אבדוק|נשלח|נעביר|נכין|נסיים|נטפל|בטיפול|מטפלים|מעביר(?:ה)?\s+ל[\u0590-\u05FF"]+|העברתי\s+ל(?:רואה|רואת|עורך|עורכת|עו"ד|רו"ח|מנהל|מנהלת|צוות|מחלקת|הנהלת|אחראי)[\u0590-\u05FF"]*|אשאל\s+את)(?=$|[\s,.!?])/;
+  const ACK_WORDS = new Set(['thanks', 'thank', 'you', 'a', 'lot', 'so', 'much', 'very', 'again', 'many', 'ok', 'okay', 'k', 'great', 'perfect', 'cool', 'noted', 'got', 'it', 'received', 'sounds', 'good', 'will', 'do', 'sure', 'thx', 'ty', 'awesome', 'wonderful', 'appreciated', 'appreciate',
+    'תודה', 'רבה', 'רבות', 'אוקיי', 'אוקי', 'בסדר', 'סבבה', 'מעולה', 'קיבלתי', 'מצוין', 'מצויין', 'יופי', 'רשמתי', 'נהדר', 'אחלה', 'שוב', 'ענקית', 'ענק']);
+  function ackOnly(own) {
+    const w = String(own || '').toLowerCase().replace(/[^\p{L}\p{N}\s']/gu, ' ').split(/\s+/).filter(Boolean);
+    return w.length > 0 && w.length <= 8 && w.every((x) => ACK_WORDS.has(x));
+  }
+  function addressesOf(v) {
+    const list = Array.isArray(v) ? v : (v == null ? [] : String(v).split(/[,;]/));
+    return list.map(emailOf).filter(Boolean);
+  }
   // The quoted original under a reply: everything from the first marker on.
   const QUOTE_HEAD = /(?:^|\n)\s*(?:On .{4,200}?wrote:|בתאריך .{4,200}?(?:נכתב|כתב|כתבה)[^:\n]*:|-{2,}\s*Original Message\s*-{2,}|-{2,}\s*הודעה מקורית\s*-{2,}|From: .+\n(?:Sent|Date): |מאת: .+\n(?:נשלח|תאריך): )/i;
 
@@ -66,10 +86,12 @@ const FlowReplySent = (() => {
 
   // What the sent words do: 'answer', 'hold', 'ack' or 'empty'.
   function readReply(text) {
+    if (AUTO.test(String(text || ''))) return 'auto';
+    if (FORWARD.test(String(text || ''))) return 'forward';
     const own = ownWords(text);
     if (!own) return 'empty';
-    if (ACK_ONLY.test(own)) return 'ack';
-    if (HOLD_EN.test(own) || HOLD_HE.test(own)) return 'hold';
+    if (ACK_ONLY.test(own) || ackOnly(own)) return 'ack';
+    if (HOLD_EN.test(own) || HOLD_HE.test(own) || HOLD_MORE_EN.test(own) || HOLD_MORE_HE.test(own)) return 'hold';
     return 'answer';
   }
 
@@ -96,7 +118,11 @@ const FlowReplySent = (() => {
       sent: sent === true,
       from: emailOf(m.from),
       dateMs: Number.isFinite(when) ? when : null,
-      text: m.text != null ? m.text : (m.bodyPreview || (m.body && m.body.content) || m.snippet || '')
+      text: m.text != null ? m.text : (m.bodyPreview || (m.body && m.body.content) || m.snippet || ''),
+      // Who it went to, when the host passed it (Gmail To/Cc headers, Graph toRecipients/ccRecipients); null when unknown.
+      to: (m.to != null || m.cc != null || m.toRecipients || m.ccRecipients)
+        ? addressesOf(m.to).concat(addressesOf(m.cc), addressesOf(m.toRecipients), addressesOf(m.ccRecipients)) : null,
+      auto: m.autoSubmitted === true || /auto-(?:replied|generated)/i.test(String(m.autoSubmitted || ''))
     };
   }
 
@@ -131,12 +157,16 @@ const FlowReplySent = (() => {
     const ours = msgs.filter((m) => m.id && m.threadId === tid && mine.indexOf(m.from) >= 0 && m.dateMs != null && m.dateMs > since);
     const sent = ours.filter((m) => m.sent).sort((a, b) => a.dateMs - b.dateMs);
     if (!sent.length) return silence(ours.length ? 'draft-unsent' : 'not-sent');
-    const kinds = sent.map((m) => ({ m: m, kind: readReply(m.text) }));
+    // The one who asked must be among the recipients when the loop knows them and the host says who the message went to.
+    const asker = loop.counterpart && loop.counterpart.email ? emailOf(loop.counterpart.email) : '';
+    const toAsker = (m) => !asker || m.to == null || m.to.indexOf(asker) >= 0;
+    const kinds = sent.map((m) => ({ m: m, kind: m.auto ? 'auto' : (!toAsker(m) ? 'not-to-asker' : readReply(m.text)) }));
     const answers = kinds.filter((k) => k.kind === 'answer');
     if (!answers.length) {
       const last = kinds[kinds.length - 1];
       if (kinds.some((k) => k.kind === 'hold')) return { action: 'hold', reason: 'holding-reply', messageId: last.m.id };
-      return silence(last.kind === 'ack' ? 'ack-only' : 'empty-reply');
+      const why = { ack: 'ack-only', auto: 'auto-reply', forward: 'forwarded', 'not-to-asker': 'not-to-asker' };
+      return silence(why[last.kind] || 'empty-reply');
     }
     const best = answers[answers.length - 1].m;
     return {
@@ -175,6 +205,9 @@ const FlowReplySent = (() => {
     if (m.threadId !== planned.threadId) return miss('verify_failed', { why: 'other-thread' });
     if (mine.indexOf(m.from) < 0) return miss('verify_failed', { why: 'not-from-person' });
     if (readReply(m.text) !== 'answer') return miss('verify_failed', { why: 'not-an-answer' });
+    if (m.auto) return miss('verify_failed', { why: 'auto-reply' });
+    const askerNow = loop.counterpart && loop.counterpart.email ? emailOf(loop.counterpart.email) : '';
+    if (askerNow && m.to != null && m.to.indexOf(askerNow) < 0) return miss('verify_failed', { why: 'not-to-asker' });
     const verifiedAt = typeof input.now === 'string' ? input.now : new Date().toISOString();
     const system = input.surface === 'outlook' ? 'microsoft/mail' : 'gmail/message';
     const proof = proofs ? proofs.buildProof({ system: system, externalId: m.id, fetchedBack: true, verifiedAt: verifiedAt }) : null;

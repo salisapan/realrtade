@@ -80,7 +80,23 @@ const FlowLoopAnswer = (() => {
     const ids = new Set(), words = new Set();
     const nq = ' ' + toks.join(' ') + ' ';
     for (const [k, set] of byKey) if (k.includes(' ') && nq.includes(' ' + k + ' ')) { set.forEach((x) => ids.add(x)); k.split(' ').forEach((x) => words.add(x)); }
-    for (const t of toks) for (const v of tokenVariants(t.replace(/'s$/, ''))) if (byKey.has(v) && !STOP.has(v) && !STOP_HE.has(v)) { byKey.get(v).forEach((x) => ids.add(x)); words.add(t); }
+    // Red team 2026-11-20 (docs/glance-ai/red-team.md): one word that names two different people («Dana» for Dana Cohen and Dana Levi,
+    // "Levi" for Dana Levi and Avi Levi) answered for one of them, or for both under the first one's name. A word the full name did not
+    // already settle is kept only when it names exactly one person; two is a refusal, never a guess (the same rule as the sound match).
+    const whoOf = new Map();
+    for (const w of loops) whoOf.set(w.id, String((w.counterpart && (w.counterpart.email || w.counterpart.name)) || '').toLowerCase());
+    let ambiguousWord = false;
+    for (const t of toks) {
+      if (words.has(t)) continue;
+      for (const v of tokenVariants(t.replace(/'s$/, ''))) {
+        if (!byKey.has(v) || STOP.has(v) || STOP_HE.has(v)) continue;
+        const set = byKey.get(v);
+        const persons = new Set([...set].map((x) => whoOf.get(x)));
+        if (persons.size > 1) { ambiguousWord = true; continue; }
+        set.forEach((x) => ids.add(x)); words.add(t);
+      }
+    }
+    if (ambiguousWord) return { ids: new Set(), words, ambiguous: true };
     if (ids.size) return { ids, words, ambiguous: false };
     // The same person in the other script («מה אבי חייב לי?» for Avi Levi, "what does Shai owe me?" for «שי כהן»), by sound
     // (core/name-sound.js). Kept only when exactly one person fits; two people who sound alike is a refusal, never a guess.

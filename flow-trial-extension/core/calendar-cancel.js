@@ -68,7 +68,14 @@ const FlowCalendarCancel = (() => {
     const ev = hits[0];
     if (!ev.id || !ev.etag) return silence('no-event-id');
     if (ev.recurringEventId || (Array.isArray(ev.recurrence) && ev.recurrence.length)) return silence('recurring');
-    if (ev.organizer && ev.organizer.self === false) return silence('not-organizer');
+    // Red team 2026-11-20 (docs/glance-ai/red-team.md), the same rule as core/calendar-move.js (red team 2026-11-06): only an ordinary
+    // event of the person's own is theirs to delete. No organizer said, a guest list the calendar left out (attendeesOmitted), a flight or
+    // booking Gmail put on the calendar (eventType fromGmail), an out-of-office, focus-time or working-location block, a locked event and
+    // a private copy of someone else's event all stay silent.
+    if (!ev.organizer || ev.organizer.self !== true) return silence(ev.organizer && ev.organizer.self === false ? 'not-organizer' : 'organizer-unknown');
+    if (ev.attendeesOmitted === true) return silence('guests-hidden');
+    if (ev.eventType && ev.eventType !== 'default') return silence('not-a-plain-event:' + ev.eventType);
+    if (ev.locked === true || ev.privateCopy === true) return silence('not-yours-to-delete');
     if (otherGuests(ev).length) return silence('has-guests');
     const title = String(ev.summary || '').replace(/\s+/g, ' ').trim().slice(0, 120);
     const he = intent.lang === 'he' || input.lang === 'he';

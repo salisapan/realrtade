@@ -5,6 +5,10 @@
 // card / bank / payment-app credit from that merchant for that amount closes it; pending, future, a charge, a refund the
 // person sent, another merchant, a partial amount, a spoof and two fits do not. Run: node test/refund-loop-corpus.cjs
 const { FlowRefundLoop: R } = require('../core/refund-loop.js');
+// Red team 2026-11-13: only a notice that passed DKIM/SPF counts (authPass must be true). These fixtures are authenticated notices,
+// so a message without authPass is passed as authenticated here; the red team corpus covers a missing and a failed result.
+const judgeAuthenticated = R.judge;
+R.judge = (loops, msg, opts) => judgeAuthenticated(loops, msg && !Object.prototype.hasOwnProperty.call(msg, 'authPass') ? Object.assign({ authPass: true }, msg) : msg, opts);
 const { FlowLabsSwitches: L } = require('../core/labs-switches.js');
 let failures = 0;
 function check(name, cond, detail) {
