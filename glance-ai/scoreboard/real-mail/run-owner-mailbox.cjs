@@ -11,7 +11,14 @@ const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ?
 const file = path.join(__dirname, arg('file', path.join('private', 'owner-mailbox-2026-11-12.jsonl')));
 if (!fs.existsSync(file)) { console.log('no private file here (it is gitignored and lives only where it was built): ' + path.relative(G, file)); process.exit(0); }
 const E = require(path.join(G, 'model', 'teacher', 'engine.cjs')).makeEngine('tip');
-const rows = fs.readFileSync(file, 'utf8').trim().split('\n').map(JSON.parse);
+// The personal mailbox set (private/personal/*.jsonl, pull-personal.cjs) has its own row shape {folder, label:{has_request, kind}}: adapted here to the shape this runner reads. Held-out files print aggregates only (no --list).
+const STEP_OF_KIND = { draft: 'draft', task: 'task', calendar: 'calendar', file_save: 'file_save', pay: 'task' };
+const adapt = (r) => (r.bucket || !r.folder ? r : Object.assign({}, r, {
+  bucket: (/heldout/.test(file) ? 'personal-heldout/' : 'personal-dev/') + r.folder, lang: /[\u0590-\u05FF]/.test(r.body || '') ? 'he' : 'en', surface: 'gmail', direction: r.folder === 'sent' ? 'outbound' : 'inbound',
+  from: { name: 'Person', email: 'person@firm.example' }, to: r.folder === 'sent' ? ['person@firm.example'] : ['sali@gmail.example'], cc: [], unsure: !r.label,
+  gold: r.label && r.label.has_request ? [STEP_OF_KIND[r.label.kind] || 'task'] : [], alsoOk: r.label && r.label.kind === 'pay' ? ['draft'] : [] }));
+const rows = fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse).map(adapt);
+if (/heldout/.test(file) && process.argv.includes('--list')) { console.log('held-out file: --list is refused (aggregates only)'); process.exit(0); }
 const OWN = ['Sali', 'Sali Sapan', 'סאלי'];
 if (arg('features')) {
   const { prepare } = require(path.join(G, 'model', 'runtime', 'pipeline-v2.cjs'));

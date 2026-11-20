@@ -79,7 +79,12 @@ const FlowFollowUp = (() => {
     /\bplease (?:confirm|send|share|review|sign|approve|reply|respond|forward|provide|return|let me know|pay|transfer|wire|settle|get back)\b/i,
     /\b(?:i(?:'m| am)|we(?:'re| are)) (?:still )?(?:waiting|awaiting)\b|\bawaiting your\b|\bwaiting (?:for|on) (?:your|the)\b/i,
     /\b(?:i|we) (?:need|require) (?:you to|your) (?:confirm|approval|signature|reply|response|decision|answer|input|sign|send)\b/i,
-    /\b(?:confirm|reply|respond|get back to me|send (?:it|them|me)|let me know) (?:by|before|no later than|until|within)\b/i
+    /\b(?:confirm|reply|respond|get back to me|send (?:it|them|me)|let me know) (?:by|before|no later than|until|within)\b/i,
+    // Asks to put a file somewhere or open/fill something («Please save the attached file to Drive», «please file it») and a time put to the other side
+    // for a yes («Does that work for you?», «Let's hold a review on Tuesday at 10:00») (personal dev set, 2026-11-20).
+    /\bplease (?:save|file|store|upload|open|fill(?: out| in)?)\b/i,
+    /\b(?:does|would|will|is) (?:that|this|it|the time|\d{1,2}(?::\d{2})?\s*(?:am|pm)?) (?:work|suit|be (?:ok|okay|fine|good|convenient))(?: for you)?\s*\?/i,
+    /\b(?:let['’]s|shall we|how about|can we) (?:meet|have (?:a|an|the) [\w -]{0,30}?(?:meeting|call|sync|review)|hold (?:a|an) [\w -]{0,40}?(?:meeting|call|sync|review)|set up (?:a|an) [\w -]{0,30}?(?:meeting|call)|catch up)\b[^.?!]{0,60}\b(?:\d{1,2}:\d{2}|\d{1,2}\s*(?:am|pm))/i
   ];
   const ASK_HE = [
     /(?:תוכל(?:ו|י)?|אפשר|ניתן) (?:בבקשה )?(?:לשלוח|לאשר|להשיב|לחתום|להעביר|לעדכן|לבדוק|לשלם|לחזור)/,
@@ -108,7 +113,12 @@ const FlowFollowUp = (() => {
     // The way a person really asks in a business mail (owner's real threads, 2026-11-12): "we would be glad to set up a short meeting",
     // "glad to receive the name of...", "glad if you send the invitation". A closing courtesy ("נשמח לעזור", "אשמח לעמוד לרשותך") is not here.
     /(?:נשמח|אשמח) (?:לתאם|לקבוע|להיפגש|לקבל (?:את|ממך|מכם)|לדעת (?:מראש|אם|מי|מתי|על)|שתשלח(?:ו|י)?|שתצרפ(?:ו|י)?|שתעדכנ(?:ו|י)?|שתחזר(?:ו|י)?|שתאשר(?:ו|י)?)/,
-    /אפשר לקבוע כאן|(?:או )?לשלוח לי (?:יום|מועד|תאריך)/
+    /אפשר לקבוע כאן|(?:או )?לשלוח לי (?:יום|מועד|תאריך)/,
+    // A masculine/feminine future imperative with «בבקשה» («תפתח בבקשה מצגת», «תשמרי את המצורף בדרייב בבקשה»), a plain imperative chain with a day («מלא את הטופס, חתום והחזר עד מחר»),
+    // and a meeting proposed at a clock («בוא ניפגש ביום שני ב-11:00», «פגישת עבודה ביום ד׳ ב-14:30?») (personal dev set, 2026-11-20).
+    /(?:^|[\s,.])ת(?:פתח|פתחי|שמור|שמרי|מלא|מלאי|חתום|חתמי|שלח|שלחי|עדכן|עדכני|בדוק|בדקי|כין|כיני|העבר|העבירי)(?![\u0590-\u05FF])[^.?!]{0,70}בבקשה|בבקשה\s+ת(?:פתח|פתחי|שמור|שמרי|מלא|מלאי|חתום|חתמי|שלח|שלחי|עדכן|עדכני|בדוק|בדקי|כין|כיני|העבר|העבירי)(?![\u0590-\u05FF])/,
+    /(?:^|[\s,.])(?:מלא|מלאי|חתום|חתמי|החזר|החזירי|שלח|שלחי)(?![\u0590-\u05FF])[^.?!]{0,60}(?:ו(?:החזר|החזירי|שלח|שלחי|חתום|חתמי))?[^.?!]{0,30}עד\s+(?:מחר|יום\s+\S+|היום|ה-?\d)/,
+    /בוא(?:י|ו)?\s+(?:ניפגש|נפגש|נקבע|נדבר)[^.?!]{0,40}\d{1,2}[:.]\d{2}|(?:פגישה|פגישת\s+\S+)\s+ב(?:יום\s+\S+\s+ב)?-?\s*\d{1,2}[:.]\d{2}\s*\?/
   ];
 
   // ---- payment --------------------------------------------------------------
@@ -130,6 +140,8 @@ const FlowFollowUp = (() => {
     const t = String(s || '').trim();
     // «לאישורך.» / «לאישרוך» / «טיוטת מכתב לאישורך.»: attached for approval, the reply is the approval.
     if (/(?:^|\s)(?:לאישור(?:ך|כם)|לאישרוך)[.!]*$/.test(t)) return true;
+    // «פגישת עבודה ביום ד׳ ב-14:30?»: a meeting put at a clock as a question.
+    if (/^(?:פגישה|פגישת\s+\S+)\s+ב(?:יום\s+\S+\s+ב)?-?\s*\d{1,2}[:.]\d{2}\s*\?$/.test(t)) return true;
     // A clock put as a question with no verb («אפשרי היום ב14:30?», «15:00 אפשרי?», «מתאים מחר ב-10:00?») is a request for a time in a real office thread.
     if (/^(?:אפשרי|מתאים|נוח|פנוי|פנויה)\s+(?:(?:היום|מחר|מחרתיים|ביום\s+\S+)\s+)?(?:ב-?\s*)?\d{1,2}[:.]\d{2}\s*\?$/.test(t) || /^\d{1,2}[:.]\d{2}\s+(?:אפשרי|מתאים|נוח)\s*\?$/.test(t)) return true;
     // «אתה זמין?» / «את זמינה?» and a short clarifying question («האם הכוונה לאישור זכויות?») are asks too short for the four-word filter (law-firm mailbox, 2026-11-18).
@@ -515,6 +527,22 @@ const FlowFollowUp = (() => {
   // courtesy, and the day it is due (stated, else two business days).
   // text: your own message, quoted history removed. Returns null or a loop-shaped
   // ask with direction 'mine'.
+  // ---- promises the pipeline misses: Hebrew first-person future of a closed verb list, and a passive future with a time word -----------------------------------------------------
+  const PROMISE_VERBS_HE = '(?:אברר|אבדוק|אטפל|אעדכן|אשלח|אעביר|אחזור|אשיב|אתקן|אקפיץ|אצרף|אכין|אעלה|אתאם|אקבע|אתקשר|אדבר|אעשה|אסמן|אגיש|אחתום|אשלם|אסדר|אארגן|אוודא|אבצע|אשמור|אפתח|אסכם|אחזיר|אקפוץ|אכתוב|אשיג|אאשר|נעביר|נשלח|נעדכן|נטפל|נבדוק|נחזור|נתקן|נתאם|נקבע|נשיב|נצרף|נכין|נגיש|נבצע|נסדיר|נאשר|נחזיר|נקפיץ|נברר|נתקשר|נדבר)';
+  const PROMISE_PASSIVE_HE = /(?:^|[\s,.])(?:יועבר|יועברו|תועבר|תועברו|יופק|יופקו|תופק|תישלח|יישלח|יישלחו|יעודכן|יעודכנו|יטופל|יטופלו|תטופל|יוגש|יוגשו|תוגש|יתקבל|תתקבל|יוסדר|תוסדר|יסודר|יצא|תצא|יוחזר|יוחזרו)(?![\u0590-\u05FF])[^.?!]{0,40}(?:בהקדם|עד\s+\S+|ביום\s+\S+|מחר|בשבוע\s+\S+|בימים\s+הקרובים|ב-?\d)/;
+  const PROMISE_FIRST_HE = new RegExp('(?:^|[\\s,.;])' + PROMISE_VERBS_HE + '(?![\\u0590-\\u05FF])');
+  const PROMISE_CONDITIONAL_HE = /(?:^|[\s,])(?:אם|במידה|ככל\s+ש|בהנחה)(?![\u0590-\u05FF])[^.?!]{0,60}$/;
+  function commitmentExtra(s) {
+    const t = String(s || '').trim();
+    if (!hasHebrew(t) || /\?\s*$/.test(t)) return null;
+    if (PROMISE_PASSIVE_HE.test(t) && !/(?:^|\s)(?:אם|במידה)(?![\u0590-\u05FF])/.test(t)) return { type: 'promise', action: null };
+    const m = PROMISE_FIRST_HE.exec(t);
+    if (!m) return null;
+    // an open offer or a condition in front of the verb («במידה וצריך … ואעביר»), a request frame («אשמח ש…») and a thanks/done report are not promises
+    if (PROMISE_CONDITIONAL_HE.test(t.slice(0, m.index + 1))) return null;
+    if (/(?:אשמח|נשמח|אודה|נודה|אבקש\s+ש)(?![\u0590-\u05FF])/.test(t.slice(Math.max(0, m.index - 20), m.index + 1))) return null;
+    return { type: 'promise', action: null };
+  }
   function classifyCommitment(text, ctx) {
     const c = ctx || {};
     const body = String(text || '').trim();
@@ -527,6 +555,12 @@ const FlowFollowUp = (() => {
     for (const s of lines) {
       if (pipe) { const r = pipe.recognize(s); if (r.act === 'PROMISE' && r.commitment) { hit = { line: s, t: r.commitment, tier: r.tier }; break; } }
       else { const t = types.detectCommitmentSentence(s); if (t) { hit = { line: s, t }; break; } }
+    }
+    // Off by default (the product reads promises as before). With ctx.commitmentRecall: the closed-lexicon Hebrew promises the pipeline misses (measured in glance-ai/scoreboard/real-mail/commitment-eval.cjs).
+    // With the flag, an open offer or a condition in the promise sentence («במידה וצריך … אעביר», «אם זה אומר … אתקן») is not a promise; «אם כך, …» («if so, …») is a plain consequence and stays.
+    if (hit && c.commitmentRecall === true && hasHebrew(hit.line) && /(?:^|[\s,])(?:אם|במידה)(?![\u0590-\u05FF])/.test(hit.line) && !/(?:^|[\s,])אם\s+כך(?![\u0590-\u05FF])/.test(hit.line)) hit = null;
+    if (!hit && c.commitmentRecall === true) {
+      for (const s of sentences(body).filter((x) => words(x) >= 2 && !COURTESY.test(x))) { const t = commitmentExtra(s); if (t) { hit = { line: s, t, tier: 'rule' }; break; } }
     }
     if (!hit) return null;
     const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);
