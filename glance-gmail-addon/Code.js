@@ -409,6 +409,7 @@ function stageDoIt_(e, lang) {
   var decision = judgeOpen_(opened, e);
   planLog_(decision, opened.messageId);
   if (!decision.speak) return { card: update_(render_(silenceCard_(decision, opened.messageId, lang))) };
+  if (decision.past) return { card: update_(render_(Glance.cards.proposal(decision, opened.messageId, lang))) };
   return {
     scopes: scopesForKind_(decision.kind),
     write: function () {

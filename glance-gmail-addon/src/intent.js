@@ -390,6 +390,17 @@ var GlanceIntent = (function () {
     };
   }
 
+  function datePassed_(result) {
+    var facts = result && result.intent && result.intent.facts;
+    return Boolean(facts && facts.date && facts.date.past);
+  }
+
+  function slashShown_(iso) {
+    var parts = String(iso || '').split('-');
+    if (parts.length !== 3) return '';
+    return String(+parts[2]) + '/' + String(+parts[1]);
+  }
+
   function clockOf(params) {
     if (!params) return null;
     var hour = params.hour;
@@ -467,7 +478,10 @@ var GlanceIntent = (function () {
     if (steps.length === 1 && steps[0].kind === 'calendar' && result.plan.id === 'hold') {
       var holdParams = steps[0].params || {};
       var holdClock = clockOf(holdParams);
-      var holdDate = isoOrNull(holdParams.dateIso, now, timeZone);
+      var holdPast = datePassed_(result);
+      var holdDate = holdPast && validIso(holdParams.dateIso)
+        ? holdParams.dateIso
+        : isoOrNull(holdParams.dateIso, now, timeZone);
       var holdTitle = sanitizeTitle(holdParams.title || '');
       if (!holdClock || !holdDate || !holdTitle) return null;
       if (holdParams.requireTime === false && !holdClock) return null;
@@ -482,6 +496,8 @@ var GlanceIntent = (function () {
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
         useMeetingSubject: holdParams.useMeetingSubject === true,
+        past: holdPast,
+        pastShown: holdPast ? slashShown_(holdDate) : '',
         lang: mailLang(sourceText || ''),
         reason: 'hold',
         planId: 'hold'

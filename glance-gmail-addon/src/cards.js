@@ -51,12 +51,17 @@ var GlanceCards = (function () {
     var L = i18n();
     if (decision.kind === 'hold') {
       var holdWhen = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
-      return card(lang, [
+      var holdWidgets = [
         text(lang, L.t(lang, 'calendarHold')),
         text(lang, decision.title),
-        whenLine(lang, holdWhen),
-        doItButton(messageId, lang)
-      ]);
+        whenLine(lang, holdWhen)
+      ];
+      if (decision.past) {
+        holdWidgets.push(text(lang, L.t(lang, 'datePassed') + ' (' + (decision.pastShown || '') + ')'));
+        return card(lang, holdWidgets);
+      }
+      holdWidgets.push(doItButton(messageId, lang));
+      return card(lang, holdWidgets);
     }
     if (decision.kind === 'schedule') {
       var when = decision.dateIso;

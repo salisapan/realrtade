@@ -35,7 +35,8 @@ var GlanceI18n = (function () {
       composeNeedsReply: 'Open Glance from a reply. This compose has no message to read.',
       composeNoReply: 'This message has no reply to insert.',
       composeAskFirst: 'Open the message in Glance first and press Prepare a reply.',
-      alreadyInDraft: 'The reply is already in the draft.'
+      alreadyInDraft: 'The reply is already in the draft.',
+      datePassed: 'That date has already passed'
     },
     he: {
       doIt: 'בצע',
@@ -68,7 +69,8 @@ var GlanceI18n = (function () {
       composeNeedsReply: 'פתחו את Glance מתשובה. לכתיבה הזו אין הודעה לקרוא.',
       composeNoReply: 'בהודעה הזו אין תשובה להכניס.',
       composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».',
-      alreadyInDraft: 'התשובה כבר בטיוטה.'
+      alreadyInDraft: 'התשובה כבר בטיוטה.',
+      datePassed: 'התאריך כבר עבר'
     }
   };
 

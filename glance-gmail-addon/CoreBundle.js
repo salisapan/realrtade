@@ -510,6 +510,29 @@ const FlowExtract = (() => {
     if (/(?:בשעה|(?<![\u0590-\u05FF])בעה|\bat\s+\d|\b\d{1,2}:\d{2}\b)/i.test(window)) return true;
     return false;
   }
+  function daysBetweenIso_(later, earlier) {
+    var a = String(later).split('-');
+    var b = String(earlier).split('-');
+    return Math.round((Date.UTC(+a[0], +a[1] - 1, +a[2]) - Date.UTC(+b[0], +b[1] - 1, +b[2])) / 86400000);
+  }
+
+  // ~6 months. A day further back than this, with no year, is next year.
+  var OMITTED_YEAR_PAST_DAYS = 183;
+
+  function omittedSlashInZone_(monthIdx, day, today) {
+    var year = +String(today).slice(0, 4);
+    var thisYear = buildDate(year, monthIdx, day);
+    if (!thisYear) return null;
+    var isoThis = iso(thisYear);
+    if (isoThis >= today) return { iso: isoThis, past: false };
+    if (daysBetweenIso_(today, isoThis) > OMITTED_YEAR_PAST_DAYS) {
+      var nextYear = buildDate(year + 1, monthIdx, day);
+      if (!nextYear) return null;
+      return { iso: iso(nextYear), past: false };
+    }
+    return { iso: isoThis, past: true };
+  }
+
   // 23/10 is day 23. 10/23 is month 10. 5/6 is either, so it stays words with no ISO.
   // Day-first stays. A bare slash, a past day, or a number inside an invoice is not a date.
   function slashDate(text, now) {
@@ -537,19 +560,27 @@ const FlowExtract = (() => {
       let year = m[3] ? +m[3] : null;
       const yearOmitted = year == null;
       if (year != null && year < 100) year += 2000;
-      let built = monthDay(m[0], monthIdx, day, year, now || new Date());
-      let iso = built && built.iso;
-      // The add-on sets the user's zone. An omitted year that has already
-      // passed (18/11 read on 20/11) is the next occurrence, not "no date".
-      // With no zone the extension still drops a past slash date.
-      if (activeZone && yearOmitted && iso && iso < today) {
-        const rolled = monthDay(m[0], monthIdx, day, +iso.slice(0, 4) + 1, now || new Date());
-        if (rolled && rolled.iso && rolled.iso >= today) {
-          built = rolled;
-          iso = rolled.iso;
+      let built;
+      let iso;
+      // With the user's zone set, an omitted year is this year when that day
+      // is today or later. More than about six months ago means next year
+      // (5/1 read on 20/12). A day that passed more recently stays this year
+      // and is marked past (18/11 read on 20/11). The clock is left alone.
+      // With no zone, a past slash date is still not a date.
+      if (activeZone && yearOmitted) {
+        const resolved = omittedSlashInZone_(monthIdx, day, today);
+        if (!resolved) {
+          if (!ambiguous) ambiguous = { raw: m[0], iso: null };
+          continue;
         }
+        built = { raw: m[0], iso: resolved.iso };
+        if (resolved.past) built.past = true;
+        iso = resolved.iso;
+      } else {
+        built = monthDay(m[0], monthIdx, day, year, now || new Date());
+        iso = built && built.iso;
       }
-      if (!iso || !slashDateContext(src, m.index, m[0]) || iso < today) {
+      if (!iso || !slashDateContext(src, m.index, m[0]) || (iso < today && !(built && built.past))) {
         if (!ambiguous) ambiguous = { raw: m[0], iso: null };
         continue;
       }
@@ -6627,7 +6658,10 @@ const FlowIntent = (() => {
     const calledOff = (s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text))
       && !liveWithAsk(vetoClauses(text));
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
-    const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
+    // A slash day with no year that passed within about six months stays on the
+    // facts (extract marks date.past when the user zone is set). It is still
+    // the meeting, with its clock. An older past day is not.
+    const isPast = isPastDate(facts.date && facts.date.iso, ctx.now) && !(facts.date && facts.date.past);
     // infoOrNoise is the same veto as s.flags.noise, for phrasings the
     // scorer's own list does not name yet (FYI, a quick bump, "Accepted:").
     // It also stops the score path below: a FYI wrapped around a strong
@@ -11857,7 +11891,8 @@ var GlanceI18n = (function () {
       composeNeedsReply: 'Open Glance from a reply. This compose has no message to read.',
       composeNoReply: 'This message has no reply to insert.',
       composeAskFirst: 'Open the message in Glance first and press Prepare a reply.',
-      alreadyInDraft: 'The reply is already in the draft.'
+      alreadyInDraft: 'The reply is already in the draft.',
+      datePassed: 'That date has already passed'
     },
     he: {
       doIt: 'בצע',
@@ -11890,7 +11925,8 @@ var GlanceI18n = (function () {
       composeNeedsReply: 'פתחו את Glance מתשובה. לכתיבה הזו אין הודעה לקרוא.',
       composeNoReply: 'בהודעה הזו אין תשובה להכניס.',
       composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».',
-      alreadyInDraft: 'התשובה כבר בטיוטה.'
+      alreadyInDraft: 'התשובה כבר בטיוטה.',
+      datePassed: 'התאריך כבר עבר'
     }
   };
 
@@ -12343,6 +12379,17 @@ var GlanceIntent = (function () {
     };
   }
 
+  function datePassed_(result) {
+    var facts = result && result.intent && result.intent.facts;
+    return Boolean(facts && facts.date && facts.date.past);
+  }
+
+  function slashShown_(iso) {
+    var parts = String(iso || '').split('-');
+    if (parts.length !== 3) return '';
+    return String(+parts[2]) + '/' + String(+parts[1]);
+  }
+
   function clockOf(params) {
     if (!params) return null;
     var hour = params.hour;
@@ -12420,7 +12467,10 @@ var GlanceIntent = (function () {
     if (steps.length === 1 && steps[0].kind === 'calendar' && result.plan.id === 'hold') {
       var holdParams = steps[0].params || {};
       var holdClock = clockOf(holdParams);
-      var holdDate = isoOrNull(holdParams.dateIso, now, timeZone);
+      var holdPast = datePassed_(result);
+      var holdDate = holdPast && validIso(holdParams.dateIso)
+        ? holdParams.dateIso
+        : isoOrNull(holdParams.dateIso, now, timeZone);
       var holdTitle = sanitizeTitle(holdParams.title || '');
       if (!holdClock || !holdDate || !holdTitle) return null;
       if (holdParams.requireTime === false && !holdClock) return null;
@@ -12435,6 +12485,8 @@ var GlanceIntent = (function () {
         minute: holdClock.minute,
         quote: sanitizeTitle(holdParams.quote || ''),
         useMeetingSubject: holdParams.useMeetingSubject === true,
+        past: holdPast,
+        pastShown: holdPast ? slashShown_(holdDate) : '',
         lang: mailLang(sourceText || ''),
         reason: 'hold',
         planId: 'hold'
@@ -13206,12 +13258,17 @@ var GlanceCards = (function () {
     var L = i18n();
     if (decision.kind === 'hold') {
       var holdWhen = decision.dateIso + ' ' + (decision.hour < 10 ? '0' : '') + decision.hour + ':' + (decision.minute < 10 ? '0' : '') + decision.minute;
-      return card(lang, [
+      var holdWidgets = [
         text(lang, L.t(lang, 'calendarHold')),
         text(lang, decision.title),
-        whenLine(lang, holdWhen),
-        doItButton(messageId, lang)
-      ]);
+        whenLine(lang, holdWhen)
+      ];
+      if (decision.past) {
+        holdWidgets.push(text(lang, L.t(lang, 'datePassed') + ' (' + (decision.pastShown || '') + ')'));
+        return card(lang, holdWidgets);
+      }
+      holdWidgets.push(doItButton(messageId, lang));
+      return card(lang, holdWidgets);
     }
     if (decision.kind === 'schedule') {
       var when = decision.dateIso;

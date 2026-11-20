@@ -2086,10 +2086,9 @@ console.log('\n--- message path parity ---');
     sandbox.Date = Clock;
     try { return fn(); } finally { sandbox.Date = prev; }
   }
-  function liveBudgetMeeting(id, nowIso) {
+  function liveBudgetMeeting(id, nowIso, body, write) {
     return withClock(nowIso, function () {
       reset();
-      const body = 'נקבעה פגישה ב-18/11 בשעה 10:00, תשריין ביומן.';
       state.messages[id] = gmailMessage({
         id: id,
         threadId: 't' + id,
@@ -2105,22 +2104,21 @@ console.log('\n--- message path parity ---');
         commonEventObject: { userLocale: 'he', timeZone: { id: 'Asia/Jerusalem', offset: 7200000 } }
       };
       const card = openMessage(ev)[0];
-      const proof = doIt(Object.assign({}, ev, { parameters: { messageId: id, source: 'message' } })).card;
+      const acted = doIt(Object.assign({}, ev, { parameters: { messageId: id, source: 'message' } })).card;
       const ids = Object.keys(state.events);
       const event = ids.length === 1 ? state.events[ids[0]] : null;
       const taskCount = Object.keys(state.tasks).length;
-      const undone = undo(Object.assign({}, ev, { parameters: { messageId: id, source: 'message' } })).card;
-      return {
-        card: card,
-        proof: proof,
-        event: event,
-        taskCount: taskCount,
-        undone: undone,
-        left: Object.keys(state.events).length
-      };
+      let undone = null;
+      let left = ids.length;
+      if (write && event) {
+        undone = undo(Object.assign({}, ev, { parameters: { messageId: id, source: 'message' } })).card;
+        left = Object.keys(state.events).length;
+      }
+      return { card: card, proof: acted, event: event, taskCount: taskCount, undone: undone, left: left };
     });
   }
-  const ahead = liveBudgetMeeting('budgetAhead', '2026-11-01T08:00:00Z');
+  const BUDGET = 'נקבעה פגישה ב-18/11 בשעה 10:00, תשריין ביומן.';
+  const ahead = liveBudgetMeeting('budgetAhead', '2026-11-01T08:00:00Z', BUDGET, true);
   check('the exact budget mail is a calendar event on 18/11/2026 10:00 Asia/Jerusalem',
     ahead.event &&
     ahead.event.start.dateTime === '2026-11-18T10:00:00' &&
@@ -2134,19 +2132,35 @@ console.log('\n--- message path parity ---');
   check('Undo deletes that 18/11/2026 event',
     ahead.left === 0 && linesOf(ahead.undone).join('\n').indexOf('בוטל') !== -1,
     { left: ahead.left, lines: linesOf(ahead.undone) });
-  const liveDay = liveBudgetMeeting('budgetLive', '2026-11-20T08:00:00Z');
-  check('on 20/11 an omitted 18/11 is the next occurrence, a calendar event, not a dateless task',
-    liveDay.event &&
-    liveDay.event.start.dateTime === '2027-11-18T10:00:00' &&
-    liveDay.event.start.timeZone === 'Asia/Jerusalem' &&
+  const liveDay = liveBudgetMeeting('budgetLive', '2026-11-20T08:00:00Z', BUDGET, false);
+  const liveLines = linesOf(liveDay.card).join('\n');
+  check('the budget mail on 20/11/2026 shows a past-date warning and no Do It',
+    buttonsOf(liveDay.card).filter((b) => b.action === 'onDoIt').length === 0 &&
+    liveLines.indexOf('התאריך כבר עבר (18/11)') !== -1 &&
+    liveLines.indexOf('2026-11-18') !== -1 &&
+    liveLines.indexOf('10:00') !== -1 &&
     liveDay.taskCount === 0 &&
-    linesOf(liveDay.card).join('\n').indexOf('2027-11-18') !== -1 &&
-    linesOf(liveDay.card).join('\n').indexOf('10:00') !== -1 &&
-    linesOf(liveDay.proof).join('\n').indexOf('2027-11-18') !== -1,
-    { event: liveDay.event, tasks: liveDay.taskCount, card: linesOf(liveDay.card), proof: linesOf(liveDay.proof) });
-  check('Undo deletes the next-occurrence event',
-    liveDay.left === 0 && linesOf(liveDay.undone).join('\n').indexOf('בוטל') !== -1,
-    { left: liveDay.left, lines: linesOf(liveDay.undone) });
+    !liveDay.event &&
+    linesOf(liveDay.proof).join('\n').indexOf('התאריך כבר עבר (18/11)') !== -1,
+    { card: linesOf(liveDay.card), proof: linesOf(liveDay.proof), event: liveDay.event, tasks: liveDay.taskCount });
+  const january = liveBudgetMeeting('jan5', '2026-12-20T08:00:00Z', 'נקבעה פגישה ב-5/1 בשעה 9:00, תשריין ביומן.', true);
+  check('5/1 at 9:00 on 20/12/2026 is 5/1/2027 09:00',
+    january.event &&
+    january.event.start.dateTime === '2027-01-05T09:00:00' &&
+    january.event.start.timeZone === 'Asia/Jerusalem' &&
+    january.taskCount === 0 &&
+    linesOf(january.card).join('\n').indexOf('2027-01-05') !== -1 &&
+    linesOf(january.card).join('\n').indexOf('09:00') !== -1,
+    { event: january.event, card: linesOf(january.card) });
+  const laterNovember = liveBudgetMeeting('nov25', '2026-11-20T08:00:00Z', 'נקבעה פגישה ב-25/11 בשעה 10:00, תשריין ביומן.', true);
+  check('25/11 at 10:00 on 20/11/2026 is 25/11/2026 10:00',
+    laterNovember.event &&
+    laterNovember.event.start.dateTime === '2026-11-25T10:00:00' &&
+    laterNovember.event.start.timeZone === 'Asia/Jerusalem' &&
+    laterNovember.taskCount === 0 &&
+    linesOf(laterNovember.card).join('\n').indexOf('2026-11-25') !== -1 &&
+    linesOf(laterNovember.card).join('\n').indexOf('10:00') !== -1,
+    { event: laterNovember.event, card: linesOf(laterNovember.card) });
   check('compose does not send', !/GmailDraft\.send|GmailApp\.sendEmail|gmail\.send|sendEmail|Drafts\.send|MailApp|\.send\(/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));
 }
 
