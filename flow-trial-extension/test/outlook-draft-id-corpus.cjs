@@ -352,6 +352,125 @@ function background(routes) {
   check('the same open mail keeps the failure text when the DOM mutates',
     stays(fakeFail, true) === true && stays(fakeFail, false) === false);
 
+  const INBOX_ID = 'AAMkINBOXCOPY';
+  const SENT_ID = 'AAMkSENTCOPY';
+  const DRAFT_ID = 'AAMkDRAFTCOPY';
+  function selfCopies() {
+    const row = (id, folder, draft, from) => ({
+      id: id,
+      subject: 'שאלה קטנה 317b',
+      isDraft: draft,
+      parentFolderId: folder,
+      conversationId: 'AAQkSAMECONV',
+      receivedDateTime: '2026-11-20T18:00:00Z',
+      from: { emailAddress: { address: from } }
+    });
+    return [
+      row(INBOX_ID, 'FOLDER_INBOX', false, CID),
+      row(SENT_ID, 'FOLDER_SENT', false, ALIAS),
+      row(DRAFT_ID, 'FOLDER_DRAFTS', true, ALIAS)
+    ];
+  }
+  function folderRoutes(rows, provedId, draftName) {
+    return [
+      { method: 'GET', test: /\/me\/mailFolders\/inbox/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'FOLDER_INBOX' }), text: async () => '' }) },
+      { method: 'GET', test: /\/me\/mailFolders\/sentitems/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'FOLDER_SENT' }), text: async () => '' }) },
+      { method: 'GET', test: /\/me\/mailFolders\/drafts/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'FOLDER_DRAFTS' }), text: async () => '' }) },
+      { method: 'GET', test: new RegExp('/me/messages/' + draftName), reply: () => ({ ok: true, status: 200, json: async () => ({ id: draftName, isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) },
+      { method: 'GET', test: /\/me\/messages\/[^/?]+/, reply: (url, prefer) => {
+        if (url.indexOf(provedId) >= 0 && /ImmutableId/.test(prefer || '')) return { ok: true, status: 200, json: async () => ({ id: provedId }), text: async () => JSON.stringify({ id: provedId }) };
+        return { ok: false, status: 400, json: async () => ({}), text: async () => '' };
+      } },
+      { method: 'GET', test: /\$filter=/, reply: (url) => {
+        const filter = decodeURIComponent(url);
+        if (filter.indexOf('isDraft') < 0 || filter.indexOf('parentFolderId') < 0 || filter.indexOf('conversationId') < 0) {
+          return { ok: false, status: 400, json: async () => ({}), text: async () => '' };
+        }
+        return { ok: true, status: 200, json: async () => ({ value: rows }), text: async () => '' };
+      } },
+      { method: 'POST', test: /\/createReply$/, reply: () => ({ ok: true, status: 201, json: async () => ({ id: draftName, isDraft: true, body: { contentType: 'Text', content: 'x' } }), text: async () => '' }) },
+      { method: 'PATCH', test: new RegExp('/me/messages/' + draftName), reply: () => ({ ok: true, status: 200, json: async () => ({ id: draftName }), text: async () => '' }) }
+    ];
+  }
+  async function writeCopies(extra, rows, provedId, draftName) {
+    const bg = background(folderRoutes(rows || selfCopies(), provedId, draftName));
+    const wrote = await bg.fn('outlookDraftWrite')(Object.assign({
+      requireProvenId: true,
+      outlookCandidates: [CONV],
+      outlookIncomingId: CONV,
+      internetMessageId: '',
+      subject: 'שאלה קטנה 317b',
+      openFolder: 'inbox',
+      body: 'x'
+    }, extra || {}));
+    return { bg: bg, wrote: wrote, posts: bg.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url)) };
+  }
+  const withFrom = await writeCopies({ senderEmail: ALIAS, ownSenderEmail: '', openSenderEmail: '' }, null, INBOX_ID, 'DRAFT-INBOX');
+  const withFromLog = withFrom.bg.notes.join('\n');
+  check('an Inbox and Sent copy of a self-sent subject resolves to the Inbox copy when from is present',
+    withFrom.wrote.ok === true && withFrom.posts.length === 1 && withFrom.posts[0].url.indexOf(INBOX_ID) >= 0 &&
+    withFrom.posts[0].url.indexOf(SENT_ID) < 0 && withFrom.posts[0].url.indexOf(DRAFT_ID) < 0 &&
+    withFromLog.indexOf('narrow rows=3 afterDrafts=2 afterFolder=1') >= 0 && withFromLog.indexOf('from=sender') >= 0 &&
+    withFromLog.indexOf(ALIAS) < 0 && withFromLog.indexOf(INBOX_ID) < 0,
+    { ok: withFrom.wrote.ok, posts: withFrom.posts.map((c) => c.url), log: withFromLog });
+  const noFrom = await writeCopies({ senderEmail: '', ownSenderEmail: '', openSenderEmail: '' }, null, INBOX_ID, 'DRAFT-INBOX2');
+  const noFromLog = noFrom.bg.notes.join('\n');
+  check('the same Inbox copy is used when from is missing',
+    noFrom.wrote.ok === true && noFrom.posts.length === 1 && noFrom.posts[0].url.indexOf(INBOX_ID) >= 0 &&
+    noFromLog.indexOf('why=missing-from') >= 0 && noFromLog.indexOf('from=none') >= 0 &&
+    noFromLog.indexOf('afterFolder=1') >= 0,
+    { ok: noFrom.wrote.ok, log: noFromLog });
+
+  const twoInbox = [
+    { id: 'AAMkINBOXA', subject: 'שאלה קטנה 317b', isDraft: false, parentFolderId: 'FOLDER_INBOX', conversationId: 'AAQkONE', from: { emailAddress: { address: CID } } },
+    { id: 'AAMkINBOXB', subject: 'שאלה קטנה 317b', isDraft: false, parentFolderId: 'FOLDER_INBOX', conversationId: 'AAQkTWO', from: { emailAddress: { address: ALIAS } } }
+  ];
+  const two = await writeCopies({ senderEmail: '', ownSenderEmail: '', openSenderEmail: '' }, twoInbox, 'AAMkINBOXA', 'DRAFT-TWO');
+  check('two Inbox messages with the same subject fail closed',
+    two.wrote.ok === false && two.wrote.reason === 'ambiguous' && !two.bg.calls.some((c) => c.method === 'POST') &&
+    two.bg.notes.join('\n').indexOf('afterFolder=2') >= 0 && two.bg.notes.join('\n').indexOf('why=ambiguous') >= 0,
+    { reason: two.wrote.reason, log: two.bg.notes.join('\n') });
+
+  const DANA = 'AAMkDANA';
+  const LEVI = 'AAMkLEVI';
+  const otherRows = [
+    { id: DANA, subject: 'שאלה קטנה 317b', isDraft: false, parentFolderId: 'FOLDER_SENT', conversationId: 'AAQkDANA', from: { emailAddress: { address: 'dana.cohen.test@example.com' } } },
+    { id: LEVI, subject: 'שאלה קטנה 317b', isDraft: false, parentFolderId: 'FOLDER_INBOX', conversationId: 'AAQkLEVI', from: { emailAddress: { address: 'dana.levi.test@example.com' } } }
+  ];
+  const other = await writeCopies({ senderEmail: 'dana.cohen.test@example.com', ownSenderEmail: '', openSenderEmail: '' }, otherRows, DANA, 'DRAFT-DANA');
+  check('a non-self sender still matches that from address',
+    other.wrote.ok === true && other.posts.length === 1 && other.posts[0].url.indexOf(DANA) >= 0 && other.posts[0].url.indexOf(LEVI) < 0 &&
+    other.bg.notes.join('\n').indexOf('from=sender') >= 0 && other.bg.notes.join('\n').indexOf('dana.cohen.test@example.com') < 0,
+    { ok: other.wrote.ok, posts: other.posts.map((c) => c.url), log: other.bg.notes.join('\n') });
+
+  const payload = page.slice(page.indexOf('function finishContactsDraft'), page.indexOf('function showDraftUndo'));
+  check('the draft payload carries conversationId, receivedDateTime, and openFolder',
+    payload.indexOf('conversationId:') >= 0 && payload.indexOf('receivedDateTime:') >= 0 && payload.indexOf('openFolder:') >= 0);
+
+  let JSDOM = null;
+  try { ({ JSDOM } = require('jsdom')); } catch (e) { JSDOM = null; }
+  check('jsdom is installed for the self-sent header', !!JSDOM);
+  if (JSDOM) {
+    const html = '<!doctype html><body><div id="ReadingPaneContainerId" role="main">' +
+      '<div role="heading">שאלה קטנה 317b</div>' +
+      '<div class="persona"><span class="from">' +
+      '<span>sali sapan</span><span>&lt;</span><span>glance.salisapan@outlook.com</span><span>&gt;</span>' +
+      '</span></div>' +
+      '<div role="document">מה כתובת המייל של דנה כהן?</div></div></body>';
+    const href = 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(CONV);
+    const dom = new JSDOM(html, { url: href });
+    const parsed = FlowOwaParse.readPane(dom.window.document, href, { own: [CID] });
+    check('a nested Name <email> header sets ownSenderEmail for a self-sent mail',
+      parsed && parsed.senderEmail === '' && parsed.ownSenderEmail === ALIAS && parsed.openSenderEmail === ALIAS && parsed.openFolder === 'inbox',
+      parsed && { senderEmail: parsed.senderEmail, ownSenderEmail: parsed.ownSenderEmail, openSenderEmail: parsed.openSenderEmail, openFolder: parsed.openFolder });
+    const bareHref = 'https://outlook.live.com/mail/0/';
+    const domBare = new JSDOM(html.replace('<div id="ReadingPaneContainerId"', '<div role="treeitem" aria-selected="true">Inbox</div><div id="ReadingPaneContainerId"'), { url: bareHref });
+    const fromTree = FlowOwaParse.readPane(domBare.window.document, bareHref, { own: [CID] });
+    check('the selected Inbox folder is used when the address has no folder',
+      fromTree && fromTree.openFolder === 'inbox' && fromTree.ownSenderEmail === ALIAS,
+      fromTree && fromTree.openFolder);
+  }
+
   if (failures) process.exit(1);
   console.log('outlook-draft-id-corpus: all passed');
 })().catch((err) => {

@@ -472,7 +472,10 @@
           subject: (pane && pane.subject) || '',
           senderEmail: (pane && pane.senderEmail) || '',
           ownSenderEmail: (pane && pane.ownSenderEmail) || '',
-          openSenderEmail: (pane && (pane.senderEmail || pane.ownSenderEmail)) || '',
+          openSenderEmail: (pane && (pane.openSenderEmail || pane.senderEmail || pane.ownSenderEmail)) || '',
+          conversationId: (pane && pane.conversationId) || '',
+          receivedDateTime: (pane && pane.receivedDateTime) || '',
+          openFolder: (pane && pane.openFolder) || '',
           explicitClick: true
         }
       }, (graph) => {
@@ -607,10 +610,30 @@
     place(card);
   }
 
-  function readPane() {
+  function ownFromAuth(auth) {
+    const out = [];
+    function add(raw) {
+      const e = String(raw || '').trim().toLowerCase();
+      if (e && e.indexOf('@') > 0 && out.indexOf(e) < 0) out.push(e);
+    }
+    if (!auth) return out;
+    if (auth.account) { add(auth.account.address); add(auth.account.mail); }
+    (auth.ownAddresses || []).forEach(add);
+    if (auth.profile) {
+      add(auth.profile.mail);
+      add(auth.profile.userPrincipalName);
+      (auth.profile.proxyAddresses || []).forEach((p) => {
+        const m = String(p || '').match(/^smtp:(.+)$/i);
+        if (m) add(m[1]);
+      });
+    }
+    return out;
+  }
+
+  function readPane(own) {
     const parse = named('FlowOwaParse');
     if (!parse || typeof parse.readPane !== 'function') return null;
-    try { return parse.readPane(document, location.href, {}) || null; } catch (e) { return null; }
+    try { return parse.readPane(document, location.href, { own: own || [] }) || null; } catch (e) { return null; }
   }
 
   let paneKey = '';
@@ -761,7 +784,7 @@
 
   async function tick() {
     if (busy) return;
-    const pane = readPane();
+    let pane = readPane();
     if (!pane || (!pane.subject && !pane.text)) return;
     const identity = mailIdentity(pane);
     const held = document.querySelector('.flow-lane-ms');
@@ -780,6 +803,8 @@
         try { state = await store.get(); } catch (e) { state = null; }
       }
       if (paneKey !== key) return;
+      const owned = readPane(ownFromAuth(state && state.outlookAuth));
+      if (owned && mailIdentity(owned) === identity) pane = owned;
       const log = (state && state.log) || [];
       const mods = modules();
       const chipUp = cardHost && cardHost.isConnected;

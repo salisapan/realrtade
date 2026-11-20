@@ -6389,7 +6389,7 @@ function outlookRowAddress(row) {
 }
 
 async function outlookListMessages(filter, gets) {
-  const url = OUTLOOK_GRAPH + '/me/messages?$filter=' + encodeURIComponent(filter) + '&$select=id,subject,from,sender,receivedDateTime,internetMessageId&$top=25';
+  const url = OUTLOOK_GRAPH + '/me/messages?$filter=' + encodeURIComponent(filter) + '&$select=id,subject,from,sender,isDraft,parentFolderId,conversationId,receivedDateTime,internetMessageId&$top=25';
   outlookAssertNotSend(url);
   let res = null;
   try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
@@ -6408,14 +6408,74 @@ function outlookBracketInternetId(raw) {
   return s;
 }
 
-function outlookPageFrom(p) {
-  return String((p && (p.senderEmail || p.ownSenderEmail || p.openSenderEmail)) || '').trim().toLowerCase();
+function outlookPageFromSource(p) {
+  const sender = String((p && p.senderEmail) || '').trim().toLowerCase();
+  const own = String((p && p.ownSenderEmail) || '').trim().toLowerCase();
+  const open = String((p && p.openSenderEmail) || '').trim().toLowerCase();
+  if (sender && sender.indexOf('@') > 0) return { from: sender, field: 'sender' };
+  if (own && own.indexOf('@') > 0) return { from: own, field: 'own' };
+  if (open && open.indexOf('@') > 0) return { from: open, field: 'open' };
+  return { from: '', field: 'none' };
 }
 
-function logContactsBranch(how, listStatus, rows, why) {
+function logContactsBranch(how, listStatus, rows, why, fromField) {
+  const fromBit = fromField ? ' from=' + fromField : '';
   try {
-    console.info('[Glance] contacts draft branch how=' + (how || '') + ' list=' + (listStatus == null ? '' : listStatus) + ' rows=' + (rows == null ? '' : rows) + ' why=' + (why || ''));
+    console.info('[Glance] contacts draft branch how=' + (how || '') + ' list=' + (listStatus == null ? '' : listStatus) + ' rows=' + (rows == null ? '' : rows) + ' why=' + (why || '') + fromBit);
   } catch (e) { /* no console */ }
+}
+
+function logContactsNarrow(rows, afterDrafts, afterFolder, why) {
+  try {
+    console.info('[Glance] contacts draft narrow rows=' + rows + ' afterDrafts=' + afterDrafts + ' afterFolder=' + afterFolder + ' why=' + (why || ''));
+  } catch (e) { /* no console */ }
+}
+
+function outlookCanonId(id) {
+  return String(id || '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '').trim().toLowerCase();
+}
+
+async function outlookFolderId(name) {
+  const url = OUTLOOK_GRAPH + '/me/mailFolders/' + encodeURIComponent(name) + '?$select=id';
+  outlookAssertNotSend(url);
+  let res = null;
+  try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
+  if (!res || !res.ok) return '';
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  return body && body.id ? String(body.id) : '';
+}
+
+// Inbox and Sent Items are two copies of one self-sent mail. Drop drafts,
+// keep the open conversation, then keep the folder the person has open.
+async function outlookNarrowCopies(rows, p) {
+  const start = (rows || []).length;
+  let kept = (rows || []).filter((row) => row && row.isDraft !== true);
+  const afterDrafts = kept.length;
+  const conv = outlookCanonId(p && p.conversationId);
+  if (conv) {
+    const matched = kept.filter((row) => outlookCanonId(row && row.conversationId) === conv);
+    if (matched.length) kept = matched;
+    else kept = [];
+  }
+  const open = String((p && p.openFolder) || '').trim().toLowerCase();
+  if (kept.length > 1 && (open === 'inbox' || open === 'sentitems' || open === 'drafts')) {
+    const inboxId = await outlookFolderId('inbox');
+    const sentId = await outlookFolderId('sentitems');
+    const draftsId = await outlookFolderId('drafts');
+    if (draftsId) kept = kept.filter((row) => String(row.parentFolderId || '') !== draftsId);
+    if (open === 'inbox' && sentId) kept = kept.filter((row) => String(row.parentFolderId || '') !== sentId);
+    else if (open === 'sentitems' && inboxId) kept = kept.filter((row) => String(row.parentFolderId || '') !== inboxId);
+    const wantId = open === 'inbox' ? inboxId : (open === 'sentitems' ? sentId : draftsId);
+    if (wantId && kept.length > 1) {
+      const inOpen = kept.filter((row) => String(row.parentFolderId || '') === wantId);
+      if (inOpen.length) kept = inOpen;
+    }
+  }
+  const afterFolder = kept.length;
+  const why = kept.length > 1 ? 'ambiguous' : (kept.length ? '' : 'empty-list');
+  logContactsNarrow(start, afterDrafts, afterFolder, why);
+  return kept;
 }
 
 // GET /me/messages/{id} with both spellings and both Prefer values. The id
@@ -6479,11 +6539,12 @@ async function outlookLookupOpenMessage(p, gets) {
     }
   }
   const subject = String((p && p.subject) || '').trim();
+  const src = outlookPageFromSource(p);
   if (!subject) {
-    logContactsBranch('subject-from', '', 0, 'missing-subject');
+    logContactsBranch('subject-from', '', 0, 'missing-subject', src.field);
     return null;
   }
-  const from = outlookPageFrom(p);
+  const from = src.from;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const filter = "receivedDateTime ge " + since + " and subject eq '" + outlookOdataQuote(subject) + "'";
   const before = gets.length;
@@ -6497,20 +6558,15 @@ async function outlookLookupOpenMessage(p, gets) {
     return outlookSameMailbox(who.from, from, known) || outlookSameMailbox(who.sender, from, known);
   }) : rows.slice();
   const why = !from ? 'missing-from' : (hits.length ? '' : 'empty-list');
-  if (hits.length > 1) {
-    logContactsBranch('subject-from', listStatus, hits.length, why || 'ambiguous');
-    return { ambiguous: true, how: 'subject-from' };
-  }
-  if (hits.length === 1 && hits[0] && hits[0].id) {
-    const proven = await outlookProveMessage([hits[0].id], gets);
-    if (proven && proven.id) {
-      logContactsBranch('subject-from', listStatus, 1, why);
-      return { id: proven.id, immutable: proven.immutable === true, how: 'subject-from' };
-    }
-    logContactsBranch('subject-from', listStatus, 1, 'prove-failed');
+  logContactsBranch('subject-from', listStatus, hits.length, why || (hits.length > 1 ? 'ambiguous' : ''), src.field);
+  const narrowed = await outlookNarrowCopies(hits, p);
+  if (narrowed.length > 1) return { ambiguous: true, how: 'subject-from' };
+  if (narrowed.length === 1 && narrowed[0] && narrowed[0].id) {
+    const proven = await outlookProveMessage([narrowed[0].id], gets);
+    if (proven && proven.id) return { id: proven.id, immutable: proven.immutable === true, how: 'subject-from' };
+    logContactsBranch('subject-from', listStatus, 1, 'prove-failed', src.field);
     return null;
   }
-  logContactsBranch('subject-from', listStatus, hits.length, why || 'empty-list');
   return null;
 }
 

@@ -717,13 +717,40 @@ const FlowOwaParse = (() => {
     return false;
   }
 
+  // One address in a short header chip. Consumer OWA nests "Name <email>"
+  // across child nodes, so the pattern is read from the parent's text too.
+  function angledAddress(text) {
+    const t = plainLine(text).replace(/\s+/g, ' ').trim();
+    if (!t || t.length > 180) return null;
+    if (/^(?:to|cc|from|אל|עותק|מאת)\b/i.test(t) && (t.match(/@/g) || []).length > 1) return null;
+    const found = t.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/gi) || [];
+    const uniq = [];
+    found.forEach((raw) => {
+      const e = String(raw || '').toLowerCase();
+      if (e && uniq.indexOf(e) < 0) uniq.push(e);
+    });
+    if (uniq.length !== 1) return null;
+    const angled = t.match(/<\s*([^<>\s]+@[^<>\s]+)\s*>/i);
+    const email = angled ? angled[1] : uniq[0];
+    let name = '';
+    if (angled) name = t.split('<')[0].replace(/[<>()"]/g, '').replace(/^(?:from|מאת)\s*:?\s*/i, '').trim();
+    return { email: email, name: name };
+  }
+
   // Sender of the open message: a mailto link, an element whose title/aria-label carries an address, or "Name <address>"
   // text in the message header, above the body, that is not one of the person's own addresses.
+  // A self-sent header is the person's own address: email stays empty and ownEmail is set.
   // Graph `from` is the address when the page only shows a name. This walk
   // skips the recipient well so a To/Cc address is not stored as the sender.
   function senderOf(container, bodyRoot, own) {
-    const mine = new Set((own || []).map((a) => String(a || '').toLowerCase()));
-    const ok = (e) => e && !mine.has(e);
+    const mine = addressSet(own);
+    const isOwnAddress = (e) => {
+      if (!e || !mine.size) return false;
+      if (mine.has(e)) return true;
+      let hit = false;
+      mine.forEach((a) => { if (!hit && sameMailbox(e, a, mine)) hit = true; });
+      return hit;
+    };
     let ownEmail = '';
     if (!container || !container.querySelectorAll) return { email: '', name: '', ownEmail: '' };
     const nodes = container.querySelectorAll('a[href^="mailto:"], [title*="@"], [aria-label*="@"], span, button');
@@ -744,15 +771,14 @@ const FlowOwaParse = (() => {
           if (!name) { const shown = textOf(n); if (shown && !EMAIL_RE.test(shown) && shown.length <= 80) name = shown; }
         }
       }
-      if (!email && n.children && n.children.length === 0) {
-        const t = textOf(n);
-        const m = t.match(/^(.{0,80}?)\s*<\s*([^<>\s]+@[^<>\s]+)\s*>$/);
-        if (m) { email = m[2]; name = m[1].trim(); }
+      if (!email && !(n.querySelector && n.querySelector('[data-testid="RecipientWell"]'))) {
+        const hit = angledAddress(textOf(n));
+        if (hit) { email = hit.email; name = hit.name; }
       }
       email = normEmail(email);
       if (!EMAIL_RE.test(email)) continue;
       const clean = looksLikeDateTime(name) ? '' : name.slice(0, 80);
-      if (ok(email)) return { email, name: clean, ownEmail: '' };
+      if (!isOwnAddress(email)) return { email, name: clean, ownEmail: '' };
       if (!ownEmail) ownEmail = email;
     }
     return { email: '', name: '', ownEmail: ownEmail };
@@ -992,6 +1018,8 @@ const FlowOwaParse = (() => {
     const whoTo = recipientsOf(container, bodyRoot, Object.assign({}, opts, { senderEmail: who.email }));
     const internetMessageId = internetMessageIdOf(header) || internetMessageIdOf(bodyRoot);
     const when = receivedInfo(container, bodyRoot);
+    const ownSenderEmail = who.ownEmail || '';
+    const openSenderEmail = who.email || ownSenderEmail || '';
     return {
       itemId: ids.itemId,
       conversationId: conversationId,
@@ -999,9 +1027,11 @@ const FlowOwaParse = (() => {
       idKind: idKind,
       idSource: idSource,
       rawUrlId: ids.raw || null,
+      openFolder: openFolderName(href || (typeof location !== 'undefined' ? location.href : ''), d),
       subject: subject === senderName && head.senderName ? '' : subject,
       senderEmail: who.email,
-      ownSenderEmail: who.ownEmail || '',
+      ownSenderEmail: ownSenderEmail,
+      openSenderEmail: openSenderEmail,
       senderName: senderName.slice(0, 80),
       text: stripReadingChrome(body),
       to: whoTo.to,
@@ -1016,6 +1046,29 @@ const FlowOwaParse = (() => {
       hourCycle: hourCycleOf(d),
       attachments: attachmentsOf(container, bodyRoot)
     };
+  }
+
+  function openFolderOf(href) {
+    const raw = String(href || '').toLowerCase();
+    const m = raw.match(/\/(inbox|sentitems|drafts)(?:\/|$|\?|#)/);
+    return m ? m[1] : '';
+  }
+
+  function openFolderName(href, doc) {
+    const fromUrl = openFolderOf(href);
+    if (fromUrl) return fromUrl;
+    if (!doc || !doc.querySelector) return '';
+    let node = null;
+    try {
+      node = doc.querySelector('[role="treeitem"][aria-selected="true"], [role="treeitem"][aria-current="true"], [data-folder-name]');
+    } catch (e) { node = null; }
+    if (!node) return '';
+    const label = plainLine((node.getAttribute && (node.getAttribute('data-folder-name') || node.getAttribute('aria-label') || node.getAttribute('title'))) || textOf(node)).toLowerCase();
+    if (!label || label.length > 80) return '';
+    if (/\binbox\b|תיבת הדואר הנכנס|דואר נכנס/.test(label)) return 'inbox';
+    if (/sent items|sentitems|פריטים שנשלחו/.test(label)) return 'sentitems';
+    if (/\bdrafts?\b|טיוטות/.test(label)) return 'drafts';
+    return '';
   }
 
   function bracketInternetId(raw) {
