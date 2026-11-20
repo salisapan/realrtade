@@ -9,11 +9,11 @@ const { g } = require('../capabilities/union.cjs');
 const F = g('FlowFollowUp'), NOW = new Date('2026-11-17T10:00:00+02:00').getTime();
 const D = path.join(process.env.GLANCE_PRIVATE || path.join(__dirname, 'private'), 'commitments');
 const show = process.argv.includes('--show'), json = process.argv.includes('--json');
-const rd = (f) => fs.readFileSync(path.join(D, f), 'utf8').split('\n').filter(Boolean).map(JSON.parse);
-const text = Object.fromEntries(rd('input.jsonl').map((r) => [r.set + '|' + r.id, r.body]));
+const rd = (f) => (fs.existsSync(path.join(D, f)) ? fs.readFileSync(path.join(D, f), 'utf8').split('\n').filter(Boolean).map(JSON.parse) : []);
+const text = Object.fromEntries(rd('input.jsonl').concat(rd('input2.jsonl')).map((r) => [r.set + '|' + r.id, r.body]));
 const HELD = (s) => /heldout/.test(s);
 const S = {}, miss = [], fals = [];
-for (const l of rd('labels.jsonl')) {
+for (const l of rd('labels.jsonl').concat(rd('labels2.jsonl'))) {
   const body = text[l.set + '|' + l.id]; if (body == null) continue;
   const cx = { now: NOW, lang: /[֐-׿]/.test(body) ? 'he' : 'en', commitmentRecall: process.env.GLANCE_COMMIT_RECALL === '1' };
   let c = null, a = null; try { c = F.classifyCommitment(body, cx); } catch (e) {} try { a = F.classifyOutgoing(body, cx); } catch (e) {}

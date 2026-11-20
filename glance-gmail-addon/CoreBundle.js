@@ -10663,6 +10663,8 @@ const FlowIncomingJudge = (() => {
   const POLITE_IMP_HE = /^(?:אנא|נא|בבקשה)\s+(שלח|שלחי|פנה|פני|פרט|פרטי|אשר|אשרי|העבר|העבירי|צרף|צרפי|מלא|מלאי|חתום|חתמי|עדכן|עדכני|החזר|החזירי|בדוק|בדקי|השב|השיבי|הגב|הגיבי|תקן|תקני|הוסף|הוסיפי|קבע|קבעי|שמור|שמרי|הכן|הכיני|ודא|וודא|ודאי)(?:\/י)?(?![\u0590-\u05FF])/;
   // «ותעדכן אותי», «תחזור אליי כשזה מוכן», «אשמח לעדכון לאחר מכן», «הודע לי»: the work ask also asks to be told when it is done.
   const REPORT_BACK_HE = /(?:ת?עדכ(?:ן|ני|נו)\s+(?:אותי|אותנו|אליי|אלי)|תחזור(?:ו|י)?\s+(?:אליי|אלי|אלינו)|הודע(?:ו|י)?\s+לי|תודיע(?:ו|י)?\s+לי|אשמח\s+לעדכון|נשמח\s+לעדכון|דווח(?:ו|י)?\s+לי|תדווח(?:ו|י)?\s+לי)/;
+  const REPORT_BACK_ANY_HE = /(?:(?:^|[\s,.])ו?תחזור(?:ו|י)?\s+(?:אליי|אלי|אלינו|ל[\u05D0-\u05EA]{2,})|שלח(?:ו|י)?\s+(?:אליי|אלי|לי)\s+[^.]{0,40}(?:לאחר\s+מכן|כשתסיים|בסיום|לבדיקה)|אשמח\s+שתחזור|ת?עדכנו\s+(?:כש|לאחר|אחרי)|(?:^|[\s,.])תשלח(?:ו|י)?\s+לי\s+\S+|העברת\s+\S+(?:\s+\S+){0,3}\s+אליי)/;
+  const REPORT_BACK_EN = /\b(?:let me know (?:once|when|if it)|update me|get back to me|report back|keep me posted|confirm (?:once|when) (?:it|this|you))\b/i;
   const POLITE_IMP_SEND_HE = /^(?:שלח|שלחי|העבר|העבירי|צרף|צרפי|החזר|החזירי)$/;
   const POLITE_IMP_CHANNEL_HE = /(?:במייל\s+חוזר|בחזרה|בהודעה\s+חוזרת|תשובה|בתגובה)/;
   const POLITE_IMP_WORK_HE = /^(?:פנה|פני|מלא|מלאי|חתום|חתמי|בדוק|בדקי|תקן|תקני|הוסף|הוסיפי|קבע|קבעי|שמור|שמרי|הכן|הכיני|ודא|וודא|ודאי)$/;
@@ -10899,6 +10901,12 @@ const FlowIncomingJudge = (() => {
   function planOrdered(i, res) {
     if (!i || i.planV2 !== true || !res || !res.show || !res.process || !Array.isArray(res.process.steps)) return res;
     const st = res.process.steps, di = st.findIndex((x) => x && (x.kind === 'gmailDraft' || x.kind === 'outlookDraft')), ti = st.findIndex((x) => x && (x.kind === 'googleTask' || x.kind === 'outlookTask'));
+    // A task-only plan whose mail also asks to be told when it is done gets the reply draft after the task (one draft, no send; the person still approves).
+    if (di < 0 && ti >= 0 && i.surface !== 'chat' && st.every((x) => x && (x.kind === 'googleTask' || x.kind === 'outlookTask')) && (REPORT_BACK_HE.test(String(i.text || '')) || REPORT_BACK_ANY_HE.test(String(i.text || '')) || REPORT_BACK_EN.test(String(i.text || '')))) {
+      const he = /[\u0590-\u05FF]/.test(String(i.text || '')), what = (st[ti].params && st[ti].params.what) || '';
+      const rc = replyCard(i, { kind: 'reply', what, lang: he ? 'he' : 'en', dateIso: null }), d = rc && rc.process && rc.process.steps.find((x) => x && x.kind === 'gmailDraft');
+      if (d) { d.params.lang = he ? 'he' : 'en'; d.dependsOn = null; return Object.assign({}, res, { process: Object.assign({}, res.process, { steps: st.concat([d]) }) }); }
+    }
     if (di < 0 || ti < 0 || ti < di || st[di].dependsOn === st[ti].id || st[ti].dependsOn === st[di].id) return res;
     const next = st.slice(); const [t] = next.splice(ti, 1); next.splice(di, 0, t);
     return Object.assign({}, res, { process: Object.assign({}, res.process, { steps: next }) });

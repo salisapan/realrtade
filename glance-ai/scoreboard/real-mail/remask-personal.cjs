@@ -6,9 +6,10 @@ const sets = [[tk.own, '[OWNER]'], [tk.names, '[NAME]'], [tk.org, '[ORG]']].map(
 const mk = (w) => new RegExp('(?<![\\u05D0-\\u05EAA-Za-z])[בהוכלמש]{0,2}(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')(?![\\u05D0-\\u05EAA-Za-z])', 'gi');
 const res = sets.map(([ws, tag]) => [ws.map(mk), tag]);
 let changed = 0;
-for (const f of fs.readdirSync(D).filter((x) => /\.jsonl$/.test(x))) {
-  const rows = fs.readFileSync(path.join(D, f), 'utf8').split('\n').filter(Boolean).map(JSON.parse);
+const C = path.join(path.dirname(D), 'commitments');
+for (const [dir, f] of fs.readdirSync(D).filter((x) => /\.jsonl$/.test(x)).map((x) => [D, x]).concat(fs.existsSync(C) ? fs.readdirSync(C).filter((x) => /^(?:rows|input).*\.jsonl$/.test(x)).map((x) => [C, x]) : [])) {
+  const rows = fs.readFileSync(path.join(dir, f), 'utf8').split('\n').filter(Boolean).map(JSON.parse);
   for (const r of rows) for (const k of ['subject', 'body']) { let t = String(r[k] || ''); const was = t; for (const [list, tag] of res) for (const re of list) t = t.replace(re, (x, g) => x.slice(0, x.length - g.length) + tag); if (t !== was) { r[k] = t; changed++; } }
-  fs.writeFileSync(path.join(D, f), rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  fs.writeFileSync(path.join(dir, f), rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
 }
 console.log('fields re-masked', changed);

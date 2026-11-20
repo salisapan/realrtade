@@ -77,8 +77,15 @@ function fishPick(n) {
   }
   return keep;
 }
-const inboxPick = FISH ? fishPick(arg('fishn', 300)) : pick('in:inbox -category:promotions -category:social -category:forums' + BASE, NIN);
-const sentPick = FISH ? [] : pick('in:sent' + BASE, NSENT);
+const FISHSENT = process.argv.includes('--fishsent');
+function sentFishPick(n) {
+  const known = new Set((() => { try { const m = JSON.parse(fs.readFileSync(path.join(OUT, 'manifest.json'), 'utf8')); return m.dev.concat(m.heldout); } catch (e) { return []; } })());
+  const all = listIds('in:sent -in:chats -in:drafts newer_than:' + arg('fishdays', 365) + 'd', 4000), seen = {}, per = [];
+  for (const m of all) if (!seen[m.threadId] && !known.has(H('thread:' + m.threadId))) { seen[m.threadId] = 1; per.push(m); }
+  return per.sort((a, b) => rank(a.threadId) - rank(b.threadId)).slice(0, n);
+}
+const inboxPick = FISHSENT ? [] : FISH ? fishPick(arg('fishn', 300)) : pick('in:inbox -category:promotions -category:social -category:forums' + BASE, NIN);
+const sentPick = FISHSENT ? sentFishPick(arg('fishn', 300)) : FISH ? [] : pick('in:sent' + BASE, NSENT);
 
 // --enrich: keep the masked rows and labels, add `fromKind` (automated | list | person) from the sender's local part and the bulk/auto headers, matched by the hashed message id. No text is touched.
 if (process.argv.includes('--enrich')) {
@@ -157,7 +164,7 @@ for (const [folder, list] of [['inbox', inboxPick], ['sent', sentPick]]) {
     if (folder === 'inbox' && from === own) continue; // this row is for what others sent
     const body = mask(textOf(m), m), subject = mask(hdr(m, 'subject'), m);
     if (body.replace(/\[[A-Z]+\]/g, '').trim().length < 3) continue;
-    const sp = split(m.threadId), id = (sp === 'dev' ? 'pd' : 'ph') + (folder === 'inbox' ? 'i' : 's') + (FISH ? 'x' : '') + '-' + String(rows[sp][folder].length + 1).padStart(3, '0');
+    const sp = split(m.threadId), id = FISHSENT ? (sp === 'dev' ? 'csd' : 'csh') + '-' : (sp === 'dev' ? 'pd' : 'ph') + (folder === 'inbox' ? 'i' : 's') + (FISH ? 'x' : '') + '-' + String(rows[sp][folder].length + 1).padStart(3, '0');
     const row = { id, folder, mid: H('mid:' + m.id), toN: to.length || 1, ccN: cc.length, ownInTo: to.indexOf(own) >= 0, subject, body, label: null, fromKind: FISH ? 'person' : undefined };
     rows[sp][folder].push(row); manifest[sp].push(H('thread:' + m.threadId)); n++;
   }
@@ -166,11 +173,12 @@ for (const [folder, list] of [['inbox', inboxPick], ['sent', sentPick]]) {
 for (const sp of ['dev', 'heldout']) for (const f of ['inbox', 'sent']) {
   for (const r of rows[sp][f]) { r.body = mask(r.body, null); r.subject = mask(r.subject, null); }
   if (FISH && f === 'sent') continue;
+  if (FISHSENT) { if (f === 'sent') { const dd = path.join(OUT, '..', 'commitments'); fs.mkdirSync(dd, { recursive: true }); fs.writeFileSync(path.join(dd, 'rows-' + sp + '.jsonl'), rows[sp][f].map((r) => JSON.stringify(r)).join('\n') + (rows[sp][f].length ? '\n' : '')); } continue; }
   fs.writeFileSync(path.join(OUT, sp + '-' + f + (FISH ? '-x' : '') + '.jsonl'), rows[sp][f].map((r) => JSON.stringify(r)).join('\n') + (rows[sp][f].length ? '\n' : ''));
 }
 // a fishing run keeps what the first pass collected: tokens and the manifest are merged, never replaced
 let oldTk = { own: [], names: [], org: [] }, oldMf = { dev: [], heldout: [] };
-if (FISH) { try { oldTk = JSON.parse(fs.readFileSync(path.join(OUT, 'tokens.json'), 'utf8')); oldMf = JSON.parse(fs.readFileSync(path.join(OUT, 'manifest.json'), 'utf8')); } catch (e) {} }
+if (FISH || FISHSENT) { try { oldTk = JSON.parse(fs.readFileSync(path.join(OUT, 'tokens.json'), 'utf8')); oldMf = JSON.parse(fs.readFileSync(path.join(OUT, 'manifest.json'), 'utf8')); } catch (e) {} }
 fs.writeFileSync(path.join(OUT, 'tokens.json'), JSON.stringify({ own: [...new Set([...oldTk.own, ...ownTokens])], names: [...new Set([...oldTk.names, ...tokens])], org: [...new Set([...oldTk.org, ...orgTokens])], ownAddr: own }));
 fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({ made: new Date().toISOString().slice(0, 10), salted: true, dev: oldMf.dev.concat(manifest.dev), heldout: oldMf.heldout.concat(manifest.heldout) }));
 console.log('fetch errors', errs, '| rows', n, JSON.stringify({ dev: { inbox: rows.dev.inbox.length, sent: rows.dev.sent.length }, heldout: { inbox: rows.heldout.inbox.length, sent: rows.heldout.sent.length } }));

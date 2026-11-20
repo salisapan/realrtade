@@ -3,17 +3,17 @@
 // Checks: an e-mail address, a URL, a phone number, a run of 7+ digits, a header-derived name token (private/personal/tokens.json), the owner's own address.
 const fs = require('fs'), path = require('path');
 const PRIV = process.env.GLANCE_PRIVATE || path.join(__dirname, 'private');
-const dirs = process.argv.slice(2).length ? process.argv.slice(2) : [path.join(PRIV, 'personal')];
+const dirs = process.argv.slice(2).length ? process.argv.slice(2) : [path.join(PRIV, 'personal'), path.join(PRIV, 'commitments')];
 let bad = 0, rows = 0;
 for (const d of dirs) {
   if (!fs.existsSync(d)) continue;
   let tk = { own: [], names: [], org: [], ownAddr: '' };
-  try { tk = JSON.parse(fs.readFileSync(path.join(d, 'tokens.json'), 'utf8')); } catch (e) {}
+  try { tk = JSON.parse(fs.readFileSync(path.join(fs.existsSync(path.join(d, 'tokens.json')) ? d : path.join(PRIV, 'personal'), 'tokens.json'), 'utf8')); } catch (e) {}
   const STOP = new Set(require('./mask-stop.json'));
   const toks = [...tk.own, ...tk.names, ...tk.org].filter((w) => w.length >= 3 && !STOP.has(w.toLowerCase()));
   const re = [['email', /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/], ['url', /https?:\/\/|www\./i], ['phone', /(?:\+?972|\b0)[-\s]?\d{1,2}[-\s]?\d{3}[-\s]?\d{4}\b/], ['digits7', /\d{7,}/]];
   const found = {};
-  for (const f of fs.readdirSync(d).filter((x) => /\.jsonl$/.test(x))) {
+  for (const f of fs.readdirSync(d).filter((x) => /\.jsonl$/.test(x) && !/^labels/.test(x))) {
     for (const l of fs.readFileSync(path.join(d, f), 'utf8').split('\n').filter(Boolean)) {
       let r; try { r = JSON.parse(l); } catch (e) { continue; }
       rows++;

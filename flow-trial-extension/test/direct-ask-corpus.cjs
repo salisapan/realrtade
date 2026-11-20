@@ -257,6 +257,11 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   { const txt = 'היי סאלי,\n\nתעדכן אותי בבקשה עד יום ראשון אם ההזמנה שלך מוכנה.\n\nתודה'; const off = kinds(judge(txt)), on = kinds(judge(txt, { planV2: true }));
     check('plan order is unchanged with the flag off', off === 'gmailDraft+googleTask', off);
     check('plan order puts the task first with planV2', on === 'googleTask+gmailDraft', on); }
+  // Plan gap (flag planV2, off by default; invented sentences): a work-only plan whose mail also asks to be told gets the reply draft after the task; without that ask the plan is unchanged.
+  { const wb = 'היי סאלי,\n\nתגישו בבקשה עד מחר את הבקשה לרשות. תשלחו לי אסמכתא על ההגשה.\n\nתודה', wo = 'היי סאלי,\n\nתגישו בבקשה עד מחר את הבקשה לרשות.\n\nתודה';
+    check('work ask that asks to be told: flag off keeps the task alone', kinds(judge(wb)) === 'googleTask', kinds(judge(wb)));
+    check('work ask that asks to be told: planV2 adds the reply draft after the task', kinds(judge(wb, { planV2: true })) === 'googleTask+gmailDraft', kinds(judge(wb, { planV2: true })));
+    check('work ask with no ask to be told: planV2 leaves the task alone', kinds(judge(wo, { planV2: true })) === 'googleTask', kinds(judge(wo, { planV2: true }))); }
 }
 
 console.log('\nTOTAL FAILURES:', failures);
