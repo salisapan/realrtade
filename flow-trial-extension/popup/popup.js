@@ -45,6 +45,7 @@
   let loopView = 'date';
   const tabScroll = { setup: 0, open: 0, log: 0 };
   let scrollLock = false;
+  let scrollEpoch = 0;
   let renderDepth = 0;
   let openPaintGen = 0;
   let connectorPaintGen = 0;
@@ -123,9 +124,15 @@
     const scroller = panelScroller();
     if (!scroller) return;
     const y = tabScroll[activeTabId()] || 0;
+    const token = ++scrollEpoch;
+    // Hold the lock through the layout that follows the paint. A jump back
+    // to 0 in that frame is the paint, not the person, and must not replace
+    // a position they already set.
     scrollLock = true;
     scroller.scrollTop = y;
-    scrollLock = false;
+    requestAnimationFrame(() => {
+      if (token === scrollEpoch) scrollLock = false;
+    });
   }
   let scrollAtRender = 0;
   function beginRender() {
@@ -195,8 +202,8 @@
         // leave the line off after the write has landed.
         syncWhyLine(whyRev).catch(() => {});
       }
-      if (ch.surfaceHealth) renderSurfaces().catch(() => {});
-      if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent || ch.glanceWhyByConv || ch.glanceUiLanguage || ch.surfaceHealth)) return;
+      if (ch.surfaceHealth) scheduleSurfaceHealth(ch.surfaceHealth.newValue);
+      if (!(ch.outlookAuth || ch.outlookSync || ch.glanceWhyCurrent || ch.glanceWhyByConv || ch.glanceUiLanguage)) return;
       const rev = whyRev;
       refresh().then(() => {
         if (rev !== whyRev) return;
@@ -1137,10 +1144,16 @@
         document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
         document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.dataset.panel === tab.dataset.tab));
         scrollLock = true;
-        if (tab.dataset.tab === 'log') await renderLog();
-        if (tab.dataset.tab === 'open') await renderOpen();
-        scrollLock = false;
-        restoreScroll();
+        try {
+          if (tab.dataset.tab === 'log') await renderLog();
+          if (tab.dataset.tab === 'open') await renderOpen();
+        } finally {
+          // The paint's own restore drops the lock as soon as the list is
+          // built. Taking it again here stops the layout scroll to 0 from
+          // being stored before this handler puts the saved position back.
+          scrollLock = true;
+          restoreScroll();
+        }
       });
     });
   }
@@ -2465,6 +2478,32 @@
     });
   }
 
+  let surfaceHealthTimer = null;
+  // A health report updates the one status line. It does not rebuild the
+  // activity list, so a rescan cannot put the panel back at the top.
+  function applySurfaceHealth(next) {
+    const host = document.getElementById('surface-list');
+    if (!host || !next || typeof next !== 'object') return false;
+    const ids = Object.keys(next);
+    if (!ids.length) return true;
+    for (let i = 0; i < ids.length; i++) {
+      const row = host.querySelector('[data-surface="' + ids[i] + '"]');
+      const state = row && row.querySelector('.wait-state');
+      if (!state || state.textContent === 'כבוי') return false;
+      const bad = next[ids[i]] && next[ids[i]].ok === false;
+      state.className = 'wait-state' + (bad ? '' : ' ok');
+      state.textContent = bad ? 'פעיל, אבל הדף לא מזוהה' : 'פעיל';
+    }
+    return true;
+  }
+  function scheduleSurfaceHealth(next) {
+    clearTimeout(surfaceHealthTimer);
+    surfaceHealthTimer = setTimeout(() => {
+      surfaceHealthTimer = null;
+      if (!applySurfaceHealth(next)) renderSurfaces().catch(() => {});
+    }, 400);
+  }
+
   async function renderSurfaces() {
     const host = document.getElementById('surface-list');
     if (!host) return;
@@ -2483,6 +2522,7 @@
       if (id === 'whatsapp') continue; // WhatsApp Web turns on with the one Meta consent
       const s = st.surfaces[id];
       const row = el('div', 'wait-item');
+      row.dataset.surface = id;
       const top = el('div', 'wait-top');
       top.appendChild(el('span', 'wait-who', s.label));
       const bad = s.enabled && s.health && s.health.ok === false;
