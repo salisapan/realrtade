@@ -19,6 +19,10 @@ const FlowDayWords = (() => {
     const at = now instanceof Date ? now : new Date(now == null ? Date.now() : now);
     s = s.replace(/־/g, '-');
     s = s.replace(/(יום|ליום|ביום)\s+([אבגדהוש])[׳'’`]/g, (m, d, a) => d + ' ' + ABBR[a]);
+    // «שריין ג׳ 10:00» names Tuesday with no word יום. Only a geresh letter
+    // immediately before a clock, so a lone «ג׳» elsewhere stays as written.
+    // The date reader takes «ביום שלישי», the same form «ביום ג׳» already becomes.
+    s = s.replace(/(^|[^\u0590-\u05FF])([אבגדהוש])[׳'’`]\s*(?=בשעה\s*\d|ב-?\d{1,2}[:.]\d{2}|\d{1,2}[:.]\d{2})/g, (m, pre, a) => pre + 'ביום ' + ABBR[a] + ' ');
     // «נקבע לשני בשעה 9:00», «ניפגש בחמישי ב-10:00»: the weekday without «יום». Only with a clock right after, because «לשני» alone is also «for the second»
     // and «בשלישי» «in the third». It becomes «ליום שני בשעה 9:00», which the date reader takes.
     s = s.replace(/(^|[^\u0590-\u05FF])([לב])(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?=\s+(?:בשעה\s+\d|ב-?\d{1,2}[:.]\d{2}|ב-?\d{1,2}(?![\d:.]|\s*(?:אנשים|אנשי|פעמים|שעות))))/g, (m, pre, lead, d) => pre + lead + 'יום ' + d);
