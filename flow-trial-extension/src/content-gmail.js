@@ -5173,18 +5173,13 @@ function glanceUiCopy(kind) {
       return { result: 'created', reason: r.proof && r.proof.fetchedBack === true ? 'verified' : 'unproved', line: '', reconnect: false };
     }
     const raw = r && typeof r.reason === 'string' && r.reason ? r.reason : 'no-response';
-    if (raw === 'unverified' || (r && r.unverified === true && r.ref)) {
-      return {
-        result: 'failed',
-        reason: 'unverified',
-        reconnect: false,
-        line: lead + (he
-          ? 'Google עדיין לא החזיר את האירוע. הוא נשאר ביומן, ו«בטל» מסיר אותו.'
-          : 'Google has not returned the event yet. It stays on the calendar, and Undo removes it.')
-      };
-    }
     const he = glanceUiHebrew();
     const lead = he ? 'לא נוצר אירוע ביומן — ' : 'No calendar event was created — ';
+    // The event was created and Google has not shown it back yet. The receipt
+    // says Not verified / לא אומת and keeps Undo. It is not "nothing was created".
+    if (raw === 'unverified' || (r && r.unverified === true && r.ref)) {
+      return { result: 'unverified', reason: 'unverified', line: '', reconnect: false };
+    }
     if (raw === 'not-connected') {
       return {
         result: 'failed',
