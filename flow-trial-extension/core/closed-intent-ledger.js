@@ -305,7 +305,14 @@ const FlowClosedIntentLedger = (() => {
   }
 
   function pii(value) {
-    return /@|https?:\/\/|\d{8,}/.test(JSON.stringify(value));
+    const blob = JSON.stringify(value);
+    if (/@|https?:\/\//.test(blob)) return true;
+    // UUIDs and clock strings contain digits. Strip those shapes, then a long digit run is a phone.
+    const rest = blob
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/g, '')
+      .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}/g, '')
+      .replace(/\d{4}-\d{2}-\d{2}/g, '');
+    return /\d{8,}/.test(rest);
   }
 
   function envelope(stage, data, ctx) {

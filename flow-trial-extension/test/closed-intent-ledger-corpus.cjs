@@ -47,8 +47,9 @@ check('explore.epsilon is off', L.EXPLORE_EPSILON === 0 && L.DP_NOISE.enabled ==
 const shown = L.buildEvents(poison({
   kind: 'shown', app: 'gmail', intentHint: 'hold', score: 82, ts: NOW, tzOffsetMinutes: 0, engineVersion: 'dev'
 }), { now: NOW, seq: 0, installUuid: L.uuidv7(NOW) });
-check('a shown row emits a decision and then shown', shown.ok && shown.events.length === 2 && shown.events[0].type.indexOf('decision') >= 0 && shown.events[1].type.indexOf('shown') >= 0);
-check('the decision is CloudEvents 1.0', shown.events && shown.events[0].specversion === '1.0' && shown.events[0].seq === 0);
+check('a shown row emits a decision and then shown', shown.ok && shown.events && shown.events.length === 2 && shown.events[0].type.indexOf('decision') >= 0 && shown.events[1].type.indexOf('shown') >= 0, shown);
+const decision = shown.events && shown.events[0];
+check('the decision is CloudEvents 1.0', !!(decision && decision.specversion === '1.0' && decision.seq === 0), decision);
 check('score is quantized to 0.05', shown.events && shown.events[0].data.candidates[0].raw_score_q === 0.8);
 check('propensity is 1 when deterministic', shown.events && shown.events[0].data.propensity === 1 && shown.events[0].data.deterministic === true && shown.events[0].data.explore_epsilon === 0);
 check('fixture mail cannot enter an event', leaked(shown.events).length === 0, leaked(shown.events));
