@@ -6,13 +6,13 @@ const PRIV = process.env.GLANCE_PRIVATE || path.join(__dirname, 'private');
 const ROOT = path.join(__dirname, '..', '..', '..');
 const run = (args, env) => { try { return cp.execFileSync(process.execPath, args, { env: Object.assign({}, process.env, env || {}), encoding: 'utf8', maxBuffer: 1 << 26 }); } catch (e) { return String(e.stdout || ''); } };
 const rows = [];
-for (const set of ['v2', 'v2b', 'dev2', 'dev3']) {
-  if (!fs.existsSync(path.join(PRIV, set))) continue;
+for (const set of ['v2', 'v2b', 'dev2', 'dev3', 'personal-dev', 'personal-heldout']) {
+  if (!fs.existsSync(path.join(PRIV, set.startsWith('personal') ? 'personal' : set))) continue;
   let j; try { j = JSON.parse(run([path.join(__dirname, 'real-eval.cjs'), set, '--json'])); } catch (e) { continue; }
   for (const key of ['inbox/gmail', 'inbox/outlook', 'sent/follow']) {
     const v = j.out[key]; if (!v) continue;
     const pos = v.pos || 0, hit = v.hit || 0, fo = v.falseOffer || 0, wt = v.wrongType || 0;
-    rows.push([set + (set.startsWith('v2') ? ' (held-out)' : ''), key, hit + '/' + pos, pos ? Math.round(100 * hit / pos) + '%' : '-', 'wrong ' + (fo + wt) + ' (false ' + fo + ', type ' + wt + ')']);
+    rows.push([set + (/^v2|heldout/.test(set) ? ' (held-out)' : ''), key, hit + '/' + pos, pos ? Math.round(100 * hit / pos) + '%' : '-', 'wrong ' + (fo + wt) + ' (false ' + fo + ', type ' + wt + ')']);
   }
 }
 const kf = (v1) => { try { const j = JSON.parse(run([path.join(ROOT, 'glance-ai', 'scoreboard', 'capabilities', 'kind-frozen-run.cjs'), '--json'].concat(v1 ? ['--v1'] : []), { GLANCE_SHIPPED: 'wave2' })); return j.tot || j; } catch (e) { return null; } };

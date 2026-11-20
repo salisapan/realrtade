@@ -222,6 +222,32 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
   for (const t of ['שלום,\n\nתודה בבקשה על הדיווח.\n\nבברכה', 'שלום,\n\nתוכנית העבודה בבקשה מצורפת לעיונך.\n\nבברכה', 'היי דנה,\n\nתדפיס בבקשה את הטבלה בצבעוני.']) {
     const r = judge(t); check('round-5 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
   }
+  // Round 6 (invented sentences): a polite frame after a lead-in clause, «אודה לטיפולך / על התייחסותכם / לאישורך», «לטיפולך» alone; a frame that follows someone else's name stays quiet.
+  for (const t of ['היי סאלי,\n\nהבנתי שאתה מטפל בעניין, אשמח שתחזור ללקוח.\n\nתודה', 'שלום,\n\nבעניין ההסכם עם הספק אודה לטיפולך.\n\nתודה', 'שלום רב,\n\nהבנק מבקש את המסמך הנוסף. אודה על התייחסותכם.\n\nבברכה', 'שלום,\n\nצריך אישור נקי מהרשם\nלטיפולך\nתודה']) {
+    const r = judge(t); check('round-6 ask offers: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const t of ['שלום,\n\nדנה, אשמח לטיפולך בעניין.\n\nתודה', 'היי,\n\n@דנה @רון נודה לעזרתכם בעניין החתימה.\n\nתודה', 'שלום,\n\nהוא אמר שאשמח לשמוע על הטיפול בו.\n\nבברכה']) {
+    const r = judge(t); check('round-6 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
+  // Round 7 (invented sentences): a bare imperative with no day to the reader alone; the same sentence to a group, or after someone else's name, stays quiet.
+  for (const t of ['היי סאלי,\n\nתעדכן אותי כשהמסמך מוכן.\n\nתודה', 'שלום,\n\nדבר איתי על ההצעה.\n\nתודה']) {
+    const r = judge(t); check('round-7 ask offers: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const t of ['שלום,\n\nהוא ביקש שנדבר איתי על ההצעה, כך כתב.\n\nבברכה', 'שלום,\n\nתודה על העדכון, הכל ברור.\n\nבברכה']) {
+    const r = judge(t); check('round-7 contrast stays quiet: ' + t.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
+  // Round 8 (invented sentences): automated notices stay quiet even from a person-looking sender: meeting notes written by a bot, an order-status notice.
+  for (const x of ['Notes from the meeting on Tuesday at 4 PM.\n\nThese notes were shared with the host. The content was auto-generated and may be wrong.\n\nOpen notes', 'We\'re getting your order ready.\n\nYour order is being prepared, total 45.00. Track your order below.', 'ההזמנה שלך נשלחה והיא בדרך אליך.\n\nמעקב משלוח בקישור']) {
+    const r = judge(x); check('round-8 automated notice stays quiet: ' + x.split('\n')[0].slice(0, 28), !r.show, kinds(r));
+  }
+  const keep8 = judge('היי סאלי,\n\nתעדכן אותי בבקשה עד יום ראשון אם ההזמנה שלך מוכנה.\n\nתודה'); check('round-8 a person asking about an order still offers', keep8.show, kinds(keep8));
+  // Round 9 (invented sentences): «אנא / בבקשה» + a plain imperative; a cold sales outreach with a demo stays quiet.
+  for (const x of ['היי סאלי,\n\nאנא פנה למזכירות לבירור המועד.\n\nתודה', 'שלום,\n\nבבקשה פרט קצת יותר על הרקע.\n\nתודה', 'שלום,\n\nאנא שלח/י במייל חוזר את הטופס החתום.\n\nתודה']) {
+    const r = judge(x); check('round-9 ask offers: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const x of ['שלום,\n\nרציתי לוודא שהחומרים הגיעו. נשמח להיפגש ולהציג הדגמה חיה של המערכת.\n\nבברכה', 'Dear valued customer,\n\nThis is a reminder that your parcel is delayed. Please reply if you have questions.', 'שלום,\n\nאנא לא להפריע בשעות הערב.\n\nתודה']) {
+    const r = judge(x); check('round-9 contrast stays quiet: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
 }
 
 console.log('\nTOTAL FAILURES:', failures);
