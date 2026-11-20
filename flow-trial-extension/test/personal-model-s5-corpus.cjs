@@ -73,6 +73,10 @@ space.approveSpace('work', 'personal');
 check('an approval allows the other space', space.memoryPolicy(fact, 'personal').ok === true);
 space.withoutMemory('t-9', true);
 check('a thread can run without memory', space.memoryPolicy(fact, 'work').reason === 'without-memory');
+space.setStyleRule({ audience: 'client', lang: 'en', greeting: 'dear-name', signoff: 'best' }, NOW);
+const quietDraft = space.conditionDraft('Hello there', { lang: 'en', audience: 'client', thread: 't-9' });
+check('a silent thread leaves the draft alone', quietDraft.reason === 'without-memory' && quietDraft.text === 'Hello there' && quietDraft.applied === false, quietDraft);
+space.withoutMemory('t-9', false);
 const edited = space.editSummary('Designer in Haifa', 'personal', NOW);
 check('a summary edit is user_said', edited.ok && edited.fact.provenance === 'user_said' && edited.fact.status === 'active');
 
@@ -122,8 +126,9 @@ async function shredCheck() {
   await repo.shred();
   const gone = await repo.load();
   check('crypto-shred destroys the key and the rows', gone.facts.length === 0 && gone.entities.length === 0);
-  const fresh = await Store.openRepository(db);
-  const again = await fresh.load();
+  await repo.rekey();
+  await db.put('facts', sealed);
+  const again = await repo.load();
   check('a new key does not restore the address', again.facts.length === 0 && JSON.stringify(sealed || {}).indexOf('roni@example.com') < 0);
 }
 

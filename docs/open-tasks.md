@@ -24,7 +24,7 @@ PR #104 / 0.9.39 live Gate PASSED on cd524a30 (row 50) and merged @`87f2056f`. 0
 
 | # | Task | Status | Owner | Due | Notes |
 |---|------|--------|-------|-----|-------|
-| 90 | Personal model slice 5: embeddings and Hebrew NER on Glance cloud, switch off, inbound instructions stay candidates | done, not merged | Cursor | - | TODO(CTO): `personal-infer` on the existing glance-assist function. No new host. No download. Gate: not run live. |
+| 90 | Personal model slice 5: embeddings and Hebrew NER on Glance cloud, switch off, inbound instructions stay candidates | done, not merged | Cursor | - | TODO(CTO): `personal-infer` on the existing glance-assist function. No new host. No download. Forget all destroys the key. Gate: not run live. |
 | 89 | Personal model slices 1–4: people, habits, city, style, work facts, and a passive bandit. Consent per category, default off. On this computer. | done, not merged | Cursor | - | No new scope or host permission. No mail body. Gate: not run live. Not deployed. |
 | 88 | Closed-intent ledger: types-only record of a proved Do It or an Undo, consent default off, local export and delete, upload stub disabled | done, not merged | Cursor | - | Local only. No new scope or permission. Upload does not call the network. Gate: not run live. |
 | 1 | Merge branch `claude/install-uiux-pro-max-skill-a4agox` into `main` and deploy | open | owner | 2026-10-07 | Live site still shows the old copy. ClickUp: https://app.clickup.com/t/z8vk7p8nh3 **Netlify deploy is on HOLD until the owner writes «מאשר» (2026-10-08).** |

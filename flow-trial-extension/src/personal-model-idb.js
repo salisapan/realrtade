@@ -139,25 +139,30 @@
       async load() {
         if (!key) return { entities: [], aliases: [], facts: [], tombstones: [], exemplars: [] };
         var state = { entities: [], aliases: [], facts: [], tombstones: [], exemplars: [], consents: null };
+        async function readSealed(store, row) {
+          if (!row || !row.payload) return null;
+          try { return await open(key, row.payload, store + ':' + row.id); }
+          catch (err) { return null; }
+        }
         var rows = await db.all('facts');
         for (var i = 0; i < rows.length; i++) {
-          if (!rows[i].payload) continue;
-          state.facts.push(await open(key, rows[i].payload, 'facts:' + rows[i].id));
+          var fact = await readSealed('facts', rows[i]);
+          if (fact) state.facts.push(fact);
         }
         var aliases = await db.all('aliases');
         for (var a = 0; a < aliases.length; a++) {
-          if (!aliases[a].payload) continue;
-          state.aliases.push(await open(key, aliases[a].payload, 'aliases:' + aliases[a].id));
+          var alias = await readSealed('aliases', aliases[a]);
+          if (alias) state.aliases.push(alias);
         }
         var entities = await db.all('entities');
         for (var e = 0; e < entities.length; e++) {
-          if (!entities[e].payload) continue;
-          state.entities.push(await open(key, entities[e].payload, 'entities:' + entities[e].id));
+          var entity = await readSealed('entities', entities[e]);
+          if (entity) state.entities.push(entity);
         }
         var exemplars = await db.all('exemplars');
         for (var x = 0; x < exemplars.length; x++) {
-          if (!exemplars[x].payload) continue;
-          state.exemplars.push(await open(key, exemplars[x].payload, 'exemplars:' + exemplars[x].id));
+          var exemplar = await readSealed('exemplars', exemplars[x]);
+          if (exemplar) state.exemplars.push(exemplar);
         }
         state.tombstones = await db.all('tombstones');
         var consentRows = await db.all('consents');
@@ -207,6 +212,10 @@
       async shred() {
         for (var i = 0; i < STORES.length; i++) await db.clear(STORES[i]);
         key = null;
+      },
+      async rekey() {
+        key = await ensureKey(db);
+        return { extractable: key.extractable === true };
       }
     };
   }
@@ -240,6 +249,20 @@
     });
   }
 
+  function forgetAll() {
+    return enqueue(async function () {
+      var api = model();
+      if (!api) return { ok: false, reason: 'missing' };
+      var repo = await openRepository(await dbHandle());
+      api.hydrate(await repo.load());
+      var result = api.forgetAllSync();
+      await repo.shred();
+      await repo.rekey();
+      await repo.save(api.snapshot());
+      return result;
+    });
+  }
+
   function listen() {
     if (typeof document !== 'undefined') return;
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.onMessage) return;
@@ -254,7 +277,7 @@
       else if (msg.type === 'flow:personal-model-edit') done = withState(function (api) { return api.editFactSync(msg.id, msg.object); });
       else if (msg.type === 'flow:personal-model-forget') done = withState(function (api) { return api.forgetFactSync(msg.id); });
       else if (msg.type === 'flow:personal-model-never') done = withState(function (api) { return api.neverSync(msg.predicate, msg.object, msg.email); });
-      else if (msg.type === 'flow:personal-model-forget-all') done = withState(function (api) { return api.forgetAllSync(); });
+      else if (msg.type === 'flow:personal-model-forget-all') done = forgetAll();
       else if (msg.type === 'flow:personal-model-export') done = withState(function (api) { return { ok: true, doc: api.exportJsonSync() }; });
       else if (msg.type === 'flow:personal-model-rank') done = withState(function (api) { return api.closureAssistSync(msg.input || {}); });
       else if (msg.type === 'flow:personal-model-place') done = withState(function (api) { return api.setPlaceSync(msg.city); });
@@ -274,6 +297,7 @@
     withState: withState,
     ingest: function (header) { return withState(function (api) { return api.ingestHeaderSync(header); }); },
     ingestCalendar: function (events) { return withState(function (api) { return api.ingestCalendarSync(events); }); },
-    view: function () { return withState(function (api) { return api.viewSync(); }); }
+    view: function () { return withState(function (api) { return api.viewSync(); }); },
+    forgetAll: forgetAll
   };
 });

@@ -11198,6 +11198,10 @@ const FlowPersonalModel = (() => {
 
     function conditionDraft(text, ctx) {
       const assist = assistFor('style');
+      const thread = ctx && idOf(ctx.thread);
+      if (thread && state.silentThreads[thread]) {
+        return { applied: false, model_assist: assist, status: 'none', text: text, exemplarIds: [], reason: 'without-memory' };
+      }
       if (assist !== 'on') return { applied: false, model_assist: assist, status: 'none', text: text, exemplarIds: [] };
       const lang = ctx && ctx.lang === 'he' ? 'he' : 'en';
       const audience = audienceOf(ctx || {}, emailOf(ctx && ctx.recipient));
