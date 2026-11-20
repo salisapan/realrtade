@@ -25,6 +25,7 @@ if (!process.argv.includes('--no-corpora')) {
   const extra = fails.filter((f) => KNOWN.indexOf(f) < 0);
   corpora = extra.length ? 'NEW FAILURES: ' + extra.join(' ') : 'green (only the 3 known red)';
 }
+try { const pv = JSON.parse(fs.readFileSync(path.join(PRIV, 'personal', 'provenance.json'), 'utf8')); const a = pv.ownerApproval || {}; console.log('personal set provenance: owner approval ' + a.level + ' (' + a.date + '), row-level owner-verified rows ' + (a.ownerVerifiedRows || 0) + '; labels are Claude labels'); } catch (e) {}
 const w = [26, 14, 9, 6]; console.log('GOALS  v2 inbox >=60% | v2 sent >=90% | wrong Do It 0 | old sets must not drop (70/89, 54/70, 0 false)\n');
 for (const r of rows) console.log(r[0].padEnd(w[0]), r[1].padEnd(w[1]), r[2].padEnd(w[2]), r[3].padEnd(w[3]), r[4]);
 console.log('\ncorpora:', corpora);
