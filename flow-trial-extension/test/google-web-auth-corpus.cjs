@@ -73,6 +73,7 @@ function load(opts) {
   let onMessageListener = null;
   const runtime = {
     getManifest: () => ({
+      glance_no_seed: true, // the first-wave Labs seed (core/labs-seed.js) writes at startup; this corpus counts the writes of the Google profile
       oauth2: {
         client_id: opts.chromeClientId || CHROME_CLIENT,
         scopes: opts.scopes || SCOPES.slice()

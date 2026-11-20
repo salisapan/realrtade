@@ -24,9 +24,9 @@ function familyOf(r) {
   return 'other:' + kinds.join('+');
 }
 // The readers the judge does not call. Each returns a family or null. They are the product's own recognizers, called with the Labs switch assumed on.
-function readers(text, surface) {
+function readers(text, surface, only) {
   const at = new Date(NOW), hits = [];
-  const t = (name, fn) => { try { const m = g(name); const r = m && fn(m); if (r) hits.push(r); } catch (e) { /* reader error = silent */ } };
+  const t = (name, fn) => { if (only && only.indexOf(name) < 0) return; try { const m = g(name); const r = m && fn(m); if (r) hits.push(r); } catch (e) { /* reader error = silent */ } };
   if (surface === 'gmail') t('FlowWorkspaceFile', (m) => { const r = m.recognize(text); return r && r.kind === 'clear' ? ({ doc: 'doc_create', sheet: 'sheet_create', slides: 'slides_create', form: 'form_create' }[r.fileKind] || 'doc_create') : null; });
   if (surface === 'gmail') t('FlowSheetRow', (m) => { const r = m.recognize(text); return r && r.kind === 'clear' ? 'sheet_row' : null; });
   t('FlowMeetLink', (m) => { const r = m.recognize(text, at); return r && r.kind === 'clear' ? 'video_link' : null; });
@@ -37,14 +37,21 @@ function readers(text, surface) {
 }
 
 const OWN = { gmail: 'ai.local.flow@gmail.com', outlook: 'glance.salisapan@outlook.com' };
+// GLANCE_SHIPPED=1 reads the product the way it ships: every Labs switch OFF and the kind readers that sit behind a switch not called (what the person sees with no setup).
+const MODE = process.env.GLANCE_SHIPPED || '';   // '' every switch on; '1' every switch off; 'wave1' the four closes the owner turned on (core/labs-seed.js) and the rest off
+const SHIPPED = MODE === '1' || MODE === 'wave1' || MODE === 'wave2';
+const WAVE1 = MODE === 'wave1' || MODE === 'wave2';
+// wave2 = wave1 + the closes that create a new file or a video link (WORKSPACE_FILE, MEET_LINK, TEAMS_MEETING, ONEDRIVE_NEW_FILE); CALENDAR_CHANGE, recurring and the rest stay off.
+const WAVE2 = MODE === 'wave2';
+const WAVE2_READERS = ['FlowWorkspaceFile', 'FlowMeetLink', 'FlowTeamsMeeting', 'FlowOnedriveNewFile'];   // directAskOn is on in every mode: both content scripts and the chat card pass it true (owner-approved 2026-11-12)
 function recognize(over, text) {
   const surface = over.surface || 'gmail', own = OWN[surface];
   const input = Object.assign({ text, subject: 'Subject', sender: { name: 'Dana Levi', email: 'dana@acme.io' }, now: new Date(NOW), threadUrl: 'https://x/y', hasThreadAttachment: false, attachmentCount: 0, surface,
     to: [own], cc: [], ownAddresses: [own], ownNames: ['Sali', 'Sali Sapan', 'סאלי'], userName: 'Sali', direction: 'inbound', inbound: true, namesWaitDone: true,
-    systemNoticeOn: true, bookingNoticeOn: true, paymentAskOn: true, taskAskOn: true, directAskOn: true, workspaceFileOn: true }, over);
+    systemNoticeOn: !SHIPPED || WAVE1, bookingNoticeOn: !SHIPPED || WAVE1, paymentAskOn: !SHIPPED || WAVE1, taskAskOn: !SHIPPED || WAVE1, directAskOn: true, workspaceFileOn: !SHIPPED || WAVE2, calendarChangeOn: !SHIPPED }, over);
   let r; try { r = J.judge(input, DEPS); } catch (e) { r = { show: false, reason: 'ERR ' + e.message }; }
   let got = familyOf(r), via = 'judge';
-  const h = readers(text, surface); if (h.length) { got = h[0]; via = 'reader'; }
+  const h = WAVE2 ? readers(text, surface, WAVE2_READERS) : (SHIPPED ? [] : readers(text, surface)); if (h.length) { got = h[0]; via = 'reader'; }
   return { family: got, via, reason: r && r.show ? '' : (r && r.reason) || '', result: r };
 }
-module.exports = { recognize, familyOf, readers, NOW, OWN };
+module.exports = { recognize, familyOf, readers, NOW, OWN, g };

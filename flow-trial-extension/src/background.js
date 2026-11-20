@@ -67,6 +67,7 @@ import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
 // Loaded after proof-of-close.js on purpose: the module reads FlowProofOfClose when it loads.
 import '../core/planner-task.js'; // classic: sets globalThis.FlowPlannerTask (switch PLANNER_TASK, off)
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
+import '../core/labs-seed.js'; // classic: sets globalThis.FlowLabsSeed (the first wave of Labs closes, on in a non-store install)
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/outlook-word.js'; // classic: sets globalThis.FlowOutlookWord (an empty .docx for a new file)
@@ -2887,6 +2888,12 @@ function googleTaskTitle(p) {
   const Title = globalThis.FlowCommitmentTitle;
   const span = Title && typeof Title.fromPayload === 'function' ? Title.fromPayload(p) : '';
   if (span) return String(span).slice(0, 255);
+  // A reply card whose label is only its date («Reply requested by Oct 8») is titled by the work the ask names, when the ask is a plain verb plus object.
+  if (Title && typeof Title.askTitleFromBody === 'function' && /^Reply requested\b/i.test(String((p && p.label) || ''))) {
+    const body = p && (p.text != null && String(p.text).trim() ? p.text : p.bodyText) || (p && p.params && p.params.what) || '';
+    const ask = Title.askTitleFromBody(String(body));
+    if (ask) return String(ask).slice(0, 255);
+  }
   return String((p && p.label) || '').replace(/\s+/g, ' ').trim().slice(0, 255);
 }
 
@@ -6338,6 +6345,22 @@ async function outlookDeleteDraft(draftId, prefer) {
   try { await outlookFetch(delUrl, { method: 'DELETE', headers: headers }); } catch (e) { /* already gone */ }
 }
 // The owner's off switches live in one storage object. A missing key is off.
+// The first wave of Labs closes starts ON in an unpacked (non-store) install (core/labs-seed.js; owner, 2026-11-16). Once per seed version, into the storage object the popup edits; a row the person
+// turns off stays off. A Web Store install never seeds, and an e2e copy of the extension opts out through manifest.glance_no_seed.
+async function seedLabsDefaults() {
+  try {
+    const mf = (chrome.runtime && typeof chrome.runtime.getManifest === 'function' && chrome.runtime.getManifest()) || {};
+    if (mf.update_url || mf.glance_no_seed === true) return;
+    const Seed = globalThis.FlowLabsSeed;
+    if (!Seed) return;
+    const bag = await chrome.storage.local.get({ glanceSwitches: {}, glanceSwitchesSeed: 0 });
+    const next = Seed.seed(bag.glanceSwitches, bag.glanceSwitchesSeed);
+    if (next.changed) await chrome.storage.local.set({ glanceSwitches: next.bag, glanceSwitchesSeed: next.version });
+  } catch (e) { /* the seed is a convenience: a failed write leaves every row as the person had it */ }
+}
+void seedLabsDefaults();
+if (chrome.runtime && chrome.runtime.onInstalled) chrome.runtime.onInstalled.addListener(() => { void seedLabsDefaults(); });
+
 async function glanceSwitchOn(name) {
   try {
     // A Chrome Web Store install (Chrome adds update_url) never turns a Labs switch on, whatever storage says.

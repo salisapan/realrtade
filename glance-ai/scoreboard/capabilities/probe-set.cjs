@@ -58,6 +58,9 @@ module.exports = [
   // --- files
   ['file.save', 'en', 'Hi Sali, please save the attached pdf to Drive.', 'file_save', 1],
   ['file.save', 'he', 'היי סאלי, תשמור את הקובץ המצורף בדרייב.', 'file_save', 1],
+  ['file.save', 'he', 'היי סאלי, תשמרי בבקשה את החשבונית המצורפת בתיקיית הנהלת החשבונות.', 'file_save', 1],
+  ['file.save', 'he', 'היי סאלי, תשימי את הדוח המצורף בדרייב המשותף של הצוות.', 'file_save', 1],
+  ['file.save.neg', 'he', 'היי סאלי, תשים לב שהתיקייה ריקה, ראי את המצורף.', 'none', 1],
   ['file.save.neg', 'en', "Hi Sali, please don't save the attachment, it's for reference only.", 'none', 1],
   ['file.find', 'en', 'Hi Sali, could you send me the signed vendor contract by Thursday?', 'chain'],
   ['file.find', 'he', 'היי סאלי, תוכל לשלוח לי את החוזה החתום עד יום חמישי?', 'chain'],

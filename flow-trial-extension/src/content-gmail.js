@@ -83,6 +83,14 @@ function glanceUiCopy(kind) {
   function glanceLabsLocked() {
     try { return Boolean(chrome.runtime.getManifest().update_url); } catch (e) { return false; }
   }
+  // glanceSwitches.CALENDAR_CHANGE (Labs row, off): a mail that moves or cancels one named meeting («the Thursday sync at 10:00 is moved to Friday at 11:00») gets a Move It or
+  // Clear It card. Read here once and kept current by the storage listener; the store lock keeps it false in a Web Store install.
+  let calendarChangeSwitch = false;
+  function readCalendarChangeSwitch() {
+    if (glanceLabsLocked()) { calendarChangeSwitch = false; return; }
+    try { chrome.storage.local.get({ glanceSwitches: {} }).then((bag) => { calendarChangeSwitch = !!(bag && bag.glanceSwitches && bag.glanceSwitches.CALENDAR_CHANGE === true); }).catch(() => {}); } catch (e) { /* keep the last value */ }
+  }
+  readCalendarChangeSwitch();
   // A second injection in this same world must not start another watcher.
   // After an update the old world is gone, so this guard is false and the
   // new files run. The service worker removes leftover chips first.
@@ -613,7 +621,7 @@ function glanceUiCopy(kind) {
       const prepared = (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function')
         ? FlowIncomingJudge.prepareForJudge(text)
         : text;
-      intent = (typeof FlowIntent !== 'undefined') ? FlowIntent.classify(prepared, ctx) : null;
+      intent = (typeof FlowIntent !== 'undefined') ? FlowIntent.classify(prepared, Object.assign({}, ctx, { calendarChangeOn: typeof calendarChangeSwitch !== 'undefined' && calendarChangeSwitch === true })) : null;
     }
     if (!intent || !intent.type) return { show: false, reason: 'intent-null', intent: intent || null };
     if (intent.plannedProcess && intent.plannedProcess.steps && intent.plannedProcess.steps.length) {
@@ -631,7 +639,8 @@ function glanceUiCopy(kind) {
       executionMemory: ctx.executionMemory || null,
       attachFile: ctx.attachFile || null,
       text: text,
-      subject: ctx.subject || ''
+      subject: ctx.subject || '',
+      calendarChangeOn: typeof calendarChangeSwitch !== 'undefined' && calendarChangeSwitch === true
     }) : null;
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent: intent };
     return { show: true, intent: intent, process: process };
@@ -1647,7 +1656,11 @@ function glanceUiCopy(kind) {
       if (hit && await holdAlreadyMade(ctx.senderEmail, hit.intent, [ctx.messageId])) return { type: null };
       if (hit) return Object.assign({}, hit.intent, { plannedProcess: hit.process });
     }
-    let intent = FlowIntent.classify(prepared, ctx);
+    let intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { calendarChangeOn: typeof calendarChangeSwitch !== 'undefined' && calendarChangeSwitch === true }));
+    // Group mail (four or more on To): a request aimed at someone else, or a broadcast that does not name the reader, is not this person's Do It.
+    // The same rule the shared judge applies on the other mail surfaces (core/incoming-judge.js groupAddressing).
+    if (intent && intent.type === 'request' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.groupAddressing === 'function' && base && base.inbound !== false && ctx.senderIsUser !== true
+        && FlowIncomingJudge.groupAddressing({ text: prepared, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail' }, prepared) === 'quiet') intent = { type: null, quiet: 'hedge' };
     if (intent && intent.type === 'request' && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.doItOverride === 'function'
         && base && base.inbound !== false && ctx.senderIsUser !== true) {
       const over = FlowIncomingJudge.doItOverride({ text: prepared, subject: ctx.subject || '', sender: { email: ctx.senderEmail, name: ctx.senderName }, now: ctx.now, threadUrl: ctx.threadUrl || null, to: ctx.to || null, cc: ctx.cc || null, ownAddresses: ctx.ownAddresses || null, senderEmail: ctx.senderEmail, userName: ctx.userName || null, ownNames: ctx.ownNames || null, surface: 'gmail', inbound: true, attachmentCount: ctx.attachmentCount || 0 }, intent);
@@ -7335,7 +7348,7 @@ function glanceUiCopy(kind) {
         scanReadingPane();
       }).catch(() => {});
     }
-    if (changes.glanceSwitches) rescanOpenMailForSwitches();
+    if (changes.glanceSwitches) { readCalendarChangeSwitch(); rescanOpenMailForSwitches(); }
   });
 
   globalThis.__glanceGmailPage = {

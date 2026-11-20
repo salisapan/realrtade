@@ -1,0 +1,72 @@
+{
+ "tag": "kinds-v0",
+ "tauPerLabel": {
+  "cal_booking": 0.99,
+  "cal_cancel": 0.555,
+  "cal_hold": 0.995,
+  "cal_move": 0.72,
+  "cal_recurring": 0.315,
+  "commit_reader": 0.555,
+  "commit_sender": 0.645,
+  "doc_append": 0.56,
+  "doc_create": 0.69,
+  "draft_reply": 0.995,
+  "excel_create": 0.83,
+  "file_save": 0.945,
+  "form_create": 0.6,
+  "notice_system": 0.855,
+  "pay": 0.71,
+  "sheet_create": 0.58,
+  "sheet_row": 0.52,
+  "slides_create": 0.525,
+  "task": 0.98,
+  "video_link": 0.37,
+  "word_create": 0.375
+ },
+ "C": 128.0,
+ "classes": [
+  "cal_booking",
+  "cal_cancel",
+  "cal_hold",
+  "cal_move",
+  "cal_recurring",
+  "commit_reader",
+  "commit_sender",
+  "doc_append",
+  "doc_create",
+  "draft_reply",
+  "excel_create",
+  "file_save",
+  "form_create",
+  "none",
+  "notice_system",
+  "pay",
+  "sheet_create",
+  "sheet_row",
+  "slides_create",
+  "task",
+  "video_link",
+  "word_create"
+ ],
+ "tau": 0.995,
+ "kappa": 0.91,
+ "oof": {
+  "tau": 0.995,
+  "kappa": 0.91,
+  "noneRows": 4550,
+  "oofWrongDoIt": 12,
+  "actRows": 5023,
+  "oofShown": 1637,
+  "oofRight": 1605
+ },
+ "rows": {
+  "synthetic": 3101,
+  "pool": 6472,
+  "poolHeldOutDropped": 6
+ },
+ "predicted": {
+  "frozen701": 701,
+  "kindFrozen": 139
+ },
+ "syntheticValAcc": 0.9056603773584906
+}

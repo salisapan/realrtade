@@ -348,9 +348,15 @@ const FlowExtract = (() => {
     } catch (e) { return text; }
   }
 
+  // A clause that names a day which is NOT the close's day: where the writer will be away («I will be abroad on Monday») and what was already due («the invoice was due on
+  // Monday»). With such a clause in the mail, the first date pattern to match could take that day instead of the one the ask is about (slot gold, 2026-11-15: a kickoff on
+  // Tuesday was filed on the Monday the sender is abroad). The clause is dropped before matching; when nothing else carries a date the whole text is read as before.
+  const SIDE_DATE = /\b(?:i|we|he|she|they)(?:'ll|'m|'re|\s+will|\s+am|\s+are)?\s+(?:be\s+)?(?:abroad|away|out of (?:the )?office|on (?:leave|vacation|holiday|a trip)|travel(?:l)?ing|unavailable|off)\b[^.!?\n,;]*|\b(?:was|were|had been)\s+due\b[^.!?\n,;]*|\b(?:i|we)\s+(?:sent|emailed|e-mailed|shared|submitted|filed|paid|called|spoke|met|wrote|forwarded|attached|uploaded|signed|booked)\b[^.!?\n,;]*/gi;
   function parseDate(text, now) {
     text = dayWordsFirst(text, now);
     now = now || new Date();
+    const noSide = String(text || '').replace(SIDE_DATE, ' ');
+    if (noSide !== text && noSide.trim()) { const r = parseDate(noSide, now); if (r) return r; }
     let m;
 
     // An ISO-shaped string is not automatically an ISO date. This passed
@@ -401,7 +407,7 @@ const FlowExtract = (() => {
 
     // "by Monday" / "next Friday" — only when a scheduling word introduces it,
     // so a signature line reading "Monday" is not mistaken for a deadline.
-    m = text.match(new RegExp('\\b(?:by|on|before|due|until|no later than|signing|closing|starting|effective|kick(?:ing)? off)\\s+(?:on\\s+)?(?:next\\s+)?(' + DAYS.join('|') + ')\\b', 'i'));
+    m = text.match(new RegExp('\\b(?:by|on|before|due|until|no later than|signing|closing|starting|effective|kick(?:ing)? off)\\s+(?:(?:eod|end of (?:the )?day|end of business|close of business|cob)\\s+)?(?:on\\s+)?(?:next\\s+)?(' + DAYS.join('|') + ')\\b', 'i'));
     if (m) {
       const target = DAYS.indexOf(m[1].toLowerCase());
       const d = new Date(now);

@@ -196,6 +196,9 @@ const FlowDraftReply = (() => {
       if (qs.length) {
         lines.push(he ? (qs.length > 1 ? 'תודה על השאלות. התשובות לפי הסדר:' : 'תודה על השאלה.') : (qs.length > 1 ? 'Thanks for the questions. Answers in order:' : 'Thanks for the question.'));
         qs.forEach((q, k) => { lines.push('', (qs.length > 1 ? (k + 1) + '. ' : '') + q, he ? '[התשובה שלך]' : '[Your answer]'); });
+        // The mail's own figures, added up (core/incoming-judge.js askExtras): a check for the person to confirm, never an answer.
+        const checks = Array.isArray(params.checks) ? params.checks.map((c) => cleanLine(c)).filter(Boolean).slice(0, 4) : [];
+        if (checks.length) { lines.push('', he ? 'לבדיקתך, חישוב מתוך המייל (לא תשובה):' : 'For your check, arithmetic from the mail (not an answer):'); checks.forEach((c) => lines.push(c)); }
         return lines.join('\n').replace(/\u2014/g, '-').replace(/\u2013/g, '-');
       }
     }
