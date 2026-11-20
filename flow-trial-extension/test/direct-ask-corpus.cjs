@@ -241,6 +241,13 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
     const r = judge(x); check('round-8 automated notice stays quiet: ' + x.split('\n')[0].slice(0, 28), !r.show, kinds(r));
   }
   const keep8 = judge('היי סאלי,\n\nתעדכן אותי בבקשה עד יום ראשון אם ההזמנה שלך מוכנה.\n\nתודה'); check('round-8 a person asking about an order still offers', keep8.show, kinds(keep8));
+  // Round 9 (invented sentences): «אנא / בבקשה» + a plain imperative; a cold sales outreach with a demo stays quiet.
+  for (const x of ['היי סאלי,\n\nאנא פנה למזכירות לבירור המועד.\n\nתודה', 'שלום,\n\nבבקשה פרט קצת יותר על הרקע.\n\nתודה', 'שלום,\n\nאנא שלח/י במייל חוזר את הטופס החתום.\n\nתודה']) {
+    const r = judge(x); check('round-9 ask offers: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), r.show, kinds(r));
+  }
+  for (const x of ['שלום,\n\nרציתי לוודא שהחומרים הגיעו. נשמח להיפגש ולהציג הדגמה חיה של המערכת.\n\nבברכה', 'Dear valued customer,\n\nThis is a reminder that your parcel is delayed. Please reply if you have questions.', 'שלום,\n\nאנא לא להפריע בשעות הערב.\n\nתודה']) {
+    const r = judge(x); check('round-9 contrast stays quiet: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
+  }
 }
 
 console.log('\nTOTAL FAILURES:', failures);

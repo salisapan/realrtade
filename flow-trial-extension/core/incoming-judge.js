@@ -243,6 +243,9 @@ const FlowIncomingJudge = (() => {
   const POLITE_FRAME_HE = /^(?:(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA]))|(?:בבקשה|נא)\s+(?=ת[\u05D0-\u05EA]{2,}(?![\u0590-\u05FF]))|נא\s+(?=(?:עדכנ[וי]|שלח[וי]|אשר[וי]|השיב[וי]|החזיר[וי]|העביר[וי]|צרפ[וי])(?![\u0590-\u05FF])))/;
   const POLITE_NOMINAL_HE = /^(?:אודה|נודה|אשמח|נשמח|נא|אנא)\s+(?:מאוד\s+)?(?:על\s+(הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה|שליחת|העברת|החזרת|התייחסותך|התייחסותכם|עזרתך|עזרתכם)|(?:ל(?:המשך\s+)?(?:דבר\s+)?|(?<=(?:נא|אנא)\s+))(טיפולך|טיפולכם|עזרתך|עזרתכם|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם))(?![\u0590-\u05FF])/;
   const POLITE_FRAME_MID_HE = /(?<=^|[\s,;])(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA])|ל(?=(?:טיפול|אישור|התייחסות|תגובת|עזרת)(?:ך|כם|כן))|על\s+(?=(?:התייחסות|עזרת)(?:ך|כם|כן)))/;
+  // «אנא פנה למזכירות», «בבקשה פרט קצת יותר», «אנא שלח/י במייל חוזר»: a polite word and a plain imperative of a short closed list (real-mail personal dev set, 2026-11-20).
+  const POLITE_IMP_HE = /^(?:אנא|נא|בבקשה)\s+(שלח|שלחי|פנה|פני|פרט|פרטי|אשר|אשרי|העבר|העבירי|צרף|צרפי|מלא|מלאי|חתום|חתמי|עדכן|עדכני|החזר|החזירי|בדוק|בדקי|השב|השיבי|הגב|הגיבי|תקן|תקני|הוסף|הוסיפי|קבע|קבעי|שמור|שמרי|הכן|הכיני|ודא|וודא|ודאי)(?:\/י)?(?![\u0590-\u05FF])/;
+  const POLITE_IMP_WORK_HE = /^(?:פנה|פני|מלא|מלאי|חתום|חתמי|בדוק|בדקי|תקן|תקני|הוסף|הוסיפי|קבע|קבעי|שמור|שמרי|הכן|הכיני|ודא|וודא|ודאי)$/;
   const NOMINAL_WORK_HE = /^(?:אישורך|אישורכם|טיפולך|טיפולכם|עזרתך|עזרתכם|הכנת|בדיקת|בדיקתך|תיקון|עדכון|מילוי|חתימה)$/;
   const NOMINAL_BACK_HE = /^(?:שליחת|העברת|החזרת|קבלת|אישורך|אישורכם|תשובתך|תשובתכם|מענה|עדכונך|עדכונכם|התייחסותך|התייחסותכם|תגובתך|תגובתכם)$/;
   const DIRECT_IMP_SEND_HE = /^(?:שלח|שלחי|תגיב|תגיבי|תענה|תעני|תשיב|תשיבי|תחזור|תחזרי|תשלח|תשלחי|תעביר|תעבירי|תצרף|תצרפי|תעדכן|תעדכני|עדכנו|עדכני|שלחו|שלחי|אשרו|אשרי|השיבו|השיבי|החזירו|החזירי|העבירו|העבירי|צרפו|צרפי)(?![\u0590-\u05FF])/;
@@ -336,11 +339,12 @@ const FlowIncomingJudge = (() => {
       const genImp = pleaseIn && GEN_IMP_HE.test(x1) && !GEN_IMP_NOT_HE.test(x1) && !/(?:ות|ית|ים|ין|ון)$/.test(x1.split(/[\s,.!?]/)[0]);
       const modalWork = MODAL_WORK_HE.test(x1) || /^(?:אתה|את|אתם|אתן)\s+(?:יכול|יכולה|יכולים|יכולות)\s+(?:בבקשה\s+)?ל(?:בדוק|הכין|טפל|הוסיף|תקן|חתום|בצע|השלים|ארגן|וודא|רשום|תייק|דבר)/.test(x1), modalSend = MODAL_SEND_HE.test(x1), handling = HANDLING_ONLY_HE.test(x1);
       const modal = MODAL_REPLY_HE.test(x1) || modalSend;
-      const framed = POLITE_FRAME_HE.test(x1) || modal || modalWork || handling || genImp || (pleaseIn && (DIRECT_IMP_WORK_HE.test(x1) || DIRECT_IMP_SEND_HE.test(x1))), nominal = !POLITE_FRAME_HE.test(x1) && !framed && POLITE_NOMINAL_HE.exec(x1);
+      const pimp = POLITE_IMP_HE.exec(x1), pimpWork = !!pimp && POLITE_IMP_WORK_HE.test(pimp[1]);
+      const framed = POLITE_FRAME_HE.test(x1) || !!pimp || modal || modalWork || handling || genImp || (pleaseIn && (DIRECT_IMP_WORK_HE.test(x1) || DIRECT_IMP_SEND_HE.test(x1))), nominal = !POLITE_FRAME_HE.test(x1) && !framed && POLITE_NOMINAL_HE.exec(x1);
       if ((framed || nominal) && greetsOther) continue;
       const x = framed ? x1.replace(POLITE_FRAME_HE, '') : x1;
-      const work = modalWork || handling || (genImp && !DIRECT_IMP_BACK_HE.test(x) && !DIRECT_IMP_SEND_HE.test(x)) || (nominal ? NOMINAL_WORK_HE.test(nominal[1] || nominal[2]) : DIRECT_IMP_WORK_HE.test(x));
-      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : (DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)) || modal);
+      const work = modalWork || handling || pimpWork || (genImp && !DIRECT_IMP_BACK_HE.test(x) && !DIRECT_IMP_SEND_HE.test(x)) || (nominal ? NOMINAL_WORK_HE.test(nominal[1] || nominal[2]) : DIRECT_IMP_WORK_HE.test(x));
+      const back = nominal ? NOMINAL_BACK_HE.test(nominal[1] || nominal[2]) : ((!!pimp && !pimpWork) || DIRECT_IMP_BACK_HE.test(x) || (framed && DIRECT_IMP_SEND_HE.test(x)) || modal);
       if (!work && !back) continue;
       const d = dayOf(x1, now0).date;
       // A bare imperative with no day, to the reader alone or with one other («תעדכן אותי», «דבר איתי», «לא לשכוח את החשבונית בבקשה»): addressed straight to the reader, so it is the ask (real-mail dev set, 2026-11-19).

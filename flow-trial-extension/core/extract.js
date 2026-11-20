@@ -722,7 +722,7 @@ const FlowExtract = (() => {
     if (/^calendar-notification$/.test(local)) return true;
     // newsletter@ news@ marketing@ — the local part, not a longer word such as newspaper.
     if (/^(newsletter|news|marketing)(?![a-z0-9])/.test(local)) return true;
-    if (/\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b|\byou are receiving this\b|\byou(?:'|’)re receiving this\b|\byou received this email because\b|קיבלת מייל זה|להסרה מרשימת התפוצה|הנך רשום|\bcontent (?:was|is) auto-?generated\b|\bauto-?generated (?:by|notes|summary)\b|\bwe(?:'|’)re getting your order ready\b|(?<!\bif )(?<!\bwhether )\byour order (?:is|has been) (?:ready|shipped|on its way|confirmed|being prepared|out for delivery)\b|\btrack your (?:order|package|delivery|parcel)\b|(?<!אם )(?<!האם )ההזמנה שלך (?:יצאה|נשלחה|מוכנה|התקבלה|בדרך)/i.test(text)) return true;
+    if (/\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b|\byou are receiving this\b|\byou(?:'|’)re receiving this\b|\byou received this email because\b|קיבלת מייל זה|להסרה מרשימת התפוצה|הנך רשום|\bcontent (?:was|is) auto-?generated\b|\bauto-?generated (?:by|notes|summary)\b|\bwe(?:'|’)re getting your order ready\b|(?<!\bif )(?<!\bwhether )\byour order (?:is|has been) (?:ready|shipped|on its way|confirmed|being prepared|out for delivery)\b|\btrack your (?:order|package|delivery|parcel)\b|\bdear valued\b|\bvalued customer\b|\blive demo\b|הדגמה חיה|\b(?:happy|glad|would love) to (?:show|give|schedule)[^.]{0,40}\bdemo\b|נשמח (?:להיפגש|לקבוע)[^.]{0,60}(?:הדגמה|דמו)|(?<!אם )(?<!האם )ההזמנה שלך (?:יצאה|נשלחה|מוכנה|התקבלה|בדרך)/i.test(text)) return true;
     return false;
   }
 
