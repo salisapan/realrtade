@@ -4,7 +4,7 @@
 // Conditional on detection: a request the engine stays silent on has no extraction or plan to score (that is the detection metric, real-eval.cjs).
 // Extraction per field: precision = right / extracted, coverage = right / gold-present, and a hallucination count where the text gives nothing and the engine invented a value.
 // Plan: exact = engine steps equal the gold steps as an ordered list; covers = every gold step is present; extra = steps the gold does not have. Held-out sets are not part of this lane (no held-out gold exists).
-// GLANCE_EXTRACT_V2=1 switches on the new behaviour behind its flag (OFF by default), see core/plan-extra.js when present.
+// GLANCE_PLAN_V2=1 switches on the new plan behaviour behind its flag (OFF by default): work-first order and the reply step after a work ask that asks to be told.
 process.env.GLANCE_SHIPPED = process.env.GLANCE_SHIPPED || 'wave2';
 const fs = require('fs'), path = require('path');
 const { recognize, OWN } = require('../capabilities/union.cjs');
@@ -19,7 +19,7 @@ for (const [set, files] of [['dev2', ['dev2/dev2-inbox-messages.jsonl']], ['dev3
 const STEP = { gmailDraft: 'reply_draft', googleTask: 'task', calendar: 'calendar_event', drive: 'save_file', oneDrive: 'save_file', saveFile: 'save_file' };
 function engine(r) {
   const own = OWN.gmail, col = []; for (let i = 0; i < Math.max(0, (r.toN || 1) - (r.ownInTo ? 1 : 0)); i++) col.push('colleague' + i + '@firm.example');
-  const rec = recognize({ surface: 'gmail', sender: { name: 'Person', email: r.fromKind === 'automated' ? 'noreply@firm.example' : 'person@firm.example' }, to: r.ownInTo === false ? col : [own].concat(col), cc: r.ownInTo === false ? [own] : [], subject: r.subject || 'RE: x', ownNames: ['סאלי', 'Sali'], now: new Date('2026-11-17T10:00:00+02:00') }, String(r.body || '').replace(/\[OWNER\]/g, 'סאלי'));
+  const rec = recognize({ surface: 'gmail', sender: { name: 'Person', email: r.fromKind === 'automated' ? 'noreply@firm.example' : 'person@firm.example' }, to: r.ownInTo === false ? col : [own].concat(col), cc: r.ownInTo === false ? [own] : [], subject: r.subject || 'RE: x', ownNames: ['סאלי', 'Sali'], now: new Date('2026-11-17T10:00:00+02:00'), planV2: process.env.GLANCE_PLAN_V2 === '1' }, String(r.body || '').replace(/\[OWNER\]/g, 'סאלי'));
   if (!rec || rec.family === 'none' || !rec.result || !rec.result.intent) return null;
   const I = rec.result.intent, f = I.facts || {}, e = I.entities || {}, steps = (rec.result.process && rec.result.process.steps) || [];
   const money = f.money && f.money.value != null ? f.money.value : (steps.map((s) => s.params && s.params.amount).find((a) => a != null) || null);

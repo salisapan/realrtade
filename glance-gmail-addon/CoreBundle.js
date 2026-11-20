@@ -10661,6 +10661,8 @@ const FlowIncomingJudge = (() => {
   const POLITE_FRAME_MID_HE = /(?<=^|[\s,;])(?:אשמח|נשמח|אודה|נודה|אבקש|נבקש)\s+(?:מאוד\s+)?(?:ש(?=ת[\u05D0-\u05EA])|אם\s+(?=ת[\u05D0-\u05EA])|ל(?=(?:טיפול|אישור|התייחסות|תגובת|עזרת)(?:ך|כם|כן))|על\s+(?=(?:התייחסות|עזרת)(?:ך|כם|כן)))/;
   // «אנא פנה למזכירות», «בבקשה פרט קצת יותר», «אנא שלח/י במייל חוזר»: a polite word and a plain imperative of a short closed list (real-mail personal dev set, 2026-11-20).
   const POLITE_IMP_HE = /^(?:אנא|נא|בבקשה)\s+(שלח|שלחי|פנה|פני|פרט|פרטי|אשר|אשרי|העבר|העבירי|צרף|צרפי|מלא|מלאי|חתום|חתמי|עדכן|עדכני|החזר|החזירי|בדוק|בדקי|השב|השיבי|הגב|הגיבי|תקן|תקני|הוסף|הוסיפי|קבע|קבעי|שמור|שמרי|הכן|הכיני|ודא|וודא|ודאי)(?:\/י)?(?![\u0590-\u05FF])/;
+  // «ותעדכן אותי», «תחזור אליי כשזה מוכן», «אשמח לעדכון לאחר מכן», «הודע לי»: the work ask also asks to be told when it is done.
+  const REPORT_BACK_HE = /(?:ת?עדכ(?:ן|ני|נו)\s+(?:אותי|אותנו|אליי|אלי)|תחזור(?:ו|י)?\s+(?:אליי|אלי|אלינו)|הודע(?:ו|י)?\s+לי|תודיע(?:ו|י)?\s+לי|אשמח\s+לעדכון|נשמח\s+לעדכון|דווח(?:ו|י)?\s+לי|תדווח(?:ו|י)?\s+לי)/;
   const POLITE_IMP_SEND_HE = /^(?:שלח|שלחי|העבר|העבירי|צרף|צרפי|החזר|החזירי)$/;
   const POLITE_IMP_CHANNEL_HE = /(?:במייל\s+חוזר|בחזרה|בהודעה\s+חוזרת|תשובה|בתגובה)/;
   const POLITE_IMP_WORK_HE = /^(?:פנה|פני|מלא|מלאי|חתום|חתמי|בדוק|בדקי|תקן|תקני|הוסף|הוסיפי|קבע|קבעי|שמור|שמרי|הכן|הכיני|ודא|וודא|ודאי)$/;
@@ -10769,7 +10771,7 @@ const FlowIncomingJudge = (() => {
       // A bare imperative with no day, to the reader alone or with one other («תעדכן אותי», «דבר איתי», «לא לשכוח את החשבונית בבקשה»): addressed straight to the reader, so it is the ask (real-mail dev set, 2026-11-19).
       const oneToOne = (i.to || []).length <= 2 && !greetsOther && (DIRECT_IMP_SEND_HE.test(x1) || /^דבר\s+איתי(?![\u0590-\u05FF])/.test(x1));
       if (d ? d < ymdOf(now0) : !(framed || nominal || oneToOne)) continue;
-      return { kind: work ? 'task' : 'reply', what: x.slice(0, 200), title: x.replace(/[.!?\s]+$/, '').slice(0, 80), dateIso: d, lang: 'he' };
+      return { kind: work ? 'task' : 'reply', what: x.slice(0, 200), title: x.replace(/[.!?\s]+$/, '').slice(0, 80), dateIso: d, lang: 'he', reportBack: !!work && REPORT_BACK_HE.test(ownText) };
     }
     // 1. plain information questions
     // A chat opens on the same line as its first question ("היי, מה המחיר...?"): the greeting is not part of the question.
@@ -10838,7 +10840,12 @@ const FlowIncomingJudge = (() => {
   function directAskCard(i, body) {
     const hit = directAsk(i, body);
     if (!hit) return null;
-    if (hit.kind === 'task') { const c = doItCard(i, hit); c.intent.directAsk = true; return c; }
+    if (hit.kind === 'task') {
+      const c = doItCard(i, hit); c.intent.directAsk = true;
+      // i.planV2: a work ask that also asks to be told when it is done carries the reply draft after the task (the plan the person follows: do it, then answer).
+      if (i.planV2 === true && hit.reportBack === true && i.surface !== 'chat') { const rc = replyCard(i, hit), d = rc && rc.process && rc.process.steps.find((x) => x && (x.kind === 'gmailDraft' || x.kind === 'outlookDraft')); if (d) { d.params.lang = hit.lang; d.dependsOn = null; c.process.steps.push(d); } }
+      return c;
+    }
     if (i.surface === 'chat') {
       // No email draft in a chat: the person types the answer there. The card is a task to answer, with no day invented; it closes on their
       // own reply in that chat (core/model-plan.js chat anchors).
@@ -10888,9 +10895,17 @@ const FlowIncomingJudge = (() => {
     return { show: false, reason: 'quiet:group-not-addressed', intent: res.intent || null };
   }
 
+  // i.planV2 (OFF by default; measured in glance-ai/scoreboard/real-mail/extraction-plan-eval.cjs): a plan puts the work before the reply, the way the person does it: the task step comes ahead of the draft step when the two do not depend on each other.
+  function planOrdered(i, res) {
+    if (!i || i.planV2 !== true || !res || !res.show || !res.process || !Array.isArray(res.process.steps)) return res;
+    const st = res.process.steps, di = st.findIndex((x) => x && (x.kind === 'gmailDraft' || x.kind === 'outlookDraft')), ti = st.findIndex((x) => x && (x.kind === 'googleTask' || x.kind === 'outlookTask'));
+    if (di < 0 || ti < 0 || ti < di || st[di].dependsOn === st[ti].id || st[ti].dependsOn === st[di].id) return res;
+    const next = st.slice(); const [t] = next.splice(ti, 1); next.splice(di, 0, t);
+    return Object.assign({}, res, { process: Object.assign({}, res.process, { steps: next }) });
+  }
   function judge(input, deps) {
     const i = input || {};
-    return groupQuieted(i, judgeInner(i, deps));
+    return planOrdered(i, groupQuieted(i, judgeInner(i, deps)));
   }
 
   function judgeInner(input, deps) {

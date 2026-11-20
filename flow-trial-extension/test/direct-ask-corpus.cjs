@@ -253,6 +253,10 @@ console.log('\n--- a polite frame is an explicit ask; a please-do-not is not a r
     const r = judge(x); check('round-10 send verb without a channel stays quiet: ' + x.split('\n').filter(Boolean)[1].slice(0, 28), !r.show, kinds(r));
   }
   const ch = judge('שלום,\n\nאנא שלח/י במייל חוזר את הטופס החתום.\n\nתודה'); check('round-10 send verb with the reply channel offers', ch.show, kinds(ch));
+  // Plan order (flag planV2, off by default; invented sentence): the work comes before the reply when a plan has both; with the flag off the order is as before.
+  { const txt = 'היי סאלי,\n\nתעדכן אותי בבקשה עד יום ראשון אם ההזמנה שלך מוכנה.\n\nתודה'; const off = kinds(judge(txt)), on = kinds(judge(txt, { planV2: true }));
+    check('plan order is unchanged with the flag off', off === 'gmailDraft+googleTask', off);
+    check('plan order puts the task first with planV2', on === 'googleTask+gmailDraft', on); }
 }
 
 console.log('\nTOTAL FAILURES:', failures);
