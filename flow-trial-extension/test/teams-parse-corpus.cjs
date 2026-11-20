@@ -65,5 +65,39 @@ const missed = P.identify('https://teams.live.com/v2/', blank);
 check('a shell with no header is not a chat', missed.id === '');
 check('a miss names the missing signals and not the message', P.missingSignals(missed.signals) === 'urlChatId=missing domChatId=missing title=missing headerAria=missing' && P.missingSignals(missed.signals).indexOf('סיכום') < 0);
 
+const bare = dom('<div role="main" data-tid="chat-pane-main"><div data-tid="chat-header"><span>sali sapan (You)</span><button type="button">Call</button></div>' +
+  '<div data-tid="message-author-name">You</div><div data-tid="chat-pane-message" id="m-bare"><div data-tid="message-body"><p dir="auto">תוכל לשלוח לי את הסיכום עד מחר?</p></div></div></div>');
+const bareId = P.identify('https://teams.live.com/v2/', bare);
+const bareRows = P.messagesFromDom(bare);
+check('v2 header text without a heading is the self-chat', bareId.id === 'teams:title:sali sapan (you)' && bareId.signals.self === true && bareId.signals.title === 'sali sapan (You)', bareId);
+check('v2 self sender stays me', bareRows.length === 1 && bareRows[0].author === 'me', bareRows[0]);
+
+const said = dom('<div role="main" data-tid="chat-pane-main"><div data-tid="chat-header"><span>Dana Cohen</span></div>' +
+  '<div data-tid="chat-pane-message" id="m-said" aria-label="Dana Cohen said: Can you review the draft by Wednesday?"><div data-tid="message-body"><p dir="auto">Can you review the draft by Wednesday?</p></div></div></div>');
+const saidId = P.identify('https://teams.live.com/v2/', said);
+const saidRows = P.messagesFromDom(said);
+check('v2 header span names the one-to-one', saidId.signals.self === false && saidId.signals.title === 'Dana Cohen' && saidId.id === 'teams:title:dana cohen', saidId);
+check('v2 sender is read from the said label', saidRows.length === 1 && saidRows[0].author === 'them' && /review the draft/.test(saidRows[0].text), saidRows[0]);
+
+const user = dom('<div role="main"><div data-tid="message-username">Dana Cohen</div><div data-tid="chat-pane-message" id="m-user"><p dir="auto">Can you review the draft by Wednesday?</p></div></div>');
+check('v2 message-username is the sender', P.messagesFromDom(user)[0].author === 'them');
+
+const replyHead = dom('<div role="main"><div data-tid="reply-message-header"><span class="fui-StyledText">Dana Cohen</span><span>10:32</span></div>' +
+  '<div data-tid="chat-pane-message" id="m-reply"><div data-tid="message-body"><p dir="auto">Can you review the draft by Wednesday?</p></div></div></div>');
+check('v2 reply header span is the sender', P.messagesFromDom(replyHead)[0].author === 'them');
+
+check('window title is the chat when the DOM header is empty', P.titleFromDocument('Chat | sali sapan (You) | Microsoft Teams') === 'sali sapan (You)');
+check('a fixture title is not a chat', P.titleFromDocument('Glance Teams fixture') === '');
+const titled = P.identify('https://teams.live.com/v2/', blank, 'Chat | Dana Cohen | Microsoft Teams');
+check('v2 window title identifies the open chat', titled.id === 'teams:title:dana cohen' && titled.signals.self === false && titled.signals.title === 'Dana Cohen', titled);
+const titledSelf = P.identify('https://teams.live.com/v2/', blank, 'Chat | sali sapan (You) | Microsoft Teams');
+check('v2 window title identifies a self-chat', titledSelf.signals.self === true && titledSelf.id === 'teams:title:sali sapan (you)', titledSelf);
+
+const parent = 'https://teams.live.com/v2/#/conversations/19%3Aabc%40thread.v2?ctx=chat';
+check('the parent frame hash is the open chat', P.bestHref('https://teams.live.com/v2/', parent) === parent);
+check('the parent frame id is 19:', P.chatIdFromHref(P.bestHref('https://teams.live.com/v2/', parent)) === '19:abc@thread.v2');
+check('a frame that already has an id keeps it', P.bestHref('https://teams.microsoft.com/v2/#/l/chat/19%3Adana%40thread.v2', parent) === 'https://teams.microsoft.com/v2/#/l/chat/19%3Adana%40thread.v2');
+check('a foreign parent is ignored', P.bestHref('https://teams.live.com/v2/', 'https://mail.google.com/mail/u/0/#inbox') === 'https://teams.live.com/v2/');
+
 if (failures) process.exit(1);
 console.log('teams-parse-corpus: all passed');

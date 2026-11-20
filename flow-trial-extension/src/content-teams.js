@@ -87,9 +87,23 @@
     });
   }
 
-  async function loadMessages(main) {
+  function frameHref() {
+    let own = '';
+    let parentHref = '';
+    try { own = String(location.href || ''); } catch (e) { own = ''; }
+    try {
+      if (window.parent && window.parent !== window) parentHref = String(window.parent.location.href || '');
+    } catch (e) { parentHref = ''; }
+    return P.bestHref(own, parentHref);
+  }
+
+  function windowTitle() {
+    try { return P.titleFromDocument(document.title); } catch (e) { return ''; }
+  }
+
+  async function loadMessages(main, href) {
     if (P.domSufficient(main)) return P.messagesFromDom(main).slice(-MAX_ROWS);
-    const chatId = P.chatIdFromHref(location.href);
+    const chatId = P.chatIdFromHref(href);
     if (!chatId) return P.messagesFromDom(main).slice(-MAX_ROWS);
     const remote = await askWorker(chatId);
     if (remote && remote.ok && Array.isArray(remote.messages) && remote.messages.length) return remote.messages.slice(-MAX_ROWS);
@@ -154,7 +168,8 @@
     if (!P.page(location.href) && !isFixturePath()) { whyNot('not-teams-page', location.href); return; }
     if (isFixturePath() && !(await readDevFlag())) { whyNot('dev-fixture-off', location.href); return; }
     const main = root();
-    const found = P.identify(location.href, main);
+    const href = frameHref();
+    const found = P.identify(href, main, windowTitle());
     if (!found.id) {
       report(false, 'chat-not-identified');
       whyNot('chat-not-identified', P.missingSignals(found.signals));
@@ -164,7 +179,7 @@
     if (kind === 'group') { report(true); whyNot('not-one-to-one', found.signals.title || found.id); return; }
     const oneToOne = kind === 'dm';
     const title = found.signals.title || P.titleOf(main);
-    const list = await loadMessages(main);
+    const list = await loadMessages(main, href);
     if (!list.length) { report(false, 'no-messages-recognised'); whyNot('no-messages-recognised', 'bubbles=0'); return; }
     report(true);
     const party = { name: P.partyName(title) || 'Teams chat', email: null };

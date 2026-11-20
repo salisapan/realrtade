@@ -93,6 +93,13 @@ const FlowTeamsParse = (() => {
     return t;
   }
 
+  function plainName(text) {
+    const t = usableTitle(text);
+    if (!t || t.length > 80) return '';
+    if (/^\d{1,2}:\d{2}/.test(t)) return '';
+    return t;
+  }
+
   function titleOf(root) {
     if (!root || !root.querySelector) return '';
     for (let i = 0; i < TITLE_SELECTORS.length; i++) {
@@ -101,7 +108,33 @@ const FlowTeamsParse = (() => {
       const t = usableTitle(el.getAttribute('data-glance-title') || el.getAttribute('aria-label') || el.textContent);
       if (t) return t;
     }
-    return '';
+    const header = root.querySelector('[data-tid="chat-header"]');
+    if (!header) return '';
+    const bits = Array.from(header.querySelectorAll('span, h1, h2, h3, [role="heading"]'));
+    for (let i = 0; i < bits.length; i++) {
+      if (bits[i].closest && bits[i].closest('button, [role="button"]')) continue;
+      const t = plainName(bits[i].textContent);
+      if (t) return t;
+    }
+    return plainName(header.textContent);
+  }
+
+  function titleFromDocument(title) {
+    const raw = fresh(title);
+    if (!raw) return '';
+    if (!/microsoft teams/i.test(raw) && !/^(?:chat|conversation|צ'אט|שיחה)\s*[|–-]/.test(raw)) return '';
+    let t = raw.replace(/\s*[|–-]\s*Microsoft Teams\s*$/i, '');
+    t = t.replace(/^(?:chat|conversation|צ'אט|שיחה)\s*[|–-]\s*/i, '');
+    if (/^microsoft teams$/i.test(fresh(t))) return '';
+    return plainName(t);
+  }
+
+  function bestHref(own, parentHref) {
+    const a = String(own || '');
+    if (chatIdFromHref(a)) return a;
+    const b = String(parentHref || '');
+    if (b && b !== a && page(b) && chatIdFromHref(b)) return b;
+    return a;
   }
 
   function headerAria(root) {
@@ -159,16 +192,29 @@ const FlowTeamsParse = (() => {
     return joinText(pieces);
   }
 
+  const AUTHOR_SELECTOR = '[data-tid="message-author-name"], [data-tid="message-author"], [data-tid="message-username"]';
+
   function authorName(node) {
     if (!node || !node.querySelector) return '';
-    const inside = node.querySelector('[data-tid="message-author-name"], [data-tid="message-author"]');
+    const inside = node.querySelector(AUTHOR_SELECTOR);
     if (inside && node.contains(inside)) return fresh(inside.textContent);
+    const reply = node.querySelector('[data-tid="reply-message-header"] span');
+    if (reply && node.contains(reply)) {
+      const named = plainName(reply.textContent);
+      if (named) return named;
+    }
     let prev = node.previousElementSibling;
     let hops = 0;
     while (prev && hops < 4) {
-      if (prev.getAttribute && prev.getAttribute('data-tid') === 'message-author-name') return fresh(prev.textContent);
-      const nested = prev.querySelector && prev.querySelector('[data-tid="message-author-name"], [data-tid="message-author"]');
+      const tid = prev.getAttribute && prev.getAttribute('data-tid');
+      if (tid === 'message-author-name' || tid === 'message-author' || tid === 'message-username') return fresh(prev.textContent);
+      const nested = prev.querySelector && prev.querySelector(AUTHOR_SELECTOR);
       if (nested) return fresh(nested.textContent);
+      if (tid === 'reply-message-header') {
+        const span = prev.querySelector && prev.querySelector('span');
+        const named = plainName(span ? span.textContent : prev.textContent);
+        if (named) return named;
+      }
       prev = prev.previousElementSibling;
       hops += 1;
     }
@@ -181,6 +227,12 @@ const FlowTeamsParse = (() => {
     if (raw === 'me' || raw === 'them') return raw;
     const aria = String((node.getAttribute && node.getAttribute('aria-label')) || '');
     if (/^(?:you|אתה|את)\b|you sent|הודעה שלך/i.test(aria)) return 'me';
+    const said = aria.match(/^\s*(.{1,80}?)\s+said\b/i) || aria.match(/^\s*(.{1,80}?)\s+אמר(?:ה|ת)?\b/);
+    if (said) {
+      const who = fresh(said[1]);
+      if (SELF_NAME.test(who) || SELF_MARK.test(who)) return 'me';
+      if (who) return 'them';
+    }
     const name = authorName(node);
     if (SELF_NAME.test(name)) return 'me';
     if (name) return 'them';
@@ -231,7 +283,7 @@ const FlowTeamsParse = (() => {
   function identify(href, root, titleHint) {
     const urlChatId = chatIdFromHref(href);
     const domChatId = chatIdFromDom(root);
-    const title = usableTitle(titleHint) || titleOf(root);
+    const title = titleOf(root) || titleFromDocument(titleHint) || usableTitle(titleHint);
     const aria = headerAria(root);
     const signals = { urlChatId: urlChatId, domChatId: domChatId, title: title, headerAria: aria };
     signals.self = isSelfChat(title, aria, urlChatId || domChatId);
@@ -285,6 +337,8 @@ const FlowTeamsParse = (() => {
     page: page,
     chatIdFromHref: chatIdFromHref,
     chatIdFromDom: chatIdFromDom,
+    bestHref: bestHref,
+    titleFromDocument: titleFromDocument,
     identify: identify,
     missingSignals: missingSignals,
     isSelfChat: isSelfChat,

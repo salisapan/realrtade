@@ -20,6 +20,8 @@ check('background loads teams-web-read and lane-teams-worker', /teams-web-read\.
 check('content-teams never clicks send', !/\.click\s*\(/.test(content) && !/requestSubmit/.test(content));
 check('worker handles flow:teams-web-read', /flow:teams-web-read/.test(worker));
 check('content asks the worker for Graph read only', /flow:teams-web-read/.test(content) && !/fetch\s*\(\s*['\"]https:\/\/graph/.test(content));
+check('content identifies the open chat from the frame, its parent, and the window title', /bestHref/.test(content) && /titleFromDocument/.test(content) && /chat-not-identified/.test(content) && /missingSignals/.test(content));
+check('content names an unidentified sender and never posts', /sender-not-identified/.test(content) && !/\bPOST\b/.test(content));
 check('Connect files untouched in this lane', !fs.existsSync(path.join(root, 'src/outlook-connect.js')) || bg.indexOf('teams.microsoft.com') >= 0);
 
 if (failures) process.exit(1);
