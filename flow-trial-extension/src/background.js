@@ -854,24 +854,40 @@ async function injectTeamsOpenTabs() {
         func: () => Boolean(window.__glanceLaneTeamsBoot)
       });
       missing = (reply || []).filter((row) => row && row.result !== true && typeof row.frameId === 'number').map((row) => row.frameId);
-    } catch (e) { missing = []; }
+    } catch (e) {
+      const detail = e && e.message ? String(e.message) : 'frames-unread';
+      teamsSwLine('[Glance] teams why-not teams-lane-not-injected ' + detail);
+      continue;
+    }
     if (!missing.length) continue;
     try {
       if (chrome.scripting.insertCSS) await chrome.scripting.insertCSS({ target: { tabId: tab.id, frameIds: missing }, files: LANE_CHAT_CSS });
       await chrome.scripting.executeScript({ target: { tabId: tab.id, frameIds: missing }, files: files });
     } catch (e) {
       const detail = e && e.message ? String(e.message) : '';
-      console.info('[Glance] teams why-not teams-lane-not-injected' + (detail ? ' ' + detail : ''));
+      teamsSwLine('[Glance] teams why-not teams-lane-not-injected' + (detail ? ' ' + detail : ''));
     }
   }
 }
 
 let teamsLaneJob = null;
+let lastTeamsSwLine = { line: '', at: 0 };
+function teamsSwLine(line) {
+  const text = String(line || '').slice(0, 400);
+  if (text.indexOf('[Glance] teams ') !== 0) return;
+  const now = Date.now();
+  if (text === lastTeamsSwLine.line && now - lastTeamsSwLine.at < 1200) return;
+  lastTeamsSwLine = { line: text, at: now };
+  try { console.info(text); } catch (e) { /* no console */ }
+  const bag = globalThis.__glanceTeamsLines || (globalThis.__glanceTeamsLines = []);
+  bag.push(text);
+  if (bag.length > 40) bag.splice(0, bag.length - 40);
+}
 function queueRestoreLaneTeams() {
   const run = Promise.resolve(teamsLaneJob).then(() => restoreLaneTeams());
   teamsLaneJob = run.then(() => { if (teamsLaneJob === run) teamsLaneJob = null; }, (err) => {
     const detail = err && err.message ? String(err.message) : '';
-    console.info('[Glance] teams why-not teams-lane-not-registered ' + detail);
+    teamsSwLine('[Glance] teams why-not teams-lane-not-registered ' + detail);
     if (teamsLaneJob === run) teamsLaneJob = null;
   });
   return run;
@@ -882,12 +898,13 @@ async function restoreLaneTeams() {
   let on = false;
   try { on = await chrome.permissions.contains({ origins: TEAMS_HOSTS }); }
   catch (e) {
-    console.info('[Glance] teams why-not teams-permission-unknown');
+    teamsSwLine('[Glance] teams why-not teams-permission-unknown');
     return;
   }
   const id = LANE_TEAMS.id;
   if (!on) {
     try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) { /* not registered */ }
+    teamsSwLine('[Glance] teams why-not host-not-granted');
     return;
   }
   let row = await teamsScriptRow();
@@ -911,10 +928,10 @@ async function restoreLaneTeams() {
       }
     }
     if (!registered) {
-      console.info('[Glance] teams why-not teams-lane-not-registered' + (lastError ? ' ' + lastError : ''));
+      teamsSwLine('[Glance] teams why-not teams-lane-not-registered' + (lastError ? ' ' + lastError : ''));
       return;
     }
-    console.info('[Glance] teams lane registered ' + spec.matches.join(' '));
+    teamsSwLine('[Glance] teams lane registered ' + spec.matches.join(' '));
   }
   await injectTeamsOpenTabs();
 }
@@ -936,6 +953,13 @@ try {
     chrome.permissions.onRemoved.addListener((perm) => {
       restoreLaneChats();
       if (teamsPermissionTouches(perm)) queueRestoreLaneTeams();
+    });
+  }
+  if (chrome.tabs && chrome.tabs.onUpdated && chrome.tabs.onUpdated.addListener) {
+    chrome.tabs.onUpdated.addListener((_tabId, info, tab) => {
+      const url = (info && info.url) || (tab && tab.url) || '';
+      if (!/^https:\/\/teams\.(?:live|microsoft)\.com\//.test(url)) return;
+      queueRestoreLaneTeams();
     });
   }
 } catch (e) { /* the next wake reads the grant again */ }
@@ -2971,14 +2995,31 @@ async function chatCalendarTarget() {
 }
 
 async function chatTaskTarget(msg) {
-  // The Teams web lane is on when the host is granted. It does not sit behind the Labs chat-card switch,
-  // and it does not need Microsoft: Google Tasks is enough, Outlook only when that is what is connected.
-  if (!(msg && msg.channel === 'teams') && !(await glanceSwitchOn(msg && msg.own === true ? 'CHAT_PROMISE_CARD' : 'CHAT_TASK_CARD'))) return { ok: false, reason: 'switch-off' };
-  if (msg && msg.kind === 'calendar') return chatCalendarTarget();
-  // Google writes through the lane, which needs the connected account on record (a chat page has no mailbox to name it).
+  // The Teams web lane is on when the Teams host is granted. It does not sit behind the Labs
+  // chat-card switch. A task uses Google Tasks when that account is connected. Microsoft is
+  // not required; Outlook is only a fallback when Google Tasks is absent and Outlook is connected.
+  const teamsLane = !!(msg && msg.channel === 'teams');
+  if (!teamsLane && !(await glanceSwitchOn(msg && msg.own === true ? 'CHAT_PROMISE_CARD' : 'CHAT_TASK_CARD'))) return { ok: false, reason: 'switch-off' };
+  const tasksAuth = await getGoogleTasksAuth();
+  if (msg && msg.kind === 'calendar') {
+    const hold = await chatCalendarTarget();
+    if (hold && hold.ok) return hold;
+    if (teamsLane && tasksAuth) return { ok: true, connectorId: 'googleTask' };
+    return hold || { ok: false, reason: 'not-connected' };
+  }
+  if (teamsLane && tasksAuth) return { ok: true, connectorId: 'googleTask' };
   let account = '';
   try { account = globalThis.FlowGoogleLaneAccount ? await globalThis.FlowGoogleLaneAccount.read() : ''; } catch (e) { account = ''; }
-  if (account && await getGoogleTasksAuth()) return { ok: true, connectorId: 'googleTask' };
+  if (account && (tasksAuth || await getGoogleTasksAuth())) return { ok: true, connectorId: 'googleTask' };
+  // Teams does not wake Microsoft. Outlook is a fallback only when that account is already stored.
+  if (teamsLane) {
+    let stored = null;
+    try {
+      const bag = await chrome.storage.local.get('outlookAuth');
+      stored = bag && bag.outlookAuth && bag.outlookAuth.token;
+    } catch (e) { stored = null; }
+    if (!stored) return { ok: false, reason: 'not-connected' };
+  }
   try {
     const session = await outlookSession({});
     if (session && session.ok && session.token && outlookHasTasksScope(session.token) !== false) return { ok: true, connectorId: 'outlookTask' };
@@ -7942,6 +7983,17 @@ if (chrome.runtime.onConnect && typeof chrome.runtime.onConnect.addListener === 
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === 'flow:teams-trace') {
+    let fromUs = false;
+    try {
+      const url = sender && sender.url ? String(sender.url) : '';
+      fromUs = Boolean(sender && sender.id && chrome.runtime && sender.id === chrome.runtime.id)
+        || url.indexOf('chrome-extension://' + (chrome.runtime && chrome.runtime.id ? chrome.runtime.id : '') + '/') === 0
+        || /^https:\/\/teams\.(?:live|microsoft)\.com\//.test(url);
+    } catch (e) { fromUs = false; }
+    if (fromUs) teamsSwLine(msg.line);
+    return;
+  }
   if (!msg || !msg.type) return;
   // Signup, later, opens the one Meta consent page. The prompt stays on that page.
   if (msg.type === 'flow:open-meta-chats') {

@@ -84,12 +84,18 @@
 
   function whyNot(reason, detail) {
     const extra = detail ? ' ' + String(detail) : '';
-    const line = '[Glance] teams why-not ' + reason + extra;
-    trace(line);
+    trace('[Glance] teams why-not ' + reason + extra);
     try {
       const node = document.querySelector('[data-glance-quiet]');
-      if (node) { node.hidden = false; node.textContent = line; }
+      if (node) { node.hidden = false; node.textContent = '[Glance] teams why-not ' + reason + extra; }
     } catch (e) { /* gone */ }
+  }
+
+  function probe(href, found, bubbles) {
+    const id = found && found.id ? String(found.id).slice(0, 80) : 'none';
+    const self = found && found.signals && found.signals.self ? 'true' : 'false';
+    const url = String(href || '').replace(/[\r\n]/g, '').slice(0, 180);
+    trace('[Glance] teams probe url=' + url + ' chat=' + id + ' self=' + self + ' bubbles=' + bubbles);
   }
 
   function askWorker(chatId) {
@@ -120,7 +126,9 @@
 
   async function loadMessages(main, href) {
     const local = P.messagesFromDom(main).slice(-MAX_ROWS);
-    if (P.domSufficient(main)) return local;
+    // The open bubbles are the read. Graph is optional enrichment and is not
+    // required, and it is not asked when Microsoft is not connected.
+    if (local.length) return local;
     const chatId = P.chatIdFromHref(href);
     if (!chatId) return local;
     const remote = await askWorker(chatId);
@@ -143,8 +151,8 @@
       }
     }
     if (who !== 'them') {
-      if (who === 'me') whyNot('from-me', key);
-      else whyNot('sender-not-identified', key);
+      if (who === 'me') whyNot('from-me');
+      else whyNot('sender-not-identified');
       return;
     }
     if (!text || inflight.has(key)) return;
@@ -158,7 +166,7 @@
       }
       const r = await FlowChatLane.draftInto(box, input);
       if (typeof FlowChatTaskCard !== 'undefined') await FlowChatTaskCard.afterDraft(r, input, box);
-      if (!(r && r.ok && r.judged && r.judged.draft)) whyNot((r && r.reason) || 'silence', key);
+      if (!(r && r.ok && r.judged && r.judged.draft)) whyNot((r && r.reason) || 'silence');
       else drafted.add(key);
     })();
     finish.catch(() => whyNot('draft-failed', key)).finally(() => { inflight.delete(key); });
@@ -173,10 +181,10 @@
     const input = P.judgeInput(last, party, { oneToOne: true, group: false, key: key, now: Date.now(), selfChat: true });
     const asLoop = Object.assign({}, input, { fromMe: false, own: false, selfChat: true, oneToOne: true, group: false });
     const finish = (async () => {
-      if (typeof FlowChatTaskCard === 'undefined') { whyNot('card-missing', threadId); return; }
+      if (typeof FlowChatTaskCard === 'undefined') { whyNot('card-missing'); return; }
       FlowChatTaskCard.sync(key);
       const offered = await FlowChatTaskCard.offer(asLoop);
-      if (!(offered && offered.shown)) whyNot((offered && offered.reason) || 'silence', threadId);
+      if (!(offered && offered.shown)) whyNot((offered && offered.reason) || 'silence');
     })();
     finish.catch(() => whyNot('draft-failed', threadId)).finally(() => { inflight.delete(key); });
     await finish;
@@ -188,21 +196,24 @@
     const main = root();
     const href = frameHref();
     const found = P.identify(href, main, windowTitle());
+    const bubbles = P.messagesFromDom(main).length;
+    probe(href, found, bubbles);
     if (!found.id) {
       report(false, 'chat-not-identified');
       whyNot('chat-not-identified', P.missingSignals(found.signals));
       return;
     }
     const kind = P.threadKind(main);
-    if (kind === 'group') { report(true); whyNot('not-one-to-one', found.signals.title || found.id); return; }
+    if (kind === 'group') { report(true); whyNot('not-one-to-one'); return; }
     const oneToOne = kind === 'dm';
     const title = found.signals.title || P.titleOf(main);
     const list = await loadMessages(main, href);
-    if (!list.length) { report(false, 'no-messages-recognised'); whyNot('no-messages-recognised', 'bubbles=0'); return; }
+    if (!list.length) { report(false, 'no-messages'); whyNot('no-messages', 'bubbles=0'); return; }
     report(true);
     const party = { name: P.partyName(title) || 'Teams chat', email: null };
     try { document.documentElement.setAttribute('data-glance-lane-teams', 'on'); } catch (e) { /* */ }
-    if (found.signals.self) {
+    const allMine = list.every((m) => (m.author || P.authorOf(m.node)) === 'me');
+    if (found.signals.self || allMine) {
       await offerLoop(main, list[list.length - 1], party, found.id);
       return;
     }
@@ -210,8 +221,11 @@
   }
 
   function schedule() {
-    clearTimeout(timer);
-    timer = setTimeout(() => { scan().catch((e) => console.error('[Glance] Teams scan failed', e)); }, DEBOUNCE_MS);
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      scan().catch((e) => whyNot('scan-failed', e && e.message ? String(e.message).slice(0, 80) : 'error'));
+    }, DEBOUNCE_MS);
   }
 
   const watch = document.documentElement || document.body;

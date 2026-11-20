@@ -60,14 +60,22 @@ function bodyOf(html) {
   return m ? m[1] : html;
 }
 
-async function openV2(glance, html, switches) {
+async function openV2(glance, html, switches, auth) {
   if (server.reset) server.reset();
   server.setAccount('me@x.com');
   await glance.seedGmail(Object.assign({
     googleConnectedAccount: { email: 'me@x.com', at: Date.now(), source: 'web' },
     glanceDevFixture: true
   }, switches ? { glanceSwitches: switches } : {}));
-  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; }, server.origin);
+  if (auth === 'google-only' || auth === 'neither') {
+    await glance.evaluateWorker(async (mode) => {
+      await chrome.storage.local.remove(['outlookAuth', 'outlookSync']);
+      if (mode === 'neither') {
+        await chrome.storage.local.remove(['googleTasksAuth', 'googleWebAuth', 'googleConnectedAccount', 'googleGrantedScopes', 'connectorId']);
+      }
+    }, auth);
+  }
+  await glance.evaluateWorker((origin) => { globalThis.__glanceE2e.httpOrigin = origin; globalThis.__glanceTeamsLines = []; }, server.origin);
   const page = await glance.context.newPage();
   const logs = [];
   page.on('console', (msg) => logs.push(msg.text()));
@@ -383,6 +391,30 @@ test('teams.live.com v2 one-to-one: the other person\'s ask shows a card without
   const page = await openV2(glance, html);
   await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
   expect((page.__glanceLogs || []).some((line) => line.indexOf('chat-not-identified') >= 0)).toBe(false);
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+});
+
+test('Microsoft disconnected, Google connected: the self-chat ask creates one Google Task', async ({ glance }) => {
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures/teams-v2-live-self.html'), 'utf8');
+  const page = await openV2(glance, html, null, 'google-only');
+  await expect(page.locator(CARD)).toBeVisible({ timeout: 20000 });
+  await page.locator(CARD + ' button.flow-chip').click();
+  await expect(page.locator(CARD + ' .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(Object.keys(server.tasks()).length).toBe(1);
+  const lines = await glance.evaluateWorker(() => globalThis.__glanceTeamsLines || []);
+  expect(lines.some((line) => line.indexOf('[Glance] teams probe ') === 0 && line.indexOf('self=true') >= 0 && line.indexOf('bubbles=') >= 0)).toBe(true);
+  expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
+});
+
+test('neither Microsoft nor Google: the self-chat logs why-not and writes nothing', async ({ glance }) => {
+  const html = fs.readFileSync(path.join(__dirname, 'fixtures/teams-v2-live-self.html'), 'utf8');
+  const page = await openV2(glance, html, null, 'neither');
+  await expect.poll(async () => {
+    const lines = await glance.evaluateWorker(() => globalThis.__glanceTeamsLines || []);
+    return lines.some((line) => line.indexOf('[Glance] teams why-not not-connected') >= 0);
+  }, { timeout: 20000 }).toBe(true);
+  await expect(page.locator(CARD)).toHaveCount(0);
+  expect(Object.keys(server.tasks()).length).toBe(0);
   expect(await page.evaluate(() => window.__glanceSendClicks || 0)).toBe(0);
 });
 
