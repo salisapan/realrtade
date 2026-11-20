@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+
+<html dir="ltr" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="light dark" name="color-scheme"/>
+<meta content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5" name="viewport"/>
+<meta content="Three Flow setups: a dedicated secure cloud that masks all sensitive data before processing, Flow-Edge on the employee's own computer, and Flow-Onprem on a dedicated server in the office network." data-he-content="שלוש אפשרויות ל-Flow: ענן מאובטח ייעודי שמסתיר כל מידע רגיש לפני עיבוד, Flow-Edge על המחשב של העובד עצמו, ו-Flow-Onprem על שרת ייעודי ברשת המשרד." data-de-content="Drei Flow-Varianten: eine dedizierte sichere Cloud, die alle sensiblen Daten vor der Verarbeitung maskiert, Flow-Edge auf dem eigenen Rechner der Mitarbeitenden, und Flow-Onprem auf einem dedizierten Server im Büronetzwerk." data-fr-content="Trois configurations Flow : un cloud sécurisé dédié qui masque toutes les données sensibles avant tout traitement, Flow-Edge sur l’ordinateur de l’employé, et Flow-Onprem sur un serveur dédié dans le réseau du cabinet." data-es-content="Tres configuraciones de Flow: una nube segura dedicada que enmascara todos los datos sensibles antes del procesamiento, Flow-Edge en el ordenador del propio empleado, y Flow-Onprem en un servidor dedicado en la red del despacho." name="description"/>
+<meta content="#07090F" name="theme-color"/>
+<link href="https://theflow-ai.com/solutions/deployment.html" rel="canonical"/>
+<link href="../favicon.ico" rel="icon" sizes="any"/>
+<link href="../favicon-32x32.png" rel="icon" sizes="32x32" type="image/png"/>
+<link href="../favicon-48x48.png" rel="icon" sizes="48x48" type="image/png"/>
+<link href="../favicon-16x16.png" rel="icon" sizes="16x16" type="image/png"/>
+<link href="../apple-touch-icon.png" rel="apple-touch-icon"/>
+<title data-he="פריסה: איפה Flow רצה · Flow" data-de='Bereitstellung: Wo Flow läuft | Flow' data-fr='Déploiement : Où Flow s’exécute | Flow' data-es='Despliegue: Dónde se ejecuta Flow | Flow'>Deployment: Where Flow Runs | Flow</title>
+<meta content="website" property="og:type"/>
+<meta content="Deployment: Where Flow Runs | Flow" data-he-content="פריסה: איפה Flow רצה · Flow" data-de-content="Bereitstellung: Wo Flow läuft | Flow" data-fr-content="Déploiement : Où Flow s’exécute | Flow" data-es-content="Despliegue: Dónde se ejecuta Flow | Flow" property="og:title"/>
+<meta content="Three Flow setups: a dedicated secure cloud that masks all sensitive data before processing, Flow-Edge on the employee's own computer, and Flow-Onprem on a dedicated server in the office network." data-he-content="שלוש אפשרויות ל-Flow: ענן מאובטח ייעודי שמסתיר כל מידע רגיש לפני עיבוד, Flow-Edge על המחשב של העובד עצמו, ו-Flow-Onprem על שרת ייעודי ברשת המשרד." data-de-content="Drei Flow-Varianten: eine dedizierte sichere Cloud, die alle sensiblen Daten vor der Verarbeitung maskiert, Flow-Edge auf dem eigenen Rechner der Mitarbeitenden, und Flow-Onprem auf einem dedizierten Server im Büronetzwerk." data-fr-content="Trois configurations Flow : un cloud sécurisé dédié qui masque toutes les données sensibles avant tout traitement, Flow-Edge sur l’ordinateur de l’employé, et Flow-Onprem sur un serveur dédié dans le réseau du cabinet." data-es-content="Tres configuraciones de Flow: una nube segura dedicada que enmascara todos los datos sensibles antes del procesamiento, Flow-Edge en el ordenador del propio empleado, y Flow-Onprem en un servidor dedicado en la red del despacho." property="og:description"/>
+<meta content="https://theflow-ai.com/solutions/deployment.html" property="og:url"/>
+<meta content="https://theflow-ai.com/og.jpg" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Deployment: Where Flow Runs | Flow" data-he-content="פריסה: איפה Flow רצה · Flow" data-de-content="Bereitstellung: Wo Flow läuft | Flow" data-fr-content="Déploiement : Où Flow s’exécute | Flow" data-es-content="Despliegue: Dónde se ejecuta Flow | Flow" name="twitter:title"/>
+<meta content="Three Flow setups: a dedicated secure cloud that masks all sensitive data before processing, Flow-Edge on the employee's own computer, and Flow-Onprem on a dedicated server in the office network." data-he-content="שלוש אפשרויות ל-Flow: ענן מאובטח ייעודי שמסתיר כל מידע רגיש לפני עיבוד, Flow-Edge על המחשב של העובד עצמו, ו-Flow-Onprem על שרת ייעודי ברשת המשרד." data-de-content="Drei Flow-Varianten: eine dedizierte sichere Cloud, die alle sensiblen Daten vor der Verarbeitung maskiert, Flow-Edge auf dem eigenen Rechner der Mitarbeitenden, und Flow-Onprem auf einem dedizierten Server im Büronetzwerk." data-fr-content="Trois configurations Flow : un cloud sécurisé dédié qui masque toutes les données sensibles avant tout traitement, Flow-Edge sur l’ordinateur de l’employé, et Flow-Onprem sur un serveur dédié dans le réseau du cabinet." data-es-content="Tres configuraciones de Flow: una nube segura dedicada que enmascara todos los datos sensibles antes del procesamiento, Flow-Edge en el ordenador del propio empleado, y Flow-Onprem en un servidor dedicado en la red del despacho." name="twitter:description"/>
+<meta content="https://theflow-ai.com/og.jpg" name="twitter:image"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Deployment","item":"https://theflow-ai.com/solutions/deployment.html"}]}</script>
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat — which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.btn{display:inline-block; background:var(--cat); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:13px 30px; border-radius:999px}
+.btn:hover{filter:brightness(1.1)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+</style>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';d.dataset.ui=l;var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<link href="../assets/flow-header.css" rel="stylesheet"/>
+<link href="../assets/flow-booking.css" rel="stylesheet"/>
+<link href="../assets/flow-inner.css" rel="stylesheet"/>
+<style id="fc-dp-h1">/* 14/11 final close: black-to-blue H1 like every other page (light 90deg LTR / 270deg RTL; dark #EEF2F9 > #5B8CFF 62% > #2D5EFF) */.dp-h1 b{font-weight:inherit;display:block}.dp-gw{display:block;font-style:normal;padding-inline:.04em .1em;margin-inline:-.04em -.1em;background:linear-gradient(90deg,#1d2433 0%,#1F46D6 62%,#2D5EFF 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}html[data-theme="dark"] .dp-gw{background:linear-gradient(90deg,#EEF2F9 0%,#5B8CFF 62%,#2D5EFF 100%);-webkit-background-clip:text;background-clip:text}html:is([dir="rtl"],[data-ui="he"],[lang="he"]) .dp-gw{background:linear-gradient(270deg,#1d2433 0%,#1F46D6 62%,#2D5EFF 100%);-webkit-background-clip:text;background-clip:text}html:is([dir="rtl"],[data-ui="he"],[lang="he"])[data-theme="dark"] .dp-gw{background:linear-gradient(270deg,#EEF2F9 0%,#5B8CFF 62%,#2D5EFF 100%);-webkit-background-clip:text;background-clip:text}</style><script defer src="/assets/flow-consent.js"></script></head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="ctl" id="ctl">
+<div class="lang">
+<button aria-controls="langMenu" aria-expanded="false" aria-haspopup="menu" aria-label="Language" id="langBtn" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" viewbox="0 0 16 16"><circle cx="8" cy="8" r="6.4"></circle><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"></path></svg>
+<span class="sr-only" id="langName">English</span>
+</button>
+<div aria-labelledby="langBtn" class="menu" id="langMenu" role="menu"></div>
+</div>
+<button aria-label="Night mode" aria-pressed="false" class="theme" id="themeBtn" type="button">
+<svg aria-hidden="true" class="sun" fill="none" stroke="currentColor" stroke-width="1.3" viewbox="0 0 16 16"><circle cx="8" cy="8" r="3"></circle><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"></path></svg>
+<svg aria-hidden="true" class="moon" fill="none" stroke="currentColor" stroke-width="1.3" viewbox="0 0 16 16"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"></path></svg>
+</button>
+</div>
+<flow-header data-base="../"></flow-header>
+<main id="main">
+<div class="wrap">
+<span class="eyebrow" data-he="פתרונות" data-de='Lösungen' data-fr='Solutions' data-es='Soluciones'>Solutions</span>
+<h1 class="title dp-h1" data-he="<b>איפה Flow רצה:</b> <span class=&quot;dp-gw&quot;>שלוש אפשרויות</span>" data-de="<b>Wo Flow läuft:</b> <span class=&quot;dp-gw&quot;>drei Varianten</span>" data-fr="<b>Où Flow s’exécute :</b> <span class=&quot;dp-gw&quot;>trois configurations</span>" data-es="<b>Dónde se ejecuta Flow:</b> <span class=&quot;dp-gw&quot;>tres configuraciones</span>"><b>Where Flow runs:</b> <span class="dp-gw">three setups</span></h1>
+<article>
+<p class="lead" data-he="צוותים במקצועות מוסדרים שואלים שתי שאלות: לאן המידע הולך, ומי יכול לחייב לחשוף אותו. Flow עונה בשלוש אפשרויות, והמשרד בוחר את זו שהמדיניות שלו דורשת. בכל השלוש, Flow מכינה את העבודה ואדם מאשר אותה לפני שמשהו נכתב." data-de='Regulierte Teams stellen zwei Fragen: wohin die Daten gehen, und wer den Zugriff darauf erzwingen kann. Flow antwortet mit drei Varianten, und das Büro wählt die, die seine Richtlinie verlangt. In allen dreien bereitet Flow die Arbeit vor, und ein Mensch gibt sie frei, bevor etwas geschrieben wird.' data-fr='Les équipes réglementées posent deux questions : où vont les données, et qui peut en exiger l’accès. Flow répond par trois configurations, et le cabinet choisit celle que sa politique exige. Dans les trois, Flow prépare le travail et une personne l’approuve avant que quoi que ce soit ne soit écrit.' data-es='Los equipos regulados plantean dos preguntas: adónde van los datos, y quién puede exigir acceso a ellos. Flow responde con tres configuraciones, y el despacho elige la que exige su política. En las tres, Flow prepara el trabajo y una persona lo aprueba antes de que se escriba nada.'>Regulated teams ask two questions: where the data goes, and who can compel access to it. Flow answers with three setups, and the office chooses the one its policy calls for. In all three, Flow prepares the work and a person approves it before anything is written.</p>
+<h2 data-he="שלוש האפשרויות" data-de='Die drei Varianten' data-fr='Les trois configurations' data-es='Las tres configuraciones'>The three setups</h2>
+<h3 data-he="1. הענן המאובטח הייעודי של Flow" data-de='1. Die dedizierte sichere Cloud von Flow' data-fr='1. Le cloud sécurisé dédié de Flow' data-es='1. La nube segura dedicada de Flow'>1. Flow's dedicated secure cloud</h3>
+<p data-he="Flow רצה בענן מאובטח ייעודי משלה, ומסתירה כל מידע רגיש לפני כל עיבוד. שמות, מזהים ושדות רגישים אחרים מוחלפים לפני שמודל רואה את החומר. זו האפשרות הקלה ביותר להתחיל איתה." data-de='Flow läuft in einer eigenen dedizierten sicheren Cloud und maskiert alle sensiblen Daten vor jeder Verarbeitung. Namen, Kennungen und andere sensible Felder werden ersetzt, bevor ein Modell das Material sieht. Das ist die leichteste Variante für den Einstieg.' data-fr='Flow s’exécute dans son propre cloud sécurisé dédié et masque toutes les données sensibles avant tout traitement. Les noms, identifiants et autres champs sensibles sont remplacés avant qu’un modèle ne voie le contenu. C’est la configuration la plus légère pour commencer.' data-es='Flow se ejecuta en su propia nube segura dedicada y enmascara todos los datos sensibles antes de cualquier procesamiento. Los nombres, identificadores y otros campos sensibles se sustituyen antes de que un modelo vea el material. Esta es la configuración más ligera para empezar.'>Flow runs in its own dedicated secure cloud, and masks all sensitive data before any processing. Names, identifiers and other sensitive fields are replaced before a model sees the material. This is the lightest setup to start with.</p>
+<h3 data-he="2.&#x200F; Flow-Edge" data-de='2. Flow-Edge' data-fr='2. Flow-Edge' data-es='2. Flow-Edge'>2. Flow-Edge</h3>
+<p data-he="למחשבים עם חומרה מתאימה. העיבוד מתבצע במחשב של העובד עצמו: המידע נשמר רק שם ולעולם לא יוצא ממנו." data-de='Für Computer mit geeigneter Hardware. Die Verarbeitung erfolgt auf dem eigenen Rechner der Mitarbeitenden: die Daten werden nur dort gespeichert und verlassen ihn niemals.' data-fr='Pour les ordinateurs disposant du matériel adapté. Le traitement s’effectue sur l’ordinateur de l’employé : les données n’y sont stockées que là et n’en sortent jamais.' data-es='Para ordenadores con el hardware adecuado. El procesamiento se realiza en el propio ordenador del empleado: los datos se almacenan solo allí y nunca salen de él.'>For computers with suitable hardware. Processing happens on the employee's own computer: data is stored only there and never leaves it.</p>
+<h3 data-he="3.&#x200F; Flow-Onprem" data-de='3. Flow-Onprem' data-fr='3. Flow-Onprem' data-es='3. Flow-Onprem'>3. Flow-Onprem</h3>
+<p data-he="שרת ייעודי ברשת הפנימית של המשרד. המידע לא עובר לענן חיצוני." data-de='Ein dedizierter Server im internen Netzwerk des Büros. Daten gehen niemals in eine externe Cloud.' data-fr='Un serveur dédié dans le réseau interne du cabinet. Les données ne vont jamais vers un cloud externe.' data-es='Un servidor dedicado en la red interna del despacho. Los datos nunca van a una nube externa.'>A dedicated server inside the office's internal network. Data never goes to an external cloud.</p>
+<h2 data-he="מיקום אינו ריבונות" data-de='Residenz ist nicht Souveränität' data-fr='La résidence n’est pas la souveraineté' data-es='La residencia no es soberanía'>Residency is not sovereignty</h2>
+<p data-he="מיקום הוא איפה הבייטים יושבים. ריבונות היא מי יכול לדרוש אותם. נעילת אזור עונה על השאלה הראשונה. היא לא עונה, בפני עצמה, על צו חשיפה, על זימון, או על ספק שיכול לקרוא את התוכן. קבעו איזו שאלה המדיניות באמת שואלת לפני שבוחרים אפשרות." data-de='Residenz ist, wo die Bytes liegen. Souveränität ist, wer sie verlangen kann. Eine Regionsbindung beantwortet die erste Frage. Sie beantwortet für sich genommen weder einen Herausgabebefehl noch eine Vorladung noch einen Anbieter, der die Nutzlast lesen kann. Benennen Sie, welche Frage die Richtlinie tatsächlich stellt, bevor Sie eine Variante wählen.' data-fr='La résidence, c’est l’endroit où se trouvent les octets. La souveraineté, c’est qui peut les exiger. Une fixation de région répond à la première question. Elle ne répond pas, à elle seule, à une injonction, à une assignation, ou à un fournisseur qui peut lire la charge utile. Indiquez quelle question la politique pose réellement avant de choisir une configuration.' data-es='La residencia es donde están los bytes. La soberanía es quién puede exigirlos. Fijar una región responde a la primera pregunta. Por sí sola, no responde a un requerimiento, a una citación, ni a un proveedor que pueda leer la carga útil. Indique qué pregunta plantea realmente la política antes de elegir una configuración.'>Residency is where the bytes sit. Sovereignty is who can demand them. A region pin answers the first question. It does not, by itself, answer a compel, a subpoena, or a vendor that can read the payload. Name which question the policy is actually asking before you pick a setup.</p>
+<h2 data-he="איך בוחרים" data-de='So wählen Sie' data-fr='Comment choisir' data-es='Cómo elegir'>How to choose</h2>
+<ul>
+<li data-he="הסתרת מידע לפני העיבוד, חוזה שמגביל שימוש ושער אנושי לפני כל כתיבה יכולים להספיק לחלק מהצוותים: זה הענן המאובטח הייעודי." data-de='Maskierte Nutzlasten, ein Vertrag, der die Nutzung beschränkt, und ein menschliches Tor vor jeder Schreiboperation können für einige Teams ausreichen: das ist die dedizierte sichere Cloud.' data-fr='Des charges utiles masquées, un contrat qui limite l’usage, et un contrôle humain avant toute écriture peuvent suffire à certaines équipes : c’est le cloud sécurisé dédié.' data-es='Las cargas útiles enmascaradas, un contrato que limita el uso y una puerta humana antes de cualquier escritura pueden bastar para algunos equipos: esa es la nube segura dedicada.'>Masked payloads, a contract that limits use, and a human gate before any write can be enough for some teams: that is the dedicated secure cloud.</li>
+<li data-he="כשהמדיניות אומרת שחומר לקוחות נשאר על המחשב של העובד: Flow-Edge, על מחשבים עם חומרה מתאימה." data-de='Wenn die Richtlinie vorgibt, dass Kundenmaterial auf dem Rechner der Mitarbeitenden bleibt: Flow-Edge, auf Computern mit geeigneter Hardware.' data-fr='Lorsque la politique exige que le contenu client reste sur l’ordinateur de l’employé : Flow-Edge, sur des ordinateurs disposant du matériel adapté.' data-es='Cuando la política exige que el material del cliente permanezca en el ordenador del empleado: Flow-Edge, en ordenadores con el hardware adecuado.'>When policy says client material stays on the employee's machine: Flow-Edge, on computers with suitable hardware.</li>
+<li data-he="כשהמדיניות אומרת שהוא נשאר בתוך רשת המשרד, על שרת שהמשרד שולט בו: Flow-Onprem." data-de='Wenn die Richtlinie vorgibt, dass es im Büronetzwerk bleibt, auf einem Server, den das Büro kontrolliert: Flow-Onprem.' data-fr='Lorsque la politique exige qu’il reste dans le réseau du cabinet, sur un serveur que le cabinet contrôle : Flow-Onprem.' data-es='Cuando la política exige que permanezca dentro de la red del despacho, en un servidor que el despacho controla: Flow-Onprem.'>When policy says it stays inside the office network, on a server the office controls: Flow-Onprem.</li>
+</ul>
+<p data-he="המדיניות מחליטה. סיסמה על ״AI פרטי״ לא. הביאו את המדיניות שחלה על החומר, את המערכות שכתיבה תיגע בהן ואת מי שחייב לאשר אותה, והאפשרות מתבררת מהן." data-de='Die Richtlinie entscheidet. Ein Slogan über "private KI" nicht. Bringen Sie die Richtlinie, die für das Material gilt, die Systeme, die eine Schreiboperation berühren würde, und wer sie freigeben muss, und die Variante ergibt sich daraus.' data-fr='C’est la politique qui décide. Un slogan sur l’« IA privée » ne le fait pas. Apportez la politique qui régit le contenu, les systèmes qu’une écriture toucherait, et qui doit l’approuver, et la configuration s’ensuit.' data-es='La política decide. Un eslogan sobre «IA privada» no. Traiga la política que rige el material, los sistemas que tocaría una escritura, y quién debe aprobarla, y la configuración se deriva de ello.'>The policy decides. A slogan about "private AI" does not. Bring the policy that governs the material, the systems a write would touch, and who must approve it, and the setup follows from them.</p>
+<h2 data-he="מה נשאר זהה בשלושתן" data-de='Was in allen dreien gleich bleibt' data-fr='Ce qui reste identique dans les trois' data-es='Lo que no cambia en las tres'>What stays the same in all three</h2>
+<ul>
+<li data-he="Flow מכינה; אדם מאשר. Flow לא שולחת ולא כותבת אוטומטית." data-de='Flow bereitet vor; ein Mensch gibt frei. Flow sendet und schreibt nicht automatisch.' data-fr='Flow prépare ; une personne approuve. Flow n’envoie et n’écrit pas automatiquement.' data-es='Flow prepara; una persona aprueba. Flow no envía ni escribe de forma automática.'>Flow prepares; a person approves. Flow does not auto-send or auto-write.</li>
+<li data-he='הביצוע הוא שלב מוגדר, לא שרשרת של קליקים מנוחשים. &lt;a href="../articles.html"&gt;מה אישור צריך להראות&lt;/a&gt;.' data-de='Die Ausführung ist ein festgelegter Schritt, keine Reihe geratener Klicks. &lt;a href="../articles.html"&gt;Was eine Freigabe zeigen muss&lt;/a&gt;.' data-fr='L’exécution est une étape définie, pas une série de clics devinés. &lt;a href="../articles.html"&gt;Ce que l’approbation doit montrer&lt;/a&gt;.' data-es='La ejecución es un paso definido, no una serie de clics adivinados. &lt;a href="../articles.html"&gt;Qué debe mostrar una aprobación&lt;/a&gt;.'>Execution is a defined step, not a series of guessed clicks. <a href='/articles'>What approval has to show</a>.</li>
+<li data-he='בקרות האבטחה מוסכמות עם צוות האבטחה שלכם במסגרת ההתקשרות. &lt;a href="../security.html"&gt;עמוד האבטחה&lt;/a&gt; מתאר את הארכיטקטורה.' data-de='Sicherheitskontrollen werden mit Ihrem Sicherheitsteam im Rahmen der Zusammenarbeit vereinbart. Die &lt;a href="../security.html"&gt;Sicherheitsseite&lt;/a&gt; beschreibt die Architektur.' data-fr='Les contrôles de sécurité sont convenus avec votre équipe de sécurité dans le cadre de la collaboration. La &lt;a href="../security.html"&gt;page sécurité&lt;/a&gt; décrit l’architecture.' data-es='Los controles de seguridad se acuerdan con su equipo de seguridad en el marco de la colaboración. La &lt;a href="../security.html"&gt;página de seguridad&lt;/a&gt; describe la arquitectura.'>Security controls are agreed with your security team in the engagement. The <a href='/security'>security page</a> describes the architecture.</li>
+</ul>
+<h2 data-he="שאלות נפוצות" data-de='Häufige Fragen' data-fr='Questions courantes' data-es='Preguntas habituales'>Common questions</h2>
+<h3 data-he="האם Flow שולחת מסמכים למודל ציבורי כברירת מחדל?" data-de='Sendet Flow Dokumente standardmäßig an ein öffentliches Modell?' data-fr='Flow envoie-t-il des documents à un modèle public par défaut ?' data-es='¿Flow envía documentos a un modelo público de forma predeterminada?'>Does Flow send documents to a public model by default?</h3>
+<p data-he="לא. בענן המאובטח הייעודי, מידע רגיש מוסתר לפני כל עיבוד. ב-Flow-Edge הוא נשאר במחשב של העובד. ב-Flow-Onprem הוא נשאר על שרת ברשת שלכם." data-de='Nein. In der dedizierten sicheren Cloud werden sensible Daten vor jeder Verarbeitung maskiert. Mit Flow-Edge bleiben sie auf dem Rechner der Mitarbeitenden. Mit Flow-Onprem bleiben sie auf einem Server in Ihrem Netzwerk.' data-fr='Non. Dans le cloud sécurisé dédié, les données sensibles sont masquées avant tout traitement. Avec Flow-Edge, elles restent sur l’ordinateur de l’employé. Avec Flow-Onprem, elles restent sur un serveur dans votre réseau.' data-es='No. En la nube segura dedicada, los datos sensibles se enmascaran antes de cualquier procesamiento. Con Flow-Edge permanecen en el ordenador del empleado. Con Flow-Onprem permanecen en un servidor de su red.'>No. In the dedicated secure cloud, sensitive data is masked before any processing. With Flow-Edge it stays on the employee's computer. With Flow-Onprem it stays on a server in your network.</p>
+<h3 data-he="אפשר לשנות אפשרות בהמשך?" data-de='Können wir die Variante später ändern?' data-fr='Pouvons-nous changer de configuration plus tard ?' data-es='¿Podemos cambiar de configuración más adelante?'>Can we change setups later?</h3>
+<p data-he="האפשרות נבחרת עם המשרד במסגרת ההתקשרות. דברו איתנו על מעבר ביניהן. העמוד הזה הוא מסגור מוצר, לא ייעוץ משפטי." data-de='Die Variante wird mit dem Büro im Rahmen der Zusammenarbeit gewählt. Sprechen Sie uns auf einen Wechsel an. Diese Seite ist eine Produkteinordnung, keine Rechtsberatung.' data-fr='La configuration est choisie avec le cabinet dans le cadre de la collaboration. Parlez-nous d’un passage de l’une à l’autre. Cette page est un cadrage produit, pas un conseil juridique.' data-es='La configuración se elige con el despacho en el marco de la colaboración. Háblenos de un cambio entre ellas. Esta página es un encuadre de producto, no un asesoramiento jurídico.'>Setup is chosen with the office in the engagement. Talk to us about moving between them. This page is product framing, not legal advice.</p>
+<h2 data-he="איפה זה רלוונטי" data-de="Wo dies gilt" data-fr="Où cela s’applique" data-es="Dónde aplica esto">Where this applies</h2>
+<p data-he='ראו את העמודים של &lt;a href="legal.html"&gt;משרדי עורכי דין&lt;/a&gt;, &lt;a href="insurance.html"&gt;סוכני ביטוח&lt;/a&gt;, &lt;a href="cpas.html"&gt;משרדי רואי חשבון&lt;/a&gt;, &lt;a href="hospitals.html"&gt;בתי חולים&lt;/a&gt; ו&lt;a href="government.html"&gt;המגזר הציבורי&lt;/a&gt;.' data-de='Sehen Sie die Seiten für &lt;a href="legal.html"&gt;Kanzleien&lt;/a&gt;, &lt;a href="insurance.html"&gt;Versicherungsagenturen&lt;/a&gt;, &lt;a href="cpas.html"&gt;Steuerkanzleien&lt;/a&gt;, &lt;a href="hospitals.html"&gt;Krankenhäuser&lt;/a&gt; und &lt;a href="government.html"&gt;den öffentlichen Sektor&lt;/a&gt;.' data-fr='Consultez les pages pour les &lt;a href="legal.html"&gt;avocats&lt;/a&gt;, les &lt;a href="insurance.html"&gt;courtiers en assurance&lt;/a&gt;, les &lt;a href="cpas.html"&gt;experts-comptables&lt;/a&gt;, les &lt;a href="hospitals.html"&gt;hôpitaux&lt;/a&gt; et &lt;a href="government.html"&gt;le secteur public&lt;/a&gt;.' data-es='Vea las páginas de &lt;a href="legal.html"&gt;despachos de abogados&lt;/a&gt;, &lt;a href="insurance.html"&gt;corredurías de seguros&lt;/a&gt;, &lt;a href="cpas.html"&gt;asesorías&lt;/a&gt;, &lt;a href="hospitals.html"&gt;hospitales&lt;/a&gt; y &lt;a href="government.html"&gt;el sector público&lt;/a&gt;.'>See the pages for <a href='/solutions/legal'>law firms</a>, <a href='/solutions/insurance'>insurance agents</a>, <a href='/solutions/cpas'>accounting firms</a>, <a href='/solutions/hospitals'>hospitals</a> and <a href='/solutions/government'>the public sector</a>.</p>
+<div class="cta">
+<h2 data-he="בוחרים אפשרות יחד איתנו" data-de='Wählen Sie mit uns eine Variante' data-fr='Choisissez une configuration avec nous' data-es='Elija una configuración con nosotros'>Choose a setup with us</h2>
+<p data-he="הטופס בעמוד הבית מבקש מייל עבודה וחוזר עם תוכנית פריסה." data-de='Das Formular auf der Startseite fragt nach einer geschäftlichen E-Mail und antwortet mit einem Bereitstellungsplan.' data-fr='Le formulaire de la page d’accueil demande une adresse e-mail professionnelle et renvoie un plan de déploiement.' data-es='El formulario de la página de inicio pide un correo de trabajo y responde con un plan de despliegue.'>The homepage form asks for a work email and comes back with a deployment plan.</p>
+<a class='doit' data-book data-ga='sol_deploy_waitlist' href='/#book'><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-he="קבלו תוכנית פריסה" data-de='Bereitstellungsplan erhalten' data-fr='Recevoir un plan de déploiement' data-es='Recibir un plan de despliegue'>Get a deployment plan</span></a>
+<p class="cta-alt" data-he='מעדיפים לדבר? &lt;a href="../contact.html"&gt;צרו קשר&lt;/a&gt; או &lt;a href="deployment.html"&gt;ראו את שלוש אפשרויות הפריסה&lt;/a&gt;.' data-de='Lieber besprechen? &lt;a href="../contact.html"&gt;Kontaktieren Sie uns&lt;/a&gt; oder &lt;a href="deployment.html"&gt;sehen Sie die drei Bereitstellungsvarianten&lt;/a&gt;.' data-fr='Vous préférez en parler ? &lt;a href="../contact.html"&gt;Contactez-nous&lt;/a&gt; ou &lt;a href="deployment.html"&gt;voir les trois configurations de déploiement&lt;/a&gt;.' data-es='¿Prefiere hablarlo? &lt;a href="../contact.html"&gt;Contacte con nosotros&lt;/a&gt; o &lt;a href="deployment.html"&gt;vea las tres configuraciones de despliegue&lt;/a&gt;.'>Prefer to talk it through? <a href='/contact'>Contact us</a> or <a href='/solutions/deployment'>see the three deployment setups</a>.</p>
+</div>
+</article>
+</div>
+</main>
+<footer class="site-foot" dir="ltr" id="footer" lang="en">
+<div class="foot-in">
+<div class="foot-cols">
+<div class="foot-col foot-brand">
+<img alt="Flow" height="28" loading="lazy" src="../assets/flow-logo-200.webp" width="64"/>
+<a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+</div>
+<nav aria-label="Product" class="foot-col">
+<h3 data-k="ft.hFlow">Product</h3>
+<a data-k='ft.glance' href='/glance'>Glance</a>
+<a data-k='ft.flow' href='/#product'>Flow</a>
+<a data-k='ft.sec' href='/security'>Security</a>
+<a data-k='ft.pricing' href='/pricing'>Pricing</a>
+<a data-k='ft.solutions' href='/solutions'>Solutions</a>
+</nav>
+<nav aria-label="Company" class="foot-col">
+<h3 data-k="ft.hCo">Company</h3>
+<a data-k='ft.about' href='/about'>About</a>
+<a data-k='ft.blog' href='/articles'>Insights</a>
+<a data-k='ft.contact' href='/contact'>Contact</a>
+</nav>
+</div>
+<div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav aria-label="Legal" class="foot-legal"><a data-k='ft.privacy' href='/privacy'>Privacy</a><a data-k='ft.terms' href='/terms'>Terms</a></nav></div>
+</div>
+</footer>
+<script src="../assets/flow-header.js"></script>
+<script src="../assets/flow-inner.js"></script>
+<script defer="" src="../assets/flow-booking.js"></script>
+<script src="../assets/flow-i18n.js"></script></body>
+</html>

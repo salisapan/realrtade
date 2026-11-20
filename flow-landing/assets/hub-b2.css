@@ -1,0 +1,72 @@
+/* Solutions option B2 · local 13.11: one phone, three profession cards, clearer active state, deeper float */
+.op-b2{padding:0 0 40px}
+.b2-in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.95fr);grid-template-areas:"copy stage" "cards stage";column-gap:72px;row-gap:28px;align-items:center;max-width:1120px;margin:0 auto;padding:56px 24px 24px;min-height:min(820px,calc(100svh - 64px));box-sizing:border-box}
+.b2-copy{grid-area:copy;align-self:end}
+.b2-copy .fx-h1{margin:0 0 14px;text-align:start}
+.b2-copy .fx-lead{margin:0;text-align:start;max-width:30em}
+.b2-copy .fx-cta{justify-content:flex-start;margin-top:24px}
+.b2-cards{grid-area:cards;align-self:start;display:flex;flex-direction:column;gap:12px}
+.b2-stage{grid-area:stage;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0 48px}
+/* cards */
+.b2-card{position:relative;display:flex;gap:16px;align-items:flex-start;padding:20px 22px 20px;border-radius:20px;cursor:pointer;background:var(--fx-card);
+ box-shadow:0 0 0 .5px rgba(0,0,0,.09),0 1px 2px rgba(0,0,0,.04);transition:transform .55s cubic-bezier(.22,1,.36,1),box-shadow .55s,background .4s;outline:none;overflow:hidden;-webkit-tap-highlight-color:transparent}
+html[data-theme="dark"] .b2-card{background:#101318;box-shadow:0 0 0 .5px rgba(255,255,255,.10)}
+.b2-card:hover{transform:translateY(-2px);box-shadow:0 0 0 .5px rgba(0,0,0,.09),0 10px 24px -12px rgba(15,22,45,.22)}
+.b2-card.on{transform:translateY(-3px) scale(1.012);box-shadow:var(--fx-sh-hero)}
+html[data-theme="dark"] .b2-card.on{background:#171b23;box-shadow:0 0 0 .5px rgba(255,255,255,.16),0 30px 60px -22px rgba(0,0,0,.9),0 0 50px -20px rgba(45,94,255,.35)}
+.b2-card:focus-visible{box-shadow:0 0 0 2px #2D5EFF,var(--fx-sh)}
+.b2-dot{flex:none;width:10px;height:10px;margin-top:9px;border-radius:50%;background:rgba(118,118,128,.38);transition:background .4s,box-shadow .4s}
+.b2-card.on .b2-dot{background:#2D5EFF;box-shadow:0 0 0 4px rgba(45,94,255,.16)}
+.b2-tx{flex:1;min-width:0}
+.op-b2 .b2-card .hb-t{font-size:20px;color:var(--ink);opacity:.78;transition:opacity .4s}
+.op-b2 .b2-card.on .hb-t{opacity:1}
+.op-b2 .b2-card .hb-d{margin-top:4px;font-size:15px;color:var(--fx-mut)}
+.op-b2 .b2-card .hb-go{margin-top:8px}
+.b2-card:not(.on) .hb-go{opacity:.75}
+.b2-tap{flex:none;align-self:center;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:var(--fx-mut);background:rgba(118,118,128,.10);transition:background .4s,color .4s,transform .5s cubic-bezier(.22,1,.36,1)}
+html[dir="rtl"] .b2-tap svg{transform:scaleX(-1)}
+.b2-card.on .b2-tap{background:#2D5EFF;color:#fff;box-shadow:0 6px 14px -6px rgba(45,94,255,.7)}
+.b2-card:hover .b2-tap{transform:translateX(2px)}
+html[dir="rtl"] .b2-card:hover .b2-tap{transform:translateX(-2px)}
+.b2-prog{position:absolute;inset-inline:22px;bottom:0;height:2px;border-radius:2px;background:transparent;overflow:hidden}
+.b2-prog::after{content:"";position:absolute;inset:0;background:#2D5EFF;opacity:.55;transform:scaleX(0);transform-origin:left}
+html[dir="rtl"] .b2-prog::after{transform-origin:right}
+.b2-card.on.run .b2-prog::after{animation:b2Prog var(--b2-dur,6.5s) linear forwards}
+@keyframes b2Prog{to{transform:scaleX(1)}}
+/* phone */
+.b2-float{position:relative;display:flex;flex-direction:column;align-items:center;animation:b2Float 9s ease-in-out infinite;will-change:transform}
+.b2-phone{width:300px;animation:none}
+.b2-phone .op-ph{filter:drop-shadow(0 1px 1px rgba(0,0,0,.06)) drop-shadow(0 6px 10px rgba(15,22,45,.08)) drop-shadow(0 22px 34px rgba(15,22,45,.16)) drop-shadow(0 54px 70px rgba(15,22,45,.20))}
+html[data-theme="dark"] .b2-phone .op-ph{filter:drop-shadow(0 0 .5px rgba(255,255,255,.28)) drop-shadow(0 24px 36px rgba(0,0,0,.7)) drop-shadow(0 50px 80px rgba(0,0,0,.6))}
+.b2-ground{position:absolute;left:50%;bottom:14px;width:230px;height:30px;margin-left:-115px;border-radius:50%;background:radial-gradient(closest-side,rgba(15,22,45,.26),rgba(15,22,45,.08) 60%,transparent);filter:blur(6px);animation:b2Ground 9s ease-in-out infinite;pointer-events:none}
+html[data-theme="dark"] .b2-ground{background:radial-gradient(closest-side,rgba(45,94,255,.30),rgba(45,94,255,.08) 60%,transparent)}
+@keyframes b2Float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+@keyframes b2Ground{0%,100%{transform:scaleX(1);opacity:1}50%{transform:scaleX(.86);opacity:.7}}
+/* label that names the profession on the phone */
+.b2-label{position:relative;z-index:2;display:inline-grid;grid-template-columns:auto auto;align-items:center;column-gap:8px;margin-bottom:-14px;padding:8px 16px 8px 13px;border-radius:999px;background:var(--fx-card);font-size:14px;font-weight:600;color:var(--ink);
+ box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 8px 20px -8px rgba(15,22,45,.30)}
+html[dir="rtl"] .b2-label{padding:8px 13px 8px 16px}
+html[data-theme="dark"] .b2-label{background:#1c1f27;box-shadow:0 0 0 .5px rgba(255,255,255,.14),0 10px 24px -8px rgba(0,0,0,.8)}
+.b2-label i{width:8px;height:8px;border-radius:50%;background:#2D5EFF}
+.b2-lb{grid-column:2;grid-row:1;opacity:0;transition:opacity .45s;white-space:nowrap}
+.b2-lb.on{opacity:1}
+.op-b2 .hb-dep{margin-top:28px}
+@media (max-width:1000px){
+ .b2-in{grid-template-columns:1fr;grid-template-areas:"copy" "stage" "cards";min-height:0;max-width:560px;padding:40px 20px 8px;row-gap:12px}
+ .b2-copy{text-align:center}.b2-copy .fx-h1,.b2-copy .fx-lead{text-align:center;margin-inline:auto}.b2-copy .fx-cta{justify-content:center}
+ .b2-stage{padding:18px 0 34px}
+ .b2-phone{width:236px}
+ .b2-ground{width:190px;margin-left:-95px;bottom:8px}
+ .op-b2 .b2-card:not(.on) .hb-d,.op-b2 .b2-card:not(.on) .hb-go{display:none}
+ .b2-card{padding:16px 18px;align-items:center}
+ .b2-card .b2-dot{margin-top:0}
+ .b2-card.on{align-items:flex-start}.b2-card.on .b2-dot{margin-top:8px}
+ .op-b2 .b2-card .hb-t{font-size:18px}
+}
+@media (max-width:360px){.b2-phone{width:214px}.b2-card{padding:14px 14px;gap:12px}}
+@media (prefers-reduced-motion:reduce){.b2-float,.b2-ground{animation:none}.b2-card.on.run .b2-prog::after{animation:none}}
+html[data-theme="dark"] .b2-card{background:#0d1015}
+html[data-theme="dark"] .b2-card.on{background:#1b2030}
+html[data-theme="dark"] .op-b2 .b2-card:not(.on) .hb-t{opacity:.8}
+@media (min-width:1001px){.b2-stage{transform:translateY(var(--b2-y,0px));transition:transform 1s cubic-bezier(.22,1,.36,1)}}
+@media (prefers-reduced-motion:reduce){.b2-stage{transition:none}}

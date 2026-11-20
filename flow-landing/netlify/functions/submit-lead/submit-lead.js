@@ -14,7 +14,7 @@
 // the database so someone can record it by hand, with every submitted field
 // in the body. If the write succeeds and the email fails, the visitor still
 // gets success and the failure is logged. The visitor gets an error, pointing
-// at hello@theflow-ai.com, only when both channels fail.
+// at info@theflow-ai.com, only when both channels fail.
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -168,9 +168,9 @@ async function notifyOwner(lead, apiKey, stored, log, logErr) {
 
 function failureResponse(serviceKey) {
   if (!serviceKey) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Lead capture is not configured. Please email hello@theflow-ai.com.' }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Lead capture is not configured. Please email info@theflow-ai.com.' }) };
   }
-  return { statusCode: 502, body: JSON.stringify({ error: 'We could not record that. Please email hello@theflow-ai.com.' }) };
+  return { statusCode: 502, body: JSON.stringify({ error: 'We could not record that. Please email info@theflow-ai.com.' }) };
 }
 
 exports.handler = async function (event) {

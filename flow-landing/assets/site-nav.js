@@ -6,7 +6,7 @@
     pricing: { en: 'Pricing', he: 'תמחור' },
     security: { en: 'Security', he: 'אבטחה' },
     contact: { en: 'Contact', he: 'צור קשר' },
-    cta: { en: 'Get Glance', he: 'קבלו את Glance' }
+    cta: { en: 'Get Glance', he: 'התקן Glance' }
   };
 
   function stored() {
@@ -40,20 +40,24 @@
   document.querySelectorAll('.site-links a').forEach(function (a) {
     var href = a.getAttribute('href') || '';
     var on =
-      (href === '/trial.html' && /\/trial\.html$/.test(path)) ||
-      (href === '/pricing.html' && /\/pricing\.html$/.test(path)) ||
-      (href === '/security.html' && /\/security\.html$/.test(path)) ||
-      (href === '/contact.html' && /\/contact\.html$/.test(path));
+      (/trial\.html$/.test(href) && /\/trial\.html$/.test(path)) ||
+      (/pricing\.html$/.test(href) && /\/pricing\.html$/.test(path)) ||
+      (/security\.html$/.test(href) && /\/security\.html$/.test(path)) ||
+      (/contact\.html$/.test(href) && /\/contact\.html$/.test(path));
     if (on) a.classList.add('active');
   });
 
-  apply(stored());
-  var btn = document.getElementById('langBtn');
-  if (btn) {
-    btn.addEventListener('click', function () {
-      var next = stored() === 'he' ? 'en' : 'he';
-      try { localStorage.setItem('flow_lang', next); } catch (e) {}
-      apply(next);
-    });
+  /* Pages with #langMenu use the 5-language control and flow.lang.
+     Leave lang, dir, and [data-nav] to flow-i18n.js on those pages. */
+  if (!document.getElementById('langMenu')) {
+    apply(stored());
+    var btn = document.getElementById('langBtn');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        var next = stored() === 'he' ? 'en' : 'he';
+        try { localStorage.setItem('flow_lang', next); } catch (e) {}
+        apply(next);
+      });
+    }
   }
 })();

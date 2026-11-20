@@ -1,0 +1,203 @@
+/* Corner v26 — four readable hero steps, a full WhatsApp column,
+   three asks at a time, and a quiet Do It press. Signup stays v25. */
+
+/* Resting hero: the card is fully on stage, steps included.
+   The scroll story still fades them in; the static frame does not. */
+html.h21-static .h21-scene{height:700px}
+@media (min-width:761px){
+  html.h21-static .h21-card{top:8px !important}
+}
+@media (max-width:760px){
+  html.h21-static .h21-scene{height:calc(min(64vh,540px) + 720px)}
+  html.h21-static .h21-card{top:calc(min(64vh,540px) + 16px) !important}
+}
+html.h21-static #live-acts > li.act,
+html.h21-static #live-chip,
+html.h21-static .h21-card .ss-add{
+  opacity:1 !important;
+  transform:none !important;
+}
+
+/* The scene is click-through; the card and its Do It stay clickable. */
+.h21-scene .h21-card,
+.h21-scene .h21-card .do-halo,
+.h21-scene .h21-card .act-more-btn,
+.h21-scene .h21-card .ss-add-input{pointer-events:auto}
+
+/* ---------- 1 · hero card: four steps, then a quiet more row ---------- */
+#live-acts:not(.is-open) > .act.is-extra{display:none}
+.act-more{list-style:none;margin:0}
+.act-more-btn{
+  display:block;width:100%;margin:0;padding:7px 10px;
+  border:0;border-radius:10px;background:transparent;cursor:pointer;
+  color:#86868b;font:500 13px/1.3 var(--ui),Inter,sans-serif;
+  text-align:start;letter-spacing:-.01em;
+}
+.act-more-btn:hover{color:#1d1d1f;background:rgba(0,0,0,.035)}
+.act-more-btn:focus-visible{outline:2px solid #1d1d1f;outline-offset:2px}
+html[data-theme="dark"] .act-more-btn{color:#a1a1a6}
+html[data-theme="dark"] .act-more-btn:hover{color:#f5f5f7;background:rgba(255,255,255,.05)}
+.h21-card .acts{gap:5px}
+.h21-card .act-text{font-size:13.5px;line-height:1.3}
+.h21-card .act-row{padding:7px 9px}
+
+/* ---------- 2 · WhatsApp fills the content column; the card sits inside the list ---------- */
+#demo-whatsapp .wa21-wrap,
+#demo-whatsapp .wa21{width:100% !important;max-width:none !important}
+.wa21-glance.glance-surface{transform:none !important}
+@media (min-width:1100px){
+  #demo-whatsapp .wa21-list{width:480px !important;flex:none}
+  html:not([dir="rtl"]) .wa21-wrap .wa21-glance.glance-surface{
+    left:32px !important;right:auto !important;
+    width:416px !important;max-width:416px !important;
+  }
+  html[dir="rtl"] .wa21-wrap:has(.wa21[dir="rtl"]) .wa21-glance.glance-surface{
+    right:32px !important;left:auto !important;
+    width:416px !important;max-width:416px !important;
+  }
+}
+@media (min-width:761px) and (max-width:1099px){
+  #demo-whatsapp .wa21-list{width:400px !important;flex:none}
+  html:not([dir="rtl"]) .wa21-wrap .wa21-glance.glance-surface{
+    left:20px !important;right:auto !important;
+    width:360px !important;max-width:360px !important;
+  }
+  html[dir="rtl"] .wa21-wrap:has(.wa21[dir="rtl"]) .wa21-glance.glance-surface{
+    right:20px !important;left:auto !important;
+    width:360px !important;max-width:360px !important;
+  }
+}
+
+/* ---------- 3 · five asks, three at a time ---------- */
+.day21-track{
+  scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-x;
+}
+@media (min-width:1180px){
+  .day21-arrows,.day21-dots{display:flex !important}
+  .day21-end{display:block}
+  .day21-track{
+    display:flex !important;
+    grid-template-columns:none !important;
+    overflow-x:auto !important;
+    gap:16px !important;
+    scroll-snap-type:x mandatory !important;
+  }
+  .day21-card{
+    flex:0 0 calc((100% - 72px) / 3) !important;
+    width:auto !important;
+    min-height:320px !important;
+    scroll-snap-align:start !important;
+    padding:22px 22px 18px !important;
+    gap:14px !important;
+    border-radius:22px !important;
+  }
+  .day21-card time{font-size:26px !important}
+  .day21-ask{font-size:16px !important;line-height:1.35 !important}
+  .day21-acts li{font-size:13px !important;padding:8px 10px !important;gap:8px !important}
+  .day21-src{white-space:nowrap !important}
+}
+.day21-track.can-next{
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - var(--pad) - 56px),transparent calc(100% - var(--pad) - 4px));
+  mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - var(--pad) - 56px),transparent calc(100% - var(--pad) - 4px));
+}
+.day21-track.can-prev{
+  -webkit-mask-image:linear-gradient(90deg,transparent calc(var(--pad) + 4px),#000 calc(var(--pad) + 56px),#000 100%);
+  mask-image:linear-gradient(90deg,transparent calc(var(--pad) + 4px),#000 calc(var(--pad) + 56px),#000 100%);
+}
+.day21-track.can-prev.can-next{
+  -webkit-mask-image:linear-gradient(90deg,transparent calc(var(--pad) + 4px),#000 calc(var(--pad) + 56px),#000 calc(100% - var(--pad) - 56px),transparent calc(100% - var(--pad) - 4px));
+  mask-image:linear-gradient(90deg,transparent calc(var(--pad) + 4px),#000 calc(var(--pad) + 56px),#000 calc(100% - var(--pad) - 56px),transparent calc(100% - var(--pad) - 4px));
+}
+@media (min-width:761px) and (max-width:1179px){
+  .day21-card{flex:0 0 calc((100% - 20px) / 2) !important;width:auto !important;scroll-snap-align:start}
+}
+@media (max-width:760px){
+  .day21-track{--pad:20px}
+}
+
+/* ---------- 4 · Do It press: scale, then the living ring becomes a check ---------- */
+.do-halo{transition:transform .14s ease}
+.do-halo.v26-down,
+.do-halo.is-pressing,
+.demo-doit.is-pressing{transform:scale(.96) !important}
+.v26-ring{position:relative;display:inline-flex;flex:none;vertical-align:middle}
+.v26-tick{
+  position:absolute;inset:0;display:grid;place-items:center;
+  color:#1d1d1f;opacity:0;pointer-events:none;
+}
+.v26-tick svg{width:68%;height:68%;display:block}
+.v26-tick path{stroke-dasharray:24;stroke-dashoffset:24}
+.living-ico.is-morph{animation:v26ring .72s ease both}
+.v26-tick.is-on{animation:v26tick .72s ease both}
+.v26-tick.is-on path{animation:v26draw .32s ease .16s forwards}
+.living-ico.v26-hold{opacity:0}
+.v26-tick.v26-hold{opacity:1}
+.v26-tick.v26-hold path{stroke-dashoffset:0}
+@keyframes v26ring{
+  0%{transform:scale(1);opacity:1}
+  30%{transform:scale(.84);opacity:1}
+  46%{transform:scale(.72);opacity:0}
+  76%{opacity:0;transform:scale(.9)}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes v26tick{
+  0%{opacity:0;transform:scale(.72)}
+  28%{opacity:0;transform:scale(.8)}
+  48%{opacity:1;transform:scale(1)}
+  74%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1)}
+}
+@keyframes v26draw{to{stroke-dashoffset:0}}
+html[data-theme="dark"] .v26-tick{color:#f5f5f7}
+@media (prefers-reduced-motion: reduce){
+  .do-halo,.do-halo.v26-down,.do-halo.is-pressing,.demo-doit.is-pressing{transition:none;transform:none !important}
+  .living-ico.is-morph,.v26-tick.is-on,.v26-tick.is-on path{animation:none !important}
+  .v26-tick{opacity:0}
+}
+
+/* ---------- loading signup pill looks locked ---------- */
+.su[data-state="loading"] .su-row,
+.su[data-state="loading"] .su-row:focus-within{
+  background:#eeeef0;
+  box-shadow:0 0 0 1px rgba(0,0,0,.1);
+}
+html[data-theme="dark"] .su[data-state="loading"] .su-row,
+html[data-theme="dark"] .su[data-state="loading"] .su-row:focus-within{
+  background:rgba(255,255,255,.025);
+  box-shadow:0 0 0 1px rgba(255,255,255,.1);
+}
+
+/* Hold is a quiet gray, never a blue fill. */
+.chip-hold,
+html[data-theme="dark"] .chip-hold,
+html[data-theme="dark"] .glance-surface .chip-hold{
+  color:#3a3a3c !important;
+  background:#ececee !important;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.1) !important;
+}
+html[data-theme="dark"] .chip-hold,
+html[data-theme="dark"] .glance-surface .chip-hold{
+  color:#f5f5f7 !important;
+  background:#3a3a3c !important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16) !important;
+}
+
+/* The Do It chip keeps its width. The label is the word, not brackets. */
+.chip-act,.chip-act .do-halo,.doit-dark{flex-shrink:0}
+.doit-dark{letter-spacing:.01em}
+
+/* Suggestion pills stay inside the chat and wrap instead of clipping. */
+.wa21-suggests{flex:none;max-width:100%;box-sizing:border-box}
+.wa21-suggests button{
+  max-width:100%;
+  height:auto;
+  white-space:normal;
+  overflow:visible;
+  text-align:start;
+  line-height:1.35;
+}
+
+/* Sticky nav must not cover a section scrolled into view. */
+#demo-whatsapp,#surfaces,#day,#get-glance,.h21-scene{scroll-margin-top:64px}

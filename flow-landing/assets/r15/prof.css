@@ -1,0 +1,59 @@
+/* r15 profession pages (insurance, CPAs) only. Linked only from he/solutions/{insurance,cpas}.html; lawyers never loads it.
+   Additions for card types the lawyers stage does not have. Same tokens as r14s.css / stack.css. */
+
+/* phone stack: a plain ledger table (Hashav entries), neutral greys, Flow blue for the highlighted row */
+#r14s#r14s .stk .tb{border:1px solid #e3e3e6!important;border-radius:10px;overflow:hidden}
+#r14s#r14s .stk .tb table{width:100%;border-collapse:collapse;font-size:15px}
+#r14s#r14s .stk .tb th,#r14s#r14s .stk .tb td{padding:8px 10px;text-align:right;border-top:1px solid #ededf0!important;font-weight:400;white-space:nowrap}
+#r14s#r14s .stk .tb thead th{border-top:0!important;background:#f5f5f7!important;font-weight:600;font-size:14px;color:#6e6e73!important}
+#r14s#r14s .stk .tb td:last-child,#r14s#r14s .stk .tb th:last-child{text-align:left}
+#r14s#r14s .stk .tb tr.on td{background:rgba(45,94,255,.06)!important;font-weight:600}
+#r14s#r14s .stk .tb .more{padding:8px 10px;font-size:14px;color:#6e6e73!important;border-top:1px solid #ededf0!important}
+html[data-theme="dark"] #r14s#r14s .stk .tb{border-color:rgba(255,255,255,.12)!important}
+html[data-theme="dark"] #r14s#r14s .stk .tb thead th{background:rgba(255,255,255,.06)!important;color:#a1a1a6!important}
+html[data-theme="dark"] #r14s#r14s .stk .tb th,html[data-theme="dark"] #r14s#r14s .stk .tb td,html[data-theme="dark"] #r14s#r14s .stk .tb .more{border-top-color:rgba(255,255,255,.08)!important}
+html[data-theme="dark"] #r14s#r14s .stk .tb tr.on td{background:rgba(91,140,255,.14)!important}
+html[data-theme="dark"] #r14s#r14s .stk .tb .more{color:#a1a1a6!important}
+
+/* desktop stage: Docusign envelope tile (a quiet document sketch, no colour) */
+#r14s#r14s .tile-ds{display:flex;flex-direction:column}
+#r14s#r14s .tile-ds .ds-doc{margin:10px 0 0;background:#fff!important;border-radius:10px!important;box-shadow:0 0 0 .5px var(--lw-line);padding:12px 12px 14px;display:flex;flex-direction:column;gap:6px}
+#r14s#r14s .tile-ds .ds-h{margin:0;font:700 14px/1.3 var(--text);color:#1a1a2e!important}
+#r14s#r14s .tile-ds .ds-s{margin:0 0 4px;font:400 11.5px/1.3 var(--text);color:#6e6e73!important}
+#r14s#r14s .tile-ds .ds-ln{display:block;height:5px;border-radius:3px;background:#ececf0!important}
+#r14s#r14s .tile-ds .ds-ln.s{width:62%}
+#r14s#r14s .tile-ds .ds-sig{margin-top:8px;height:34px;border:1px dashed #c7c7cc!important;border-radius:8px!important;display:flex;align-items:flex-end;padding:0 8px 4px}
+#r14s#r14s .tile-ds .ds-sig span{font:500 11px/1 var(--text);color:#86868b!important}
+#r14s#r14s .tile-ds .ds-to{margin:10px 0 4px;font:600 13px/1.3 var(--text);color:#1a1a2e!important}
+#r14s#r14s .tile-ds .lw-status{align-self:flex-start}
+#r14s#r14s .tile-ds .flow-attr{margin-top:auto;padding-top:8px}
+#r14s#r14s .app-gen-doc .mark.pdfm img{width:18px;height:18px}
+#r14s#r14s .tile-gen .lw-total{margin-top:6px}
+
+/* Hashav's navy mark disappears on the dark cards: give it the same small white plate a dark-mode app icon would have */
+html[data-theme="dark"] .r15-tr .r15-lg img[src*="hashav"],html[data-theme="dark"] #r14s#r14s .stk .lg img[src*="hashav"]{background:#fff!important;border-radius:22%;padding:3px;box-sizing:border-box}
+
+/* dark-gw line-1: match B3 ink #EEF2F9 (overrides r15-dark #f3f3f3; this file loads after it) */
+html[data-theme="dark"] .x4m .r15-h1,html[data-theme="dark"] .x4m .r15-h2{color:#EEF2F9}
+
+/* 13/11 public-sector polish (x4-gov only): smaller honest orbit (4 inner + 5 outer) reads fuller with larger tiles.
+   flow-orbit-v7.js places tiles from a fixed 42/54px box, so the extra size is centred back with a negative margin. */
+.x4-gov .o20-orb{width:50px;height:50px;margin:-4px 0 0 -4px}
+@media (min-width:521px){.x4-gov .o20-orb{width:64px;height:64px;margin:-5px 0 0 -5px}}
+.x4-gov .o20-orb img{width:46%;height:46%}
+/* LTR desktop H1: balance the black lines; sublines: no one-word last line */
+.x4-gov .r15-h1 b{text-wrap:balance}
+.x4-gov .r15-sub2,.x4-gov .r15-sub{text-wrap:balance}
+/* phone hero: tighter card rhythm so the process tabs reach the first screen (spacing only, same type sizes) */
+@media not all and (min-width:1100px) and (min-height:620px){
+  .x4-gov #r14s#r14s .stk .sh{padding-top:11px;padding-bottom:9px}
+  .x4-gov #r14s#r14s .stk .sh .sec+.sec{margin-top:3px;padding-top:5px}
+  .x4-gov #r14s#r14s .stk .sh .k{margin-bottom:5px}
+  .x4-gov #r14s#r14s .stk .pr li{padding:3px 0}
+  .x4-gov #r14s#r14s .stk .go{padding-top:3px}
+  .x4-gov #r14s#r14s .lead{margin-top:2px}
+}
+/* desktop process subline: one line where it fits, otherwise balanced (no lone last word) */
+.x4-gov #r14s#r14s .sub{max-width:56em;text-wrap:balance}
+@media not all and (min-width:1100px) and (min-height:620px){.x4-gov #r14s#r14s .stk .st li{padding:1px 0}}
+html:has(main.x4-gov) .r15-tr .r15-sub2{text-wrap:balance}

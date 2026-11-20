@@ -1,0 +1,13 @@
+/* r15 process switcher (12.11): the stage's three dots become the three process names, all widths.
+   RTL, first process on the right. Current: ink + a 2px Flow-blue underline; others: #86868b. Same weight for all, so switching never shifts the row. */
+#r14s#r14s .dots.named{direction:rtl;gap:2px;padding:6px 0 0;font-family:Heebo,"Inter Tight",system-ui,sans-serif}
+#r14s#r14s .dots.named .dot{width:auto;height:auto;padding:5px 10px 7px;font:500 15px/1.3 Heebo,"Inter Tight",system-ui,sans-serif;letter-spacing:0;white-space:nowrap;color:#86868b!important;transition:color .3s ease}
+#r14s#r14s .dots.named .dot::before{content:none}
+#r14s#r14s .dots.named .dot span{position:relative;display:block}
+#r14s#r14s .dots.named .dot span::after{content:"";position:absolute;left:0;right:0;bottom:-5px;height:2px;border-radius:1px;background:#2D5EFF!important;transform:scaleX(0);transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+#r14s#r14s .dots.named .dot[aria-current="true"]{color:#1d1d1f!important}
+#r14s#r14s .dots.named .dot[aria-current="true"] span::after{transform:scaleX(1)}
+#r14s#r14s .dots.named .dot:focus-visible{outline:2px solid #2D5EFF;outline-offset:-2px;border-radius:8px}
+@media (hover:hover){#r14s#r14s .dots.named .dot:not([aria-current="true"]):hover{color:#1d1d1f!important}}
+@media (prefers-reduced-motion:reduce){#r14s#r14s .dots.named .dot,#r14s#r14s .dots.named .dot span::after{transition:none}}
+#r14s.rm#r14s .dots.named .dot,#r14s.rm#r14s .dots.named .dot span::after{transition:none}

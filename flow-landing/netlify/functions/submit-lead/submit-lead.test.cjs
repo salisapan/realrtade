@@ -13,7 +13,7 @@ const SECRET_MAIL = 'resend-api-sentinel-9f3a';
 const SB_LEADS = 'https://zjquktirlrhbqcnkfaok.supabase.co/rest/v1/leads';
 const RESEND = 'https://api.resend.com/emails';
 const OWNER = 'ai.local.flow@gmail.com';
-const HELLO = 'hello@theflow-ai.com';
+const HELLO = 'info@theflow-ai.com'; // visitor-facing error address (sender stays hello@)
 
 global.fetch = async (url) => {
   throw new Error('unstubbed fetch: ' + url);

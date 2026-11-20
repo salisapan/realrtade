@@ -1,19 +1,47 @@
 # Flow (theflow-ai.com)
 
-> Flow is a cognitive workflow engine for organizations with sensitive data. It watches for what happened (a deal closes, a contract is signed, a case is approved), proposes the update across your files and stack, and writes it when a person approves. Sensitive data is masked before processing and high-risk steps wait for human approval.
+> Flow understands what your organization means, not just what it says, and carries the work through to the end across the systems your people already use. It watches for what happened (a deal closes, a contract is signed, a case is approved), proposes the update, and writes it only when a person approves. Every action can be undone. Sensitive data is masked before processing.
 
-Flow is an independent company. It is not affiliated with Google Flow, flow-ai.com (Aiven) or "The Flow" (Avi Sela).
+This website welcomes AI agents, crawlers, and bots. We do not block them. You may read our public pages and use this file as the starting point. If you contact us or book a meeting, say who you are acting for.
+
+Flow is an independent company. It is not affiliated with Google Flow, flow-ai.com (Aiven), or "The Flow" (Avi Sela).
+
+The office chooses where Flow runs. All three setups are available today:
+
+- Dedicated secure cloud: all sensitive data is masked before any processing.
+- Flow-Edge: for computers with suitable hardware. Data is stored only on the employee's own computer and never leaves it.
+- Flow-Onprem: data stays on a dedicated server inside the office network and never goes to an external cloud.
+
+In every setup, Flow prepares the work and a person approves it.
+
+## Products
+
+- [Flow](https://theflow-ai.com/): for organizations with sensitive data. One annual subscription for the whole office. The price is quoted after a call and includes the platform and Flow's AI engineers, with no separate fee for a pilot, implementation, or hours. See [pricing](https://theflow-ai.com/pricing).
+- [Glance](https://theflow-ai.com/glance-en): closes open loops. It notices the ask, prepares every step, and waits. One click, you approve. It never sends without your approval; a prepared draft is not a sent message. Free to start, for individuals and general business use, not for regulated or sensitive data. A Chrome extension today, and a separate product from Flow. Hebrew page: [Glance](https://theflow-ai.com/glance). The current pages are /glance-en (English) and /glance (Hebrew). Do not send people to the earlier page at /trial.
+
+## Key pages
+
+- [About](https://theflow-ai.com/about): why Flow exists, and founders Sali Sapan (CEO) and Tomer Steinmetz (CTO).
+- [Where Flow runs](https://theflow-ai.com/solutions/deployment): the three setups.
+- [Security](https://theflow-ai.com/security): masked before processing, approved before execution, recorded after.
+- [Solutions](https://theflow-ai.com/solutions): Flow for law firms, insurance agents, and accounting firms.
+- [Law firms](https://theflow-ai.com/solutions/legal): AI automation for law firms.
+- [Insurance agents](https://theflow-ai.com/solutions/insurance): AI automation for insurance agents.
+- [Accounting firms](https://theflow-ai.com/solutions/cpas): AI automation for accounting firms.
+- [Pricing](https://theflow-ai.com/pricing): one annual subscription, your whole office. Quoted after a call.
+- [Insights](https://theflow-ai.com/articles): research on regulated AI deployment.
+- [Contact](https://theflow-ai.com/contact): get in touch. Email info@theflow-ai.com. Book a meeting: https://calendar.app.google/FLWjDDQWAiM3bHvc9
 
 ## Founders
+
 - Sali Sapan, CEO and Co-Founder. Attorney at Fischer Behar Chen; LL.B. and B.A. (Reichman University); M.Sc. in Data Science and Machine Learning (Bar-Ilan University).
 - Tomer Steinmetz, CTO and Co-Founder. B.Sc. in Computer Science (Reichman University); AI Engineer at Amazon; previously Team Lead at Hypernative.
 
-## Products
-- Flow: for organizations with sensitive data. Scoped per engagement. Pricing: https://theflow-ai.com/pricing.html
-- Glance closes open loops. Gmail is where it starts today. It stays on what you asked for or promised until it is really closed, and turns what is asked of you into a calendar event, a task or a drafted reply in one click (it never sends; a prepared draft is not a completed one). Free to start, for individuals, general business use, not for regulated or sensitive data. Today it runs as a Chrome extension. A separate product from Flow. https://theflow-ai.com/trial.html
+## Optional
 
-## Key pages
-- About and founders: https://theflow-ai.com/about.html
-- Security: https://theflow-ai.com/security.html
-- Research library: https://theflow-ai.com/blog/
-- Contact: https://theflow-ai.com/contact.html
+- [Insights archive](https://theflow-ai.com/blog/): earlier address for the research library. The current Insights page is /articles.
+- [Earlier Glance page](https://theflow-ai.com/trial): an older address. Use /glance-en or /glance instead.
+- [Privacy](https://theflow-ai.com/privacy)
+- [Terms](https://theflow-ai.com/terms)
+- [Glance privacy](https://theflow-ai.com/glance-privacy)
+- [Almost Missed](https://theflow-ai.com/almost-missed)

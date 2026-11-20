@@ -1,0 +1,191 @@
+/* Flow inner pages · v4 layer (after flow-inner.css, flow-rich.css, hero-samples.css, v3.css).
+   Raises the bar: de-densified long text (one idea per screen), the Glance-style gradient word (1–2 per page),
+   physical calculator bars, the B2 switch on Legal, deliberate un-pinned mobile steps, and subtraction of template tells. */
+
+/* ---------- 1 · one accent word, not accent everywhere ---------- */
+.rc.v3 .rc-h2 em,.rc.v3 .acc-t:not(.rc-eb){color:inherit;background:none;-webkit-text-fill-color:currentColor;font-style:normal}
+html:not([data-theme="dark"]) .rc.v3 .rc-h2 em,html[data-theme="dark"] .rc.v3 .rc-h2 em{color:inherit;background:none;-webkit-text-fill-color:currentColor}
+/* statements: ink, the gradient word is the only colour */
+html:not([data-theme="dark"]) .rc.v3 .v3-st .ln:last-child>span,html[data-theme="dark"] .rc.v3 .v3-st .ln:last-child>span{background:none;color:var(--v3-ink);-webkit-text-fill-color:currentColor}
+/* Glance 'Closed.' accent: near-black navy → deep blue → bright blue, left to right, italic, ends on the full stop */
+.rc.v3 .v4-gw{font-style:italic;padding-inline:.04em .1em;margin-inline:-.04em -.1em;
+  background:linear-gradient(90deg,#1d2433 0%,#1F46D6 62%,#2D5EFF 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;white-space:nowrap}
+html[data-theme="dark"] .rc.v3 .v4-gw{background:linear-gradient(180deg,#5B8CFF,#2D5EFF);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+html[data-ui="he"] .rc.v3 .v4-gw{font-style:normal}
+
+/* ---------- 2 · eyebrows: quiet tabular numerals (Security only), never a coloured label ---------- */
+.rc.v3 .rc-eb,.rc.v3 .tile .num{color:var(--v3-ink3);font-variant-numeric:tabular-nums;letter-spacing:.02em;font-weight:500}
+html:not([data-theme="dark"]) .rc.v3 .rc-eb,html[data-theme="dark"] .rc.v3 .rc-eb{color:var(--v3-ink3)}
+.rc.v3 .big .n,.rc.v3 .kp b,.rc.v3 .au .n,.rc.v3 .cx b,.rc.v3 .cx .big{font-variant-numeric:tabular-nums}
+
+/* ---------- 3 · long-text chapters ---------- */
+@media (min-width:900px){.rc.v3 .v4-ch:not(.v4-cta):not(.v4-moment){min-height:min(100svh,880px)}}
+.rc.v3 .v4-in{display:block}
+.rc.v3 .v4-head{margin:0 0 clamp(28px,4.4vw,64px)}
+.rc.v3 .v4-head .rc-eb{display:block;margin:0 0 14px}
+.rc.v3 .v4-ch .rc-h2{font-size:clamp(calc(38px*var(--z)),min(5vw,8vh),calc(72px*var(--z)));max-width:14em}
+.rc.v3 .v4-lead{font:600 clamp(24px,min(2.7vw,4.6vh),44px)/1.16 var(--disp);letter-spacing:-.026em;color:var(--v3-ink);max-width:21em;text-wrap:balance;margin:0}
+.rc.v3 .v4-lead-m{font-size:clamp(22px,min(2.3vw,4vh),34px);color:var(--v3-ink2)}
+.rc.v3 .v4-sub{font:400 clamp(17px,1.35vw,21px)/1.5 var(--text);color:var(--v3-ink2);max-width:32em;margin:clamp(22px,2.6vw,36px) 0 0}
+.rc.v3 .v4-lead+.v4-tiles,.rc.v3 .v4-lead+.v4-rel,.rc.v3 .v4-head+.v4-tiles{margin-top:clamp(36px,5vw,72px)}
+.rc.v3 .v4-tiles{display:grid;gap:clamp(14px,1.6vw,20px)}
+@media (min-width:900px){.rc.v3 .v4-tiles.two{grid-template-columns:repeat(2,minmax(0,1fr))}.rc.v3 .v4-tiles.one{max-width:calc(1120px*var(--z)*.66)}}
+.rc.v3 .v4-t{padding:clamp(26px,3vw,44px);display:flex;flex-direction:column;justify-content:center;gap:16px;min-height:clamp(150px,16vw,230px)}
+.rc.v3 .v4-th{font:600 clamp(21px,min(1.95vw,3.4vh),30px)/1.2 var(--disp);letter-spacing:-.022em;color:var(--v3-ink);margin:0;text-wrap:balance}
+.rc.v3 .tile p.v4-tp{font:400 clamp(16.5px,1.3vw,20px)/1.5 var(--text);color:var(--v3-ink2);max-width:30em;margin:0}
+.rc.v3 .tile p.v4-loss{font:600 clamp(20px,1.7vw,26px)/1.25 var(--disp);letter-spacing:-.02em;color:var(--v3-ink)}
+.rc.v3 .v4-rel{font:400 clamp(15.5px,1.15vw,18px)/1.5 var(--text);color:var(--v3-ink2);max-width:36em;margin:clamp(24px,3vw,40px) 0 0}
+.rc.v3 .v4-rel a,.rc.v3 .v4-sub a,.rc.v3 .tile .v4-tp a,.rc.v3 .v4-lead a{color:var(--v3-ink);text-decoration:underline;text-decoration-color:rgba(45,94,254,.55);text-underline-offset:.2em;text-decoration-thickness:1px}
+html[data-theme="dark"] .rc.v3 .v4-rel a,html[data-theme="dark"] .rc.v3 .v4-sub a,html[data-theme="dark"] .rc.v3 .tile .v4-tp a{text-decoration-color:rgba(110,155,254,.7)}
+.rc.v3 .v4-swfoot{margin-top:clamp(28px,4vw,52px)}
+/* split layout: heading column left, content right (spec-sheet rhythm, alternates with the stacked giant-lead chapters) */
+@media (min-width:1000px){
+  .rc.v3 .v4-b .v4-in{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,7fr);column-gap:clamp(48px,7vw,120px);align-content:center;align-items:start}
+  .rc.v3 .v4-b .v4-in>*{grid-column:2}
+  .rc.v3 .v4-b .v4-in>.v4-head,.rc.v3 .v4-b .v4-in>.rc-h2{grid-column:1;grid-row:1/span 8;margin:0;position:sticky;top:clamp(96px,14vh,140px)}
+  .rc.v3 .v4-b .rc-h2{font-size:clamp(34px,3.7vw,58px)}
+  .rc.v3 .v4-b .v4-lead{max-width:none}
+  .rc.v3 .v4-b .v4-lead+.v4-tiles{margin-top:clamp(28px,3.6vw,48px)}
+}
+/* spec rows */
+.rc.v3 .v4-rows{margin:0;display:grid}
+.rc.v3 .v4-row{display:grid;gap:8px clamp(24px,3vw,48px);padding-block:clamp(22px,2.4vw,34px);border-top:1px solid var(--v3-hair)}
+.rc.v3 .v4-row:last-child{border-bottom:1px solid var(--v3-hair)}
+@media (min-width:700px){.rc.v3 .v4-row{grid-template-columns:minmax(130px,1fr) minmax(0,2.6fr)}}
+.rc.v3 .v4-row dt{font:600 clamp(19px,1.6vw,24px)/1.25 var(--disp);letter-spacing:-.018em;color:var(--v3-ink)}
+.rc.v3 .v4-row dd{margin:0;font:400 clamp(16.5px,1.3vw,20px)/1.5 var(--text);color:var(--v3-ink2);max-width:34em}
+.rc.v3 .v4-row code{font:500 .88em var(--text);background:var(--v3-hair);padding:1px 6px;border-radius:6px;white-space:nowrap}
+/* the Do It moment chapter keeps its own layout */
+.rc.v3 .v4-moment .rc-eb{display:block}
+/* readlist: hairline rows, no card */
+.rc.v3 .v4-read{list-style:none;margin:0;padding:0}
+.rc.v3 .v4-read li{padding-block:clamp(16px,1.8vw,24px);border-top:1px solid var(--v3-hair);font:500 clamp(17px,1.35vw,21px)/1.35 var(--disp);letter-spacing:-.012em;background:none;box-shadow:none;border-radius:0}
+.rc.v3 .v4-read li:last-child{border-bottom:1px solid var(--v3-hair)}
+.rc.v3 .v4-read a{color:var(--v3-ink);text-decoration:none}
+.rc.v3 .v4-read a:hover{text-decoration:underline;text-decoration-color:rgba(45,94,254,.55);text-underline-offset:.2em}
+
+/* ---------- 4 · closing CTAs: huge type on the page, no card ---------- */
+.rc.v3 .v4-cta .rc-cta .gl,.rc.v3 .v4-cta .rc-cta>div{background:none!important;box-shadow:none!important;border:0!important;padding:0;text-align:center;display:grid;justify-items:center;gap:clamp(18px,2.4vw,30px)}
+.rc.v3 .v4-cta .rc-h2{font-size:clamp(calc(40px*var(--z)),min(6.6vw,11vh),calc(104px*var(--z)));max-width:12em;margin-inline:auto;letter-spacing:-.034em;line-height:1.02}
+.rc.v3 .v4-cta .rc-p{font-size:clamp(17px,1.5vw,22px);max-width:28em;margin-inline:auto}
+.rc.v3 .v4-glance{min-height:0!important;padding-block:clamp(56px,8vw,96px)}
+.rc.v3 .v4-glance .rc-prod{display:grid;grid-template-columns:1fr auto;gap:8px clamp(24px,4vw,64px);align-items:center}
+.rc.v3 .v4-glance .rc-h2{font-size:clamp(28px,3.2vw,48px);grid-column:1}
+.rc.v3 .v4-glance .rc-p{grid-column:1;margin:0}
+.rc.v3 .v4-glance .magnetic{grid-column:2;grid-row:1/span 2}
+@media (max-width:699px){.rc.v3 .v4-glance .rc-prod{grid-template-columns:1fr}.rc.v3 .v4-glance .magnetic{grid-column:1;grid-row:auto;margin-top:14px}}
+
+/* ---------- 5 · pricing plans: a comparison, not three equal cards ---------- */
+.rc.v3 .gts{gap:0;align-items:stretch}
+.rc.v3 .gts .gt{background:none!important;box-shadow:none!important;border-radius:0;border:0;border-top:1px solid var(--v3-hair);padding:clamp(24px,2.6vw,40px) clamp(20px,2.4vw,36px) clamp(28px,3vw,44px);position:relative;transition:background .45s var(--ease-x),box-shadow .45s var(--ease-x),border-radius .45s}
+.rc.v3 .gts .gt+.gt{border-inline-start:1px solid var(--v3-hair)}
+.rc.v3 .gts .gt .bd,.rc.v3 .gts .gt .gp{display:none}
+.rc.v3 .gts .gt h3{font:600 clamp(26px,2.6vw,40px)/1.1 var(--disp);letter-spacing:-.028em;color:var(--v3-ink)}
+.rc.v3 .gts .gt>p{font:400 clamp(16px,1.25vw,19px)/1.5 var(--text);color:var(--v3-ink2)}
+.rc.v3 [data-dep="cloud"] .gt[data-m="cloud"],.rc.v3 [data-dep="edge"] .gt[data-m="edge"],.rc.v3 [data-dep="onprem"] .gt[data-m="onprem"]{background:var(--v3-card)!important;box-shadow:var(--v3-sh)!important;border-radius:calc(28px*var(--z) + 6px);border-color:transparent;z-index:1}
+.rc.v3 [data-dep] .gt[data-m]:not([data-m]){}
+@media (max-width:899px){.rc.v3 .gts .gt+.gt{border-inline-start:0}.rc.v3 .gts .gt{border-radius:0}}
+
+/* ---------- 6 · calculator bars: brand blue with physical depth ---------- */
+.rc.v3 .cx .cap2{gap:14px}
+.rc.v3 .cx .cap2 .r{grid-template-columns:84px 1fr}
+.rc.v3 .cx .cap2 .tr{height:28px;border-radius:999px;overflow:visible;background:#e8ebf2;box-shadow:inset 0 1px 3px rgba(15,22,45,.16),inset 0 0 0 1px rgba(15,22,45,.04),0 1px 0 rgba(255,255,255,.9)}
+.rc.v3 .cx .cap2 .tr i{border-radius:999px;min-width:28px}
+.rc.v3 .cx .cap2 .t0 i,.rc.v3 .cx .cap2 .t1 i.base{background:linear-gradient(180deg,#5D86FF 0%,#2D5EFF 52%,#2349D9 100%);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5),inset 0 -2px 4px rgba(8,24,110,.32),0 6px 12px -4px rgba(45,94,255,.55),0 1px 1px rgba(15,22,45,.2)}
+.rc.v3 .cx .cap2 .t1 i:not(.base){width:100%;background:linear-gradient(180deg,#8EAEFF 0%,#5B8CFF 52%,#3E70F5 100%);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.6),inset 0 -2px 4px rgba(20,50,170,.28),0 6px 12px -4px rgba(45,94,255,.4),0 1px 1px rgba(15,22,45,.16)}
+.rc.v3 .cx .cap2 .t1 i.base{border-radius:999px 0 0 999px;box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5),inset 0 -2px 4px rgba(8,24,110,.32),1px 0 0 rgba(255,255,255,.7),0 1px 1px rgba(15,22,45,.2)}
+html[data-ui="he"] .rc.v3 .cx .cap2 .t1 i.base,[lang="he"] .rc.v3 .cx .cap2 .t1 i.base{border-radius:0 999px 999px 0}
+.rc.v3 .cx .cap2 .mx{color:#fff;font:700 13px/1 var(--text);font-variant-numeric:tabular-nums;text-shadow:0 1px 1px rgba(10,30,120,.4)}
+html[data-theme="dark"] .rc.v3 .cx .cap2 .tr{background:#070a12;box-shadow:inset 0 1px 4px rgba(0,0,0,.7),inset 0 0 0 1px rgba(150,166,204,.1),0 1px 0 rgba(255,255,255,.04)}
+html[data-theme="dark"] .rc.v3 .cx .cap2 .t0 i,html[data-theme="dark"] .rc.v3 .cx .cap2 .t1 i.base{background:linear-gradient(180deg,#6E9BFF 0%,#3B74FF 52%,#2D5EE0 100%);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.4),inset 0 -2px 4px rgba(6,20,90,.45),0 6px 14px -4px rgba(59,116,255,.6)}
+html[data-theme="dark"] .rc.v3 .cx .cap2 .t1 i:not(.base){background:linear-gradient(180deg,#A6C0FF 0%,#7BA4FF 52%,#5B8CFF 100%);box-shadow:inset 0 1.5px 0 rgba(255,255,255,.55),inset 0 -2px 4px rgba(20,50,170,.3),0 6px 14px -4px rgba(59,116,255,.5)}
+html[data-theme="dark"] .rc.v3 .cx .cap2 .t1 i.base{box-shadow:inset 0 1.5px 0 rgba(255,255,255,.4),inset 0 -2px 4px rgba(6,20,90,.45),1px 0 0 rgba(255,255,255,.55)}
+html[data-theme="dark"] .rc.v3 .cx .cap2 .mx{color:#06133a;text-shadow:none}
+.rc.v3 .cx .live i,.rc.v3 .cx .dpl .pill{display:none}
+
+/* ---------- 7 · Legal: the deployment switch is the B2 hero switch ---------- */
+.rc.v3 .v4-sw{margin-top:clamp(36px,5vw,64px);display:grid;justify-items:start;gap:0}
+.rc.v3 .v4-sw .hs-segc{margin-top:0;display:inline-grid}
+.rc.v3 .v4-sw .hs-segnote{margin-top:clamp(22px,2.8vw,32px);max-width:30em;min-height:4.6em;font-size:clamp(17px,1.4vw,21px);color:var(--v3-ink2);text-wrap:pretty}
+.rc.v3 .v4-sw .hs-segnote b{color:var(--v3-ink)}
+@media (max-width:899px){.rc.v3 .v4-sw .hs-segc{width:100%;max-width:420px}}
+
+/* ---------- 8 · mobile: pinned stories become one deliberate step each (no pin) ---------- */
+.v4-steps{display:none}
+@media (max-width:899px){
+  .rc.v3 .rc-story.v4-off{display:none}
+  .v4-steps{display:grid;gap:clamp(56px,16vw,88px);padding-top:clamp(8px,3vw,20px)}
+  .rc.v3 .rc-story.v4-ms{height:auto;display:block}
+  .rc.v3 .v4-ms .pin{position:static;height:auto;display:grid;grid-template-columns:1fr;gap:clamp(22px,6vw,32px);padding:0;max-width:none}
+  .rc.v3 .v4-ms .stg{height:auto;min-height:0;border-radius:28px}
+  .rc.v3 .v4-ms[data-kind="layers"] .stg{min-height:min(76vw,320px)}
+  .rc.v3 .v4-ms .cap{display:grid;grid-template-columns:1fr;gap:12px;opacity:1;padding:0}
+  .rc.v3 .v4-ms .cap .k{font:500 15px/1 var(--text);font-variant-numeric:tabular-nums;letter-spacing:.02em;color:var(--v3-ink3);display:block}
+  .rc.v3 .v4-ms .cap .k::after{content:" / 4"}
+  .rc.v3 .v4-ms .cap h3{font-size:clamp(30px,8.6vw,40px);line-height:1.08}
+  .rc.v3 .v4-ms .cap p{grid-column:1;max-height:none;opacity:1;font-size:clamp(17px,4.6vw,19px);line-height:1.5;max-width:26em}
+  .rc.v3 .v4-ms .bar,.rc.v3 .v4-ms .cw>.bar{display:none}
+  .rc.v3 .v4-ms .cw{padding:0}
+  .rc.v3 .v4-ms .hs-pl{translate:none}
+}
+html.rm .v4-ms .rv{opacity:1}
+
+/* ---------- 9 · mobile text chapters ---------- */
+@media (max-width:899px){
+  .rc.v3 .v4-ch{padding-block:clamp(64px,16vw,96px)}
+  .rc.v3 .v4-lead{font-size:clamp(24px,6.6vw,30px)}
+  .rc.v3 .v4-th{font-size:clamp(21px,5.8vw,25px)}
+  .rc.v3 .v4-t{min-height:0;padding:26px 24px}
+  .rc.v3 .v4-head{margin-bottom:28px}
+}
+
+/* ---------- 10 · second pass: boxes only where there is product UI ---------- */
+.rc.v3 .tile.v4-t{background:none!important;box-shadow:none!important;border:0!important;border-top:1px solid var(--v3-hair)!important;border-radius:0!important;padding:clamp(22px,2.4vw,34px) 0 0;min-height:0;justify-content:flex-start;-webkit-backdrop-filter:none;backdrop-filter:none}
+.rc.v3 .tile.v4-t::before,.rc.v3 .tile.v4-t::after{display:none}
+.rc.v3 .v4-tiles{gap:clamp(24px,3vw,56px)}
+@media (min-width:1000px){.rc.v3 .v4-b .v4-tiles.two{grid-template-columns:1fr}.rc.v3 .v4-b .v4-tiles{gap:clamp(20px,2.4vw,32px)}}
+.rc.v3 .v4-ch .v4-lead+.v4-tiles{margin-top:clamp(36px,5vw,64px)}
+/* the 1-2-3 under the zone diagram: three hairline columns with a plain numeral, no boxes */
+.rc.v3 .zn .pts{gap:clamp(20px,3vw,48px);margin-top:clamp(18px,2vw,28px)}
+.rc.v3 .zn .pt{background:none!important;border-radius:0;padding:16px 0 0;border-top:1px solid var(--v3-hair);grid-template-columns:1fr;gap:10px;font-size:clamp(15px,1.15vw,17px)}
+.rc.v3 .zn .pt .num-r{background:none!important;box-shadow:none!important;border:0!important;width:auto;height:auto;min-width:0;padding:0;border-radius:0;color:var(--v3-ink3)!important;font:500 14px/1 var(--text);font-variant-numeric:tabular-nums;justify-self:start}
+.rc.v3 .zn .live i,.rc.v3 .zn .bnd-l svg{display:none}
+/* hero headline: ink, no coloured half-title */
+html:not([data-theme="dark"]) .rc.v3 h1 .g,html[data-theme="dark"] .rc.v3 h1 .g{background:none;color:inherit;-webkit-text-fill-color:currentColor}
+
+/* ---------- 11 · pricing: quiet statements instead of chips and cards ---------- */
+.rc.v3 .rc-loss{background:none!important;box-shadow:none!important;border:0!important;padding:0;border-radius:0;font:600 clamp(19px,1.6vw,24px)/1.3 var(--disp);letter-spacing:-.018em;color:var(--v3-ink);max-width:22em}
+.rc.v3 .rc-loss i{display:none}
+/* force multiplier: one calm table (who keeps what, what Flow takes), no card stack, no timeline, no chips */
+.rc.v3 .om-wrap{grid-template-columns:1fr;gap:clamp(28px,4vw,56px)}
+.rc.v3 .om-wrap .head{align-content:start!important}
+.rc.v3 .omap{background:none!important;box-shadow:none!important;border:0!important;padding:0!important;gap:0;border-radius:0;max-width:none}
+.rc.v3 .omap::before,.rc.v3 .om::before{display:none}
+.rc.v3 .om{background:none!important;box-shadow:none!important;border:0!important;border-top:1px solid var(--v3-hair)!important;border-radius:0;padding:clamp(20px,2.2vw,30px) 0;gap:10px clamp(24px,3vw,56px);align-items:start}
+@media (min-width:800px){.rc.v3 .om{grid-template-columns:minmax(150px,1fr) minmax(0,1.2fr) minmax(0,1.6fr)}}
+.rc.v3 .om h3{font:600 clamp(22px,2vw,30px)/1.15 var(--disp);letter-spacing:-.022em;color:var(--v3-ink)}
+.rc.v3 .om .kk,.rc.v3 .om .kk.f{font:500 13.5px/1.2 var(--text);letter-spacing:0;text-transform:none;color:var(--v3-ink3);margin-bottom:6px}
+.rc.v3 .om p{font:400 clamp(16.5px,1.3vw,19px)/1.4 var(--text);color:var(--v3-ink2)}
+.rc.v3 .om .tgs{display:grid;gap:4px}
+.rc.v3 .om .tg{display:block;background:none!important;border:0!important;box-shadow:none!important;padding:0;border-radius:0;font:600 clamp(16.5px,1.3vw,19px)/1.4 var(--text);color:var(--v3-ink)}
+.rc.v3 .omf{background:none!important;box-shadow:none!important;border:0!important;border-top:1px solid var(--v3-hair)!important;border-bottom:1px solid var(--v3-hair)!important;border-radius:0;grid-template-columns:1fr;padding:clamp(20px,2.2vw,30px) 0}
+.rc.v3 .omf .fl-i{display:none}
+.rc.v3 .omf b{font:600 clamp(22px,2vw,30px)/1.15 var(--disp);letter-spacing:-.022em;color:var(--v3-ink)}
+.rc.v3 .omf small{font:400 clamp(16.5px,1.3vw,19px)/1.4 var(--text);color:var(--v3-ink2)}
+/* calculator: tags become plain labels */
+.rc.v3 .cx .est b{background:none!important;box-shadow:none!important;padding:0;border-radius:0;color:var(--v3-ink3)!important;font:500 13.5px/1.3 var(--text);letter-spacing:0;text-transform:none}
+.rc.v3 .cx .est{display:grid;gap:4px;grid-template-columns:1fr}
+.rc.v3 .cx .live,.rc.v3 .card1 .live{font:500 14px/1 var(--text);letter-spacing:0;text-transform:none;color:var(--v3-ink3)}
+.rc.v3 .om-wrap+.omap{margin-top:clamp(8px,2vw,24px)}.rc.v3 .om-wrap{margin-bottom:0}
+.rc.v3 .v4-in>.rc-h2{margin:0 0 clamp(28px,4.4vw,64px)}
+@media (min-width:1000px){.rc.v3 .v4-b .v4-in>.rc-h2{margin:0}}
+.rc.v3 .v4-lead-m{color:var(--v3-ink)}
+.rc.v3 ul.v4-read li,.rc.v3 .readlist.v4-read li{background:none!important;box-shadow:none!important;border:0!important;border-top:1px solid var(--v3-hair)!important;border-radius:0!important;padding:clamp(16px,1.8vw,24px) 0!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+.rc.v3 .readlist.v4-read li:last-child{border-bottom:1px solid var(--v3-hair)!important}
+.rc.v3 .readlist.v4-read li a{display:flex;justify-content:space-between;gap:24px;background:none;padding:0;box-shadow:none;border:0;color:var(--v3-ink);font:500 clamp(17px,1.35vw,21px)/1.35 var(--disp);letter-spacing:-.012em}
+.rc.v3 .rc-sm.note,.rc.v3 .note.rc-sm{background:none!important;border:0!important;box-shadow:none!important;padding:0!important;border-radius:0!important;color:var(--v3-ink3);max-width:34em;margin-inline:auto}
+@media (min-width:1000px){.rc.v3 .v4-b .v4-lead{font-size:clamp(22px,min(2.2vw,3.8vh),34px)}}

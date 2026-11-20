@@ -1,0 +1,7 @@
+/* audit 13.11 (Dana): low-contrast labels on security and pricing, in a new override file.
+   Same neutral grey family, only darker. Locked CSS untouched.
+   Glance kickers stay #0071e3 (Glance brand). Glance rail labels left alone so the
+   active Meet state is not flattened. */
+html:not([data-theme="dark"]) ul.r3-sec li,
+html:not([data-theme="dark"]) ul.r3-sec li span{color:#6e6e73}
+html:not([data-theme="dark"]) p.mo-cap{color:#6e6e73}

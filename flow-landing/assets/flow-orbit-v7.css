@@ -1,0 +1,100 @@
+/* v7 · the Glance "Works where the loop lives" orbit (glance.html #integrations: glance/corner-v20.css "A · Orbiting Circles",
+   plus its corner-v22 / corner-v23 overrides), copied rule for rule from src-live-r3 (same files as flow-site-unified-r3).
+   Only changes: Glance blue (0,113,227) is Flow blue (45,94,255) at the same alphas; var(--alt) is #f5f5f7; the core holds the Flow
+   wordmark; dark rules are left out because the solutions pages are light only. */
+.o20sec{
+  --o20-tk-a:rgba(0,0,0,.11);--o20-tk-b:rgba(0,0,0,.035);--o20-sheen:#2D5EFF;
+  position:relative;overflow:hidden;padding:104px 0 76px;background:#f5f5f7;
+}
+.o20sec > .wrap{position:relative;z-index:1}
+.o20-sub{margin-top:16px}
+.o20{
+  --rin:136px;--rout:232px;--orb:54px;--plate-pad:40px;
+  position:relative;max-width:1000px;height:620px;margin:22px auto 0;
+}
+.o20-plate{position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;aspect-ratio:1}
+.o20-plate-out{
+  width:calc(var(--rout) * 2 + var(--orb) + var(--plate-pad));
+  background:radial-gradient(circle at 50% 28%,#ffffff 0%,#fdfdfe 42%,#f6f7f9 78%,#f1f2f5 100%);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 -30px 60px -36px rgba(0,30,80,.12),
+    0 0 0 1px rgba(0,0,0,.035),
+    0 2px 6px rgba(0,30,80,.04),
+    0 44px 64px -44px rgba(0,30,80,.30);
+}
+.o20-plate-in{
+  width:calc(var(--rin) * 2 + 16px);
+  background:radial-gradient(circle at 50% 50%,rgba(45,94,255,.075) 0%,rgba(45,94,255,.025) 52%,rgba(45,94,255,0) 72%);
+}
+.o20-tracks{position:absolute;left:0;top:0;z-index:1;pointer-events:none;overflow:visible}
+.o20-tracks circle{fill:none}
+.o20-tk{stroke-width:1}
+.o20-tk-out{stroke-width:1.6;stroke-dasharray:.1 7;stroke-linecap:round}
+.o20-sheen{position:absolute;z-index:1;pointer-events:none;overflow:visible;will-change:transform}
+.o20-sheen circle{fill:none;stroke-width:1.6;stroke-linecap:round;opacity:.55}
+.o20-orb{
+  position:absolute;left:0;top:0;z-index:3;width:var(--orb);height:var(--orb);padding:0;margin:0;
+  display:grid;place-items:center;border-radius:30%;cursor:default;font:inherit;color:#6e6e73;
+  background:linear-gradient(180deg,#ffffff 0%,#f7f8fa 100%);
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow:inset 0 1px 0 #fff,inset 0 -2px 4px rgba(0,30,80,.03),0 1px 2px rgba(0,30,80,.05),0 14px 26px -14px rgba(0,30,80,.32);
+  will-change:transform;backface-visibility:hidden;
+  transition:color .35s ease,border-color .35s ease,box-shadow .35s ease,opacity .5s ease;
+}
+.o20-orb svg{width:42%;height:42%}
+.o20:not(.is-ready) .o20-orb{opacity:0}
+.o20-orb:hover,.o20-orb:focus-visible{outline:none;color:#2D5EFF;border-color:rgba(45,94,255,.38);box-shadow:inset 0 1px 0 #fff,0 0 0 4px rgba(45,94,255,.09),0 16px 30px -14px rgba(45,94,255,.5)}
+.o20-tip{position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);font-size:11.5px;font-weight:560;letter-spacing:-.01em;color:#2D5EFF;white-space:nowrap;opacity:0;transition:opacity .25s ease;pointer-events:none}
+.o20-orb:hover .o20-tip,.o20-orb:focus-visible .o20-tip{opacity:1}
+.o20-core{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;width:104px;height:104px}
+.o20-disc{
+  position:relative;z-index:2;width:104px;height:104px;border-radius:34px;display:grid;place-items:center;
+  background:linear-gradient(180deg,#ffffff 0%,#f5f8fd 100%);border:1px solid rgba(45,94,255,.2);
+  box-shadow:inset 0 1px 0 #fff,inset 0 -6px 14px -8px rgba(45,94,255,.18),0 0 0 9px rgba(45,94,255,.045),0 2px 6px rgba(0,30,80,.06),0 26px 50px -18px rgba(45,94,255,.5);
+}
+.o20-disc .living-ico.o20-ring-ico{width:48px !important;height:48px !important}
+.o20-name{position:absolute;left:50%;top:calc(100% + 14px);transform:translateX(-50%);font-family:var(--disp,"Inter Tight",system-ui,sans-serif);font-size:16px;font-weight:650;letter-spacing:-.02em;color:#1d1d1f;white-space:nowrap}
+.o20-ripple{position:absolute;left:50%;top:50%;width:104px;height:104px;margin:-52px 0 0 -52px;border-radius:50%;border:1px solid rgba(45,94,255,.24);opacity:0;z-index:1;pointer-events:none;animation:o20ripple 6s cubic-bezier(.2,.6,.3,1) infinite}
+.o20-ripple:nth-child(2){animation-delay:2s}
+.o20-ripple:nth-child(3){animation-delay:4s}
+@keyframes o20ripple{0%{transform:scale(1);opacity:.75}100%{transform:scale(2.5);opacity:0}}
+@media (max-width:860px){
+  .o20sec{padding:76px 0 60px}
+  .o20{height:560px}
+}
+@media (max-width:560px){
+  .o20sec{padding:64px 0 52px}
+  .o20{height:auto;aspect-ratio:1/1;max-height:420px;margin-top:22px;--plate-pad:14px}
+  .o20-core,.o20-disc{width:78px;height:78px}
+  .o20-disc{border-radius:26px}
+  .o20-disc .living-ico.o20-ring-ico{width:36px !important;height:36px !important}
+  .o20-ripple{width:78px;height:78px;margin:-39px 0 0 -39px}
+  .o20-name{font-size:14px;top:calc(100% + 9px)}
+  .o20-name{display:none}
+}
+@media (prefers-reduced-motion: reduce){
+  .o20-ripple{animation:none !important}
+  .o20-ripple{display:none}
+  .o20-orb{transition:none}
+}
+/* corner-v22.css: neutral orb shadow */
+.o20-orb,.o20-orb:hover,.o20-orb:focus-visible{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75), 0 2px 6px rgba(0,0,0,.10) !important;
+}
+/* corner-v23.css: no button animation */
+.o20-orb{animation:none !important}
+
+/* ---- v7 additions for the solutions pages (Flow core, vendor marks, page type scale) ---- */
+.o20-orb img{width:42%;height:42%;object-fit:contain;display:block;pointer-events:none}
+.o20-orb.is-tile img{width:46%;height:46%}
+.o20-disc .o20-wm{width:70px;height:auto;display:block}
+.o20-name{display:none}
+.x4m .x7-tools .x7-th{text-align:center;max-width:none}
+.x4m .x7-tools .x7-th .x4-h2{max-width:15em;margin:0 auto}
+.x4m .x7-tools .x7-th .x4-sub{margin:16px auto 0;max-width:33em}
+.x4m .x7-tools .x7-th .x4-eb{color:var(--bl)}
+[dir="rtl"] .o20-tip{direction:rtl}
+@media (max-width:560px){
+  .o20-disc .o20-wm{width:54px}
+}

@@ -24,7 +24,7 @@ header.site .site-links a:hover,
 header.site .site-links a.active{color:#fff}
 header.site .site-links a.active::after{
   content:""; position:absolute; inset-inline:0; inset-block-end:-6px; height:1px;
-  background:#6E9BFF;
+  background:#7495FF;
 }
 header.site a.nav-get{
   margin-inline-start:2px !important;

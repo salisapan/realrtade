@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="es" dir="ltr" data-art-lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<title>Cómo se cifran sus datos | Flow</title>
+<meta name="description" content="Cifrado en tránsito, en reposo y durante el procesamiento, y por qué la gestión de claves decide lo que todo eso protege de verdad. Las preguntas que conviene hacer a cualquier proveedor de IA.">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://theflow-ai.com/insights/es/how-data-is-encrypted">
+<link rel="alternate" hreflang="en" href="https://theflow-ai.com/insights/en/how-data-is-encrypted">
+<link rel="alternate" hreflang="he" href="https://theflow-ai.com/insights/he/how-data-is-encrypted">
+<link rel="alternate" hreflang="de" href="https://theflow-ai.com/insights/de/how-data-is-encrypted">
+<link rel="alternate" hreflang="fr" href="https://theflow-ai.com/insights/fr/how-data-is-encrypted">
+<link rel="alternate" hreflang="es" href="https://theflow-ai.com/insights/es/how-data-is-encrypted">
+<link rel="alternate" hreflang="x-default" href="https://theflow-ai.com/insights/en/how-data-is-encrypted">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Flow">
+<meta property="og:locale" content="es_ES">
+<meta property="og:title" content="Cómo se cifran sus datos">
+<meta property="og:description" content="Cifrado en tránsito, en reposo y durante el procesamiento, y por qué la gestión de claves decide lo que todo eso protege de verdad. Las preguntas que conviene hacer a cualquier proveedor de IA.">
+<meta property="og:url" content="https://theflow-ai.com/insights/es/how-data-is-encrypted">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta property="article:published_time" content="2026-08-31">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Cómo se cifran sus datos">
+<meta name="twitter:description" content="Cifrado en tránsito, en reposo y durante el procesamiento, y por qué la gestión de claves decide lo que todo eso protege de verdad. Las preguntas que conviene hacer a cualquier proveedor de IA.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="../../favicon-32x32.png">
+<link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+<link rel="manifest" href="../../site.webmanifest">
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}};d.dataset.ui='es';try{localStorage.setItem('flow.lang','es')}catch(e){}var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<link rel="preload" href="../../assets/fonts/intertight-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../../assets/flow-header.css">
+<link rel="stylesheet" href="../../assets/flow-booking.css">
+<link rel="stylesheet" href="../../assets/flow-inner.css">
+<link rel="stylesheet" href="../../assets/insights-article.css">
+<link rel="preload" as="image" href="../../photos-img/29.webp" fetchpriority="high">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Cómo se cifran sus datos", "description": "Cifrado en tránsito, en reposo y durante el procesamiento, y por qué la gestión de claves decide lo que todo eso protege de verdad. Las preguntas que conviene hacer a cualquier proveedor de IA.", "inLanguage": "es", "datePublished": "2026-08-31", "dateModified": "2026-08-31", "image": "https://theflow-ai.com/photos-img/29.webp", "author": {"@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/"}, "publisher": {"@type": "Organization", "name": "Flow", "logo": {"@type": "ImageObject", "url": "https://theflow-ai.com/logo.png"}}, "mainEntityOfPage": "https://theflow-ai.com/insights/es/how-data-is-encrypted"}</script>
+<script defer src="/assets/flow-consent.js"></script></head>
+<body>
+<a class="skip-link" href="#main">Saltar al contenido</a>
+<div class="ctl" id="ctl">
+  <div class="lang">
+    <button type="button" id="langBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="langMenu" aria-label="Idioma">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"/></svg>
+      <span class="sr-only" id="langName"></span>
+    </button>
+    <div class="menu" id="langMenu" role="menu" aria-labelledby="langBtn"></div>
+  </div>
+  <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Modo noche">
+    <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"/></svg>
+    <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
+  </button>
+</div>
+<flow-header data-base="../../"></flow-header>
+<main id="main" class="ia">
+<article>
+<div class="w top"><a class='back' href='/articles'><i aria-hidden="true"></i>Insights</a></div>
+<header class="w hd">
+<p class="ey">Seguridad de los datos</p>
+<h1>Cómo se cifran sus datos</h1>
+<p class="lead">«Cifrado» aparece en todas las páginas de seguridad. Lo que importa es dónde se cifran los datos, con qué claves, quién las tiene y qué queda en claro durante el procesamiento.</p>
+<p class="mt"><time datetime="2026-08-31">31 de agosto de 2026</time><span class="dot" aria-hidden="true">·</span>3 min de lectura</p>
+</header>
+<div class="fig"><div><img src="../../photos-img/29.webp" width="960" height="600" alt="" decoding="async" fetchpriority="high"></div></div>
+<div class="w bd">
+<aside class="sum" aria-labelledby="sum-h"><h2 id="sum-h">En resumen</h2><ul><li>En tránsito: TLS 1.3 es el estándar actual para los datos que viajan por una red.</li><li>En reposo: AES es el cifrado de referencia; la gestión de claves marca la diferencia.</li><li>Durante el procesamiento: los datos suelen descifrarse, de ahí la importancia de dónde se procesan.</li></ul></aside>
+<h2>En tránsito</h2>
+<p>Los datos que viajan entre su organización y un servicio deben ir por TLS. La versión 1.3, definida por el IETF en la RFC 8446, eliminó opciones antiguas y más débiles. Pregunte qué versiones acepta un proveedor, no solo si usa TLS.</p>
+<h2>En reposo</h2>
+<p>Los datos almacenados se cifran casi siempre con AES, el estándar publicado por el NIST como FIPS 197. El cifrado en sí rara vez es el punto débil. Las claves, sí.</p>
+<h2>Las claves lo deciden todo</h2>
+<p>El NIST SP 800-57 describe cómo deben generarse, guardarse, renovarse y destruirse las claves. Preguntas útiles:</p>
+<ul>
+<li>¿Quién puede usar las claves que protegen sus datos, y queda registrado ese acceso?</li>
+<li>¿Las claves están separadas por cliente o son compartidas?</li>
+<li>¿Se puede revocar una clave, y qué pasa entonces con los datos?</li>
+</ul>
+<p>Muchos sistemas usan cifrado de sobre: unas claves de datos cifran los datos, y una clave maestra, guardada en un servicio de claves dedicado, cifra las claves de datos.</p>
+<h2>Durante el procesamiento</h2>
+<p>Para procesar datos, un sistema suele tener que descifrarlos en memoria. El cifrado en reposo y en tránsito no cubre ese momento. Dos cosas reducen la exposición: enviar menos datos sensibles desde el principio y procesarlos en hardware que usted controla.</p>
+<h2>En Flow</h2>
+<p>En la nube de Flow, los datos sensibles se enmascaran antes de cualquier procesamiento. Con Flow-Edge o Flow-Onprem, el procesamiento ocurre en el ordenador del empleado o en un servidor de sus instalaciones, y el contenido solo se descifra allí. Pídanos los detalles por escrito, igual que a cualquier proveedor.</p>
+<section class="src" aria-labelledby="src-h"><h2 id="src-h">Fuentes</h2><ol><li><a href="https://www.rfc-editor.org/info/rfc8446/" target="_blank" rel="noopener">IETF RFC 8446: The TLS Protocol Version 1.3 (en inglés)</a></li><li><a href="https://csrc.nist.gov/pubs/fips/197/final" target="_blank" rel="noopener">NIST FIPS 197: Advanced Encryption Standard (AES) (en inglés)</a></li><li><a href="https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final" target="_blank" rel="noopener">NIST SP 800-57 Part 1 Rev. 5: Recommendation for Key Management (en inglés)</a></li></ol></section>
+</div>
+</article>
+<section class="band" aria-labelledby="cta-h"><h2 id="cta-h">El siguiente paso</h2><p>Un plan de implantación para su organización.</p>
+<a class="doit" href="https://calendar.app.google/FLWjDDQWAiM3bHvc9" target="_blank" rel="noopener"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Reservar una llamada</span></a></section>
+</main>
+<footer class="site-foot" id="footer" lang="en" dir="ltr">
+  <div class="foot-in">
+    <div class="foot-cols">
+      <div class="foot-col foot-brand">
+        <img loading="lazy" src="../../assets/flow-logo-200.webp" alt="Flow" width="64" height="28">
+        <a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+      </div>
+      <nav class="foot-col" aria-label="Product">
+        <h3 data-k="ft.hFlow">Product</h3>
+        <a data-k='ft.glance' href='/glance'>Glance</a>
+        <a data-k='ft.flow' href='/#product'>Flow</a>
+        <a data-k='ft.sec' href='/security'>Security</a>
+        <a data-k='ft.pricing' href='/pricing'>Pricing</a>
+        <a data-k='ft.solutions' href='/solutions'>Solutions</a>
+      </nav>
+      <nav class="foot-col" aria-label="Company">
+        <h3 data-k="ft.hCo">Company</h3>
+        <a data-k='ft.about' href='/about'>About</a>
+        <a data-k='ft.blog' href='/articles'>Insights</a>
+        <a data-k='ft.contact' href='/contact'>Contact</a>
+      </nav>
+    </div>
+    <div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav class="foot-legal" aria-label="Legal"><a data-k='ft.privacy' href='/privacy'>Privacy</a><a data-k='ft.terms' href='/terms'>Terms</a></nav></div>
+  </div>
+</footer>
+<script>(function(){var d=document.documentElement,P=d.getAttribute('data-art-lang');new MutationObserver(function(){var u=d.dataset.ui;if(u&&u!==P&&document.querySelector('link[rel="alternate"][hreflang="'+u+'"]')){location.href='../'+u+'/'+location.pathname.split('/').pop()+location.search.replace(/[?&]lang=[^&]*/,'')}}).observe(d,{attributes:true,attributeFilter:['data-ui']})})();</script>
+<script src="../../assets/flow-header.js"></script>
+<script src="../../assets/flow-inner.js"></script>
+<script defer src="../../assets/flow-booking.js"></script>
+</body>
+</html>
