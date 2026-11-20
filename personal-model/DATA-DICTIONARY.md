@@ -22,6 +22,11 @@ Tie strength = 0.45 recency + 0.35 frequency + 0.20 reciprocity. Recency half-li
 | `fact.retired_at` | When the row was invalidated. Empty while current. | identity | none | 0 | true |
 | `fact.consent_category` | Which consent gate allows this row. | identity | none | 0 | true |
 | `fact.schema_ver` | Schema version token. | identity | none | 0 | false |
+| `fact.provenance` | user_said, user_sent, user_action, or third_party_content. | identity | none | 0 | true |
+| `fact.status` | active or candidate. A candidate is not used until the person confirms it. | identity | none | 0 | true |
+| `fact.memory_space` | work, personal, or client and an id. | work | none | 0 | false |
+| `fact.context_of_origin` | Where the fact was learned. | identity | none | 0 | true |
+| `fact.importance` | Normalized importance for retrieval. | identity | none | 30 | true |
 | `evidence.surface` | gmail outlook or calendar. | people | none | 0 | true |
 | `evidence.message_or_event_id` | Opaque id. Not a body and not an address. | people | indirect | 0 | true |
 | `evidence.ts` | When that message or event happened. | people | none | 0 | true |
@@ -75,6 +80,11 @@ Tie strength = 0.45 recency + 0.35 frequency + 0.20 reciprocity. Recency half-li
 | `fact.retired_at` | מתי השורה בוטלה. ריק כל עוד היא עדכנית. | identity | none | 0 | true |
 | `fact.consent_category` | איזה שער הסכמה מתיר את השורה. | identity | none | 0 | true |
 | `fact.schema_ver` | אסימון גרסת סכמה. | identity | none | 0 | false |
+| `fact.provenance` | נאמר, נשלח, פעולה, או תוכן של צד שלישי. | identity | none | 0 | true |
+| `fact.status` | פעיל או מועמד. מועמד לא בשימוש עד אישור. | identity | none | 0 | true |
+| `fact.memory_space` | עבודה, אישי, או לקוח ומזהה. | work | none | 0 | false |
+| `fact.context_of_origin` | איפה העובדה נלמדה. | identity | none | 0 | true |
+| `fact.importance` | חשיבות מנורמלת לשליפה. | identity | none | 30 | true |
 | `evidence.surface` | גימייל אאוטלוק או יומן. | people | none | 0 | true |
 | `evidence.message_or_event_id` | מזהה אטום. לא גוף ולא כתובת. | people | indirect | 0 | true |
 | `evidence.ts` | מתי ההודעה או האירוע קרו. | people | none | 0 | true |

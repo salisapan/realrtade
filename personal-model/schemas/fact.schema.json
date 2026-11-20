@@ -14,7 +14,12 @@
     "valid_from",
     "learned_at",
     "consent_category",
-    "schema_ver"
+    "schema_ver",
+    "provenance",
+    "status",
+    "memory_space",
+    "context_of_origin",
+    "importance"
   ],
   "properties": {
     "id": {
@@ -126,6 +131,36 @@
       "maxLength": 16,
       "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
       "description": "Schema version token."
+    },
+    "provenance": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "user_said, user_sent, user_action, or third_party_content."
+    },
+    "status": {
+      "type": "string",
+      "maxLength": 16,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "active or candidate. A candidate is not used until the person confirms it."
+    },
+    "memory_space": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "work, personal, or client and an id."
+    },
+    "context_of_origin": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "Where the fact was learned."
+    },
+    "importance": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Normalized importance for retrieval."
     },
     "evidence": {
       "type": "array",

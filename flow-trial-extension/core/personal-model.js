@@ -35,8 +35,12 @@ const FlowPersonalModel = (() => {
     { id: 'ethnicity', re: /\b(ethnicity|racial)\b|מוצא אתני/i },
     { id: 'union', re: /\b(trade union|labor union|union)\b|הסתדרות|ועד עובדים/i },
     { id: 'criminal', re: /\b(felony|convicted|prison|indictment)\b|כלא|הרשעה|כתב אישום/i },
-    { id: 'precise_location', re: /\b\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}\b|\bgps\b|\bplus\s*code\b|\bstreet\b|\broad\b|\bavenue\b|רחוב|שדרות|סמטה/i }
+    { id: 'precise_location', re: /\b\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}\b|\bgps\b|\bplus\s*code\b|\bstreet\b|\broad\b|\bavenue\b|רחוב|שדרות|סמטה/i },
+    { id: 'finances', re: /\b(their|his|her)\s+(salary|iban|bank account)\b|משכורת של|חשבון בנק של/i },
+    { id: 'minors', re: /\b(my son|my daughter|minor child)\b|הבן שלי|הבת שלי|קטין/i }
   ];
+  const PROVENANCE = ['user_said', 'user_sent', 'user_action', 'third_party_content'];
+  const RETRIEVAL = { recency: 0.4, importance: 0.3, cosine: 0.3 };
 
   const COPY = {
     en: {
@@ -103,7 +107,10 @@ const FlowPersonalModel = (() => {
       style_rules: [],
       review: [],
       bandit: freshBandit(),
-      wiped_at: 0
+      wiped_at: 0,
+      silentThreads: {},
+      approvals: [],
+      ngrams: []
     };
   }
 
@@ -250,6 +257,8 @@ const FlowPersonalModel = (() => {
     if (!object) return { ok: false, reason: 'empty' };
     const current = openFacts(state, draft.subject_id, draft.predicate);
     const same = current.filter((f) => f.object === object)[0];
+    const provenance = PROVENANCE.indexOf(draft.provenance) >= 0 ? draft.provenance : 'user_action';
+    const status = draft.status === 'candidate' || provenance === 'third_party_content' ? 'candidate' : 'active';
     if (same) {
       const seen = {};
       same.evidence = same.evidence || [];
@@ -259,10 +268,16 @@ const FlowPersonalModel = (() => {
         same.evidence.push(evidenceOf(e));
         seen[e.message_or_event_id] = 1;
       });
-      return { ok: true, fact: same, inserted: false };
+      if (same.status === 'candidate' && status === 'active') {
+        const atPromote = isoOf(now);
+        same.valid_to = atPromote;
+        same.retired_at = atPromote;
+      } else {
+        return { ok: true, fact: same, inserted: false };
+      }
     }
     const at = isoOf(now);
-    current.forEach((old) => { old.valid_to = at; old.retired_at = at; });
+    current.forEach((old) => { if (!old.valid_to) { old.valid_to = at; old.retired_at = at; } });
     const fact = {
       id: uuid(now + state.facts.length),
       subject_id: draft.subject_id,
@@ -271,10 +286,16 @@ const FlowPersonalModel = (() => {
       source: draft.source === 'user_stated' || draft.source === 'inferred' ? draft.source : 'observed',
       confidence: clamp01(draft.confidence),
       evidence: (draft.evidence || []).slice(0, 8).map(evidenceOf).filter((e) => e.message_or_event_id),
+      evidence_ids: Array.isArray(draft.evidence_ids) ? draft.evidence_ids.slice(0, 8) : [],
       valid_from: at,
       learned_at: at,
       consent_category: draft.consent_category,
-      schema_ver: SCHEMA
+      schema_ver: SCHEMA,
+      provenance: provenance,
+      status: status,
+      memory_space: draft.memory_space || 'work',
+      context_of_origin: draft.context_of_origin || 'mail',
+      importance: clamp01(draft.importance == null ? draft.confidence : draft.importance)
     };
     state.facts.push(fact);
     return { ok: true, fact: fact, inserted: true };
@@ -543,9 +564,14 @@ const FlowPersonalModel = (() => {
         if (fromBucket) rows.push(['person.reply_latency_from', fromBucket, 0.6]);
         rows.forEach((spec) => {
           if (THIRD_PARTY_PREDICATES.indexOf(spec[0]) < 0) return;
+          if (header.isOwn) person.corroborated = true;
           const saved = putFact(state, {
             subject_id: person.id, predicate: spec[0], object: spec[1], consent_category: 'people',
-            confidence: spec[2], evidence: evidence, email: person.email
+            confidence: spec[2], evidence: evidence, email: person.email,
+            provenance: header.isOwn || person.corroborated ? 'user_sent' : 'third_party_content',
+            status: header.isOwn || person.corroborated ? 'active' : 'candidate',
+            memory_space: header.space || 'work',
+            context_of_origin: header.surface
           }, at);
           if (saved.inserted) written += 1;
         });
@@ -687,7 +713,11 @@ const FlowPersonalModel = (() => {
         if (emailOf(q) && emailOf(q) === entity.email) names.push(entity.email);
         const matched = names.some((nm) => namesMatch(q, nm)) || namesMatch(q, entity.email.split('@')[0]);
         if (!matched) return;
-        const tieFact = openFacts(state, entity.id, 'person.tie_strength')[0];
+        if (!entity.corroborated) {
+          const active = openFacts(state, entity.id, 'person.tie_strength').filter((f) => f.status !== 'candidate');
+          if (!active.length) return;
+        }
+        const tieFact = openFacts(state, entity.id, 'person.tie_strength').filter((f) => f.status !== 'candidate')[0];
         const tie = tieFact ? Number(tieFact.object) : tieScore(entity, at);
         const confidence = clamp01(0.55 + 0.45 * (Number.isFinite(tie) ? tie : 0));
         scored.push({
@@ -780,9 +810,16 @@ const FlowPersonalModel = (() => {
         valid_from: at,
         learned_at: at,
         consent_category: fact.consent_category,
-        schema_ver: SCHEMA
+        schema_ver: SCHEMA,
+        provenance: 'user_said',
+        status: 'active',
+        memory_space: fact.memory_space || 'work',
+        context_of_origin: 'user',
+        importance: 1
       };
       state.facts.push(next);
+      const entity = state.entities.filter((e) => e.id === fact.subject_id)[0];
+      if (entity) entity.corroborated = true;
       return { ok: true, fact: next };
     }
 
@@ -805,7 +842,12 @@ const FlowPersonalModel = (() => {
         valid_from: at,
         learned_at: at,
         consent_category: fact.consent_category,
-        schema_ver: SCHEMA
+        schema_ver: SCHEMA,
+        provenance: 'user_said',
+        status: 'active',
+        memory_space: fact.memory_space || 'work',
+        context_of_origin: 'user',
+        importance: 1
       };
       state.facts.push(next);
       return { ok: true, fact: next };
@@ -1270,6 +1312,120 @@ const FlowPersonalModel = (() => {
       };
     }
 
+    function learnText(text, meta, now) {
+      const provenance = meta && PROVENANCE.indexOf(meta.provenance) >= 0 ? meta.provenance : 'third_party_content';
+      if (sensitive(text)) return { written: 0, used: false, reason: 'sensitive' };
+      const user = state.entities.filter((e) => e.kind === 'user')[0];
+      if (!user) return { written: 0, used: false, reason: 'no-user' };
+      const object = String(text || '').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      if (!object) return { written: 0, used: false, reason: 'empty' };
+      const saved = putFact(state, {
+        subject_id: user.id,
+        predicate: 'style.greeting',
+        object: object,
+        consent_category: 'style',
+        confidence: 0.4,
+        provenance: provenance,
+        status: provenance === 'third_party_content' ? 'candidate' : 'active',
+        evidence: [{ surface: 'gmail', message_or_event_id: idOf(meta && meta.messageId) || 'note', ts: now || Date.now() }],
+        email: user.email,
+        memory_space: (meta && meta.space) || 'work'
+      }, now || Date.now());
+      return { written: saved && saved.inserted ? 1 : 0, used: provenance !== 'third_party_content', fact: saved && saved.fact };
+    }
+
+    function retrievalScore(parts, weights) {
+      const w = weights || RETRIEVAL;
+      const recency = clamp01(parts && parts.recency);
+      const importance = clamp01(parts && parts.importance);
+      const cosine = clamp01(parts && parts.cosine);
+      const sum = (Number(w.recency) || 0) + (Number(w.importance) || 0) + (Number(w.cosine) || 0) || 1;
+      return Math.round(((w.recency * recency + w.importance * importance + w.cosine * cosine) / sum) * 1000) / 1000;
+    }
+
+    function consolidate(now) {
+      const at = now || Date.now();
+      const stale = state.facts.filter((f) => !f.valid_to && f.source !== 'user_stated' && f.status !== 'candidate' && decayed(f, at) < 0.25);
+      if (!stale.length) return { closed: 0, derived: 0 };
+      const ids = stale.map((f) => f.id);
+      stale.forEach((f) => { f.valid_to = isoOf(at); f.retired_at = isoOf(at); });
+      const user = state.entities.filter((e) => e.kind === 'user')[0];
+      if (user && state.consents.identity) {
+        putFact(state, {
+          subject_id: user.id,
+          predicate: 'identity.name',
+          object: 'derived',
+          consent_category: 'identity',
+          confidence: 0.5,
+          source: 'inferred',
+          provenance: 'user_action',
+          status: 'active',
+          evidence_ids: ids,
+          evidence: [{ surface: 'gmail', message_or_event_id: 'derived', ts: at }],
+          email: user.email
+        }, at);
+      }
+      return { closed: ids.length, derived: user ? 1 : 0, kept: state.facts.filter((f) => ids.indexOf(f.id) >= 0).length };
+    }
+
+    function memoryPolicy(fact, useSpace) {
+      const home = (fact && fact.memory_space) || 'work';
+      const thread = fact && fact.thread;
+      if (thread && state.silentThreads[thread]) return { ok: false, reason: 'without-memory' };
+      if (!useSpace || useSpace === home) return { ok: true };
+      if ((state.approvals || []).indexOf(home + '>' + useSpace) >= 0) return { ok: true };
+      return { ok: false, reason: 'cross-space' };
+    }
+
+    function approveSpace(from, to) {
+      const key = String(from || 'work') + '>' + String(to || 'personal');
+      if (state.approvals.indexOf(key) < 0) state.approvals.push(key);
+      return { ok: true, key: key };
+    }
+
+    function withoutMemory(threadId, on) {
+      const id = idOf(threadId) || 'thread';
+      if (on === false) delete state.silentThreads[id];
+      else state.silentThreads[id] = true;
+      return { ok: true, silent: state.silentThreads[id] === true };
+    }
+
+    function editSummary(text, space, now) {
+      const user = state.entities.filter((e) => e.kind === 'user')[0];
+      if (!user) return { ok: false, reason: 'no-user' };
+      const line = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      if (!line || sensitive(line)) return { ok: false, reason: 'sensitive' };
+      return putFact(state, {
+        subject_id: user.id,
+        predicate: 'identity.name',
+        object: line,
+        consent_category: 'identity',
+        confidence: 1,
+        source: 'user_stated',
+        provenance: 'user_said',
+        status: 'active',
+        memory_space: space || 'personal',
+        context_of_origin: 'summary',
+        evidence: [],
+        email: user.email
+      }, now || Date.now());
+    }
+
+    function learnNgrams(text) {
+      const words = String(text || '').toLowerCase().replace(/[^a-z\u0590-\u05FF\s]/g, ' ').split(/\s+/).filter((w) => w.length > 1).slice(0, 40);
+      for (let i = 0; i < words.length; i++) {
+        const uni = words[i];
+        const bi = words[i + 1] ? uni + ' ' + words[i + 1] : '';
+        [uni, bi].forEach((token) => {
+          if (!token) return;
+          const row = state.ngrams.filter((n) => n.token === token)[0];
+          if (row) row.n += 1;
+          else if (state.ngrams.length < 64) state.ngrams.push({ token: token, n: 1 });
+        });
+      }
+      return { size: state.ngrams.length };
+    }
+
     function exportJson() {
       return {
         schema_ver: SCHEMA,
@@ -1314,6 +1470,14 @@ const FlowPersonalModel = (() => {
       confirmedFrom: confirmedFrom,
       view: view,
       exportJson: exportJson,
+      learnText: learnText,
+      retrievalScore: retrievalScore,
+      consolidate: consolidate,
+      memoryPolicy: memoryPolicy,
+      approveSpace: approveSpace,
+      withoutMemory: withoutMemory,
+      editSummary: editSummary,
+      learnNgrams: learnNgrams,
       modelAssistFor: modelAssistFor,
       assistFor: assistFor,
       decayed: (fact, now) => decayed(fact, now || Date.now()),
@@ -1398,6 +1562,9 @@ const FlowPersonalModel = (() => {
     if (raw.bandit && raw.bandit.arms) state.bandit = raw.bandit;
     state.bandit.enabled = Boolean(raw.bandit && raw.bandit.enabled);
     state.wiped_at = raw.wiped_at || 0;
+    state.silentThreads = raw.silentThreads || {};
+    state.approvals = Array.isArray(raw.approvals) ? raw.approvals : [];
+    state.ngrams = Array.isArray(raw.ngrams) ? raw.ngrams : [];
     return state;
   }
 
@@ -1410,6 +1577,7 @@ const FlowPersonalModel = (() => {
     SCHEMA: SCHEMA,
     CATEGORIES: CATEGORIES,
     WEIGHTS: WEIGHTS,
+    RETRIEVAL: RETRIEVAL,
     GUARD: GUARD,
     THIRD_PARTY_PREDICATES: THIRD_PARTY_PREDICATES,
     create: create,

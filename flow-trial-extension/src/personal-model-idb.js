@@ -137,6 +137,7 @@
     var key = await ensureKey(db);
     return {
       async load() {
+        if (!key) return { entities: [], aliases: [], facts: [], tombstones: [], exemplars: [] };
         var state = { entities: [], aliases: [], facts: [], tombstones: [], exemplars: [], consents: null };
         var rows = await db.all('facts');
         for (var i = 0; i < rows.length; i++) {
@@ -202,7 +203,11 @@
         });
       },
       dump: function () { return typeof db.dump === 'function' ? db.dump() : null; },
-      keyExtractable: function () { return key.extractable === true; }
+      keyExtractable: function () { return key.extractable === true; },
+      async shred() {
+        for (var i = 0; i < STORES.length; i++) await db.clear(STORES[i]);
+        key = null;
+      }
     };
   }
 

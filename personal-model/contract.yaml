@@ -180,6 +180,60 @@ objects:
         half_life_days: 0
         retention_days: 365
         third_party: false
+      - name: provenance
+        type: token
+        max_length: 32
+        required: true
+        purpose: user_said, user_sent, user_action, or third_party_content.
+        purpose_he: נאמר, נשלח, פעולה, או תוכן של צד שלישי.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: status
+        type: token
+        max_length: 16
+        required: true
+        purpose: active or candidate. A candidate is not used until the person confirms it.
+        purpose_he: פעיל או מועמד. מועמד לא בשימוש עד אישור.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: memory_space
+        type: token
+        max_length: 64
+        required: true
+        purpose: work, personal, or client and an id.
+        purpose_he: עבודה, אישי, או לקוח ומזהה.
+        consent_category: work
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: false
+      - name: context_of_origin
+        type: token
+        max_length: 32
+        required: true
+        purpose: Where the fact was learned.
+        purpose_he: איפה העובדה נלמדה.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: importance
+        type: number
+        required: true
+        purpose: Normalized importance for retrieval.
+        purpose_he: חשיבות מנורמלת לשליפה.
+        consent_category: identity
+        pii: none
+        half_life_days: 30
+        retention_days: 365
+        third_party: true
   - name: evidence
     purpose: A pointer to a message or event. Never the body.
     fields:

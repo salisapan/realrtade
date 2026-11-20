@@ -30,6 +30,8 @@ Slice 3 reads work facts with character offsets, not a copy of the sentence. Two
 
 Slice 4 keeps a LinUCB bandit off. It does not explore a Do It, and it does not go under the guard of 0.8. The same confirmed facts can be read by the Gmail add-on. Flow on a customer's server, and iPhone, use this contract later. They are not built here.
 
+Slice 5 runs embeddings and Hebrew NER on Glance's own cloud, behind a switch that is off until the existing glance-assist host grows a stateless `personal-infer` action. Nothing is downloaded to the browser. An inbound instruction cannot change a draft. Offline, rules and libphonenumber answer.
+
 ## Surfaces
 
 | Surface | Status |
