@@ -1,0 +1,13 @@
+/* 14/11 Do It match (Sali 22:35): the Do It in the process cards and inside the phone use the original .doit material,
+   the same as the page's r15 CTA and the header button: page font, #2A57F0 label, padding 16z/34z, ring 2px*z.
+   Overrides stack.css (locked) and r14s.css values; colours for dark mode stay in r15-dark.css. Undo: remove the <link> to this file. */
+#r14s#r14s .stk button.doit{--z:.82;padding:calc(16px*var(--z)) calc(34px*var(--z));font:700 17px/1 "Inter Tight",-apple-system,system-ui,sans-serif;border-radius:calc(999px*var(--z))}
+html[lang="he"] #r14s#r14s .stk button.doit{font-family:"Heebo Sol","Inter Tight",-apple-system,"SF Hebrew",system-ui,sans-serif}
+html[lang="he"] #r14s#r14s .ph-scr .fl-bar .doit,html[lang="he"] #r14s#r14s .chain .bar .doit{font-family:"Heebo Sol","Inter Tight",-apple-system,"SF Hebrew",system-ui,sans-serif}
+html:not([lang="he"]) #r14s#r14s .ph-scr .fl-bar .doit,html:not([lang="he"]) #r14s#r14s .chain .bar .doit{font-family:"Inter Tight",-apple-system,system-ui,sans-serif}
+html:not([data-theme="dark"]) #r14s#r14s .stk button.doit,
+html:not([data-theme="dark"]) #r14s#r14s .ph-scr .fl-bar .doit,
+html:not([data-theme="dark"]) #r14s#r14s .chain .bar .doit{--doit-text:#2A57F0;color:#2A57F0!important}
+/* inside the phone on desktop (also the Solutions hub phone images): r14s sets --z:1, which leaves the label small inside a wide pill.
+   Use the r15 CTA proportion instead (z .82, 17px: label/height .39, as the original CTA) */
+@media (min-width:760px){#r14s#r14s .ph-scr .fl-bar .doit{--z:.82;font-size:17px;line-height:1}}

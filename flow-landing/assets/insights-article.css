@@ -1,0 +1,68 @@
+/* Flow Insights article pages (insights/{lang}/*.html). Tokens follow articles.html (.dx): Apple-clean, Flow blue only. Static, no JS layout. */
+.ia{--ink:#1d1d1f;--body:#1d1d1f;--mute:#6e6e73;--hair:rgba(0,0,0,.12);--acc:#2D5EFF;--acc-h:#1F46D6;--panel:#f5f5f7;background:#fff;color:var(--body);font-family:var(--text);padding:0 0 0}
+html[data-theme="dark"] .ia{--ink:#f5f5f7;--body:#e8e8ed;--mute:#a1a1a6;--hair:rgba(255,255,255,.16);--acc:#3B74FF;--acc-h:#6E9BFF;--panel:#1d1d1f;background:#000}
+.ia *,.site-foot,.site-foot *{box-sizing:border-box}
+html,body{overflow-x:clip}
+.skip-link{position:absolute;top:0;inset-inline-start:0;z-index:200;padding:10px 16px;color:#fff;text-decoration:none;font-size:15px;font-weight:600;border-radius:0 0 10px 0}
+.ia .w{max-width:732px;margin:0 auto;padding:0 24px}
+.ia .top{padding-top:28px}
+.ia .back{display:inline-flex;align-items:center;gap:.45em;min-height:44px;font-size:15px;font-weight:600;color:var(--acc-h);text-decoration:none}
+.ia .back:hover{text-decoration:underline;text-underline-offset:4px}
+.ia .back i{display:inline-block;width:.42em;height:.42em;border:solid currentColor;border-width:0 0 2px 2px;transform:rotate(45deg);margin-inline-start:2px}
+[dir="rtl"] .ia .back i{transform:rotate(-135deg)}
+.ia .hd{padding:20px 0 0}
+.ia .ey{margin:0;font-size:14px;font-weight:600;color:var(--mute);letter-spacing:0}
+.ia h1{margin:10px 0 0;font-family:var(--disp);font-size:clamp(32px,4.6vw,48px);line-height:1.08;font-weight:700;letter-spacing:-.022em;color:var(--ink);text-wrap:balance}
+.ia .lead{margin:18px 0 0;font-size:clamp(19px,2.1vw,22px);line-height:1.45;color:var(--mute);font-weight:400;text-wrap:pretty}
+.ia .mt{margin:18px 0 0;font-size:15px;color:var(--mute);font-weight:500}
+.ia .mt .dot{padding:0 .4em}
+.ia .fig{max-width:1028px;margin:36px auto 0;padding:0 24px}
+.ia .fig div{position:relative;aspect-ratio:16/10;border-radius:18px;overflow:hidden;background:var(--panel)}
+.ia .fig img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.ia .bd{padding-top:40px;font-size:18px;line-height:1.62}
+.ia .bd h2{margin:44px 0 12px;font-family:var(--disp);font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-.016em;color:var(--ink)}
+.ia .bd p{margin:0 0 16px;text-wrap:pretty}
+.ia .bd ul,.ia .bd ol{margin:0 0 16px;padding:0;list-style:none}
+.ia .bd li{position:relative;padding-inline-start:22px;margin:0 0 10px}
+.ia .bd ul li::before{content:"";position:absolute;inset-inline-start:4px;top:.68em;width:6px;height:6px;border-radius:50%;background:var(--acc)}
+.ia .bd ol{counter-reset:n}
+.ia .bd ol li{counter-increment:n;padding-inline-start:34px}
+.ia .bd ol li::before{content:counter(n);position:absolute;inset-inline-start:0;top:.12em;width:24px;height:24px;border-radius:50%;background:var(--panel);color:var(--ink);font-size:13px;font-weight:700;line-height:24px;text-align:center}
+.ia .sum{background:var(--panel);border-radius:18px;padding:24px 26px 12px;margin:0 0 8px}
+.ia .bd .sum h2{margin:0 0 12px;font-size:17px;letter-spacing:0}
+.ia .sum li{font-size:17px;line-height:1.5}
+.ia .src{margin-top:48px;padding-top:24px;border-top:1px solid var(--hair);font-size:15px;line-height:1.5;color:var(--mute)}
+.ia .bd .src h2{margin:0 0 12px;font-size:17px;letter-spacing:0}
+.ia .bd .src li{padding-inline-start:0;margin:0 0 10px}
+.ia .bd .src li::before{display:none;content:none}
+.ia .src a{color:var(--acc-h);text-decoration:none;overflow-wrap:anywhere}
+.ia .src a:hover{text-decoration:underline;text-underline-offset:3px}
+.ia .band{margin-top:72px;background:var(--panel);padding:72px 24px 80px;text-align:center}
+.ia .band h2{margin:0;font-family:var(--disp);font-size:32px;line-height:1.1;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+.ia .band p{margin:12px 0 0;font-size:18px;color:var(--mute)}
+.ia .band .doit{margin-top:28px;--z:1;text-decoration:none}
+.ia :is(a,button):focus-visible{outline:2px solid var(--acc-h);outline-offset:3px;border-radius:6px}
+[lang="he"] .ia :is(h1,.bd h2,.band h2){letter-spacing:0}
+[lang="he"] .ia .bd{font-size:18px;line-height:1.7}
+@media (min-width:900px){
+  .ia .top{padding-top:44px}
+  .ia h1{line-height:1.06}
+  .ia .bd{font-size:19px}
+  .ia .bd h2{font-size:28px;margin-top:52px}
+  .ia .fig{margin-top:48px}
+}
+@media (max-width:480px){
+  .ia .w{padding:0 20px}
+  .ia .fig{padding:0 20px;margin-top:28px}
+  .ia .bd{padding-top:32px;font-size:17px}
+  .ia .bd h2{font-size:23px;margin-top:38px}
+  .ia .sum{padding:20px 20px 8px}
+  .ia .band{margin-top:56px;padding:56px 20px 64px}
+  .ia .band h2{font-size:28px}
+}
+/* review fix 13.11 (local): r15 depth on the hero image and the "In short" box. Lives in the shared article stylesheet so builder rebuilds keep it. */
+.ia .fig div{border-radius:24px;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 1px rgba(0,0,0,.05),0 4px 10px rgba(0,0,0,.05),0 22px 44px -10px rgba(15,22,45,.20),0 48px 80px -24px rgba(15,22,45,.16)}
+.ia .sum{background:#fff;border-radius:22px;padding:26px 28px 14px;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 1px rgba(0,0,0,.04),0 3px 8px rgba(0,0,0,.04),0 16px 32px -8px rgba(15,22,45,.14),0 32px 56px -18px rgba(15,22,45,.10);margin:0 0 20px}
+html[data-theme="dark"] .ia .fig div{box-shadow:0 0 0 .5px rgba(255,255,255,.12),0 30px 60px -20px rgba(0,0,0,.85)}
+html[data-theme="dark"] .ia .sum{background:#161618;box-shadow:0 0 0 .5px rgba(255,255,255,.10),0 18px 40px -18px rgba(0,0,0,.8)}
+@media (max-width:600px){.ia .fig div{border-radius:20px}.ia .sum{padding:20px 20px 10px;border-radius:20px}}

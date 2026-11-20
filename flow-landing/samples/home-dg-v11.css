@@ -1,0 +1,94 @@
+/* Home-only: Cloud / Edge diagram layers over the on-prem hub card (same .opf language as the hub; no panels, no chips). */
+#onprem #op-s2{position:relative}
+#onprem #op-s2>:not(.dg-layer){transition:opacity .45s cubic-bezier(.4,0,.2,1)}
+#onprem #op-s2.dg-hub-off>:not(.dg-layer){opacity:0;pointer-events:none}
+#onprem .dg-layer{position:absolute;opacity:0;transition:opacity .45s cubic-bezier(.4,0,.2,1);pointer-events:none}
+#onprem .dg-layer.on{opacity:1}
+#onprem .dg-layer .opf{margin-top:0}
+#onprem .dg-layer .opf-box,#onprem .dg-layer .opf-cd,#onprem .dg-layer .opf-hub{direction:inherit}
+/* cloud: the mask gate on the wires */
+#onprem .dg-gate{position:absolute;z-index:3;width:0;height:0;--lit:0}
+#onprem .dg-gate:before{content:"";position:absolute;left:calc(var(--u)*-.5px);top:calc(var(--u)*-86px);height:calc(var(--u)*172px);border-left:calc(var(--u)*1.2px) dashed var(--k)}
+#onprem .dg-gb{position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:grid;place-items:center;width:calc(var(--u)*34px);height:calc(var(--u)*34px);border-radius:50%;background:var(--abg);
+ box-shadow:0 0 0 calc(var(--u)*1px) color-mix(in srgb,var(--a-bd) calc(var(--lit)*100%),var(--bxe)),0 0 0 calc(var(--u)*(2 + 3*var(--lit))*1px) color-mix(in srgb,var(--a-ring) calc(var(--lit)*100%),transparent),0 calc(var(--u)*5px) calc(var(--u)*10px) calc(var(--u)*-4px) rgba(20,30,60,.12)}
+#onprem .dg-gb svg{width:56%;height:56%;fill:none;stroke:var(--tin-ic);stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+#onprem .dg-gate em{position:absolute;left:0;top:calc(var(--u)*23px);transform:translateX(-50%);width:calc(var(--u)*120px);text-align:center;font-style:normal;font-size:calc(var(--u)*var(--tf)*11.5px);line-height:1.25;color:var(--hub-s);font-weight:500}
+/* edge: the employee's computer boundary + the external cloud it never talks to */
+#onprem .dg-bound{position:absolute;z-index:0;border-radius:calc(var(--u)*24px);border:calc(var(--u)*1.3px) dashed color-mix(in srgb,var(--ring) calc(18% + var(--lit,0)*30%),var(--k));--lit:0}
+#onprem .dg-bound em{position:absolute;top:calc(var(--u)*-9px);left:50%;transform:translateX(-50%);padding:0 calc(var(--u)*12px);font-style:normal;font-size:calc(var(--u)*var(--tf)*11.5px);line-height:1;white-space:nowrap;font-weight:500;color:var(--hub-s);background:var(--bx0);border-radius:calc(var(--u)*10px)}
+#onprem .dg-stub{position:absolute;z-index:0;width:0;border-left:calc(var(--u)*1.2px) dotted var(--k);transform:translateX(-50%)}
+#onprem .dg-ext{position:absolute;z-index:1;transform:translate(-50%,-50%);display:flex;align-items:center;gap:calc(var(--u)*8px);padding:calc(var(--u)*7px) calc(var(--u)*14px);border-radius:999px;background:var(--cin);box-shadow:var(--cin-sh);white-space:nowrap;color:var(--t-in)}
+#onprem .dg-ext i{display:grid;place-items:center;width:calc(var(--u)*20px);height:calc(var(--u)*20px)}
+#onprem .dg-ext svg{width:100%;height:100%;fill:none;stroke:var(--tin-ic);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#onprem .dg-ext b{font-size:calc(var(--u)*var(--tf)*12.5px);font-weight:600;line-height:1}
+#onprem .dg-ext u{text-decoration:none;font-size:calc(var(--u)*var(--tf)*12.5px);line-height:1;font-weight:700;color:var(--hub-n);padding-inline-start:calc(var(--u)*8px);border-inline-start:calc(var(--u)*1px) solid var(--k)}
+@media (prefers-reduced-motion:reduce){#onprem .dg-layer,#onprem #op-s2>:not(.dg-layer){transition:none}}
+#onprem.sx-op{margin-top:2px!important}
+/* v4 = v2 diagrams + (1) no On-Prem lead sentence, (2) tighter rhythm under the switcher */
+html body #onprem p.op-cap{display:none!important}
+html body .sx-dep .dep.dep2{padding-bottom:6px!important}
+html body .sx-dep .d2-note{margin-top:12px!important;min-height:2.9em!important}
+html body #onprem.op-v,html body #onprem.sx-op{padding-top:0!important}
+html body #onprem #op-s2{padding-top:4px!important;padding-bottom:8px!important}
+html body #onprem #op-s2 .opf{margin-top:0!important}
+/* ===== v7 (on top of v4, original diagram size) =====
+   1) all three panels share the real hub panel's height (JS: layer aspect = real box aspect, content centred) - zero shift when switching
+   2) layered soft depth on the panel (+ top-light highlight); dark = faint #2D5EFF glow, no black shadow
+   3) switcher ~30% smaller (uniform zoom: same proportions, labels stay optically centred) */
+html body #onprem .opf-box{box-shadow:0 0 0 calc(var(--u)*1px) var(--bxe),inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(15,22,45,.025),0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.10),0 24px 60px rgba(0,0,0,.09),0 40px 90px rgba(0,0,0,.05)}
+html[data-theme=dark] body #onprem .opf-box{box-shadow:0 0 0 calc(var(--u)*1px) var(--bxe),inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(45,94,255,.12),0 8px 28px rgba(45,94,255,.22),0 24px 64px rgba(45,94,255,.17),0 40px 90px rgba(45,94,255,.10)}
+html body #onprem{overflow:visible!important}
+/* ===== v8 =====
+   switcher: still the v7 scale (zoom .7 -> pill height 34px), but the container is as wide as the diagram panel, pills evenly spread with an 8px gap,
+   and the container carries the same layered depth as the panel */
+html body .dep2 .d2-seg{zoom:.7;--g:calc(8px/.7);width:calc(var(--pw,306px)/.7);column-gap:var(--g)}
+html body .dep2 .d2-seg i{width:calc((100% - 10px - 2*var(--g))/3);transform:translateX(calc(var(--i,0)*(100% + var(--g))))}
+html body .dep2 .d2-seg{box-shadow:inset 0 1px 3px rgba(15,22,45,.10),0 1px 0 rgba(255,255,255,.9),0 1px 2px rgba(0,0,0,.04),0 6px 18px rgba(0,0,0,.08),0 16px 40px rgba(0,0,0,.07),0 28px 64px rgba(0,0,0,.04)}
+html[data-theme=dark] body .dep2 .d2-seg{box-shadow:inset 0 0 0 1px rgba(150,170,220,.2),inset 0 2px 8px rgba(0,0,0,.55),0 6px 20px rgba(45,94,255,.16),0 16px 44px rgba(45,94,255,.12),0 28px 64px rgba(45,94,255,.07)}
+/* caption: text slot keeps the v4 reserved height (no shift between options / languages) */
+html body .dep2 .d2-note{display:flex;align-items:center;justify-content:center}
+html body .dep2 .d2-note .d2-t{display:block;font-style:normal;text-align:center}
+/* ===== v10 (on top of v8 minus the removed deployment link; no size changes: diagram = v4 size, panel height shared, switcher = panel width, pills 93.7x34, 8px gap) =====
+   1) caption = the diagram's title: the text sits on the bottom of its reserved slot, 12px above the grey panel (slot height unchanged -> zero shift)
+   2) moving data dot: one small accent dot per option (#2D5EFF; dark #6E9BFF), soft glow, no extra colours
+   3) switcher: the indicator glides (~280ms), the pills' own ring/opacity/colour cross-fade in the same 280ms
+   4) swipe: horizontal swipes on the panel change option; vertical pan stays native (touch-action:pan-y)
+   5) tiny panel labels (corner labels + gate / boundary captions): a notch darker, same size */
+html body .dep2 .d2-note{align-items:flex-end}
+/* 2 */
+#onprem .opf{--dotc:#2D5EFF}
+html[data-theme=dark] #onprem .opf{--dotc:#6E9BFF}
+html body #onprem .opf-svg .td{fill:var(--dotc);stroke:none;r:clamp(2.6px,calc(var(--u)*10px),3.6px);filter:drop-shadow(0 0 3px color-mix(in srgb,var(--dotc) 55%,transparent))}
+html body #onprem .opf-svg .td.mk{fill:var(--bx0);stroke:var(--dotc);stroke-width:1.5px}
+html body #onprem .opf-svg .tw{display:none}
+/* 3 */
+html body .dep2 .d2-seg i{transition:none}
+html body .dep2 .d2-seg button.d2-opt{transition:color .28s ease,opacity .28s ease}
+html body .dep2 .d2-seg button.d2-opt>.shell,html body .dep2 .d2-seg button.d2-opt>.dring{transition:opacity .28s ease}
+/* 4 */
+html body #onprem #op-s2{touch-action:pan-y;-webkit-user-select:none;user-select:none}
+/* 5 */
+html:not([data-theme=dark]) body #onprem .opf{--lab:#6e6e73;--hub-s:#5c5c61}
+html[data-theme=dark] body #onprem .opf{--lab:#b0b0b6;--hub-s:#b0b0b6}
+@media (prefers-reduced-motion:reduce){html body .dep2 .d2-seg i,html body .dep2 .d2-seg button.d2-opt,html body .dep2 .d2-seg button.d2-opt>.shell,html body .dep2 .d2-seg button.d2-opt>.dring{transition:none}}
+html.rm body .dep2 .d2-seg i,html.rm body .dep2 .d2-seg button.d2-opt,html.rm body .dep2 .d2-seg button.d2-opt>.shell,html.rm body .dep2 .d2-seg button.d2-opt>.dring{transition:none}
+
+/* ===== v11: Photos-style paging (no size changes: panel 306 x 158.3 at 390, diagrams at v4 size, switcher/caption unchanged) =====
+   The grey panel is now a static element (.dg-pan: same box material, shadow and dot grid as before, never clipped);
+   an inner window (.dg-win) clips the horizontal track. Cloud / Edge / On-Prem are three pages in that track (LTR: Cloud | Edge | On-Prem);
+   JS sets translate3d((k-pos)*100%) per page. The pages' own boxes are transparent so the panel stays put while they slide.
+   Drag: 1:1 follow, velocity-aware snap, rubber band at the ends; vertical pan stays native (touch-action:pan-y). */
+#onprem #op-s2 .dg-pan{position:absolute;left:0;top:0;margin:0!important;z-index:0;pointer-events:none}
+#onprem #op-s2 .dg-pan .opf-box{aspect-ratio:auto!important}
+#onprem #op-s2 .dg-win{position:absolute;z-index:1;overflow:hidden;pointer-events:none;isolation:isolate;transform:translateZ(0)}
+html body #onprem #op-s2>.opf:not(.dg-pan){position:relative;z-index:1;overflow:hidden;border-radius:calc(var(--u)*26px);isolation:isolate}
+#onprem #op-s2>.opf:not(.dg-pan) .opf-box,#onprem #op-s2 .dg-layer .opf-box{background:none!important;box-shadow:none!important;will-change:transform}
+#onprem #op-s2>.opf:not(.dg-pan) .opf-box:before,#onprem #op-s2 .dg-layer .opf-box:before{display:none!important}
+#onprem #op-s2 .dg-layer{position:absolute;left:0;top:0;width:100%;opacity:1;transition:none;will-change:transform}
+#onprem #op-s2.dg-hub-off>:not(.dg-layer){opacity:1;pointer-events:auto}
+@media (hover:hover) and (pointer:fine){html body #onprem #op-s2{cursor:grab}html body #onprem #op-s2.dg-drag{cursor:grabbing}}
+html body .dep2 .d2-seg i{will-change:transform}
+html body .dep2 .d2-note{width:100%;box-sizing:border-box}
+html body .dep2 .d2-note .d2-t{width:100%}
+/* 006c: cloud selection keeps the real hub hidden even if the hub node is re-rendered after dg init */
+#onprem #op-s2.dg-cloud-on>.opf:not(.dg-pan){visibility:hidden!important}

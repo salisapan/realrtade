@@ -1,0 +1,157 @@
+/* r15 phone hero (<760): one big readable card at a time, iOS-like stack. Built by stack.js only at phone widths; desktop untouched */
+@media (max-width:759px){
+#r14s#r14s .in.has-stk>.chain{display:none!important}
+#r14s#r14s .stk{position:relative;display:grid;margin:38px auto 6px;width:100%;max-width:440px;text-align:right;direction:rtl;font-family:Heebo,"Inter Tight",system-ui,sans-serif;color:#1d1d1f!important;-webkit-font-smoothing:antialiased}
+/* depth: every card has its own small shadow; the front card adds a large soft multi-layer shadow (::after, animated by opacity only); farther cards dim a touch (::before) */
+#r14s#r14s .stk>.sc{grid-area:1/1;position:relative;background:#fff!important;margin:0!important;border-radius:22px;padding:14px 16px 12px;transform-origin:50% 0;will-change:transform,opacity;backface-visibility:hidden;
+  box-shadow:0 0 0 .5px rgba(29,29,31,.07),0 2px 6px rgba(29,29,31,.06),0 10px 24px -14px rgba(29,29,31,.16)!important;display:flex;flex-direction:column;min-width:0}
+#r14s#r14s .stk>.sc::before{content:"";position:absolute;inset:0;border-radius:inherit;background:#1d1d1f!important;opacity:0;pointer-events:none;z-index:3}
+#r14s#r14s .stk>.sc::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;opacity:0;
+  box-shadow:0 1px 2px rgba(29,29,31,.07),0 6px 14px -8px rgba(29,29,31,.10),0 12px 34px -16px rgba(29,29,31,.14),0 24px 70px -32px rgba(29,29,31,.16),0 0 70px -12px rgba(29,29,31,.12)!important}   /* 12.11: depth kept on the sides, the band right under the card stays light so the process names read crisp */
+#r14s#r14s .stk>.sc[data-pos="0"]::after{opacity:1}
+#r14s#r14s .stk>.sc[data-pos="1"]::before{opacity:.025}
+#r14s#r14s .stk>.sc[data-pos="2"]::before,#r14s#r14s .stk>.sc[data-pos="3"]::before{opacity:.05}
+#r14s#r14s .stk>.sc.tap{cursor:pointer}
+#r14s#r14s .stk,#r14s#r14s .stk *{-webkit-tap-highlight-color:transparent}
+#r14s#r14s .stk>.sc:not([data-pos="0"])>*{visibility:hidden;opacity:0}
+#r14s#r14s .stk>.sc[data-pos="3"],#r14s#r14s .stk>.sc[data-pos="gone"]{visibility:hidden;pointer-events:none}
+/* contact shadow under the stack */
+#r14s#r14s .stk>.cs{position:absolute;left:20%;right:20%;bottom:-5px;height:12px;border-radius:50%;pointer-events:none;z-index:0;background:radial-gradient(closest-side,rgba(29,29,31,.12),rgba(29,29,31,0))!important}
+/* shared-element ghost (a proposal row lifting off the Flow card) */
+#r14s#r14s .stk>.gh{position:absolute;margin:0;padding:0;z-index:40;pointer-events:none;will-change:opacity}
+#r14s#r14s .stk>.gh>.gbg{position:absolute;inset:0;border-radius:14px;background:#fff!important;transform-origin:0 0;will-change:transform;
+  box-shadow:0 1px 2px rgba(29,29,31,.08),0 10px 24px -6px rgba(29,29,31,.22)!important}
+#r14s#r14s .stk>.gh>.gct{position:absolute;inset:0;margin:0;padding:6px 10px;will-change:transform}
+#r14s#r14s .stk>.gh li{border:0!important;padding:0}
+/* idle float: the whole stack breathes 3px every 5s; paused while cards move */
+#r14s#r14s .stk>.sc{animation:stk-float 5s ease-in-out infinite alternate!important}
+#r14s#r14s .stk>.cs{animation:stk-cs 5s ease-in-out infinite alternate!important}
+#r14s#r14s .stk.busy>.sc,#r14s#r14s .stk.busy>.cs{animation-play-state:paused!important}
+@keyframes stk-float{from{translate:0 0}to{translate:0 -3px}}
+@keyframes stk-cs{from{opacity:1;scale:1}to{opacity:.72;scale:.95}}
+#r14s#r14s .track:has(.in.has-stk){padding-bottom:170px!important;margin-bottom:-170px!important}
+#r14s#r14s .stk p{margin:0}
+#r14s#r14s .stk .lg{flex:none;width:28px;height:28px;display:grid;place-items:center}
+#r14s#r14s .stk .lg img,#r14s#r14s .stk .lg svg{width:100%;height:100%;display:block}
+#r14s#r14s .stk .hd{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+#r14s#r14s .stk .hd b{font-size:17px;font-weight:700;letter-spacing:-.01em}
+#r14s#r14s .stk .hd .hs{font-size:15px;color:#6e6e73!important}
+#r14s#r14s .stk .chip{margin-inline-start:auto;font-size:13px;font-weight:500;color:#6e6e73!important;background:#f5f5f7!important;border-radius:999px;padding:3px 10px;white-space:nowrap}
+#r14s#r14s .stk .chip.ok{color:#2D5EFF!important;background:rgba(45,94,255,.08)!important}
+#r14s#r14s .stk .k{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:600;color:#6e6e73!important;margin:0 0 7px}
+#r14s#r14s .stk .k i{font-style:normal;width:19px;height:19px;border-radius:50%;border:1.5px solid #c7c7cc!important;color:#1d1d1f!important;display:grid;place-items:center;font-size:12px;font-weight:700;font-family:"Inter Tight",system-ui,sans-serif;flex:none}
+#r14s#r14s .stk .sec+.sec{margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.07)!important}
+#r14s#r14s .stk .ar{display:flex;gap:10px;align-items:flex-start}
+#r14s#r14s .stk .ar .t{font-size:17px;font-weight:700;line-height:1.3}
+#r14s#r14s .stk .ar .s{font-size:15px;color:#6e6e73!important;line-height:1.35;margin-top:1px}
+#r14s#r14s .stk .ar .s em,#r14s#r14s .stk em{font-style:normal;font-weight:600;color:#1d1d1f!important}
+#r14s#r14s .stk ol{list-style:none;margin:0;padding:0}
+#r14s#r14s .stk .st li{display:flex;align-items:center;gap:8px;font-size:15px;line-height:1.3;padding:2px 0}
+#r14s#r14s .stk .st li .lg{width:22px;height:22px}
+#r14s#r14s .stk .st li .ck{margin-inline-start:auto;flex:none;width:16px;height:16px;color:#2D5EFF!important}
+#r14s#r14s .stk .pr li{display:flex;align-items:center;gap:10px;padding:4px 0}
+#r14s#r14s .stk .pr li+li{border-top:1px solid rgba(0,0,0,.05)!important}
+#r14s#r14s .stk .pr .t{font-size:17px;font-weight:600;line-height:1.3}
+#r14s#r14s .stk .pr .s{font-size:15px;color:#6e6e73!important;line-height:1.3}
+#r14s#r14s .stk .go{display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:auto;padding-top:6px}
+#r14s#r14s .stk button:not(.doit){font:inherit;color:inherit!important;background:none!important;border:0!important;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#r14s#r14s .stk button.doit:active{transform:scale(.96);transition:transform .1s}
+#r14s#r14s .stk button.doit{--z:1.1;display:flex;position:relative;align-items:center;justify-content:center;border:0!important;background:none!important;margin:0;padding:10px 30px;font:700 17px "Inter Tight",system-ui,sans-serif;color:#2D5EFF!important;border-radius:999px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#r14s#r14s .stk .cue{font-size:15px;font-weight:500;color:#2D5EFF!important}
+/* system cards */
+#r14s#r14s .stk .fld{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+#r14s#r14s .stk .fld .w{grid-column:1/-1}
+#r14s#r14s .stk .fl{font-size:14px;color:#6e6e73!important;line-height:1.3}
+#r14s#r14s .stk .fv{font-size:17px;font-weight:600;line-height:1.3;margin-top:1px}
+#r14s#r14s .stk .ttl{font-size:19px;font-weight:700;line-height:1.3;margin:0 0 12px}
+#r14s#r14s .stk .attr{font-size:15px;color:#86868b!important;margin-top:14px}
+#r14s#r14s .stk .ag li{display:flex;gap:12px;align-items:stretch;padding:5px 0}
+#r14s#r14s .stk .ag time{flex:none;width:46px;font-size:15px;color:#6e6e73!important;padding-top:9px;font-variant-numeric:tabular-nums;direction:ltr;text-align:right}
+#r14s#r14s .stk .ag .ev{flex:1;background:#f5f5f7!important;border-radius:8px;padding:8px 12px;border-inline-start:3px solid #c7c7cc!important}
+#r14s#r14s .stk .ag .ev b{display:block;font-size:17px;font-weight:600;line-height:1.3}
+#r14s#r14s .stk .ag .ev span{font-size:15px;color:#6e6e73!important}
+#r14s#r14s .stk .ag .ev.on{background:#e8effc!important;border-color:#0f6cbd!important}
+#r14s#r14s .stk .ml>div{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.07)!important;font-size:17px}
+#r14s#r14s .stk .ml>div span{color:#6e6e73!important;font-size:15px;width:44px;flex:none;padding-top:1px}
+#r14s#r14s .stk .ml .bd{font-size:17px;line-height:1.5;padding-top:12px}
+#r14s#r14s .stk .ft{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:14px}
+#r14s#r14s .stk .ft .n{font-size:15px;color:#6e6e73!important;margin-inline-end:auto}
+#r14s#r14s .stk .ft .pp{display:flex;gap:5px;direction:rtl}
+#r14s#r14s .stk .ft .pp i{width:7px;height:7px;border-radius:50%;background:#d2d2d7!important}
+#r14s#r14s .stk .ft .pp i.on{background:#2D5EFF!important}
+#r14s#r14s .stk .ft .ud{font-size:15px;font-weight:600;color:#2D5EFF!important;padding:8px 4px}
+#r14s#r14s .stk .ft .nx{display:inline-flex;align-items:center;gap:4px;font-size:15px;font-weight:600;color:#2D5EFF!important;background:rgba(45,94,255,.08)!important;border-radius:999px;padding:8px 16px}
+#r14s#r14s .stk .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+#r14s#r14s .stk .wkd{display:flex;justify-content:space-between;margin:0 0 12px;padding:0 0 10px;border-bottom:1px solid rgba(0,0,0,.07)!important}
+#r14s#r14s .stk .wkd li{display:flex;flex-direction:column;align-items:center;gap:3px;width:38px}
+#r14s#r14s .stk .wkd span{font-size:14px;color:#6e6e73!important}
+#r14s#r14s .stk .wkd b{font-size:16px;font-weight:600;width:32px;height:32px;border-radius:50%;display:grid;place-items:center}
+#r14s#r14s .stk .wkd li.on b,#r14s#r14s .stk .wkd li.on b *{background:#0f6cbd!important;color:#fff!important;-webkit-text-fill-color:#fff!important}
+#r14s#r14s .stk .wkd li.on span{color:#0f6cbd!important;font-weight:600}
+#r14s#r14s .stk .src{margin-top:14px;padding:10px 12px;border-radius:10px;background:#f5f5f7!important}
+#r14s#r14s .stk .sv{font-size:15px;line-height:1.4;margin-top:2px}
+#r14s#r14s .stk .att{display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;border-radius:10px;background:#f5f5f7!important;font-size:15px}
+#r14s#r14s .stk .att b{font-weight:600}
+#r14s#r14s .stk .att span:last-child{color:#6e6e73!important;margin-inline-start:auto;direction:ltr}
+#r14s#r14s .stk .pdf{font:700 11px "Inter Tight",system-ui,sans-serif;color:#fff!important;background:#d93025!important;border-radius:4px;padding:3px 5px}
+#r14s#r14s .stk .ent{display:flex;flex-direction:column;gap:8px}
+#r14s#r14s .stk .ent li{display:flex;gap:12px;align-items:baseline;padding:10px 12px;border-radius:10px;background:#f5f5f7!important}
+#r14s#r14s .stk .ent b{font-size:17px;font-weight:700;flex:none;min-width:48px}
+#r14s#r14s .stk .ent span{font-size:15px;color:#1d1d1f!important}
+#r14s#r14s .stk .pbar{display:flex;align-items:center;gap:12px;margin-top:14px}
+#r14s#r14s .stk .pbar .snd{flex:none;font-size:15px;font-weight:600;color:#86868b!important;background:#e8e8ed!important;border-radius:8px;padding:8px 16px}
+#r14s#r14s .stk .pbar p{font-size:15px;color:#6e6e73!important;line-height:1.35}
+#r14s#r14s .stk .lg.pt{background:#f5f5f7!important;border-radius:7px;padding:4px;color:#1d1d1f!important}
+#r14s#r14s .stk .xl{border:1px solid #d6d6d6!important;border-radius:8px;overflow:hidden}
+#r14s#r14s .stk .xl .fx{display:flex;gap:10px;align-items:center;padding:8px 10px;font-size:15px;border-bottom:1px solid #e1e1e1!important}
+#r14s#r14s .stk .xl .fx b{font:600 14px "Inter Tight",system-ui,sans-serif;color:#6e6e73!important}
+#r14s#r14s .stk .xl .fx i{font:italic 14px "Inter Tight",system-ui,sans-serif;color:#86868b!important}
+#r14s#r14s .stk .xl table{width:100%;border-collapse:collapse;font-size:15px}
+#r14s#r14s .stk .xl th,#r14s#r14s .stk .xl td{padding:8px 10px;text-align:right;border-top:1px solid #ececec!important;border-inline-start:1px solid #ececec!important;font-weight:400}
+#r14s#r14s .stk .xl thead th{background:#f3f3f3!important;font-weight:600;color:#1d1d1f!important}
+#r14s#r14s .stk .xl tbody th,#r14s#r14s .stk .xl thead th:first-child{width:30px;text-align:center;color:#6e6e73!important;background:#f3f3f3!important;font:500 14px "Inter Tight",system-ui,sans-serif}
+#r14s#r14s .stk .xl tr.on td{background:#e9f5ee!important}
+#r14s#r14s .stk .xl tr.on td:last-child{outline:2px solid #107c41;outline-offset:-2px;font-weight:600;color:#107c41!important}
+#r14s#r14s .stk .xl tr.on th{color:#107c41!important;font-weight:700}
+
+#r14s#r14s .stk .sy .bdy{flex:1;display:flex;flex-direction:column;justify-content:space-evenly;min-height:0}
+#r14s#r14s .stk .sy .bdy>*{margin-top:0!important;margin-bottom:0!important}
+#r14s#r14s .stk .sy .ft{padding-top:10px}
+#r14s#r14s .stk .steps5{display:flex;justify-content:space-between;position:relative}
+#r14s#r14s .stk .steps5::before{content:"";position:absolute;top:13px;right:18px;left:18px;height:2px;background:#1f3b63!important}
+#r14s#r14s .stk .steps5 li{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;width:54px}
+#r14s#r14s .stk .steps5 i{font:600 14px "Inter Tight",system-ui,sans-serif;font-style:normal;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#1f3b63!important;color:#fff!important}
+#r14s#r14s .stk .steps5 li.on i{background:#fff!important;color:#1f3b63!important;border:2px solid #1f3b63!important}
+#r14s#r14s .stk .steps5 span{font-size:14px;color:#6e6e73!important}
+#r14s#r14s .stk .steps5 li.on span{color:#1d1d1f!important;font-weight:600}
+
+#r14s#r14s .stk .chev{width:12px;height:12px;display:block}
+#r14s#r14s .stk:not(.used) .sh .doit{animation:stk-breathe 2.8s ease-in-out .8s infinite!important}
+@keyframes stk-breathe{0%,64%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(45,94,255,0)}76%{transform:scale(1.05);box-shadow:0 0 0 5px rgba(45,94,255,.14)}88%{transform:scale(1);box-shadow:0 0 0 9px rgba(45,94,255,0)}}
+}
+@media (max-width:759px) and (prefers-reduced-motion:reduce){#r14s#r14s .stk:not(.used) .sh .doit,#r14s#r14s .stk>.sc,#r14s#r14s .stk>.cs{animation:none!important}}
+#r14s.rm#r14s .stk>.sc,#r14s.rm#r14s .stk>.cs{animation:none!important}
+/* equal stack height on every slide: the tallest slide sets the track, the other stacks grow to match, so no slide shows a dead band */
+@media (max-width:759px){
+  #r14s#r14s .track:has(.in.has-stk){align-items:stretch}
+  #r14s#r14s .track:has(.in.has-stk)>.slide{display:flex;flex-direction:column}
+  #r14s#r14s .slide>.in.has-stk{flex:1 1 auto;display:flex;flex-direction:column}
+  #r14s#r14s .in.has-stk>.stk{flex:1 1 auto;grid-template-rows:1fr}
+  #r14s#r14s .stk>.sc.sh{justify-content:space-between}
+  #r14s#r14s .stk>.sc.sh>.go{margin-top:0}   /* the extra height is shared between the sections instead of piling up above Do It */
+  #r14s#r14s .stk .chev{width:14px;height:14px}
+}
+/* process switcher on the phone: same 28px band the dots had (+6px), paid back from the stage's bottom padding, so the hero still ends at 839 at 390x844 */
+@media (max-width:759px){
+  #r14s#r14s .r14:has(.in.has-stk){padding-bottom:6px}
+  #r14s#r14s .r14:has(.in.has-stk) .dots.named{padding-top:4px;position:relative;z-index:8}
+  #r14s#r14s .r14:has(.in.has-stk) .dots.named .dot{padding:4px 10px 6px}
+}
+/* r16 D: 320–359: tighter sides and card padding so lines stop wrapping; the hero gets ~90px back */
+@media (max-width:359px){
+  #r14s#r14s .r14 .in{padding-inline:14px}
+  #r14s#r14s .r14 .in h2{font-size:24px}
+  #r14s#r14s .stk>.sc{padding:12px 12px 10px}
+  #r14s#r14s .stk{margin-top:34px}
+}

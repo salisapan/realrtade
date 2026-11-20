@@ -1,0 +1,158 @@
+/* v2 fixes (Phase 1, fixes 5-10 + Phase 2). Loaded last on glance.html and glance-en.html. */
+
+/* 5. Gradient-text headings: the italic overhang was clipped by the inline box. Pad the paint area, cancel the layout effect. */
+.h21-h1 em,.cta21-h em,.ints-h em,.creed-h em{
+  padding-inline:.16em;margin-inline:-.16em;padding-block:.1em;margin-block:-.1em;
+  -webkit-box-decoration-break:clone;box-decoration-break:clone}
+
+/* 7. Top bar: the shared <flow-header> (see glance/glance-header.css). */
+
+/* ===== 9b · Do It: no box around the button (the button's radius was 10px / 0 with a 1px shadow = a faint square) ===== */
+.do-halo,button.do-halo,.approve-btn.do-halo,.demo-doit,.h21-doit,
+html[data-theme="dark"] .do-halo,html[data-theme="dark"] .glance-surface .do-halo{
+  box-shadow:none !important;background:transparent !important;border:0 !important;outline-offset:3px;border-radius:999px !important;
+}
+.do-halo:focus-visible{outline:2px solid var(--blue,#0071e3)}
+
+/* ===== D · Do It colour on Glance pages = Glance blue #0071e3 (same design, same sizes; the Flow pages keep #2D5EFF) ===== */
+.doit-ripple,.su-go::before{border-color:#0071e3}
+html[data-theme="dark"] .doit-ripple{border-color:#0071e3}
+html[data-theme="dark"] .doit-dark::after,
+html[data-theme="dark"] .do-halo.is-pressing .doit-dark::after{border-color:#0071e3}
+html[data-theme="dark"] .do-halo:hover .doit-dark::after{border-color:#3a9bff}
+html[data-theme="dark"] .doit-dark{box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 0 18px -6px rgba(0,113,227,.5) !important}
+html[data-theme="dark"] .do-halo:hover .doit-dark{box-shadow:inset 0 0 0 1px rgba(255,255,255,.2),0 0 26px -4px rgba(0,113,227,.6) !important}
+html[data-theme="dark"] .do-halo.is-pressing .doit-dark{box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 0 30px -2px rgba(0,113,227,.8) !important}
+.su-go{
+  color:#0068d3;
+  background:linear-gradient(180deg,#f1f7fe 0%,#deecf9 6%,#f3f9fd 20%,#eef5fb 38%,#e6f1f9 55%,#d5e5ee 74%,#b6cedd 88%,#93bad7 100%);
+}
+.su-go::after{border-color:#0076e1}
+html[data-theme="dark"] .su-go::after{border-color:#0071e3}
+html[data-theme="dark"] .bn-doit{background:radial-gradient(circle at 50% 45%,rgba(0,113,227,.16),rgba(0,113,227,0) 65%)}
+
+/* ===== 9c · Morning mark is forest green: on dark surfaces use the reversed (white) version of the same symbol ===== */
+html[data-theme="dark"] .brand-svg image[href*="morning"]{filter:brightness(0) invert(1)}
+
+/* ---- Phase 2 A · hero: parallel tool rows fill while they run ---- */
+.h21-card .act:not(.act-close) .act-row{overflow:hidden}
+.h21-card .act:not(.act-close) .act-row::after{
+  content:"";position:absolute;inset-block:0;inset-inline-start:0;width:calc(var(--p,0)*100%);pointer-events:none;
+  background:linear-gradient(#0071e3,#0071e3) bottom/100% 2px no-repeat,rgba(0,113,227,.08);
+  opacity:0;transition:opacity .35s ease}
+.h21-card[data-state="working"] .act:not(.act-close):not(.is-skipped) .act-row::after{opacity:1}
+html[data-theme="dark"] .h21-card .act:not(.act-close) .act-row::after{
+  background:linear-gradient(#3a9bff,#3a9bff) bottom/100% 2px no-repeat,rgba(58,155,255,.12)}
+/* mail attachment pill (static, no layout shift) */
+.gw-att{display:inline-flex;align-items:center;gap:8px;margin:2px 0 8px;padding:6px 10px 6px 8px;border:1px solid rgba(0,0,0,.1);border-radius:10px;background:#fafafb;font-size:12px;color:#3a3a3c;max-width:100%}
+.gw-att-ic{display:inline-grid;place-items:center;width:26px;height:20px;border-radius:5px;background:#e5484d;color:#fff;font-size:9px;font-weight:700;letter-spacing:.02em}
+html[data-theme="dark"] .gw-att{background:#1c1c1e;border-color:rgba(255,255,255,.14);color:#e5e5ea}
+
+/* ---- Phase 2 A · phone: the mail window is only as tall as its text, so the whole card fits the first screen ---- */
+@media (max-width:760px){
+  .h21-win{height:268px !important}
+  .h21-card{top:calc(268px + 12px) !important}
+}
+@media (max-width:760px){
+  .h21-tiles{display:none !important}
+  .h21-card .ss-add{display:none !important}
+}
+
+/* phase 2 · the Glance Do It raster is do-it-glance.png: hide it in dark like the old do-it.png, the CSS pill takes over */
+html[data-theme="dark"] img.chip-do[src$="do-it-glance.png"],
+html[data-theme="dark"] img.doit-inline[src$="do-it-glance.png"],
+/* perf 2026-11-13: same rule for the lighter webp copy */
+html[data-theme="dark"] img.chip-do[src$="do-it-glance-228.webp"],
+html[data-theme="dark"] img.doit-inline[src$="do-it-glance-228.webp"]{display:none !important}
+
+/* phase 2 · WhatsApp demo chip text may wrap to two lines on phone instead of cutting off */
+@media (max-width:760px){
+  #wa-glance .chip-txt{white-space:normal !important;overflow:visible !important;text-overflow:clip !important;line-height:1.25 !important}
+}
+
+/* phase 2 · WhatsApp demo has one short message: the chat window is shorter */
+#wa-glance .act-close .act-tag:empty,#meet-glance .act-close .act-tag:empty{display:none}
+
+/* ===== Phase 2 C: Meet demo, tighter and calmer ===== */
+/* top tool bar: flat, no shadow, no connectors */
+.mj-rail{box-shadow:none !important;background:transparent !important;border:1px solid rgba(0,0,0,.1)}
+html[data-theme="dark"] .mj-rail{border-color:rgba(255,255,255,.14)}
+.mj-rail li + li::before{display:none !important}
+@media (max-width:760px){.mj-rail{background:var(--bg,#fff) !important}html[data-theme="dark"] .mj-rail{background:#0b0e16 !important}}
+/* back / replay: quiet text button */
+.mj-replay,.mj-replay:hover,html[data-theme="dark"] .mj-replay{box-shadow:none !important;background:transparent !important;border:0 !important;color:#6e6e73}
+.mj-replay:hover{color:#0071e3}
+html[data-theme="dark"] .mj-replay{color:#a1a1a6}
+@media (max-width:760px){.mj-replay{width:40px !important;height:40px !important}}
+/* Noa's quote in focus: centred, large, other tiles dimmed */
+.mt-self,.mt-meta,.mt-side{display:none !important}
+.mt-grid{right:16px !important;left:16px !important;opacity:.38;transition:opacity .4s}
+.mt-cc{left:50% !important;right:auto !important;top:44% !important;bottom:auto !important;transform:translate(-50%,-50%) !important;width:min(760px,calc(100% - 64px)) !important;max-width:none !important;padding:22px 26px !important;background:rgba(24,25,28,.94) !important;box-shadow:0 18px 44px -18px rgba(0,0,0,.6)}
+.mt-cc-txt{font-size:32px !important;line-height:1.3 !important}
+.mt-cc-body b{font-size:15px !important}
+.mt-cc-av{width:40px;height:40px;font-size:17px}
+.mj-narrow .mt-cc{width:calc(100% - 56px) !important}
+.mj-narrow .mt-cc-txt{font-size:42px !important}
+.mj-narrow .mt-cc-body b{font-size:20px !important}
+.mj-narrow .mt-cc-av{width:52px;height:52px;font-size:22px}
+.mt-bar{justify-content:center !important}
+/* Do It in the Meet card: no white box */
+#meet-glance .demo-approve,#meet-glance .approve-banner{display:none !important}
+/* Meet closed card: fits the short phone frame (was clipped at the bottom) */
+@media (max-width:760px){
+  .mj-close-card{width:92% !important;padding:12px 12px 10px !important;border-radius:16px !important}
+  .mj-close-card .living-ico{display:none}
+  .mj-close-k{margin:0 0 8px !important;font-size:18px !important}
+  .mj-close-lines{gap:4px !important}
+  .mj-close-lines li{font-size:12.5px !important;padding:6px 9px !important;line-height:1.25}
+  .mj-close-undo{margin:8px 0 0 !important;font-size:12px !important}
+}
+/* wide desktop: the Glance card floats on the left of the call, so the quote is centred in the free area */
+@media (min-width:1100px){
+  .mj:not(.mj-narrow) .mt-cc{left:calc(50% + 200px) !important;width:min(760px,calc(100% - 440px)) !important}
+}
+.mj:not(.mj-narrow) .mt-cc-txt{font-size:27px !important}
+
+/* v2 CLS: hero rows keep one height from propose to settled (no collapse on close) */
+#hero li.act:not(.act-close) > .act-row{min-height:52px;box-sizing:border-box}
+#hero li.act.act-close > .act-row{min-height:76px;box-sizing:border-box}
+html[lang="en"] #hero li.act.act-close > .act-row{min-height:78px}
+@media (min-width:761px){
+  #hero li.act:not(.act-close) > .act-row{min-height:51px}
+  #hero li.act.act-close > .act-row{min-height:51px}
+  html[lang="en"] #hero li.act.act-close > .act-row{min-height:70px}
+}
+#hero li.act:not(.act-close) .act-body{min-height:36px;display:flex;flex-direction:column;justify-content:center}
+#hero li.act:not(.act-close) .act-glyph{align-self:center}
+
+#wa-glance .gs-badge.handled{display:none}
+#wa-glance .act-text{white-space:normal;text-overflow:clip;overflow:visible}
+
+/* hero: copy never runs into the arriving Gmail window on short desktop viewports */
+@media (min-width:761px){
+  .h21-h1{font-size:clamp(46px,min(7.4vw,10.5vh),112px)}
+  .h21-sub{text-wrap:balance;max-width:36em;margin-inline:auto}
+  .h21-ctas{margin-top:22px}
+}
+
+/* v2 fix 10: diagram captions sit above the column they name (RTL puts sources on the right), no letter-spacing on Hebrew */
+html[lang="he"] .b20-src .b20-cap{left:auto;right:48px}
+html[lang="he"] .b20-dst .b20-cap{right:auto;left:48px}
+html[lang="he"] .b20-cap{letter-spacing:0;font-size:12px;text-transform:none}
+@media (max-width:900px){
+  html[lang="he"] .b20-src .b20-cap{right:30px;left:auto}
+  html[lang="he"] .b20-dst .b20-cap{left:30px;right:auto}
+}
+html[lang="he"] .b20-cap{font-family:Heebo,"Inter Tight",system-ui,sans-serif;font-weight:500}
+html[lang="he"] .b20-txt{text-align:start}
+html[lang="he"] .b20-src .b20-tile{padding:10px 10px 10px 12px}
+
+/* r3 · CLS 0: the Gmail mock content is promoted, so the landing transform of the rig is never scored as a layout shift */
+.gw-top,.gw-body{will-change:transform}
+.h21-scene{overflow:clip}
+.h21-win{-webkit-box-reflect:unset!important}
+
+/* audit 13.11: the dismiss × on the chips was ~12x13px. Invisible 44px hit area,
+   reaching away from the Do It button (inline-start side) so it never covers it. */
+.chip-x{position:relative}
+.chip-x::after{content:"";position:absolute;top:50%;height:44px;width:44px;inset-inline-end:-2px;transform:translateY(-50%)}

@@ -1,0 +1,75 @@
+/* 2026-11-19 · Glance headlines: same reading-direction rule, Glance blue.
+   Light: #1d1d1f → #0071e3. Dark: #f5f5f7 → #0071e3.
+   Selectors match glance-fix-20261119.css (including :not(dark)) so these win when loaded last. */
+
+html body .h21-h1 em,
+html body .cta21-h em,
+html body .ints-h em,
+html body .creed-h em,
+html body .s21-h em,
+html body .mj-h em,
+html body .day21-h em,
+html body .bn21-h em,
+html body .h21-end-h em,
+html body .h21-h1 .h1-echo em{
+  background-image:linear-gradient(90deg,#1d1d1f 0%,#0071e3 100%)!important;
+}
+html[dir="rtl"]:not([data-theme="dark"]) body .h21-h1 em,
+html[dir="rtl"]:not([data-theme="dark"]) body .cta21-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .ints-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .creed-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .s21-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .mj-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .day21-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .bn21-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .h21-end-h em,
+html[dir="rtl"]:not([data-theme="dark"]) body .h21-h1 .h1-echo em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .h21-h1 em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .cta21-h em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .ints-h em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .creed-h em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .s21-h em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .mj-h em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .day21-h em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .bn21-h em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .h21-end-h em,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) body .h21-h1 .h1-echo em{
+  background-image:linear-gradient(270deg,#1d1d1f 0%,#0071e3 100%)!important;
+}
+html[data-theme="dark"] body .h21-h1 em,
+html[data-theme="dark"] body .cta21-h em,
+html[data-theme="dark"] body .ints-h em,
+html[data-theme="dark"] body .creed-h em,
+html[data-theme="dark"] body .s21-h em,
+html[data-theme="dark"] body .mj-h em,
+html[data-theme="dark"] body .day21-h em,
+html[data-theme="dark"] body .bn21-h em,
+html[data-theme="dark"] body .h21-end-h em,
+html[data-theme="dark"] body .h21-h1 .h1-echo em,
+html[data-theme="dark"] body .h21-h1 .h1-echo{
+  background-image:linear-gradient(90deg,#f5f5f7 0%,#0071e3 100%)!important;
+}
+html[dir="rtl"][data-theme="dark"] body .h21-h1 em,
+html[dir="rtl"][data-theme="dark"] body .cta21-h em,
+html[dir="rtl"][data-theme="dark"] body .ints-h em,
+html[dir="rtl"][data-theme="dark"] body .creed-h em,
+html[dir="rtl"][data-theme="dark"] body .s21-h em,
+html[dir="rtl"][data-theme="dark"] body .mj-h em,
+html[dir="rtl"][data-theme="dark"] body .day21-h em,
+html[dir="rtl"][data-theme="dark"] body .bn21-h em,
+html[dir="rtl"][data-theme="dark"] body .h21-end-h em,
+html[dir="rtl"][data-theme="dark"] body .h21-h1 .h1-echo em,
+html[dir="rtl"][data-theme="dark"] body .h21-h1 .h1-echo,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .h21-h1 em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .cta21-h em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .ints-h em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .creed-h em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .s21-h em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .mj-h em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .day21-h em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .bn21-h em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .h21-end-h em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .h21-h1 .h1-echo em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] body .h21-h1 .h1-echo{
+  background-image:linear-gradient(270deg,#f5f5f7 0%,#0071e3 100%)!important;
+}

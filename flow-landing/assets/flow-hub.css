@@ -1,0 +1,39 @@
+/* Solutions hub r15 · 2026-11-13 (local). Phones are stills of each profession page's own r15 hero phone (assets/hub). */
+main.hb{padding:0 0 40px;font-family:'Inter Tight',-apple-system,system-ui,sans-serif}
+html[data-ui="he"] main.hb{font-family:'Heebo','Inter Tight',-apple-system,system-ui,sans-serif}
+.hb-hero{padding:72px 0 8px}
+.hb-hero .fx-lead{margin-top:6px}
+.hb-grid-s{padding:56px 0 24px}
+.hb-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.hb-card{display:flex;flex-direction:column;overflow:hidden;text-decoration:none;color:inherit;transition:transform .5s cubic-bezier(.22,1,.36,1),box-shadow .5s}
+.hb-card:hover{transform:translateY(-4px);box-shadow:var(--fx-sh-hero)}
+.hb-card:focus-visible{outline:2px solid #2D5EFF;outline-offset:3px}
+.hb-stage{position:relative;height:380px;background:var(--fx-stage);overflow:hidden;display:flex;justify-content:center;align-items:flex-start;padding-top:38px}
+.hb-ph{width:228px;height:auto;display:block;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.06)) drop-shadow(0 10px 18px rgba(15,22,45,.14)) drop-shadow(0 34px 44px rgba(15,22,45,.16));
+  animation:hbFloat 7s ease-in-out infinite;will-change:transform}
+.hb-card:nth-child(2) .hb-ph{animation-duration:8s;animation-delay:-2.4s}
+.hb-card:nth-child(3) .hb-ph{animation-duration:7.6s;animation-delay:-4.8s}
+html[data-theme="dark"] .hb-ph{filter:drop-shadow(0 0 .5px rgba(255,255,255,.25)) drop-shadow(0 26px 40px rgba(0,0,0,.75))}
+@keyframes hbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@media (prefers-reduced-motion:reduce){.hb-ph{animation:none}}
+.hb-tx{padding:22px 24px 24px;display:flex;flex-direction:column;gap:8px}
+.hb-t{margin:0;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.02em;color:var(--ink)}
+.hb-d{margin:0;font-size:15.5px;line-height:1.5;color:var(--fx-mut)}
+.hb-go{margin-top:6px;font-size:15px;font-weight:600;color:#2D5EFF}
+html[data-theme="dark"] .hb-go{color:#6E9BFF}
+.hb-dep{text-align:center;margin:40px auto 0;font-size:15px;line-height:1.6;color:var(--fx-mut);max-width:44em}
+.hb-dep a{color:#2D5EFF;font-weight:600;text-decoration:none;white-space:nowrap}
+html[data-theme="dark"] .hb-dep a{color:#6E9BFF}
+.hb-dep a:hover{text-decoration:underline}
+@media (max-width:1000px){.hb-grid{grid-template-columns:1fr;max-width:440px;margin:0 auto;gap:20px}}
+@media (max-width:600px){
+ .hb-hero{padding:40px 0 0}
+ .hb-grid-s{padding:36px 0 8px}
+ .hb-stage{height:300px;padding-top:30px}
+ .hb-ph{width:190px}
+ .hb-tx{padding:18px 20px 20px}
+ .hb-t{font-size:20px}
+}
+.hb-dep bdi{white-space:nowrap}
+.hb-dep a{display:block;width:max-content;margin:6px auto 0}

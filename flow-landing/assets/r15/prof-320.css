@@ -1,0 +1,7 @@
+/* 320 px phones (iPhone mini / SE with Display Zoom): hero and trust keep the approved 390 composition,
+   scaled to the narrower screen instead of re-wrapping taller, so the hero fits one screen (320 x 693).
+   Headlines are not scaled (their size already follows the viewport).
+   Non-locked override, loaded after r15.css / r14s.css / stack.css / prof.css. 2026-11-13 */
+@media (max-width:339px){
+ .r15-hero>.r15-stage,.r15-tr .r15-fan{zoom:.8}
+}

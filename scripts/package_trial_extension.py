@@ -68,6 +68,11 @@ def posix(path: Path) -> str:
     return path.as_posix()
 
 
+def is_picker_archive_path(rel: str) -> bool:
+    """The Drive picker is not part of the install zip. verify_trial_install.py rejects picker/."""
+    return rel == "picker" or rel.startswith("picker/")
+
+
 def resolve_relative(from_file: Path, spec: str) -> Path:
     if spec.startswith(("http://", "https://", "chrome-extension://", "data:")):
         die(f"{from_file} references a remote URL ({spec}); the install zip must be self-contained")
@@ -93,6 +98,8 @@ def add_file(files: dict[str, Path], path: Path) -> None:
     if any(part.startswith(".") for part in rel.parts):
         die(f"refusing to package dotfile {rel}")
     key = posix(rel)
+    if is_picker_archive_path(key):
+        return
     files[key] = path
 
 
@@ -265,6 +272,12 @@ def collect(profile: str = "full") -> dict[str, Path]:
         if resolved in seen:
             continue
         seen.add(resolved)
+        try:
+            rel = posix(resolved.relative_to(EXTENSION_ROOT))
+        except ValueError:
+            rel = ""
+        if is_picker_archive_path(rel):
+            continue
         add_file(files, resolved)
         if resolved.suffix.lower() == ".html":
             pending.extend(html_local_refs(resolved))
@@ -298,21 +311,27 @@ def collect(profile: str = "full") -> dict[str, Path]:
         if SECRET_ASSIGNMENT_RE.search(text):
             die(f"{rel} looks like it contains a secret assignment; refusing to package it")
 
+    for key in list(files):
+        if is_picker_archive_path(key):
+            del files[key]
+
     return files
 
 
-def write_zip(files: dict[str, Path], out: Path) -> int:
+def write_zip(files: dict[str, Path], out: Path, replacements: dict[str, bytes] | None = None) -> int:
     if "manifest.json" not in files:
         die("install zip has no manifest.json at its root")
     for rel in files:
         if rel.startswith("flow-trial-extension/") or rel.startswith("/") or ".." in Path(rel).parts:
             die(f"install zip entry would not sit at the extension root: {rel}")
+    # The store build passes a rewritten manifest. The signup zip passes none.
+    # 7f2a2039 dropped the parameter and left this read, which made `replacements` local.
+    replacements = replacements or {}
     sha = os.environ.get("GLANCE_BUILD_STAMP") or git_sha7()
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".zip.partial")
     if tmp.exists():
         tmp.unlink()
-    replacements = replacements or {}
     # Fixed timestamps keep two builds of the same tree byte-identical.
     info_date = (2026, 1, 1, 0, 0, 0)
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -320,7 +339,8 @@ def write_zip(files: dict[str, Path], out: Path) -> int:
             info = zipfile.ZipInfo(filename=rel, date_time=info_date)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, stamped_bytes(rel, files[rel].read_bytes(), sha))
+            raw = replacements[rel] if rel in replacements else files[rel].read_bytes()
+            archive.writestr(info, stamped_bytes(rel, raw, sha))
     os.replace(tmp, out)
     return out.stat().st_size
 

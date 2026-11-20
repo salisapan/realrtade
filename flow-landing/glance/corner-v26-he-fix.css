@@ -1,0 +1,15 @@
+/* Flow review package fix, 18 Nov 2026 (candidate, not approved):
+   Hebrew helper labels must not use the Latin micro-caps style
+   (mono font + wide letter-spacing + uppercase reads broken in Hebrew).
+   Loaded only on the Hebrew page, after the versioned chain.
+   Source chain corner-v19..v26 left byte-identical. */
+html[lang="he"] .acts-label,
+html[lang="he"] .o20-legend,
+html[lang="he"] .b20-cap{
+  font-family:'Heebo','Rubik',system-ui,sans-serif;
+  letter-spacing:0;
+  text-transform:none;
+}
+html[lang="he"] .acts-label{font-size:11px;font-weight:500}
+html[lang="he"] .o20-legend{font-size:11.5px}
+html[lang="he"] .b20-cap{font-size:11px}

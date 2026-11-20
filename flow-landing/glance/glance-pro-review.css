@@ -1,0 +1,54 @@
+/* Glance Pro review: original Flow Do It material, 13.11. Local only. */
+.pro-doit.doit{--p-doit-top:rgba(255,255,255,.97);--p-doit-bot:rgba(219,230,250,.72);--p-doit-border:rgba(40,70,150,.3);--p-doit-gloss:rgba(255,255,255,.95);--p-doit-ring:#2D5EFF;--p-doit-ring-hi:#2D5EFF;--p-doit-inner:rgba(14,32,80,.12);--doit-text:#2A57F0;--glow:rgba(45,94,255,.12)}
+html[data-theme="dark"] .pro-doit.doit{--p-doit-top:rgba(228,236,250,.2);--p-doit-bot:rgba(9,13,24,.34);--p-doit-border:rgba(228,236,250,.3);--p-doit-gloss:rgba(255,255,255,.55);--p-doit-ring:#5b8cff;--p-doit-ring-hi:#6E9BFF;--p-doit-inner:rgba(14,32,80,.24);--doit-text:#e6efff;--glow:rgba(59,116,255,.5)}
+/* hero CTA: same geometry and material as the header Do It, a little larger */
+.pro-doit.doit{--z:.72;--pad-y:calc(16px*var(--z));--pad-x:calc(34px*var(--z));position:relative;display:inline-flex;align-items:center;justify-content:center;
+  padding:var(--pad-y) var(--pad-x);border:0;cursor:pointer;isolation:isolate;border-radius:calc(999px*var(--z));background:transparent;
+  -webkit-tap-highlight-color:transparent;font-family:'Inter Tight','Heebo',sans-serif;font-weight:700;font-size:15px;line-height:1;
+  color:var(--doit-text)!important;text-decoration:none;transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+html[lang="he"] .pro-doit.doit{font-family:'Heebo','Inter Tight',sans-serif}
+.pro-doit.doit .shell{position:absolute;inset:0;border-radius:inherit;z-index:-2;
+  background:linear-gradient(180deg,var(--p-doit-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--p-doit-top),var(--p-doit-bot));
+  border:1px solid var(--p-doit-border);
+  box-shadow:inset 0 1.5px 0 var(--p-doit-gloss),inset 0 calc(-12px*var(--z)) calc(26px*var(--z)) var(--p-doit-inner)}
+.pro-doit.doit .shell::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;box-shadow:0 calc(16px*var(--z)) calc(46px*var(--z)) calc(-10px*var(--z)) var(--glow)}
+.pro-doit.doit .dring{position:absolute;inset:calc(6px*var(--z));border-radius:999px;z-index:-1;border:calc(2px*var(--z)) solid var(--p-doit-ring);
+  box-shadow:0 0 calc(12px*var(--z)) var(--glow),inset 0 0 0 1px rgba(255,255,255,.28),inset 0 0 calc(11px*var(--z)) color-mix(in srgb,var(--p-doit-ring) 42%,transparent)}
+.pro-doit.doit .shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden;z-index:-1}
+.pro-doit.doit .shine::before{content:"";position:absolute;inset-block:-40%;inline-size:40%;inset-inline-start:-60%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg)}
+.pro-doit.doit .dlbl{display:block}
+@media (hover:hover){.pro-doit.doit:hover{transform:translateY(calc(-2px*var(--z))) scale(1.035)}.pro-doit.doit:hover .shine::before{animation:gh-sweep .85s cubic-bezier(.3,.6,.2,1) forwards}}
+.pro-doit.doit:active{transform:scale(.99)}
+.pro-doit.doit:focus-visible{outline:2px solid var(--p-doit-ring-hi);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){.pro-doit.doit:hover .shine::before{animation:none}}
+
+@keyframes gh-sweep{to{inset-inline-start:140%}}
+#resendForm,#resendForm2{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+#resendForm .fine,#resendForm2 .fine{flex-basis:100%;margin-block:0}
+header.site .langsw{margin-inline-start:0!important;gap:4px!important;flex-wrap:wrap;justify-content:flex-end}
+header.site .langsw a{display:inline-flex;align-items:center;justify-content:center;margin:0;padding:6px;font-size:12px}
+header.site nav{gap:8px;min-width:0}
+header.site .menu-btn{margin:0;flex-shrink:0}
+header.site .theme-btn{flex-shrink:0}
+@media(max-width:540px){
+ header.site .wrap{gap:10px;padding-inline:14px;width:100%;box-sizing:border-box}
+ header.site .brand{flex-shrink:0}
+ header.site .brand img{width:62px;height:auto}
+ header.site nav{flex:1;justify-content:flex-end;gap:6px}
+ header.site .langsw{gap:0!important;flex:none}
+ header.site .langsw a{padding-inline:5px}
+}
+@media(max-width:350px){
+ header.site .wrap{padding-inline:12px;gap:6px}
+ header.site .brand img{width:48px}
+ header.site nav{gap:4px}
+ header.site .langsw a{font-size:11px;padding-inline:4px}
+ header.site .theme-btn,header.site .menu-btn{width:30px;height:30px}
+ .pro-doit.doit{font-size:14px;--z:.65}
+}
+.keyrow .pro-doit.doit{border:0;cursor:pointer;background:transparent;padding:var(--pad-y) var(--pad-x);font-family:'Inter Tight','Heebo',sans-serif;font-weight:700;font-size:15px;color:var(--doit-text)!important}
+.keyrow .pro-doit.doit:hover{border:0}
+html[lang="he"] .keyrow .pro-doit.doit{font-family:'Heebo','Inter Tight',sans-serif}
+
+/* r3 · Hebrew has no italics */
+html[lang="he"] em{font-style:normal!important;font-synthesis:none}

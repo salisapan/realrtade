@@ -1,0 +1,18 @@
+/* audit 13.11 (Dana): light-mode labels on the profession pages to >=4.5:1.
+   Same neutral grey family, only darker in light; dark draft pill text lightened to stay readable. Loaded after r15-dark.css.
+   The r14s rules use #r14s#r14s + !important, so these match that and add the theme guard. */
+html:not([data-theme="dark"]) #r14s#r14s .titles .eye,
+html:not([data-theme="dark"]) #r14s#r14s .ph-scr .fl-src,
+html:not([data-theme="dark"]) #r14s#r14s .ph-scr .fl-src .num{color:#6e6e73!important}
+html:not([data-theme="dark"]) #r14s#r14s .mail-h .smp{color:#66666b!important}
+html:not([data-theme="dark"]) .r15-ch small,
+html:not([data-theme="dark"]) small.r15-smp{color:#6e6e73}
+
+html:not([data-theme="dark"]) #r14s#r14s .dots.named button.dot,
+html:not([data-theme="dark"]) #r14s#r14s .dots.named button.dot span{color:#6e6e73!important}
+html:not([data-theme="dark"]) .flow-attr,
+html:not([data-theme="dark"]) .flow-attr .attr-prep{color:#66666b}
+html[data-theme="dark"] #r14s#r14s .tile-draft .draft-pill{color:#7EB6FF!important}
+
+/* dark-gw line-1: match B3 ink #EEF2F9 (overrides r15-dark #f3f3f3; this file loads last on all profession pages) */
+html[data-theme="dark"] .x4m .r15-h1,html[data-theme="dark"] .x4m .r15-h2{color:#EEF2F9}

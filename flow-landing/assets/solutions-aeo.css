@@ -21,7 +21,7 @@
   border:1px solid var(--line);
   border-radius:999px;
   background:var(--panel);
-  color:var(--cat);
+  color:var(--cat-ink,var(--cat));
   font-family:var(--sans);
   font-size:.72rem;
   font-weight:700;
@@ -54,7 +54,7 @@ h1.title{overflow-wrap:break-word; text-wrap:balance}
 .faq-list summary::after{
   content:"+";
   flex:none;
-  color:var(--cat);
+  color:var(--cat-ink,var(--cat));
   font-weight:500;
   font-size:1.2rem;
   line-height:1.2;

@@ -1,0 +1,7 @@
+/* Language menu for the existing globe control. Closed state keeps the 32px ctl-b circle. */
+.ctl-lang{position:relative;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none}
+.ctl-lang-menu{position:absolute;top:calc(100% + 8px);inset-inline-end:0;z-index:80;min-width:10.5rem;padding:6px;border-radius:12px;border:.5px solid var(--ctl-line, rgba(0,0,0,.12));background:var(--ctl-bg, rgba(255,255,255,.96));box-shadow:0 10px 28px rgba(0,0,0,.14);backdrop-filter:blur(10px)}
+.ctl-lang-menu[hidden]{display:none}
+.ctl-lang-menu a{display:block;padding:7px 10px;border-radius:8px;color:var(--fh-ink, inherit);text-decoration:none;font:600 13px/1.3 Inter,system-ui,sans-serif}
+.ctl-lang-menu a:hover,.ctl-lang-menu a:focus-visible{background:rgba(0,113,227,.1)}
+.ctl-lang-menu a[aria-current="true"]{color:#0071e3}

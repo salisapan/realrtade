@@ -1,0 +1,206 @@
+/* Glance review fixes 13.11 (local). Loaded after v2-fixes.css on glance.html and glance-en.html.
+   1 · Get Glance CTAs = the real Flow Do It in Flow blue (Sali 05.11 18:54, match-flow-get-glance): header, hero, #get-glance.
+       Tokens copied from glance/flow-doit.css of the approved r4 tree. The living ring and other Glance accents stay #0071e3. */
+.fh .fh-cta.doit,.h21-get.doit,#get-glance .su-go.doit{
+  --p-doit-top:rgba(255,255,255,.97);--p-doit-bot:rgba(219,230,250,.72);--p-doit-border:rgba(40,70,150,.3);--p-doit-gloss:rgba(255,255,255,.95);
+  --p-doit-ring:#2D5EFF;--p-doit-ring-hi:#2D5EFF;--p-doit-inner:rgba(14,32,80,.12);--doit-text:#2A57F0;--glow:rgba(45,94,255,.12)}
+html[data-theme="dark"] .fh .fh-cta.doit,html[data-theme="dark"] .h21-get.doit,html[data-theme="dark"] #get-glance .su-go.doit{
+  --p-doit-top:rgba(228,236,250,.2);--p-doit-bot:rgba(9,13,24,.34);--p-doit-border:rgba(228,236,250,.3);--p-doit-gloss:rgba(255,255,255,.55);
+  --p-doit-ring:#5b8cff;--p-doit-ring-hi:#6E9BFF;--p-doit-inner:rgba(14,32,80,.24);--doit-text:#e6efff;--glow:rgba(59,116,255,.5)}
+
+/* hero CTA: same geometry and material as the header Do It, a little larger */
+.h21-get.doit{--z:.8;--pad-y:calc(16px*var(--z));--pad-x:calc(34px*var(--z));position:relative;display:inline-flex;align-items:center;justify-content:center;
+  padding:var(--pad-y) var(--pad-x);border:0;cursor:pointer;isolation:isolate;border-radius:calc(999px*var(--z));background:transparent;
+  -webkit-tap-highlight-color:transparent;font-family:'Inter Tight','Heebo',sans-serif;font-weight:700;font-size:16px;line-height:1;
+  color:var(--doit-text)!important;text-decoration:none;transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+html[lang="he"] .h21-get.doit{font-family:'Heebo','Inter Tight',sans-serif}
+.h21-get.doit .shell{position:absolute;inset:0;border-radius:inherit;z-index:-2;
+  background:linear-gradient(180deg,var(--p-doit-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--p-doit-top),var(--p-doit-bot));
+  border:1px solid var(--p-doit-border);
+  box-shadow:inset 0 1.5px 0 var(--p-doit-gloss),inset 0 calc(-12px*var(--z)) calc(26px*var(--z)) var(--p-doit-inner)}
+.h21-get.doit .shell::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;box-shadow:0 calc(16px*var(--z)) calc(46px*var(--z)) calc(-10px*var(--z)) var(--glow)}
+.h21-get.doit .dring{position:absolute;inset:calc(6px*var(--z));border-radius:999px;z-index:-1;border:calc(2px*var(--z)) solid var(--p-doit-ring);
+  box-shadow:0 0 calc(12px*var(--z)) var(--glow),inset 0 0 0 1px rgba(255,255,255,.28),inset 0 0 calc(11px*var(--z)) color-mix(in srgb,var(--p-doit-ring) 42%,transparent)}
+.h21-get.doit .shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden;z-index:-1}
+.h21-get.doit .shine::before{content:"";position:absolute;inset-block:-40%;inline-size:40%;inset-inline-start:-60%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg)}
+.h21-get.doit .dlbl{display:block}
+@media (hover:hover){.h21-get.doit:hover{transform:translateY(calc(-2px*var(--z))) scale(1.035)}.h21-get.doit:hover .shine::before{animation:gh-sweep .85s cubic-bezier(.3,.6,.2,1) forwards}}
+.h21-get.doit:active{transform:scale(.99)}
+.h21-get.doit:focus-visible{outline:2px solid var(--p-doit-ring-hi);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){.h21-get.doit:hover .shine::before{animation:none}}
+.h21-copy{pointer-events:none}.h21-copy .h21-get{pointer-events:auto}
+@media (max-width:760px){.h21-get.doit{--z:.68;font-size:15px}.h21-ctas{margin-top:18px}}
+
+/* #get-glance: real Flow Do It (shell+dring+shine), compact to fit the email row (copied from flow-doit.css, r4) */
+.su .su-go.doit{--z:.62;--pad-y:calc(16px*var(--z));--pad-x:calc(34px*var(--z));height:auto;min-height:0;padding:var(--pad-y) var(--pad-x);
+  background:transparent!important;box-shadow:none!important;isolation:isolate;color:var(--doit-text)!important;
+  font-family:'Heebo','Inter Tight',sans-serif;font-weight:700;font-size:14.5px;line-height:1;border-radius:calc(999px*var(--z));
+  transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+html:not([lang="he"]) .su .su-go.doit{font-family:'Inter Tight','Heebo',sans-serif}
+.su .su-go.doit::before,.su .su-go.doit::after{content:none;display:none}
+.su .su-go.doit .shell{position:absolute;inset:0;border-radius:inherit;z-index:-2;
+  background:linear-gradient(180deg,var(--p-doit-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--p-doit-top),var(--p-doit-bot));
+  border:1px solid var(--p-doit-border);
+  box-shadow:inset 0 1.5px 0 var(--p-doit-gloss),inset 0 calc(-12px*var(--z)) calc(26px*var(--z)) var(--p-doit-inner)}
+.su .su-go.doit .shell::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;box-shadow:0 calc(16px*var(--z)) calc(46px*var(--z)) calc(-10px*var(--z)) var(--glow)}
+.su .su-go.doit .dring{position:absolute;inset:calc(6px*var(--z));border-radius:999px;z-index:-1;border:calc(2px*var(--z)) solid var(--p-doit-ring);
+  box-shadow:0 0 calc(12px*var(--z)) var(--glow),inset 0 0 0 1px rgba(255,255,255,.28),inset 0 0 calc(11px*var(--z)) color-mix(in srgb,var(--p-doit-ring) 42%,transparent)}
+.su .su-go.doit .shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden;z-index:-1}
+.su .su-go.doit .shine::before{content:"";position:absolute;inset-block:-40%;inline-size:40%;inset-inline-start:-60%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg)}
+.su .su-go.doit .dlbl{display:block}
+@media (hover:hover){.su .su-go.doit:hover{transform:translateY(calc(-2px*var(--z))) scale(1.035)}.su .su-go.doit:hover .shine::before{animation:gh-sweep .85s cubic-bezier(.3,.6,.2,1) forwards}}
+@media (max-width:759px){.su .su-go.doit{--z:.56}}
+
+/* 2 · Headlines without periods: the gradient word sits in its own box so it paints whole (WebKit clips
+   background-clip:text on a wrapped/negative-margin inline inside a will-change layer). Phone sizes fit every language. */
+.h21-h1 em,.cta21-h em{display:inline-block}
+@media (max-width:760px){
+  html:not([lang="he"]):not([lang="en"]) .h21-h1{font-size:clamp(34px,11.2vw,48px)}
+  .h21-h1,.cta21-h{overflow-wrap:anywhere;hyphens:manual;max-width:100%}
+}
+.h21-end-h span,.h21-end-h em{display:inline-block}
+
+/* 3 · Meet avatar: no purple. Neutral grey, white initial. */
+.mt-av-n,.mt-cc-av,.dv-shav{background:#636366 !important}
+
+/* 4 · Contrast >= 4.5:1 for small labels in the hero card and steps */
+html body .gs-intent-label,html body .glance-surface .gs-intent-label,html body .h21-steps li,html body .h21-end-h span,html body .act-out,html body .acts-label{color:#6e6e73}
+html:not([data-theme="dark"]) body .h21 .js-undo,html:not([data-theme="dark"]) body .receipt-hero .js-undo{color:#0066cc}
+html body .act.st-verifying .act-out{color:#6e6e73}
+html[data-theme="dark"] body .act.st-verifying .act-out{color:#a1a1a6}
+html[data-theme="dark"] body .gs-intent-label,html[data-theme="dark"] body .glance-surface .gs-intent-label,html[data-theme="dark"] body .h21-steps li,html[data-theme="dark"] body .h21-end-h span,
+html[data-theme="dark"] body .act-out,html[data-theme="dark"] body .acts-label{color:#a1a1a6}
+html[data-theme="dark"] body .gplus-name{color:#4d9fff !important}
+
+/* 5 · Step rows: no blue rim on the active / ready / proofed rows. Soft neutral lift instead. */
+.act.is-active .act-row,.act-close.is-ready .act-row,.ss-proofed .act-row,
+.stage-demo[data-state="propose"] .act-row:hover{
+  border-color:rgba(0,0,0,.07) !important;background:#fff;
+  box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.04),0 10px 24px -14px rgba(0,0,0,.22) !important}
+html[data-theme="dark"] .act.is-active .act-row,html[data-theme="dark"] .act-close.is-ready .act-row,html[data-theme="dark"] .ss-proofed .act-row,
+html[data-theme="dark"] .stage-demo[data-state="propose"] .act-row:hover{
+  border-color:rgba(255,255,255,.1) !important;background:rgba(255,255,255,.06);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 12px 26px -14px rgba(0,0,0,.7) !important}
+/* work-in-progress panel: soft tint is enough, no blue rim */
+.acts-run{border-color:rgba(0,0,0,.07) !important;box-shadow:0 10px 24px -16px rgba(0,0,0,.2)}
+html[data-theme="dark"] .acts-run{border-color:rgba(255,255,255,.1) !important;box-shadow:0 10px 24px -16px rgba(0,0,0,.7)}
+
+/* 6 · (Sali 13.11 «תקן הכל») every Do It on Glance = Flow Do It in Flow blue, as in the approved r4 flow-doit.css.
+   Light: raster do-it-flow*.(png|webp) (the r4 Flow-blue image). Dark: the CSS twin .doit-dark, Flow dark Do It. */
+html[data-theme="dark"] img.chip-do[src$="do-it-flow.png"],html[data-theme="dark"] img.doit-inline[src$="do-it-flow.png"],
+html[data-theme="dark"] img.chip-do[src$="do-it-flow-228.webp"],html[data-theme="dark"] img.doit-inline[src$="do-it-flow-228.webp"]{display:none !important}
+.doit-ripple{border-color:#1A4EF5}
+html[data-theme="dark"] .doit-ripple{border-color:#3B74FF}
+html[data-theme="dark"] .doit-dark{color:#e6efff;background:linear-gradient(180deg,rgba(228,236,250,.2),rgba(9,13,24,.34));border-color:rgba(228,236,250,.3);
+  box-shadow:0 0 22px -4px rgba(59,116,255,.5),inset 0 1px 0 rgba(255,255,255,.08) !important}
+html[data-theme="dark"] .doit-dark::after,html[data-theme="dark"] .do-halo.is-pressing .doit-dark::after{border-color:#3B74FF}
+html[data-theme="dark"] .do-halo:hover .doit-dark,html[data-theme="dark"] .do-halo.is-pressing .doit-dark{
+  box-shadow:0 0 30px -2px rgba(59,116,255,.62),inset 0 1px 0 rgba(255,255,255,.1) !important}
+html[data-theme="dark"] .do-halo:hover .doit-dark::after{border-color:#6E9BFF}
+.do-halo:focus-visible{outline-color:#2D5EFF}
+html[data-theme="dark"] .bn-doit{background:radial-gradient(circle at 50% 45%,rgba(45,94,255,.16),rgba(45,94,255,0) 65%)}
+
+/* 7 · Glance panels: no blue rim. The 1px gradient edge becomes a neutral hairline. */
+.glance-surface::before{background:linear-gradient(160deg,rgba(0,0,0,.08),rgba(0,0,0,.03) 40%,rgba(0,0,0,.03) 70%,rgba(0,0,0,.06)) !important}
+html[data-theme="dark"] .glance-surface::before{background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.04) 40%,rgba(255,255,255,.04) 70%,rgba(255,255,255,.08)) !important}
+
+/* 8 · No blue rims or blue glow around cards and panels (Sali 13.11 «תקן הכל»). Neutral hairlines, same depth.
+   Kept on purpose: the living ring and its ping (#0071e3), the Do It rings (#2D5EFF), selected-state pills. */
+html:not([data-theme="dark"]) .chip{border-color:rgba(0,0,0,.08)!important}
+html:not([data-theme="dark"]) .pillar-chip{border-color:rgba(0,0,0,.08)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 12px 24px -14px rgba(0,0,0,.16)!important}
+html:not([data-theme="dark"]) .mj-pill{box-shadow:0 0 0 1px rgba(0,0,0,.08),0 10px 30px -10px rgba(0,30,90,.32)!important}
+html[data-theme="dark"] .chip{border-color:rgba(255,255,255,.12)!important}
+html[data-theme="dark"] .pillar-chip{border-color:rgba(255,255,255,.12)!important;box-shadow:0 10px 24px -14px rgba(0,0,0,.6)!important}
+html[data-theme="dark"] article.pillar{border-color:rgba(255,255,255,.08)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 0 0 1px rgba(255,255,255,.016),0 24px 56px -28px rgba(0,0,0,.75)!important}
+html[data-theme="dark"] .pillar-moment{border-color:rgba(255,255,255,.1)!important}
+html[data-theme="dark"] .h21-card.stage,html[data-theme="dark"] .mj-card.stage,html[data-theme="dark"] .wa21-wrap.stage{box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 14px 36px -20px rgba(0,0,0,.55),0 0 0 .5px rgba(255,255,255,.1)!important}
+html[data-theme="dark"] .ol{box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 0 0 1px rgba(255,255,255,.1),0 24px 60px -24px rgba(0,0,0,.85)!important}
+html[data-theme="dark"] .mj-pill{box-shadow:0 0 0 1px rgba(255,255,255,.14),0 10px 30px -10px rgba(0,0,0,.7)!important}
+html[data-theme="dark"] .o20-plate-out{box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 0 0 1px rgba(255,255,255,.08),0 40px 64px -40px rgba(0,0,0,.95)!important}
+
+/* 9 · 320px: the header Do It (Obtenir / Obtener Glance) must not run past the edge */
+@media (max-width:359px){html body .fh .fh-cta.doit{--z:.48;font-size:12.5px}html body .fh-end .ctl{gap:4px}}
+
+/* 10 · Gmail mock search: one line in every language (FR "Rechercher dans les messages" wrapped at 320) */
+html body .gw-search{white-space:nowrap;overflow:hidden;min-width:0}
+html:not([lang="he"]) body .gw-search{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
+
+/* 11 · Hebrew has no italics: every Hebrew headline accent stays upright (Latin languages keep the italic em) */
+html[lang="he"] em,html[lang="he"] h1 em,html[lang="he"] h2 em,html[lang="he"] h3 em,html[lang="he"] .h21-h1 em,html[lang="he"] .cta21-h em{font-style:normal!important;font-synthesis:none}
+
+/* 12 · "Same close, different surfaces": a Slack direct message (replaces the old chat mock; no WhatsApp anywhere) */
+html body .wa21.sl21{--sl-bg:#fff;--sl-side:#f5f5f7;--sl-tx:#1d1c1d;--sl-sub:#616061;--sl-line:#e6e6e8;--sl-on:#1164a3;--sl-av:#1164a3;--sl-me:#3a3a3c;--sl-tag:rgba(0,0,0,.06);
+  display:flex;text-align:start;background:var(--sl-bg);color:var(--sl-tx);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Heebo",Helvetica,Arial,sans-serif;font-size:15px;line-height:1.46;letter-spacing:0}
+html[data-theme="dark"] body .wa21.sl21{--sl-bg:#1a1d21;--sl-side:#151719;--sl-tx:#e3e3e5;--sl-sub:#a1a1a6;--sl-line:rgba(255,255,255,.1);--sl-on:#1164a3;--sl-av:#2d5eff;--sl-me:#48484a;--sl-tag:rgba(255,255,255,.1)}
+.sl21-side{width:196px;flex:none;background:var(--sl-side);border-inline-end:1px solid var(--sl-line);padding:16px 10px;display:flex;flex-direction:column;gap:2px}
+.sl21-ws{font-size:15px;font-weight:800;margin:0 8px 12px;color:var(--sl-tx)}
+.sl21-ch{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:6px;font-size:14px;color:var(--sl-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl21-ch i{font-style:normal;width:20px;height:20px;flex:none;border-radius:5px;background:rgba(0,0,0,.08);color:var(--sl-tx);font-size:11px;font-weight:700;display:grid;place-items:center}
+.sl21-ch.on{background:var(--sl-on);color:#fff}.sl21-ch.on i{background:rgba(255,255,255,.22);color:#fff}
+html[data-theme="dark"] .sl21-ch i{background:rgba(255,255,255,.12)}
+.sl21-sec{margin:14px 10px 4px;font-size:12px;font-weight:700;color:var(--sl-sub)}
+.sl21-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.sl21-head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--sl-line)}
+.sl21-who{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.sl21-who b{font-size:15.5px;font-weight:800}.sl21-who span{font-size:12.5px;color:var(--sl-sub)}
+.sl21-mark{margin-inline-start:auto;width:20px;height:20px;display:inline-flex}.sl21-mark svg{width:100%;height:100%}
+.sl21-thread{flex:1;padding:14px 18px 10px;display:flex;flex-direction:column;gap:14px;min-height:236px}
+.sl21-day{display:flex;align-items:center;gap:10px;color:var(--sl-sub);font-size:12.5px;font-weight:700}
+.sl21-day::before,.sl21-day::after{content:"";flex:1;height:1px;background:var(--sl-line)}
+.sl21-msg{display:flex;gap:10px;align-items:flex-start;border-radius:8px}
+.sl21-av{width:36px;height:36px;border-radius:8px;background:var(--sl-av);color:#fff;font-style:normal;font-weight:700;font-size:14px;display:grid;place-items:center;flex:none}
+.sl21-head .sl21-av{width:28px;height:28px;font-size:12px;border-radius:7px}
+.sl21-av.me{background:var(--sl-me)}
+.sl21-msg b{font-weight:800;font-size:15px}
+.sl21-msg time,.sl21-tag{margin-inline-start:8px;font-size:12px;color:var(--sl-sub);font-style:normal;font-weight:500}
+.sl21-tag{padding:1px 6px;border-radius:4px;background:var(--sl-tag)}
+.sl21-msg p{margin:2px 0 0;font-size:15px;line-height:1.46;white-space:pre-wrap;word-break:break-word}
+.sl21-compose{margin:0 16px 16px;padding:11px 14px;border:1px solid var(--sl-line);border-radius:8px;color:var(--sl-sub);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body .sl21 .sl21-msg.wa21-art{display:none}
+html body #demo-whatsapp[data-state="working"] .sl21-msg.wa21-art-draft,html body #demo-whatsapp[data-state="wait"] .sl21-msg.wa21-art-draft,html body #demo-whatsapp[data-state="settled"] .sl21-msg.wa21-art-sent{display:flex}
+html body .stage-demo .sl21-msg.wa21-ask{outline-offset:4px}
+@media (max-width:760px){.sl21-side{display:none}.sl21-thread{padding:12px 14px 8px;min-height:0}.sl21-head{padding:10px 14px}.sl21-compose{margin:0 12px 12px}}
+
+/* 13 · r3: the Meet panel's "Closed · 4 tools · Undo" line may wrap in longer languages instead of running off the panel */
+#mj[data-state="settled"] #demo-meet .mj-side-closed{flex-wrap:wrap;white-space:normal;max-width:100%;row-gap:2px}
+/* 14 · r3: Outlook mock header brand text was white on the light bar */
+html:not([data-theme="dark"]) .ol-top{color:#1d1d1f}
+/* 15 · r3: the demo chip line may wrap instead of ending in an ellipsis, at every width */
+#wa-glance .chip-txt{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.3!important}
+/* 16 · r3: hero step rail keeps each label on one line in longer languages (DE/FR/ES), even with the ✓ marks */
+.h21-steps li{white-space:nowrap}
+@media (max-width:430px){html:not([lang="he"]):not([lang="en"]) .h21-steps{gap:2px;padding:3px}html:not([lang="he"]):not([lang="en"]) .h21-steps li{padding:6px 7px;font-size:10.5px;letter-spacing:-.01em}}
+@media (max-width:380px){html:not([lang="he"]):not([lang="en"]) .h21-steps li{padding:5px 5px;font-size:10px}}
+
+/* 1510 leftovers: Hebrew is never italic, also mock lines (mm-vague) and any he node inside other pages */
+:lang(he),:lang(he) *{font-style:normal!important;font-synthesis:none}
+
+/* v26 merge fix: .wa21-file display:flex overrides the hidden attribute */
+.wa21-file[hidden]{display:none}
+
+/* v26 merge: WhatsApp fills the content column; the card sits inside the list (corner-v26.css §2) */
+#demo-whatsapp .wa21-wrap,
+#demo-whatsapp .wa21{width:100% !important;max-width:none !important}
+.wa21-glance.glance-surface{transform:none !important}
+@media (min-width:1100px){
+  #demo-whatsapp .wa21-list{width:480px !important;flex:none}
+  html:not([dir="rtl"]) .wa21-wrap .wa21-glance.glance-surface{
+    left:32px !important;right:auto !important;
+    width:416px !important;max-width:416px !important;
+  }
+  html[dir="rtl"] .wa21-wrap:has(.wa21[dir="rtl"]) .wa21-glance.glance-surface{
+    right:32px !important;left:auto !important;
+    width:416px !important;max-width:416px !important;
+  }
+}
+@media (min-width:761px) and (max-width:1099px){
+  #demo-whatsapp .wa21-list{width:400px !important;flex:none}
+  html:not([dir="rtl"]) .wa21-wrap .wa21-glance.glance-surface{
+    left:20px !important;right:auto !important;
+    width:360px !important;max-width:360px !important;
+  }
+  html[dir="rtl"] .wa21-wrap:has(.wa21[dir="rtl"]) .wa21-glance.glance-surface{
+    right:20px !important;left:auto !important;
+    width:360px !important;max-width:360px !important;
+  }
+}

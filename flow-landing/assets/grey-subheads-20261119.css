@@ -1,0 +1,145 @@
+/* 2026-11-19 · Option A is the default on the local homepage.
+   ?sub=0 restores the previous look. ?sub=B or ?sub=C still preview those options.
+   Does not edit locked CSS. */
+
+html[data-sub]{
+  --gs-grey:#6e6e73;
+  --gs-ink:#1d1d1f;
+  --gs-b1:#1d2433;
+  --gs-b2:#1F46D6;
+  --gs-b3:#2D5EFF;
+}
+html[data-sub][data-theme="dark"]{
+  --gs-grey:#a1a1a6; /* 7.74:1 on #07090F, 7.50:1 on #0A0E18 */
+  --gs-ink:#EEF2F9;
+  --gs-b1:#EEF2F9;
+  --gs-b2:#5B8CFF;
+  --gs-b3:#2D5EFF;
+}
+
+html[data-sub] .gs-ink{
+  color:var(--gs-ink);
+  -webkit-text-fill-color:var(--gs-ink);
+  background:none;
+  font-style:normal;
+}
+html[data-sub] .gs-grey{
+  color:var(--gs-grey);
+  -webkit-text-fill-color:var(--gs-grey);
+  background:none;
+  font-style:normal;
+}
+html[data-sub] .gs-blue,
+html[data-sub] .gs-blue em{
+  font-style:normal;
+  background:linear-gradient(90deg,var(--gs-b1) 0%,var(--gs-b2) 62%,var(--gs-b3) 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  -webkit-text-fill-color:transparent;
+}
+html[dir="rtl"][data-sub] .gs-blue,
+html[dir="rtl"][data-sub] .gs-blue em,
+html[data-sub][lang="he"] .gs-blue,
+html[data-sub][lang="he"] .gs-blue em{
+  background:linear-gradient(270deg,var(--gs-b1) 0%,var(--gs-b2) 62%,var(--gs-b3) 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+}
+
+html[data-sub] .creed-h,
+html[data-sub] .creed-h em,
+html[data-sub] .i1-hl,
+html[data-sub] #hero #h1,
+html[data-sub] #hero #h1 *{
+  font-style:normal;
+}
+
+/* ========== A · gradient heading + Apple-sized grey subhead ========== */
+html[data-sub="A"] .i1-hl .i1-g{
+  color:var(--ink);
+}
+html[data-sub="A"] #setup .sec-h .lead{
+  color:var(--gs-grey)!important;
+  font-weight:600!important;
+  font-size:21px!important;
+  line-height:1.25!important;
+  letter-spacing:-.015em!important;
+  text-wrap:balance;
+}
+/* Each sentence is a unit: one line if they fit, otherwise a break between sentences only. */
+html[data-sub="A"] #setup .sec-h .lead .gs-sent{
+  display:inline-block;
+  text-align:center;
+}
+html[data-sub="A"] #hero .sub,
+html[data-sub="A"] .i1-sub,
+html[data-sub="A"] #depsec .dp-sub,
+html[data-sub="A"] .creed-sub{
+  color:var(--gs-grey)!important;
+  font-weight:400!important;
+  font-size:18px!important;
+  line-height:1.38!important;
+  letter-spacing:-.01em!important;
+  text-wrap:balance;
+}
+@media (min-width:900px){
+  html[data-sub="A"] #setup .sec-h .lead{font-size:28px!important;line-height:1.18!important}
+  html[data-sub="A"] #hero .sub,
+  html[data-sub="A"] .i1-sub,
+  html[data-sub="A"] #depsec .dp-sub,
+  html[data-sub="A"] .creed-sub{font-size:24px!important;line-height:1.333!important}
+}
+
+/* ========== B / C remain available via ?sub= ========== */
+html[data-sub="B"] .i1-hl .i1-g,
+html[data-sub="B"] .i1-hl .i1-g > span{
+  color:var(--gs-ink);
+  -webkit-text-fill-color:var(--gs-ink);
+}
+html[data-sub="B"] #hero .sub,
+html[data-sub="B"] .i1-sub,
+html[data-sub="B"] #setup .sec-h .lead,
+html[data-sub="B"] #depsec .dp-sub,
+html[data-sub="B"] .creed-sub{
+  color:var(--gs-grey);
+}
+
+html[data-sub="C"] .i1-hl .i1-g,
+html[data-sub="C"] .i1-hl .i1-g > span{
+  color:var(--gs-grey);
+  -webkit-text-fill-color:var(--gs-grey);
+}
+html[data-sub="C"] #hero .sub,
+html[data-sub="C"] .i1-sub,
+html[data-sub="C"] #depsec .dp-sub,
+html[data-sub="C"] .creed-sub{
+  color:var(--gs-grey)!important;
+}
+html[data-sub="C"] #setup .sec-h .lead{
+  color:var(--gs-grey)!important;
+  font-weight:600!important;
+  font-size:19px!important;
+  line-height:1.25!important;
+  letter-spacing:-.012em!important;
+}
+@media (min-width:900px){
+  html[data-sub="C"] #setup .sec-h .lead{font-size:22px!important}
+}
+
+html[lang="he"][data-sub] #hero .sub,
+html[lang="he"][data-sub] .i1-sub,
+html[lang="he"][data-sub] #setup .sec-h .lead,
+html[lang="he"][data-sub] #depsec .dp-sub,
+html[lang="he"][data-sub] .creed-sub{
+  font-family:var(--he), "Heebo", var(--disp), sans-serif;
+}
+
+/* When the principles closing line wraps, park the last line at the end
+   (left in RTL, right in LTR) so the blue stays at the end of the sentence. */
+html[data-sub="A"] #intro1a .i1-hl .i1-ln.gs-end{
+  text-align-last:end;
+}
+html[data-sub="A"] .creed-sub b{
+  white-space:nowrap;
+}

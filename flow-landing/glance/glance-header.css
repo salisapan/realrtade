@@ -1,0 +1,62 @@
+/* Glance header: the shared <flow-header> (assets/flow-header.css) on Glance pages.
+   Same structure, sizes and menu as Flow. Only the accent differs: Glance blue #0071e3 (Do It CTA, focus). */
+:root{
+  --ink2:var(--muted,#6e6e73);--ink3:var(--faint,#86868b);--hair:var(--line,rgba(0,0,0,.08));
+  --bg0:var(--bg,#fff);--card:#fff;--field:rgba(0,0,0,.05);
+  --ctl-bg:rgba(255,255,255,.72);--ctl-line:rgba(0,0,0,.12);
+  --z:1;--accent-g:#0071e3;
+  --p-doit-top:rgba(255,255,255,.97);--p-doit-bot:rgba(214,230,250,.72);--p-doit-border:rgba(0,70,160,.3);--p-doit-gloss:rgba(255,255,255,.95);
+  --p-doit-ring:#0071e3;--p-doit-ring-hi:#0071e3;--p-doit-inner:rgba(0,40,100,.12);--doit-text:#0062c4;--glow:rgba(0,113,227,.14)}
+html[data-theme="dark"]{
+  --card:#0d1320;--field:rgba(255,255,255,.07);--ctl-bg:rgba(14,19,34,.72);--ctl-line:rgba(150,166,204,.22);
+  --p-doit-top:rgba(228,236,250,.2);--p-doit-bot:rgba(9,13,24,.34);--p-doit-border:rgba(228,236,250,.3);--p-doit-gloss:rgba(255,255,255,.55);
+  --p-doit-ring:#0a84ff;--p-doit-ring-hi:#4aa3ff;--p-doit-inner:rgba(0,30,80,.24);--doit-text:#e6f1ff;--glow:rgba(10,132,255,.5)}
+html{--nav-h:56px}
+@media (max-width:759px){html{--nav-h:52px}}
+.fh{--fh-bg:var(--bg,#fff);--fh-ink:var(--ink,#1d1d1f);--fh-ink2:var(--muted,#6e6e73)}
+html[data-theme="dark"] .fh{--fh-bg:#05070d}
+/* the hero is pinned right under the bar */
+body{padding-top:0}
+.fh-panel a{font-family:inherit}
+.fh-links a[aria-current="page"]{color:var(--fh-ink)}
+
+/* top-right controls (language link + theme), same 32px circles as Flow */
+.fh-end .ctl{display:flex;gap:8px;direction:ltr;align-items:center}
+.ctl .ctl-b{appearance:none;-webkit-appearance:none;position:relative;height:32px;width:32px;border-radius:999px;border:.5px solid var(--ctl-line);background:var(--ctl-bg);color:var(--fh-ink2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;text-decoration:none;transition:border-color .15s,color .15s}
+.ctl .ctl-b:hover{border-color:var(--ink3);color:var(--fh-ink)}
+.ctl .ctl-b svg{width:15px;height:15px;flex:none}
+.ctl .ctl-b::after{content:"";position:absolute;inset:-7px}
+.ctl .ctl-b:focus-visible{outline:2px solid var(--accent-g);outline-offset:2px}
+.ctl .moon{display:none}
+html[data-theme="dark"] .ctl .sun{display:none}
+html[data-theme="dark"] .ctl .moon{display:block}
+@media (max-width:759px){.fh-end .ctl{gap:6px}}
+
+/* Do It CTA, Glance blue (same geometry as Flow's .fh-cta.doit) */
+.fh .doit,.fb-card .doit{--pad-y:calc(16px*var(--z));--pad-x:calc(34px*var(--z));--pr:0;--md:0;position:relative;display:inline-flex;align-items:center;justify-content:center;
+  padding:var(--pad-y) var(--pad-x);border:0;cursor:pointer;isolation:isolate;border-radius:calc(999px*var(--z));background:transparent;
+  -webkit-tap-highlight-color:transparent;font-family:'Inter Tight','Heebo',sans-serif;font-weight:700;line-height:1;
+  color:var(--doit-text)!important;text-decoration:none;transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+html[lang="he"] .fh .doit,html[lang="he"] .fb-card .doit{font-family:'Heebo','Inter Tight',sans-serif}
+.fh .doit .shell,.fb-card .doit .shell{position:absolute;inset:0;border-radius:inherit;z-index:-2;
+  background:linear-gradient(180deg,var(--p-doit-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--p-doit-top),var(--p-doit-bot));
+  border:1px solid var(--p-doit-border);
+  box-shadow:inset 0 1.5px 0 var(--p-doit-gloss),inset 0 calc(-12px*var(--z)) calc(26px*var(--z)) var(--p-doit-inner)}
+.fh .doit .shell::before,.fb-card .doit .shell::before{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;box-shadow:0 calc(16px*var(--z)) calc(46px*var(--z)) calc(-10px*var(--z)) var(--glow)}
+.fh .doit .dring,.fb-card .doit .dring{position:absolute;inset:calc(6px*var(--z));border-radius:999px;z-index:-1;border:calc(2px*var(--z)) solid var(--p-doit-ring);
+  box-shadow:0 0 calc(12px*var(--z)) var(--glow),inset 0 0 0 1px rgba(255,255,255,.28),inset 0 0 calc(11px*var(--z)) color-mix(in srgb,var(--p-doit-ring) 42%,transparent)}
+.fh .doit .shine,.fb-card .doit .shine{position:absolute;inset:0;border-radius:inherit;overflow:hidden;z-index:-1}
+.fh .doit .shine::before,.fb-card .doit .shine::before{content:"";position:absolute;inset-block:-40%;inline-size:40%;inset-inline-start:-60%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg)}
+.fh .doit .dlbl,.fb-card .doit .dlbl{display:block}
+@media (hover:hover){.fh .doit:hover,.fb-card .doit:hover{transform:translateY(calc(-2px*var(--z))) scale(1.035);background:transparent}
+  .fh .doit:hover .shine::before{animation:gh-sweep .85s cubic-bezier(.3,.6,.2,1) forwards}}
+@keyframes gh-sweep{to{inset-inline-start:130%}}
+.fh .doit:active{transform:scale(.99)}
+.fh-cta.doit{--z:.62;height:auto;padding:var(--pad-y) var(--pad-x);font-size:13.5px}
+.fh-panel .fh-cta-m.doit{--z:.9;display:flex;width:100%;max-width:520px;height:auto;font-size:16px}
+.fb-btn.doit{--z:.9;display:flex;width:100%;height:auto;font-size:15px;padding:var(--pad-y) var(--pad-x)}
+@media (max-width:759px){.fh .fh-cta.doit{--z:.56}}
+.fh-cta.doit:focus-visible,.fh-panel .fh-cta-m.doit:focus-visible{outline:2px solid var(--p-doit-ring-hi);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){.fh .doit:hover .shine::before{animation:none}}
+.fb-steps i.on{background:#0071e3}
+.fb input:focus{border-color:#0071e3;box-shadow:0 0 0 3px rgba(0,113,227,.16)}

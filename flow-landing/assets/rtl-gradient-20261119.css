@@ -1,0 +1,42 @@
+/* 2026-11-19 · Black-to-blue text gradients follow reading direction.
+   LTR: 90deg (blue at the end, on the right).
+   RTL / Hebrew: 270deg, or the horizontal mirror of a diagonal (105deg→255deg, 100deg→260deg),
+   so blue lands at the end of the sentence, on the left.
+   Loaded last. Does not edit locked CSS. */
+
+/* Homepage + clones: creed last line was 105deg/100deg with no RTL flip. */
+html[dir="rtl"] .creed-h em,
+html:is([lang="he"],[data-ui="he"]) .creed-h em{
+  background:linear-gradient(255deg,var(--ink) 8%,var(--accent-2) 78%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+html[dir="rtl"][data-theme="dark"] .creed-h em,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] .creed-h em{
+  background:linear-gradient(260deg,#fff 0%,#A9C2FF 40%,var(--accent-2) 95%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+
+/* Security v4 accent word: had no RTL, and dark used a vertical 180deg wash. */
+html[data-theme="dark"] .rc.v3 .v4-gw{
+  background:linear-gradient(90deg,#EEF2F9 0%,#5B8CFF 62%,#2D5EFF 100%);
+}
+html[dir="rtl"]:not([data-theme="dark"]) .rc.v3 .v4-gw,
+html:is([lang="he"],[data-ui="he"]):not([data-theme="dark"]) .rc.v3 .v4-gw{
+  background:linear-gradient(270deg,#1d2433 0%,#1F46D6 62%,#2D5EFF 100%);
+}
+html[dir="rtl"][data-theme="dark"] .rc.v3 .v4-gw,
+html:is([lang="he"],[data-ui="he"])[data-theme="dark"] .rc.v3 .v4-gw{
+  background:linear-gradient(270deg,#EEF2F9 0%,#5B8CFF 62%,#2D5EFF 100%);
+}
+
+/* Security H1: keep three stacked lines after the accent moved to the last line.
+   At ≥900px, sxh.css makes .ln inline and only .fx-gw stays block, so the first
+   two phrases would sit on one line. Force every line to stay a block. */
+@media (min-width:900px){
+  .rc .hx-top h1.fx-security-h1.rc-h2{white-space:normal}
+  .rc .hx-top h1.fx-security-h1 .ln{display:block;white-space:nowrap}
+}

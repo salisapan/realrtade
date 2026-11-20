@@ -1,0 +1,60 @@
+/* Homepage review fixes · 2026-11-13 (local). Override layer only; index.html markup and inline CSS untouched. */
+/* 3 · Insights teaser: real article photos and cards (same card language as articles.html) */
+#inGrid.hi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;align-items:stretch}
+#inGrid .hi-card{display:flex;flex-direction:column;text-decoration:none;color:var(--ink);background:var(--card,#fff);border-radius:22px;overflow:hidden;
+ box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 1px rgba(0,0,0,.04),0 3px 8px rgba(0,0,0,.04),0 16px 32px -8px rgba(15,22,45,.14),0 32px 56px -18px rgba(15,22,45,.10);
+ transition:transform .5s cubic-bezier(.22,1,.36,1)}
+#inGrid .hi-card:hover{transform:translateY(-4px)}
+#inGrid .hi-ph{display:block;position:relative;aspect-ratio:16/10;background:#f5f5f7;overflow:hidden}
+#inGrid .hi-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+#inGrid .hi-bd{display:flex;flex-direction:column;gap:8px;padding:20px 22px 22px;flex:1}
+#inGrid .hi-k{font-size:13px;font-weight:600;color:var(--ink2)}
+#inGrid .hi-t{font-size:20px;line-height:1.25;font-weight:700;letter-spacing:-.015em;color:var(--ink);text-wrap:balance}
+#inGrid .hi-go{margin-top:auto;padding-top:6px;font-size:15px;font-weight:600;color:#2D5EFF}
+html[data-theme="dark"] #inGrid .hi-card{background:#12151d;box-shadow:0 0 0 .5px rgba(255,255,255,.10),0 18px 40px -18px rgba(0,0,0,.8)}
+html[data-theme="dark"] #inGrid .hi-ph{background:#1d1d1f}
+html[data-theme="dark"] #inGrid .hi-ph img{filter:brightness(.92)}
+html[data-theme="dark"] #inGrid .hi-go{color:#6E9BFF}
+@media (max-width:900px){#inGrid.hi-grid{grid-template-columns:1fr;max-width:520px;margin-inline:auto;gap:18px}#inGrid .hi-t{font-size:19px}}
+
+/* 10 · Setup "The whole office": neutral pills with depth instead of blue outlined glowing rims */
+#setup .ob9-t{background:var(--card,#fff);box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05),0 6px 14px -6px rgba(15,22,45,.14);color:var(--ink2)}
+#setup .ob9-t.on{color:var(--ink);background:var(--card,#fff);box-shadow:0 0 0 .5px rgba(0,0,0,.09),0 1px 2px rgba(0,0,0,.06),0 10px 22px -8px rgba(15,22,45,.20),0 22px 40px -18px rgba(15,22,45,.14)}
+#setup .ob9-t i{background:var(--ink3);opacity:.5}
+#setup .ob9-t.on i{background:#2D5EFF;opacity:1}
+html[data-theme="dark"] #setup .ob9-t{background:#161a24;box-shadow:0 0 0 .5px rgba(255,255,255,.10),0 10px 22px -10px rgba(0,0,0,.8);color:#a1a1a6}
+html[data-theme="dark"] #setup .ob9-t.on{background:#1c2130;color:#f5f5f7;box-shadow:0 0 0 .5px rgba(255,255,255,.14),0 14px 30px -12px rgba(0,0,0,.9)}
+html[data-theme="dark"] #setup .ob9-t.on i{background:#6E9BFF}
+/* step text contrast in dark (desktop list shows all four steps; mobile shows one at a time and keeps its own opacity) */
+@media (min-width:821px){html[data-theme="dark"] #setup .ob9-list li{opacity:.62}html[data-theme="dark"] #setup .ob9-list li.on{opacity:1}}
+html[data-theme="dark"] #setup .ob9-list p{color:#a1a1a6}
+html[data-theme="dark"] #setup .ob9-list b{color:#f5f5f7}
+@media (max-width:600px){#inGrid .hi-ph{aspect-ratio:16/9}#inGrid .hi-bd{padding:16px 18px 18px}}
+
+/* 11 · 13/11 15:06 · Setup "Where Flow runs": neutral pills with depth (same material as 10), no blue rim or tint on the chosen one */
+#setup .ob9-opt{background:var(--card,#fff);box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05),0 6px 14px -6px rgba(15,22,45,.14);color:var(--ink2)}
+#setup .ob9-opt.sel{background:var(--card,#fff);color:var(--ink);box-shadow:0 0 0 .5px rgba(0,0,0,.09),0 1px 2px rgba(0,0,0,.06),0 10px 22px -8px rgba(15,22,45,.20),0 22px 40px -18px rgba(15,22,45,.14)}
+#setup .ob9-opt.sel i{box-shadow:inset 0 0 0 1.5px #2D5EFF}
+#setup .ob9-opt i:after{background:#2D5EFF}
+html[data-theme="dark"] #setup .ob9-opt{background:#161a24;box-shadow:0 0 0 .5px rgba(255,255,255,.10),0 10px 22px -10px rgba(0,0,0,.8);color:#a1a1a6}
+html[data-theme="dark"] #setup .ob9-opt.sel{background:#1c2130;color:#f5f5f7;box-shadow:0 0 0 .5px rgba(255,255,255,.14),0 14px 30px -12px rgba(0,0,0,.9)}
+html[data-theme="dark"] #setup .ob9-opt i{box-shadow:inset 0 0 0 1.5px #6e6e73}
+html[data-theme="dark"] #setup .ob9-opt.sel i{box-shadow:inset 0 0 0 1.5px #6E9BFF}
+html[data-theme="dark"] #setup .ob9-opt i:after{background:#6E9BFF}
+/* 12 · 13/11 15:06 · Setup plates in dark: neutral hairline instead of the blue-grey rim */
+html[data-theme="dark"] #setup .ob9-plate{box-shadow:0 0 0 .5px rgba(255,255,255,.10),inset 0 1px rgba(255,255,255,.06),0 calc(30*var(--u)) calc(60*var(--u)) calc(-24*var(--u)) rgba(0,0,0,.7)}
+html[data-theme="dark"] #setup .ob9-plate:before{box-shadow:0 0 0 .5px rgba(255,255,255,.07)}
+html[data-theme="dark"] #setup .ob9-plate:after{box-shadow:0 0 0 .5px rgba(255,255,255,.05)}
+/* 13 · 13/11 15:06 · Setup text in dark: readable greys (Apple secondary #a1a1a6, primary #f5f5f7) */
+html[data-theme="dark"] #setup .ob9-art h5{color:#a1a1a6}
+html[data-theme="dark"] #setup .ob9-row{opacity:.46}
+html[data-theme="dark"] #setup .ob9-row.on{opacity:1}
+html[data-theme="dark"] #setup .ob9-row span{color:#f5f5f7}
+html[data-theme="dark"] #setup .ob9-row em{color:#8fb0ff}
+html[data-theme="dark"] #setup .ob9-caps p{color:#c7c7cc}
+html[data-theme="dark"] #setup .ob9-req{color:#f5f5f7}
+html[data-theme="dark"] #setup .ob9-st u{color:#a1a1a6}
+html[data-theme="dark"] #setup .ob9-st s{color:#8fb0ff}
+html[data-theme="dark"] #setup .ob9-list li{opacity:.7}
+/* 14 · 13/11 15:06 · Hebrew is never italic (the vague-request line in the message mock) */
+html[lang=he] .mm-line,html[lang=he] .mm-vague{font-style:normal}

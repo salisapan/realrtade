@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+
+<html data-page-lang="en" data-ui="en" dir="ltr" lang="en">
+<head><base href="/solutions/"/>
+
+<meta charset="utf-8"/>
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest"><link href="https://theflow-ai.com/solutions/hospitals" rel="canonical"/><link href="https://theflow-ai.com/solutions/hospitals" hreflang="en" rel="alternate"/><link href="https://theflow-ai.com/he/solutions/hospitals" hreflang="he" rel="alternate"/><link href="https://theflow-ai.com/solutions/hospitals?lang=de" hreflang="de" rel="alternate"/><link href="https://theflow-ai.com/solutions/hospitals?lang=fr" hreflang="fr" rel="alternate"/><link href="https://theflow-ai.com/solutions/hospitals?lang=es" hreflang="es" rel="alternate"/><link href="https://theflow-ai.com/solutions/hospitals" hreflang="x-default" rel="alternate"/><meta content="en_US" property="og:locale"/><meta content="he_IL" property="og:locale:alternate"/>
+<meta content="light dark" name="color-scheme"/>
+<meta content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5" name="viewport"/>
+<meta content="AI for hospitals: Flow prepares patient cases, purchase requests and staff schedules from your hospital’s email and files, and a team member approves every step. The data stays inside the organization: masked cloud, Flow-Edge or Flow-Onprem." name="description"/>
+<meta content="#07090F" name="theme-color"/>
+<title>AI for hospitals: everything around patient care, ready to approve | Flow</title>
+<meta content="website" property="og:type"/>
+<meta content="AI for hospitals: everything around patient care, ready to approve | Flow" property="og:title"/>
+<meta content="AI for hospitals: Flow prepares patient cases, purchase requests and staff schedules from your hospital’s email and files, and a team member approves every step. The data stays inside the organization: masked cloud, Flow-Edge or Flow-Onprem." property="og:description"/>
+<meta content="https://theflow-ai.com/solutions/hospitals" property="og:url"/>
+<meta content="https://theflow-ai.com/og.jpg" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="AI for hospitals: everything around patient care, ready to approve | Flow" name="twitter:title"/>
+<meta content="AI for hospitals: Flow prepares patient cases, purchase requests and staff schedules from your hospital’s email and files, and a team member approves every step. The data stays inside the organization: masked cloud, Flow-Edge or Flow-Onprem." name="twitter:description"/>
+<meta content="https://theflow-ai.com/og.jpg" name="twitter:image"/>
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2D5EFF; --accent-2:#2D5EFF;
+  --navy:#07090F; --cat:#2D5EFF; --cat-ink:#1F46D6;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --cat:#2D5EFF; --cat-ink:#6E9BFF;
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#2D5EFF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat-ink,var(--cat))}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat — which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1F46D6; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat-ink,var(--cat)); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+</style>
+<script>(function(){var d=document.documentElement,q=new URLSearchParams(location.search),s=function(k){try{return localStorage.getItem(k)}catch(e){return null}},L=['en','de','fr','es','he'];var go=function(h,c){var a=document.querySelector('link[rel="alternate"][hreflang="'+h+'"]');if(!a)return false;try{localStorage.setItem('flow.lang',c)}catch(e){}q.delete('lang');var p=new URL(a.href).pathname,qs=q.toString();location.replace(p+(qs?'?'+qs:'')+location.hash);return true};var l=q.get('lang');if(L.indexOf(l)<0)l=s('flow.lang');if(L.indexOf(l)<0)l='en';if(l==='he'&&go('he','he'))return;if(q.get('lang')){try{localStorage.setItem('flow.lang',l)}catch(e){}}d.dataset.ui=l;if(l!=='en'){d.lang=l;d.setAttribute('data-r15-lang',l)}var t=q.get('theme');if(t!=='dark'&&t!=='light')t=s('flow.theme');if(t!=='dark'&&t!=='light'){try{t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(e){t='light'}}d.dataset.theme=t})();</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<link as="font" crossorigin="" href="../assets/fonts/intertight-latin.woff2" rel="preload" type="font/woff2"/><link href="../assets/flow-header.css" rel="stylesheet"/>
+<link href="../assets/flow-booking.css" rel="stylesheet"/>
+<link href="../assets/flow-inner.css" rel="stylesheet"/>
+<link href="../assets/flow-review-fixes.css?b=1" rel="stylesheet"/>
+<link href="../assets/flow-rich.css" rel="stylesheet"/>
+<link href="../samples/hero-samples.css" rel="stylesheet"/>
+<link href="../samples/v3.css" rel="stylesheet"/>
+<link href="../samples/v5.css" rel="stylesheet"/><link href="../assets/flow-sol-v3.css" rel="stylesheet"/><link href="../assets/flow-sol-v4.css" rel="stylesheet"/><link href="../assets/flow-orbit-v7.css" rel="stylesheet"/><link href="../assets/flow-sol-v9-pages.css?b=19" rel="stylesheet"/><link href="../assets/r15/dep-home.css?b=1" rel="stylesheet"/><link href="../assets/r15/dep-phone.css?b=1" rel="stylesheet"/><link href="../assets/r15/r15.css?b=1" rel="stylesheet"/><link href="../assets/r15/r14s.css?b=1" rel="stylesheet"/><link href="../assets/r15/stack.css?b=1" rel="stylesheet"/><link href="../assets/r15/procnav.css?b=1" rel="stylesheet"/><link href="../assets/r15/r15-i18n.css?b=1" rel="stylesheet"/><link href="../assets/r15/r15-dark.css?b=1" rel="stylesheet"/><link href="../assets/r15/prof.css?b=1" rel="stylesheet"/>
+<link href="../assets/r15/r15-contrast.css?b=3" rel="stylesheet"/>
+<noscript><style>.rich .rv{opacity:1!important;transform:none!important}.rich .w>span{transform:none!important}.rich .tier{opacity:1!important;transform:none!important}.rich .sf .sw{opacity:1}</style></noscript>
+<script>document.documentElement.classList.add("rich")</script>
+<style id="perf1112">.rich .rv{transition-duration:.5s,.55s}.rich .rv:not(.in){transform:translateY(14px)}#r14s#r14s .stk>.sc[style*="opacity: 0;"]{animation:none!important}</style>
+<link href="../assets/r15/prof-320.css?b=1" rel="stylesheet"/>
+<link href="../assets/r15/doit-match.css?b=2" rel="stylesheet"/>
+<style id="hosp-r6">@media (max-width:759px){#r14s#r14s .slide>.in.has-stk{width:100%}}</style>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://theflow-ai.com/solutions"},{"@type":"ListItem","position":3,"name":"Hospitals","item":"https://theflow-ai.com/solutions/hospitals"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Service","name":"AI workflow automation for hospital administration","serviceType":"AI workflow automation for hospital administration","provider":{"@type":"Organization","@id":"https://theflow-ai.com/#org","name":"Flow","url":"https://theflow-ai.com/"},"url":"https://theflow-ai.com/solutions/hospitals","inLanguage":"en","audience":{"@type":"BusinessAudience","name":"Hospitals, administration and operations"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/", "logo": "https://theflow-ai.com/logo.png"}</script>
+<script defer src="/assets/flow-consent.js"></script></head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="ctl" id="ctl">
+<div class="lang">
+<button aria-controls="langMenu" aria-expanded="false" aria-haspopup="menu" aria-label="Language" id="langBtn" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" viewbox="0 0 16 16"><circle cx="8" cy="8" r="6.4"></circle><path d="M1.6 8h12.8M8 1.6c1.9 2 2.8 4.1 2.8 6.4S9.9 12.4 8 14.4M8 1.6C6.1 3.6 5.2 5.7 5.2 8s.9 4.4 2.8 6.4"></path></svg>
+<span class="sr-only" id="langName">English</span>
+</button>
+<div aria-labelledby="langBtn" class="menu" id="langMenu" role="menu"></div>
+</div>
+<button aria-label="Night mode" aria-pressed="false" class="theme" id="themeBtn" type="button">
+<svg aria-hidden="true" class="sun" fill="none" stroke="currentColor" stroke-width="1.3" viewbox="0 0 16 16"><circle cx="8" cy="8" r="3"></circle><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9L13 13M3 13l1.1-1.1M11.9 4.1L13 3"></path></svg>
+<svg aria-hidden="true" class="moon" fill="none" stroke="currentColor" stroke-width="1.3" viewbox="0 0 16 16"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"></path></svg>
+</button>
+</div>
+<flow-header data-base="../"></flow-header>
+<main class="rc hs v3 x3m x4m x9m x4-prof x4-hosp" dir="ltr" id="main" lang="en"><section class="r15-hero" aria-labelledby="r15h1"><div class="r15-in"><h1 class="r15-h1" id="r15h1"><b>Everything around patient care is ready,</b> <span class="fx-gw">you just approve</span></h1><p class="r15-sub">Flow works alongside the systems you already have</p><a class="doit r15-cta" data-book="" data-ga="sol_hospitals_hero" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Book a call</span></a></div><div id="r14s" class="r15-stage"><script>(function(w){var q=new URLSearchParams(location.search),f=q.get("f"),v=q.get("v"),ai=q.get("ai"),rm=matchMedia("(prefers-reduced-motion: reduce)").matches;w.dataset.f=f||(rm?"3":"0");if(v)w.dataset.v=v;w.dataset.ai=ai==="2"?"2":"1";if(rm)w.classList.add("rm");if(q.get("state")==="done")w.dataset.state="done"})(document.getElementById("r14s"))</script><section class="r14" id="r14" aria-roledescription="carousel">
+<div class="track">
+<div class="slide is-active" data-m="1" aria-label="Patient case">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Patient case · Example</p>
+        <h2 class="h1">CT report in, follow-up needed</h2>
+      </div>
+      <p class="lead">Flow checked the authorization and prepared a slot and an SMS</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> checked the authorization and found a free slot, and you approve with one click</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">2</span></div><p class="k">Patient service centre</p><p class="t">Laura Bennett</p><ul class="lw-fields"><li class="lw-f"><span class="k">Request</span><span class="v">Follow-up · lung clinic</span></li><li class="lw-f"><span class="k">Authorization</span><span class="v">Insurer · valid until <span class="num">2/28/2027</span></span></li><li class="lw-pair"><span class="lw-f"><span class="k">Document</span><span class="v">Chest CT report</span></span><span class="lw-f"><span class="k">Received</span><span class="v"><span class="num">11/17</span></span></span></li></ul></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-mail"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">1</span></div><h3>Chest CT report and slot request</h3><p class="from"><b>Laura Bennett</b><span class="num"><span class="num">11/17/2026 8:12 AM</span></span></p><p class="meta">To the lung clinic office</p><div class="att"><span class="fi pdf" aria-hidden="true">PDF</span><b>Chest CT report · imaging centre</b><small dir="ltr">184 KB</small></div><blockquote class="ol-quote">Hello, attached is the CT report from a private centre. My doctor asked for a follow-up at the clinic.</blockquote></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Laura Bennett</b><span class="num">8:12 AM</span></p>
+              <h3 class="ph-mail-subj">Chest CT report and slot request</h3>
+              <p class="ph-mail-meta">To the lung clinic office · PDF</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> checked<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Checked the authorization</b><span>Insurer · valid until <span class="num">2/28</span></span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Found a free slot</b><span>Lung clinic · <span class="num">1/6</span>, <span class="num">9:40 AM</span></span></div></li></ol>
+          <p class="fl-src">Checked against: the email · the authorization · the clinic calendar</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> suggests 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Slot and SMS to Laura</b><span><span class="num">1/6</span> · <span class="num">9:40 AM</span></span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Authorization for the slot</b><span>Insurer authorizations · draft</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Done · slot booked, authorization linked</p><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">3</span></div><p class="k">Lung clinic calendar · January</p><ul class="lw-list"><li><p class="lw-l1"><b>Wed <span class="num">1/6</span></b><span><span class="num">9:40 AM</span></span></p><p class="lw-l2">Follow-up · free</p><span class="lw-status">Offered</span></li><li><p class="lw-l1"><b>Thu <span class="num">1/7</span></b><span><span class="num">11:20 AM</span></span></p><p class="lw-l2">Follow-up · free</p></li><li><p class="lw-l1"><b>Mon <span class="num">1/11</span></b><span><span class="num">8:30 AM</span></span></p><p class="lw-l2">Follow-up · free</p></li></ul><p class="flow-attr"><span class="attr-prep">Prepared by Flow</span><span class="attr-done">Added by <span dir="ltr">Flow · 8:13 AM</span></span></p></div>
+          </div>
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/commit.webp" width="18" height="18" decoding="async"/> Insurer authorizations<span class="ord" aria-hidden="true">3</span></div><p class="k">Authorization</p><p class="t">Laura Bennett</p><ul class="lw-fields"><li class="lw-f"><span class="k">Service</span><span class="v">Follow-up · lung clinic</span></li><li class="lw-f"><span class="k">Slot</span><span class="v"><span class="num">1/6</span> · <span class="num">9:40 AM</span></span></li><li class="lw-pair"><span class="lw-f"><span class="k">Status</span><span class="v"><span class="lw-status">Draft</span></span></span><span class="lw-f"><span class="k">Valid until</span><span class="v"><span class="num">2/28</span></span></span></li></ul><p class="flow-attr"><span class="attr-prep">Prepared by Flow</span><span class="attr-done">Added by <span dir="ltr">Flow · 8:13 AM</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Arrived in Outlook</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><b>Outlook</b><span class="smp">Example</span></p>
+          <p class="mail-m"><span>To</span><b>Lung clinic office</b></p>
+          <p class="mail-s">CT report, slot request · Bennett <span class="att-i">PDF</span></p>
+          <p class="mail-b">Report from a private imaging centre attached · <em>asks for a follow-up</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">What Flow did</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="22" height="22" decoding="async"/></span><p>Insurer authorization valid until <span class="num">2/28</span></p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><p>Free lung clinic slot on <span class="num">1/6</span>, <span class="num">9:40 AM</span></p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">What Flow suggests</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Slot on <span class="num">1/6</span>  and SMS to Laura</p><p class="card-s">Salesforce · SMS not sent</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Authorization linked to the slot</p><p class="card-s">Insurer authorizations · draft</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Only with your approval · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="2" aria-label="Purchasing">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Consumables purchasing · Example</p>
+        <h2 class="h1">Nitrile gloves running low</h2>
+      </div>
+      <p class="lead">Flow checked use and supplier and drafted a requisition</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> checked use and the contract supplier, and you approve with one click</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/powerbi.webp" width="18" height="18" decoding="async"/> Power BI<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Use · central store</p><table class="tb"><thead><tr><th>Item</th><th>Per day</th><th>In stock</th></tr></thead><tbody><tr class="on"><td>Nitrile gloves M</td><td><span class="num">6</span></td><td><span class="num">18</span></td></tr><tr><td>Disposable gowns</td><td><span class="num">4</span></td><td><span class="num">60</span></td></tr><tr><td>Surgical masks</td><td><span class="num">9</span></td><td><span class="num">140</span></td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">1</span></div><p class="k">Stock alerts · central store</p><ul class="lw-list"><li><p class="lw-l1"><b>Nitrile gloves M</b><span><span class="num">18</span> boxes</span></p><p class="lw-l2">Below minimum · <span class="num">11/18/2026 7:40 AM</span></p><span class="lw-status">New</span></li><li><p class="lw-l1"><b>Disposable gowns</b><span><span class="num">60</span> boxes</span></p><p class="lw-l2">Enough for two weeks</p></li><li><p class="lw-l1"><b>Surgical masks</b><span><span class="num">140</span> boxes</span></p><p class="lw-l2">Enough for two weeks</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · central store</b><span class="num">7:40 AM</span></p>
+              <h3 class="ph-mail-subj">Nitrile gloves below minimum</h3>
+              <p class="ph-mail-meta">Size M · <span class="num">18</span> boxes</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> checked<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/powerbi.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Checked the use</b><span><span class="num">6</span> boxes a day</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Found the contract supplier</b><span>Delivery in <span class="num">3</span> working days</span></div></li></ol>
+          <p class="fl-src">Checked against: stock · use · framework contract</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> suggests 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Purchase request</b><span><span class="num">120</span> boxes · contract price</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/supplier.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Supplier order</b><span>Supplier portal · after release</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Done · the requisition awaits release</p><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><p class="k">Requisitions to release</p><ul class="lw-list"><li><p class="lw-l1"><b>Nitrile gloves M</b><span><span class="num">120</span> boxes</span></p><p class="lw-l2">Contract supplier · <span class="num">3</span> working days</p><span class="lw-status">Awaiting release</span></li><li><p class="lw-l1"><b>Disposable gowns</b><span><span class="num">80</span> boxes</span></p><p class="lw-l2">Contract supplier</p><span class="lw-status">Released</span></li></ul><p class="flow-attr"><span class="attr-prep">Prepared by Flow</span><span class="attr-done">Added by <span dir="ltr">Flow · 7:46 AM</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/lg/supplier.webp" width="18" height="18" decoding="async"/> Supplier portal<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Supplier order</p><p class="pdf-s">Contract supplier · <span class="num">11/18/2026</span></p><dl class="pdf-f"><div><dt>Item</dt><dd>Nitrile gloves, size M</dd></div><div><dt>Quantity</dt><dd><mark><span class="num">120</span> boxes</mark></dd></div><div><dt>Sent</dt><dd>After the requisition is released</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Came in from SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Example</span></p>
+          <p class="mail-m"><span>Alert</span><b>Central store</b></p>
+          <p class="mail-s">Nitrile gloves M · below minimum</p>
+          <p class="mail-b">Left: <span class="num">18</span> boxes · <em>three days</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">What Flow did</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/powerbi.webp" width="22" height="22" decoding="async"/></span><p>Average use: <span class="num">6</span> boxes a day</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Contract supplier: delivery in <span class="num">3</span> days</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">What Flow suggests</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Requisition for <span class="num">120</span> boxes</p><p class="card-s">SAP · for the logistics manager</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/supplier.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Order in the supplier portal</p><p class="card-s">Supplier portal · after release</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Only with your approval · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="3" aria-label="Shifts">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Staff schedule · Example</p>
+        <h2 class="h1">Evening shift swap request</h2>
+      </div>
+      <p class="lead">Flow found cover and prepared the swap for approval</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> checked the roster and the overtime limit, and the charge nurse approves with one click</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/lg/ukg.webp" width="18" height="18" decoding="async"/> UKG<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Medical ward B · week of <span class="num">Nov 22</span></p><table class="tb"><thead><tr><th>Name</th><th>Tue <span class="num">11/24</span></th><th>Mon <span class="num">11/23</span></th></tr></thead><tbody><tr><td>Hannah Clark</td><td>Evening</td><td>Morning</td></tr><tr class="on"><td>Megan Ross</td><td>Free</td><td>Morning</td></tr><tr><td>Kate Fisher</td><td>Evening</td><td>Night</td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/ukg.webp" width="18" height="18" decoding="async"/> UKG<span class="ord" aria-hidden="true">1</span></div><p class="k">Swap requests · Medical ward B</p><ul class="lw-list"><li><p class="lw-l1"><b>Hannah Clark</b><span>Evening · Tue <span class="num">11/24</span></span></p><p class="lw-l2">Family event · <span class="num">11/12/2026 9:05 AM</span></p><span class="lw-status">New</span></li><li><p class="lw-l1"><b>Kate Fisher</b><span>Morning · Thu <span class="num">11/26</span></span></p><p class="lw-l2">Swapped with Megan</p><span class="lw-status">Approved</span></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Hannah Clark</b><span class="num">9:05 AM</span></p>
+              <h3 class="ph-mail-subj">Shift swap request</h3>
+              <p class="ph-mail-meta">Evening · Tue  <span class="num">11/24</span></p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> checked<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Checked the schedule</b><span>Megan free, not after a night</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Checked overtime</b><span>Within the monthly limit</span></div></li></ol>
+          <p class="fl-src">Checked against: the request · the schedule · overtime</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> suggests 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Request to Megan</b><span>Evening · Tue  <span class="num">11/24</span></span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sharepoint.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Ward roster</b><span>Medical ward B · draft</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Done · sent to Megan, roster pending</p><span class="cue"><span dir="ltr">Undo</span> · only with your approval</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/workday.webp" width="18" height="18" decoding="async"/> Workday<span class="ord" aria-hidden="true">3</span></div><p class="k">Overtime · November</p><ul class="lw-list"><li><p class="lw-l1"><b>Megan Ross</b><span>Within limit</span></p><p class="lw-l2">after the swap</p></li><li><p class="lw-l1"><b>Hannah Clark</b><span>Within limit</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Kate Fisher</b><span>Near limit</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Prepared by Flow</span><span class="attr-done">Added by <span dir="ltr">Flow · 9:07 AM</span></span></p></div>
+          </div>
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/sharepoint.webp" width="18" height="18" decoding="async"/> SharePoint<span class="ord" aria-hidden="true">3</span></div><p class="k">Ward roster · Medical ward B</p><p class="t">Tue <span class="num">11/24</span>  · evening</p><ul class="lw-fields"><li class="lw-f"><span class="k">Shift</span><span class="v"><span class="num">3:00 PM</span> to <span class="num">11:00 PM</span></span></li><li class="lw-f"><span class="k">Covering for</span><span class="v">Hannah Clark</span></li><li class="lw-pair"><span class="lw-f"><span class="k">Cover</span><span class="v">Megan Ross</span></span><span class="lw-f"><span class="k">Status</span><span class="v"><span class="lw-status">Pending</span></span></span></li></ul><p class="flow-attr"><span class="attr-prep">Prepared by Flow</span><span class="attr-done">Added by <span dir="ltr">Flow · 9:07 AM</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Came in from UKG</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="22" height="22" decoding="async"/></span><b>UKG</b><span class="smp">Example</span></p>
+          <p class="mail-m"><span>From</span><b>Hannah Clark · Medical ward B</b></p>
+          <p class="mail-s">Shift swap request</p>
+          <p class="mail-b">Evening, Tue <span class="num">11/24</span> · <em>Family event</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">What Flow did</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="22" height="22" decoding="async"/></span><p>Megan Ross is free, not after a night</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="22" height="22" decoding="async"/></span><p>Megan is within her overtime limit</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">What Flow suggests</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Ask Megan to confirm the swap</p><p class="card-s">UKG · not sent</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sharepoint.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Medical ward B roster</p><p class="card-s">SharePoint · until the charge nurse approves</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Only with your approval · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dots named" role="group" aria-label="Processes">
+  <button class="dot" type="button" data-i="0" aria-current="true"><span>Patient case</span></button>
+  <button class="dot" type="button" data-i="1"><span>Purchasing</span></button>
+  <button class="dot" type="button" data-i="2"><span>Shifts</span></button>
+</div>
+</section></div></section><section class="x4 x4-g o20sec x7-tools"><div class="x4-in"><div class="x7-th"><h2 class="x4-h2 rv">Flow prepares the work <span class="g">inside your hospital’s systems</span></h2><p class="x4-sub rv">Flow works alongside the systems you already have. The data stays inside the hospital.</p></div><div class="o20" data-orbit20=""><div aria-hidden="true" class="o20-plate o20-plate-out"></div><div aria-hidden="true" class="o20-plate o20-plate-in"></div><svg aria-hidden="true" class="o20-tracks"></svg><div class="o20-ring" data-ring="in" data-speed="7.5"><button aria-label="Outlook" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/outlook.webp" width="23"/><span class="o20-tip">Outlook</span></button><button aria-label="Excel" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/excel.webp" width="23"/><span class="o20-tip">Excel</span></button><button aria-label="SAP" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sap.webp" style="width:62%;height:62%" width="23"/><span class="o20-tip">SAP</span></button><button aria-label="Word" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/word.webp" width="23"/><span class="o20-tip">Word</span></button><button aria-label="Power BI" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerbi.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power BI</span></button><button aria-label="SharePoint" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sharepoint.webp" width="23"/><span class="o20-tip">SharePoint</span></button></div><div class="o20-ring" data-ring="out" data-speed="-4.8"><button aria-label="Workday" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/workday.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Workday</span></button><button aria-label="Salesforce" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/salesforce.webp" style="width:64%;height:64%" width="23"/><span class="o20-tip">Salesforce</span></button><button aria-label="UKG" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/ukg.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">UKG</span></button><button aria-label="Power Automate" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerautomate.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power Automate</span></button><button aria-label="Qlik" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qlik.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Qlik</span></button><button aria-label="ServiceNow" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/servicenow.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">ServiceNow</span></button><button aria-label="SuccessFactors" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/successfactors.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">SuccessFactors</span></button><button aria-label="QGenda" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qgenda.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">QGenda</span></button></div><div class="o20-core"><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><div class="o20-disc"><img alt="Flow" class="o20-wm" height="31" src="../assets/flow-logo-400.webp" width="70"/></div></div></div></div></section><section class="r15-tr" aria-labelledby="r15trh"><div class="r15-in"><header class="r15-th"><h2 class="r15-h2" id="r15trh">Nothing moves without your approval</h2><p class="r15-sub2">Flow works inside your hospital’s systems, and patient details never pass through a chat window. Every action waits for Do It, is logged, and can be undone.</p></header><div class="r15-fan" aria-hidden="true"><figure class="r15-col r15-c1"><div class="r15-cd r15-ap"><div class="r15-ch"><img class="r15-flw" src="../assets/flow-logo-400.webp" width="400" height="176" alt="" decoding="async"/><small>Example</small></div><p class="r15-q">Book Laura at the lung clinic on 1/6 and text her?</p><ul class="r15-st"><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Follow-up on 1/6 and SMS to Laura</b><small>Salesforce</small></span></li><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Authorization linked to the slot</b><small>Insurer authorizations</small></span></li></ul><div class="r15-cf"><span class="doit r15-di"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><small>Waiting for your approval</small></div></div><figcaption><b>Flow prepares, you approve</b><span>Every action waits for your Do It</span></figcaption></figure><figure class="r15-col r15-c2"><div class="r15-cd r15-log"><div class="r15-lh"><span><b>Activity log</b><small>Patient case · Bennett</small></span><small class="r15-smp">Example</small></div><ol class="r15-le"><li><time>8:12 AM</time><span class="r15-lg"><img src="../assets/orb/outlook.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Laura’s email read</b><small>Source: email to the lung clinic office, 8:12 AM</small></span><span class="r15-who is-f">Flow</span></li><li><time>8:12 AM</time><span class="r15-lg"><img src="../assets/orb/commit.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Authorization checked</b><small>Source: insurer authorizations</small></span><span class="r15-who is-f">Flow</span></li><li><time>8:13 AM</time><span class="r15-lg"><img src="../assets/orb/salesforce.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Follow-up booked</b><small>Source: the clinic calendar</small></span><span class="r15-who">Olivia approved</span></li><li class="r15-x"><time>8:13 AM</time><span class="r15-lg"><img src="../assets/orb/commit.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Authorization linked to the slot</b><small>Source: the booked slot</small></span><span class="r15-who">Olivia approved</span></li></ol></div><figcaption><b>Every action is logged</b><span>With the time, the source and who approved</span></figcaption></figure><figure class="r15-col r15-c3"><div class="r15-cd r15-un"><div class="r15-ch"><span class="r15-lg"><img src="../assets/orb/salesforce.webp" width="40" height="40" alt="" decoding="async"/></span><b>Follow-up</b><span class="r15-done"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg>Done</span></div><dl class="r15-row"><div><dt>Patient</dt><dd>Laura Bennett</dd></div><div><dt>Clinic</dt><dd>Lung clinic</dd></div><div><dt>When</dt><dd>1/6 · 9:40 AM</dd></div></dl><div class="r15-cf"><span class="r15-undo"><svg viewBox="0 0 24 24"><path d="M9.8 6 4.5 11.3l5.3 5.3"/><path d="M4.8 11.3h9.2a5.5 5.5 0 0 1 5.5 5.5v1.7"/></svg>Undo</span><small>Updated at 8:13 AM</small></div></div><figcaption><b>And it can be undone</b><span>A completed action is reversed with Undo</span></figcaption></figure></div></div></section><div id="lgdep" class="r15-dp"><section class="dgv-sec sx-dep" id="depsec" data-zone-scope><div class="sx-in"><h2 class="dp-h" id="dpTitle">Where Flow runs</h2><p class="dp-sub">Flow’s secure cloud, the employee’s computer, or a server on the hospital’s network. The hospital chooses, and all three are available today.</p><div class="dep dep2" role="group" aria-label="Where Flow runs"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div><section class="op-sec sx-op" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section></div><section class="r15-ct" aria-labelledby="r15cth"><div class="r15-in"><div class="r15-ctc"><h2 class="r15-h2" id="r15cth">Book a short call and get a rollout plan for your hospital</h2><ol class="r15-steps"><li><span class="r15-n">1</span><b>Intro call</b><span>We map where your team works today</span></li><li><span class="r15-n">2</span><b>You choose where Flow runs</b><span>Cloud, Edge or On-Prem</span></li><li><span class="r15-n">3</span><b>A pilot with one team</b><span>Every action waits for your approval</span></li></ol><a class="doit r15-cta" data-book="" data-ga="sol_hospitals_waitlist" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Book a call</span></a></div></div></section></main>
+<template id="r15-de"><section class="r15-hero" aria-labelledby="r15h1"><div class="r15-in"><h1 class="r15-h1" id="r15h1"><b>Alles rund um die Versorgung ist vorbereitet,</b> <span class="fx-gw">Sie geben nur frei</span></h1><p class="r15-sub">Flow arbeitet neben den Systemen, die Sie bereits haben</p><a class="doit r15-cta" data-book="" data-ga="sol_hospitals_hero" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Gespräch vereinbaren</span></a></div><div id="r14s" class="r15-stage"><script>(function(w){var q=new URLSearchParams(location.search),f=q.get("f"),v=q.get("v"),ai=q.get("ai"),rm=matchMedia("(prefers-reduced-motion: reduce)").matches;w.dataset.f=f||(rm?"3":"0");if(v)w.dataset.v=v;w.dataset.ai=ai==="2"?"2":"1";if(rm)w.classList.add("rm");if(q.get("state")==="done")w.dataset.state="done"})(document.getElementById("r14s"))</script><section class="r14" id="r14" aria-roledescription="carousel">
+<div class="track">
+<div class="slide is-active" data-m="1" aria-label="Patientenfall">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Patientenfall · Beispiel</p>
+        <h2 class="h1">CT-Befund, Kontrolle nötig</h2>
+      </div>
+      <p class="lead">Flow prüfte die Zusage, Termin und SMS stehen</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> hat die Kostenübernahme geprüft und einen Termin gefunden, Sie geben mit einem Klick frei</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">2</span></div><p class="k">Patientenservice</p><p class="t">Sabine Wolf</p><ul class="lw-fields"><li class="lw-f"><span class="k">Anfrage</span><span class="v">Kontrolle · Pneumologie</span></li><li class="lw-f"><span class="k">Kostenübernahme</span><span class="v">Kasse · gültig bis <span class="num">28.02.2027</span></span></li><li class="lw-pair"><span class="lw-f"><span class="k">Dokument</span><span class="v">CT-Befund Thorax</span></span><span class="lw-f"><span class="k">Eingegangen</span><span class="v"><span class="num">17.11.</span></span></span></li></ul></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-mail"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">1</span></div><h3>CT-Befund und Terminwunsch</h3><p class="from"><b>Sabine Wolf</b><span class="num"><span class="num">17.11.2026 08:12</span></span></p><p class="meta">An das Sekretariat Pneumologie</p><div class="att"><span class="fi pdf" aria-hidden="true">PDF</span><b>CT-Befund Thorax · Radiologie</b><small dir="ltr">184 KB</small></div><blockquote class="ol-quote">Guten Tag, anbei der CT-Befund einer privaten Praxis. Meine Ärztin bat um einen Kontrolltermin.</blockquote></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Sabine Wolf</b><span class="num">08:12</span></p>
+              <h3 class="ph-mail-subj">CT-Befund und Terminwunsch</h3>
+              <p class="ph-mail-meta">An Sekretariat Pneumologie · PDF</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> hat geprüft<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Kostenübernahme geprüft</b><span>Kasse · gültig bis <span class="num">28.2.</span></span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Termin gefunden</b><span>Pneumologie · <span class="num">6.1.</span>, <span class="num">09:40</span></span></div></li></ol>
+          <p class="fl-src">Geprüft mit: E-Mail · Kostenübernahme · Kalender</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> schlägt 2 Schritte vor</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Termin und SMS an Frau Wolf</b><span><span class="num">6.1.</span> · <span class="num">09:40</span></span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Zusage für den Termin</b><span>Kostenübernahmen · Entwurf</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Erledigt · Termin steht, Zusage verknüpft</p><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">3</span></div><p class="k">Kalender Pneumologie · Januar</p><ul class="lw-list"><li><p class="lw-l1"><b>Mi. <span class="num">6.1.</span></b><span><span class="num">09:40</span></span></p><p class="lw-l2">Kontrolle · frei</p><span class="lw-status">Vorgeschlagen</span></li><li><p class="lw-l1"><b>Do. <span class="num">7.1.</span></b><span><span class="num">11:20</span></span></p><p class="lw-l2">Kontrolle · frei</p></li><li><p class="lw-l1"><b>Mo. <span class="num">11.1.</span></b><span><span class="num">08:30</span></span></p><p class="lw-l2">Kontrolle · frei</p></li></ul><p class="flow-attr"><span class="attr-prep">Vorbereitet von Flow</span><span class="attr-done">Hinzugefügt von <span dir="ltr">Flow · 08:13</span></span></p></div>
+          </div>
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/commit.webp" width="18" height="18" decoding="async"/> Kostenübernahmen<span class="ord" aria-hidden="true">3</span></div><p class="k">Kostenübernahme</p><p class="t">Sabine Wolf</p><ul class="lw-fields"><li class="lw-f"><span class="k">Leistung</span><span class="v">Kontrolle · Pneumologie</span></li><li class="lw-f"><span class="k">Termin</span><span class="v"><span class="num">6.1.</span> · <span class="num">09:40</span></span></li><li class="lw-pair"><span class="lw-f"><span class="k">Status</span><span class="v"><span class="lw-status">Entwurf</span></span></span><span class="lw-f"><span class="k">Gültig bis</span><span class="v"><span class="num">28.2.</span></span></span></li></ul><p class="flow-attr"><span class="attr-prep">Vorbereitet von Flow</span><span class="attr-done">Hinzugefügt von <span dir="ltr">Flow · 08:13</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Eingegangen in Outlook</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><b>Outlook</b><span class="smp">Beispiel</span></p>
+          <p class="mail-m"><span>An</span><b>Sekretariat Pneumologie</b></p>
+          <p class="mail-s">CT-Befund, Terminwunsch · Wolf <span class="att-i">PDF</span></p>
+          <p class="mail-b">Befund einer privaten Radiologie im Anhang · <em>Kontrolltermin</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Was Flow getan hat</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="22" height="22" decoding="async"/></span><p>Kostenübernahme gültig bis <span class="num">28.2.</span></p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><p>Pneumologie frei am <span class="num">6.1.</span>, <span class="num">09:40</span></p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Was Flow vorschlägt</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Termin am <span class="num">6.1.</span>  und SMS an Frau Wolf</p><p class="card-s">Salesforce · SMS nicht gesendet</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Zusage mit Termin verknüpft</p><p class="card-s">Kostenübernahmen · Entwurf</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Nur mit Ihrer Freigabe · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="2" aria-label="Einkauf">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Einkauf Verbrauchsmaterial · Beispiel</p>
+        <h2 class="h1">Nitrilhandschuhe werden knapp</h2>
+      </div>
+      <p class="lead">Flow prüfte Verbrauch und Lieferant, die Bestellanforderung steht</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> hat Verbrauch und Vertragslieferanten geprüft, Sie geben mit einem Klick frei</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/powerbi.webp" width="18" height="18" decoding="async"/> Power BI<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Verbrauch · Zentrallager</p><table class="tb"><thead><tr><th>Artikel</th><th>Pro Tag</th><th>Bestand</th></tr></thead><tbody><tr class="on"><td>Nitrilhandschuhe M</td><td><span class="num">6</span></td><td><span class="num">18</span></td></tr><tr><td>Einmalkittel</td><td><span class="num">4</span></td><td><span class="num">60</span></td></tr><tr><td>OP-Masken</td><td><span class="num">9</span></td><td><span class="num">140</span></td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">1</span></div><p class="k">Bestandsalarme · Zentrallager</p><ul class="lw-list"><li><p class="lw-l1"><b>Nitrilhandschuhe M</b><span><span class="num">18</span> Kartons</span></p><p class="lw-l2">Unter Minimum · <span class="num">18.11.2026 07:40</span></p><span class="lw-status">Neu</span></li><li><p class="lw-l1"><b>Einmalkittel</b><span><span class="num">60</span> Kartons</span></p><p class="lw-l2">Reicht zwei Wochen</p></li><li><p class="lw-l1"><b>OP-Masken</b><span><span class="num">140</span> Kartons</span></p><p class="lw-l2">Reicht zwei Wochen</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · Zentrallager</b><span class="num">07:40</span></p>
+              <h3 class="ph-mail-subj">Nitrilhandschuhe unter Mindestbestand</h3>
+              <p class="ph-mail-meta">Größe M · <span class="num">18</span> Kartons</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> hat geprüft<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/powerbi.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Verbrauch geprüft</b><span><span class="num">6</span> Kartons pro Tag</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Vertragslieferant gefunden</b><span>Lieferung in <span class="num">3</span> Werktagen</span></div></li></ol>
+          <p class="fl-src">Geprüft mit: Bestand · Verbrauch · Rahmenvertrag</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> schlägt 2 Schritte vor</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Bestellanforderung</b><span><span class="num">120</span> Kartons · Vertragspreis</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/supplier.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Lieferantenbestellung</b><span>Lieferantenportal · nach Freigabe</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Erledigt · Anforderung wartet auf Freigabe</p><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><p class="k">Freizugebende Anforderungen</p><ul class="lw-list"><li><p class="lw-l1"><b>Nitrilhandschuhe M</b><span><span class="num">120</span> Kartons</span></p><p class="lw-l2">Vertragslieferant · <span class="num">3</span> Werktagen</p><span class="lw-status">Freigabe offen</span></li><li><p class="lw-l1"><b>Einmalkittel</b><span><span class="num">80</span> Kartons</span></p><p class="lw-l2">Vertragslieferant</p><span class="lw-status">Freigegeben</span></li></ul><p class="flow-attr"><span class="attr-prep">Vorbereitet von Flow</span><span class="attr-done">Hinzugefügt von <span dir="ltr">Flow · 07:46</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/lg/supplier.webp" width="18" height="18" decoding="async"/> Lieferantenportal<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Lieferantenbestellung</p><p class="pdf-s">Vertragslieferant · <span class="num">18.11.2026</span></p><dl class="pdf-f"><div><dt>Artikel</dt><dd>Nitrilhandschuhe, Größe M</dd></div><div><dt>Menge</dt><dd><mark><span class="num">120</span> Kartons</mark></dd></div><div><dt>Versand</dt><dd>Nach Freigabe der Anforderung</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Kam aus SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Beispiel</span></p>
+          <p class="mail-m"><span>Hinweis</span><b>Zentrallager</b></p>
+          <p class="mail-s">Handschuhe M · unter Minimum</p>
+          <p class="mail-b">Noch <span class="num">18</span> Kartons · <em>drei Tage</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Was Flow getan hat</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/powerbi.webp" width="22" height="22" decoding="async"/></span><p>Ø-Verbrauch: <span class="num">6</span> Kartons pro Tag</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Vertragslieferant: Lieferung in <span class="num">3</span> Tagen</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Was Flow vorschlägt</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Anforderung über <span class="num">120</span> Kartons</p><p class="card-s">SAP · Freigabe Logistikleitung</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/supplier.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Bestellung im Lieferantenportal</p><p class="card-s">Lieferantenportal · nach Freigabe</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Nur mit Ihrer Freigabe · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="3" aria-label="Dienstplan">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Dienstplan · Beispiel</p>
+        <h2 class="h1">Bitte um Tausch im Spätdienst</h2>
+      </div>
+      <p class="lead">Flow fand eine Vertretung, der Tausch wartet auf Freigabe</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> hat Dienstplan und Überstundenrahmen geprüft, die Stationsleitung gibt mit einem Klick frei</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/atoss.webp" width="18" height="18" decoding="async"/> ATOSS<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Innere B · Woche ab <span class="num">23.11.</span></p><table class="tb"><thead><tr><th>Name</th><th>Di. <span class="num">24.11.</span></th><th>Mo. <span class="num">23.11.</span></th></tr></thead><tbody><tr><td>Julia Braun</td><td>Spätdienst</td><td>Frühdienst</td></tr><tr class="on"><td>Katrin Vogel</td><td>Frei</td><td>Frühdienst</td></tr><tr><td>Miriam Roth</td><td>Spätdienst</td><td>Nacht</td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/atoss.webp" width="18" height="18" decoding="async"/> ATOSS<span class="ord" aria-hidden="true">1</span></div><p class="k">Tauschanfragen · Innere B</p><ul class="lw-list"><li><p class="lw-l1"><b>Julia Braun</b><span>Spät · Di. <span class="num">24.11.</span></span></p><p class="lw-l2">Familienfeier · <span class="num">12.11.2026 09:05</span></p><span class="lw-status">Neu</span></li><li><p class="lw-l1"><b>Miriam Roth</b><span>Früh · Do. <span class="num">26.11.</span></span></p><p class="lw-l2">Getauscht mit Katrin</p><span class="lw-status">Freigegeben</span></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Julia Braun</b><span class="num">09:05</span></p>
+              <h3 class="ph-mail-subj">Diensttausch angefragt</h3>
+              <p class="ph-mail-meta">Spätdienst · Di.  <span class="num">24.11.</span></p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> hat geprüft<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/atoss.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Dienstplan geprüft</b><span>Katrin frei, nicht nach Nacht</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Überstunden geprüft</b><span>Im Monatsrahmen</span></div></li></ol>
+          <p class="fl-src">Geprüft mit: Anfrage · Dienstplan · Überstunden</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> schlägt 2 Schritte vor</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/atoss.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Anfrage an Katrin</b><span>Spätdienst · Di.  <span class="num">24.11.</span></span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sharepoint.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Stationsplan</b><span>Innere B · Entwurf</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Erledigt · an Katrin, Plan wartet</p><span class="cue"><span dir="ltr">Undo</span> · nur mit Ihrer Freigabe</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/workday.webp" width="18" height="18" decoding="async"/> Workday<span class="ord" aria-hidden="true">3</span></div><p class="k">Überstunden · November</p><ul class="lw-list"><li><p class="lw-l1"><b>Katrin Vogel</b><span>Im Rahmen</span></p><p class="lw-l2">nach dem Tausch</p></li><li><p class="lw-l1"><b>Julia Braun</b><span>Im Rahmen</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Miriam Roth</b><span>Nahe am Rahmen</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Vorbereitet von Flow</span><span class="attr-done">Hinzugefügt von <span dir="ltr">Flow · 09:07</span></span></p></div>
+          </div>
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/sharepoint.webp" width="18" height="18" decoding="async"/> SharePoint<span class="ord" aria-hidden="true">3</span></div><p class="k">Stationsplan · Innere B</p><p class="t">Di. <span class="num">24.11.</span>  · Spätdienst</p><ul class="lw-fields"><li class="lw-f"><span class="k">Dienst</span><span class="v"><span class="num">15:00</span> bis <span class="num">23:00</span></span></li><li class="lw-f"><span class="k">Statt</span><span class="v">Julia Braun</span></li><li class="lw-pair"><span class="lw-f"><span class="k">Vertretung</span><span class="v">Katrin Vogel</span></span><span class="lw-f"><span class="k">Status</span><span class="v"><span class="lw-status">Ausstehend</span></span></span></li></ul><p class="flow-attr"><span class="attr-prep">Vorbereitet von Flow</span><span class="attr-done">Hinzugefügt von <span dir="ltr">Flow · 09:07</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Kam aus ATOSS</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/orb/atoss.webp" width="22" height="22" decoding="async"/></span><b>ATOSS</b><span class="smp">Beispiel</span></p>
+          <p class="mail-m"><span>Von</span><b>Julia Braun · Innere B</b></p>
+          <p class="mail-s">Diensttausch angefragt</p>
+          <p class="mail-b">Spätdienst, Di. <span class="num">24.11.</span> · <em>Familienfeier</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Was Flow getan hat</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/atoss.webp" width="22" height="22" decoding="async"/></span><p>Katrin Vogel ist frei, nicht nach Nachtdienst</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="22" height="22" decoding="async"/></span><p>Katrin ist im Überstundenrahmen</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Was Flow vorschlägt</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/atoss.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Katrin um Zusage bitten</p><p class="card-s">ATOSS · nicht gesendet</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sharepoint.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Dienstplan Innere B</p><p class="card-s">SharePoint · bis die Stationsleitung freigibt</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Nur mit Ihrer Freigabe · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dots named" role="group" aria-label="Abläufe">
+  <button class="dot" type="button" data-i="0" aria-current="true"><span>Patientenfall</span></button>
+  <button class="dot" type="button" data-i="1"><span>Einkauf</span></button>
+  <button class="dot" type="button" data-i="2"><span>Dienstplan</span></button>
+</div>
+</section></div></section><section class="x4 x4-g o20sec x7-tools"><div class="x4-in"><div class="x7-th"><h2 class="x4-h2 rv">Flow bereitet die Arbeit vor <span class="g">in den Systemen Ihres Krankenhauses</span></h2><p class="x4-sub rv">Flow arbeitet neben den Systemen, die Sie bereits haben. Die Daten bleiben im Krankenhaus.</p></div><div class="o20" data-orbit20=""><div aria-hidden="true" class="o20-plate o20-plate-out"></div><div aria-hidden="true" class="o20-plate o20-plate-in"></div><svg aria-hidden="true" class="o20-tracks"></svg><div class="o20-ring" data-ring="in" data-speed="7.5"><button aria-label="Outlook" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/outlook.webp" width="23"/><span class="o20-tip">Outlook</span></button><button aria-label="Excel" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/excel.webp" width="23"/><span class="o20-tip">Excel</span></button><button aria-label="SAP" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sap.webp" style="width:62%;height:62%" width="23"/><span class="o20-tip">SAP</span></button><button aria-label="Word" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/word.webp" width="23"/><span class="o20-tip">Word</span></button><button aria-label="Power BI" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerbi.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power BI</span></button><button aria-label="SharePoint" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sharepoint.webp" width="23"/><span class="o20-tip">SharePoint</span></button></div><div class="o20-ring" data-ring="out" data-speed="-4.8"><button aria-label="Workday" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/workday.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Workday</span></button><button aria-label="Salesforce" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/salesforce.webp" style="width:64%;height:64%" width="23"/><span class="o20-tip">Salesforce</span></button><button aria-label="UKG" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/ukg.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">UKG</span></button><button aria-label="Power Automate" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerautomate.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power Automate</span></button><button aria-label="Qlik" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qlik.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Qlik</span></button><button aria-label="ServiceNow" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/servicenow.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">ServiceNow</span></button><button aria-label="SuccessFactors" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/successfactors.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">SuccessFactors</span></button><button aria-label="ATOSS" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/atoss.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">ATOSS</span></button></div><div class="o20-core"><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><div class="o20-disc"><img alt="Flow" class="o20-wm" height="31" src="../assets/flow-logo-400.webp" width="70"/></div></div></div></div></section><section class="r15-tr" aria-labelledby="r15trh"><div class="r15-in"><header class="r15-th"><h2 class="r15-h2" id="r15trh">Nichts passiert ohne Ihre Freigabe</h2><p class="r15-sub2">Flow arbeitet in den Systemen Ihres Krankenhauses, und Patientendaten laufen nie durch ein Chatfenster. Jede Aktion wartet auf Do It, wird protokolliert und lässt sich rückgängig machen.</p></header><div class="r15-fan" aria-hidden="true"><figure class="r15-col r15-c1"><div class="r15-cd r15-ap"><div class="r15-ch"><img class="r15-flw" src="../assets/flow-logo-400.webp" width="400" height="176" alt="" decoding="async"/><small>Beispiel</small></div><p class="r15-q">Frau Wolf am 6.1. in der Pneumologie einplanen und per SMS informieren?</p><ul class="r15-st"><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Kontrolle am 6.1. und SMS an Frau Wolf</b><small>Salesforce</small></span></li><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Zusage mit Termin verknüpft</b><small>Kostenübernahmen</small></span></li></ul><div class="r15-cf"><span class="doit r15-di"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><small>Wartet auf Ihre Freigabe</small></div></div><figcaption><b>Flow bereitet vor, Sie geben frei</b><span>Jeder Schritt wartet auf Ihr Do It</span></figcaption></figure><figure class="r15-col r15-c2"><div class="r15-cd r15-log"><div class="r15-lh"><span><b>Protokoll</b><small>Patientenfall · Wolf</small></span><small class="r15-smp">Beispiel</small></div><ol class="r15-le"><li><time>08:12</time><span class="r15-lg"><img src="../assets/orb/outlook.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>E-Mail von Frau Wolf gelesen</b><small>Quelle: E-Mail ans Sekretariat Pneumologie, 08:12</small></span><span class="r15-who is-f">Flow</span></li><li><time>08:12</time><span class="r15-lg"><img src="../assets/orb/commit.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Kostenübernahme geprüft</b><small>Quelle: Kostenübernahmen</small></span><span class="r15-who is-f">Flow</span></li><li><time>08:13</time><span class="r15-lg"><img src="../assets/orb/salesforce.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Kontrolltermin gebucht</b><small>Quelle: Ambulanzkalender</small></span><span class="r15-who">Anja hat freigegeben</span></li><li class="r15-x"><time>08:13</time><span class="r15-lg"><img src="../assets/orb/commit.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Zusage mit Termin verknüpft</b><small>Quelle: gebuchter Termin</small></span><span class="r15-who">Anja hat freigegeben</span></li></ol></div><figcaption><b>Jeder Schritt wird protokolliert</b><span>Mit Uhrzeit, Quelle und Freigabe</span></figcaption></figure><figure class="r15-col r15-c3"><div class="r15-cd r15-un"><div class="r15-ch"><span class="r15-lg"><img src="../assets/orb/salesforce.webp" width="40" height="40" alt="" decoding="async"/></span><b>Kontrolltermin</b><span class="r15-done"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg>Erledigt</span></div><dl class="r15-row"><div><dt>Patientin</dt><dd>Sabine Wolf</dd></div><div><dt>Ambulanz</dt><dd>Pneumologie</dd></div><div><dt>Termin</dt><dd>6.1. · 09:40</dd></div></dl><div class="r15-cf"><span class="r15-undo"><svg viewBox="0 0 24 24"><path d="M9.8 6 4.5 11.3l5.3 5.3"/><path d="M4.8 11.3h9.2a5.5 5.5 0 0 1 5.5 5.5v1.7"/></svg>Undo</span><small>Aktualisiert um 08:13</small></div></div><figcaption><b>Und rückgängig machbar</b><span>Ein erledigter Schritt wird mit Undo zurückgenommen</span></figcaption></figure></div></div></section><div id="lgdep" class="r15-dp"><section class="dgv-sec sx-dep" id="depsec" data-zone-scope><div class="sx-in"><h2 class="dp-h" id="dpTitle">Wo Flow läuft</h2><p class="dp-sub">Die sichere Flow-Cloud, der Rechner der Mitarbeitenden oder ein Server im Netz des Krankenhauses. Das Krankenhaus entscheidet, alle drei Optionen sind heute verfügbar.</p><div class="dep dep2" role="group" aria-label="Wo Flow läuft"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div><section class="op-sec sx-op" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section></div><section class="r15-ct" aria-labelledby="r15cth"><div class="r15-in"><div class="r15-ctc"><h2 class="r15-h2" id="r15cth">Vereinbaren Sie ein kurzes Gespräch und erhalten Sie einen Einführungsplan für Ihr Krankenhaus</h2><ol class="r15-steps"><li><span class="r15-n">1</span><b>Erstgespräch</b><span>Wir erfassen, wo Ihr Team heute arbeitet</span></li><li><span class="r15-n">2</span><b>Sie wählen, wo Flow läuft</b><span>Cloud, Edge oder On-Prem</span></li><li><span class="r15-n">3</span><b>Pilot mit einem Team</b><span>Jeder Schritt wartet auf Ihre Freigabe</span></li></ol><a class="doit r15-cta" data-book="" data-ga="sol_hospitals_waitlist" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Gespräch vereinbaren</span></a></div></div></section></template>
+<template id="r15-fr"><section class="r15-hero" aria-labelledby="r15h1"><div class="r15-in"><h1 class="r15-h1" id="r15h1"><b>Tout ce qui entoure les soins est prêt,</b> <span class="fx-gw">vous n’avez qu’à valider</span></h1><p class="r15-sub">Flow travaille aux côtés des systèmes que vous avez déjà</p><a class="doit r15-cta" data-book="" data-ga="sol_hospitals_hero" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Réserver un appel</span></a></div><div id="r14s" class="r15-stage"><script>(function(w){var q=new URLSearchParams(location.search),f=q.get("f"),v=q.get("v"),ai=q.get("ai"),rm=matchMedia("(prefers-reduced-motion: reduce)").matches;w.dataset.f=f||(rm?"3":"0");if(v)w.dataset.v=v;w.dataset.ai=ai==="2"?"2":"1";if(rm)w.classList.add("rm");if(q.get("state")==="done")w.dataset.state="done"})(document.getElementById("r14s"))</script><section class="r14" id="r14" aria-roledescription="carousel">
+<div class="track">
+<div class="slide is-active" data-m="1" aria-label="Dossier patient">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Dossier patient · Exemple</p>
+        <h2 class="h1">Scanner reçu, suivi à prévoir</h2>
+      </div>
+      <p class="lead">Flow a vérifié la prise en charge et préparé RDV et SMS</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> a vérifié la prise en charge et trouvé un créneau, et vous validez en un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">2</span></div><p class="k">Service patients</p><p class="t">Camille Martin</p><ul class="lw-fields"><li class="lw-f"><span class="k">Demande</span><span class="v">Suivi · pneumologie</span></li><li class="lw-f"><span class="k">Prise en charge</span><span class="v">Mutuelle · valable jusqu’au <span class="num">28/02/2027</span></span></li><li class="lw-pair"><span class="lw-f"><span class="k">Document</span><span class="v">Scanner thoracique</span></span><span class="lw-f"><span class="k">Reçu</span><span class="v"><span class="num">17/11</span></span></span></li></ul></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-mail"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">1</span></div><h3>Scanner thoracique et demande de RDV</h3><p class="from"><b>Camille Martin</b><span class="num"><span class="num">17/11/2026 08:12</span></span></p><p class="meta">Au secrétariat de pneumologie</p><div class="att"><span class="fi pdf" aria-hidden="true">PDF</span><b>Scanner thoracique · centre d’imagerie</b><small dir="ltr">184 KB</small></div><blockquote class="ol-quote">Bonjour, ci-joint le compte rendu du scanner fait en privé. Mon médecin a demandé un RDV de suivi.</blockquote></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Camille Martin</b><span class="num">08:12</span></p>
+              <h3 class="ph-mail-subj">Scanner thoracique et demande de RDV</h3>
+              <p class="ph-mail-meta">Au secrétariat de pneumologie · PDF</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> a vérifié<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Prise en charge vérifiée</b><span>Mutuelle · valable jusqu’au <span class="num">28/02</span></span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>A trouvé un créneau</b><span>Pneumologie · <span class="num">06/01</span>, <span class="num">09:40</span></span></div></li></ol>
+          <p class="fl-src">Vérifié avec : e-mail · prise en charge · agenda</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propose 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>RDV et SMS à Camille</b><span><span class="num">06/01</span> · <span class="num">09:40</span></span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Prise en charge du RDV</b><span>Prises en charge · brouillon</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Fait · RDV pris, prise en charge liée</p><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">3</span></div><p class="k">Agenda pneumologie · janvier</p><ul class="lw-list"><li><p class="lw-l1"><b>mer. <span class="num">06/01</span></b><span><span class="num">09:40</span></span></p><p class="lw-l2">Suivi · libre</p><span class="lw-status">Proposé</span></li><li><p class="lw-l1"><b>jeu. <span class="num">07/01</span></b><span><span class="num">11:20</span></span></p><p class="lw-l2">Suivi · libre</p></li><li><p class="lw-l1"><b>lun. <span class="num">11/01</span></b><span><span class="num">08:30</span></span></p><p class="lw-l2">Suivi · libre</p></li></ul><p class="flow-attr"><span class="attr-prep">Préparé par Flow</span><span class="attr-done">Ajouté par <span dir="ltr">Flow · 08:13</span></span></p></div>
+          </div>
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/commit.webp" width="18" height="18" decoding="async"/> Prises en charge<span class="ord" aria-hidden="true">3</span></div><p class="k">Prise en charge</p><p class="t">Camille Martin</p><ul class="lw-fields"><li class="lw-f"><span class="k">Prestation</span><span class="v">Suivi · pneumologie</span></li><li class="lw-f"><span class="k">Créneau</span><span class="v"><span class="num">06/01</span> · <span class="num">09:40</span></span></li><li class="lw-pair"><span class="lw-f"><span class="k">Statut</span><span class="v"><span class="lw-status">Brouillon</span></span></span><span class="lw-f"><span class="k">Valable jusqu’au</span><span class="v"><span class="num">28/02</span></span></span></li></ul><p class="flow-attr"><span class="attr-prep">Préparé par Flow</span><span class="attr-done">Ajouté par <span dir="ltr">Flow · 08:13</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Reçu dans Outlook</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><b>Outlook</b><span class="smp">Exemple</span></p>
+          <p class="mail-m"><span>À</span><b>Secrétariat de pneumologie</b></p>
+          <p class="mail-s">Scanner, demande de RDV · Martin <span class="att-i">PDF</span></p>
+          <p class="mail-b">Compte rendu d’un centre privé joint · <em>demande un RDV de suivi</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Ce que Flow a fait</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="22" height="22" decoding="async"/></span><p>Prise en charge valable jusqu’au <span class="num">28/02</span></p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><p>Créneau libre en pneumologie le <span class="num">06/01</span>, <span class="num">09:40</span></p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Ce que Flow propose</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Créneau le <span class="num">06/01</span>  et SMS à Camille</p><p class="card-s">Salesforce · SMS non envoyé</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Prise en charge liée au RDV</p><p class="card-s">Prises en charge · brouillon</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Uniquement avec votre accord · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="2" aria-label="Achats">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Achat de consommables · Exemple</p>
+        <h2 class="h1">Gants nitrile en stock bas</h2>
+      </div>
+      <p class="lead">Flow a vérifié conso et fournisseur et préparé la demande</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> a vérifié la conso et le fournisseur du marché, et vous validez en un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/powerbi.webp" width="18" height="18" decoding="async"/> Power BI<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Conso · magasin central</p><table class="tb"><thead><tr><th>Article</th><th>Par jour</th><th>En stock</th></tr></thead><tbody><tr class="on"><td>Gants nitrile M</td><td><span class="num">6</span></td><td><span class="num">18</span></td></tr><tr><td>Blouses jetables</td><td><span class="num">4</span></td><td><span class="num">60</span></td></tr><tr><td>Masques chirurgicaux</td><td><span class="num">9</span></td><td><span class="num">140</span></td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">1</span></div><p class="k">Alertes stock · magasin central</p><ul class="lw-list"><li><p class="lw-l1"><b>Gants nitrile M</b><span><span class="num">18</span> cartons</span></p><p class="lw-l2">Sous le seuil · <span class="num">18/11/2026 07:40</span></p><span class="lw-status">Nouveau</span></li><li><p class="lw-l1"><b>Blouses jetables</b><span><span class="num">60</span> cartons</span></p><p class="lw-l2">Assez pour deux semaines</p></li><li><p class="lw-l1"><b>Masques chirurgicaux</b><span><span class="num">140</span> cartons</span></p><p class="lw-l2">Assez pour deux semaines</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · magasin central</b><span class="num">07:40</span></p>
+              <h3 class="ph-mail-subj">Gants nitrile sous le seuil</h3>
+              <p class="ph-mail-meta">Taille M · <span class="num">18</span> cartons</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> a vérifié<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/powerbi.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Conso vérifiée</b><span><span class="num">6</span> cartons par jour</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>A trouvé le fournisseur du marché</b><span>Livraison sous <span class="num">3</span> jours ouvrés</span></div></li></ol>
+          <p class="fl-src">Vérifié avec : stock · conso · accord-cadre</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propose 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Demande d’achat</b><span><span class="num">120</span> cartons · prix du marché</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/supplier.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Commande fournisseur</b><span>Portail fournisseurs · après libération</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Fait · la demande attend sa libération</p><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><p class="k">Demandes à libérer</p><ul class="lw-list"><li><p class="lw-l1"><b>Gants nitrile M</b><span><span class="num">120</span> cartons</span></p><p class="lw-l2">Fournisseur du marché · <span class="num">3</span> jours ouvrés</p><span class="lw-status">En attente</span></li><li><p class="lw-l1"><b>Blouses jetables</b><span><span class="num">80</span> cartons</span></p><p class="lw-l2">Fournisseur du marché</p><span class="lw-status">Libérée</span></li></ul><p class="flow-attr"><span class="attr-prep">Préparé par Flow</span><span class="attr-done">Ajouté par <span dir="ltr">Flow · 07:46</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/lg/supplier.webp" width="18" height="18" decoding="async"/> Portail fournisseurs<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Commande fournisseur</p><p class="pdf-s">Fournisseur du marché · <span class="num">18/11/2026</span></p><dl class="pdf-f"><div><dt>Article</dt><dd>Gants nitrile, taille M</dd></div><div><dt>Quantité</dt><dd><mark><span class="num">120</span> cartons</mark></dd></div><div><dt>Envoi</dt><dd>Après libération de la demande</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Arrivé de SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Exemple</span></p>
+          <p class="mail-m"><span>Alerte</span><b>Magasin central</b></p>
+          <p class="mail-s">Gants nitrile M · sous le seuil</p>
+          <p class="mail-b">Reste <span class="num">18</span> cartons · <em>trois jours</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Ce que Flow a fait</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/powerbi.webp" width="22" height="22" decoding="async"/></span><p>Conso moyenne : <span class="num">6</span> cartons par jour</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Fournisseur du marché : livraison sous <span class="num">3</span> jours</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Ce que Flow propose</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Demande d’achat de <span class="num">120</span> cartons</p><p class="card-s">SAP · à libérer par la logistique</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/supplier.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Commande sur le portail fournisseurs</p><p class="card-s">Portail fournisseurs · après libération</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Uniquement avec votre accord · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="3" aria-label="Plannings">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Planning · Exemple</p>
+        <h2 class="h1">Une demande d’échange du poste du soir</h2>
+      </div>
+      <p class="lead">Flow a trouvé une remplaçante et préparé l’échange</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> a vérifié le planning et le quota d’heures sup, et la cadre valide en un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/lg/ukg.webp" width="18" height="18" decoding="async"/> UKG<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Médecine B · semaine du <span class="num">23 nov.</span></p><table class="tb"><thead><tr><th>Nom</th><th>mar. <span class="num">24/11</span></th><th>lun. <span class="num">23/11</span></th></tr></thead><tbody><tr><td>Léa Girard</td><td>Soir</td><td>Matin</td></tr><tr class="on"><td>Sophie Lambert</td><td>Libre</td><td>Matin</td></tr><tr><td>Nathalie Faure</td><td>Soir</td><td>Nuit</td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/ukg.webp" width="18" height="18" decoding="async"/> UKG<span class="ord" aria-hidden="true">1</span></div><p class="k">Demandes d’échange · Médecine B</p><ul class="lw-list"><li><p class="lw-l1"><b>Léa Girard</b><span>Soir · mar. <span class="num">24/11</span></span></p><p class="lw-l2">Événement familial · <span class="num">12/11/2026 09:05</span></p><span class="lw-status">Nouveau</span></li><li><p class="lw-l1"><b>Nathalie Faure</b><span>Matin · jeu. <span class="num">26/11</span></span></p><p class="lw-l2">Échangé avec Sophie</p><span class="lw-status">Validé</span></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Léa Girard</b><span class="num">09:05</span></p>
+              <h3 class="ph-mail-subj">Demande d’échange de poste</h3>
+              <p class="ph-mail-meta">Soir · mar.  <span class="num">24/11</span></p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> a vérifié<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Planning vérifié</b><span>Sophie libre, pas après une nuit</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Heures sup vérifiées</b><span>Dans le quota mensuel</span></div></li></ol>
+          <p class="fl-src">Vérifié avec : la demande · le planning · les heures sup</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propose 2 actions</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Demande à Sophie</b><span>Soir · mar.  <span class="num">24/11</span></span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sharepoint.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Planning du service</b><span>Médecine B · brouillon</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Fait · envoyé à Sophie, planning en attente</p><span class="cue"><span dir="ltr">Undo</span> · uniquement avec votre accord</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/workday.webp" width="18" height="18" decoding="async"/> Workday<span class="ord" aria-hidden="true">3</span></div><p class="k">Heures sup · novembre</p><ul class="lw-list"><li><p class="lw-l1"><b>Sophie Lambert</b><span>Dans le quota</span></p><p class="lw-l2">après l’échange</p></li><li><p class="lw-l1"><b>Léa Girard</b><span>Dans le quota</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Nathalie Faure</b><span>Proche du quota</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Préparé par Flow</span><span class="attr-done">Ajouté par <span dir="ltr">Flow · 09:07</span></span></p></div>
+          </div>
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/sharepoint.webp" width="18" height="18" decoding="async"/> SharePoint<span class="ord" aria-hidden="true">3</span></div><p class="k">Planning · Médecine B</p><p class="t">mar. <span class="num">24/11</span>  · soir</p><ul class="lw-fields"><li class="lw-f"><span class="k">Poste</span><span class="v"><span class="num">15:00</span> à <span class="num">23:00</span></span></li><li class="lw-f"><span class="k">À la place de</span><span class="v">Léa Girard</span></li><li class="lw-pair"><span class="lw-f"><span class="k">Remplaçante</span><span class="v">Sophie Lambert</span></span><span class="lw-f"><span class="k">Statut</span><span class="v"><span class="lw-status">En attente</span></span></span></li></ul><p class="flow-attr"><span class="attr-prep">Préparé par Flow</span><span class="attr-done">Ajouté par <span dir="ltr">Flow · 09:07</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Arrivé de UKG</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="22" height="22" decoding="async"/></span><b>UKG</b><span class="smp">Exemple</span></p>
+          <p class="mail-m"><span>De</span><b>Léa Girard · Médecine B</b></p>
+          <p class="mail-s">Demande d’échange de poste</p>
+          <p class="mail-b">Soir, mar. <span class="num">24/11</span> · <em>Événement familial</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Ce que Flow a fait</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="22" height="22" decoding="async"/></span><p>Sophie Lambert est libre, pas après une nuit</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="22" height="22" decoding="async"/></span><p>Sophie reste dans son quota d’heures sup</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Ce que Flow propose</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Demander à Sophie de confirmer</p><p class="card-s">UKG · non envoyé</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sharepoint.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Planning de Médecine B</p><p class="card-s">SharePoint · en attente de la cadre</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Uniquement avec votre accord · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dots named" role="group" aria-label="Processus">
+  <button class="dot" type="button" data-i="0" aria-current="true"><span>Dossier patient</span></button>
+  <button class="dot" type="button" data-i="1"><span>Achats</span></button>
+  <button class="dot" type="button" data-i="2"><span>Plannings</span></button>
+</div>
+</section></div></section><section class="x4 x4-g o20sec x7-tools"><div class="x4-in"><div class="x7-th"><h2 class="x4-h2 rv">Flow prépare le travail <span class="g">dans les outils de l’hôpital</span></h2><p class="x4-sub rv">Flow travaille aux côtés des systèmes que vous avez déjà. Les données restent dans l’hôpital.</p></div><div class="o20" data-orbit20=""><div aria-hidden="true" class="o20-plate o20-plate-out"></div><div aria-hidden="true" class="o20-plate o20-plate-in"></div><svg aria-hidden="true" class="o20-tracks"></svg><div class="o20-ring" data-ring="in" data-speed="7.5"><button aria-label="Outlook" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/outlook.webp" width="23"/><span class="o20-tip">Outlook</span></button><button aria-label="Excel" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/excel.webp" width="23"/><span class="o20-tip">Excel</span></button><button aria-label="SAP" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sap.webp" style="width:62%;height:62%" width="23"/><span class="o20-tip">SAP</span></button><button aria-label="Word" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/word.webp" width="23"/><span class="o20-tip">Word</span></button><button aria-label="Power BI" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerbi.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power BI</span></button><button aria-label="SharePoint" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sharepoint.webp" width="23"/><span class="o20-tip">SharePoint</span></button></div><div class="o20-ring" data-ring="out" data-speed="-4.8"><button aria-label="Workday" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/workday.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Workday</span></button><button aria-label="Salesforce" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/salesforce.webp" style="width:64%;height:64%" width="23"/><span class="o20-tip">Salesforce</span></button><button aria-label="UKG" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/ukg.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">UKG</span></button><button aria-label="Power Automate" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerautomate.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power Automate</span></button><button aria-label="Qlik" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qlik.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Qlik</span></button><button aria-label="ServiceNow" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/servicenow.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">ServiceNow</span></button><button aria-label="SuccessFactors" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/successfactors.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">SuccessFactors</span></button><button aria-label="QGenda" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qgenda.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">QGenda</span></button></div><div class="o20-core"><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><div class="o20-disc"><img alt="Flow" class="o20-wm" height="31" src="../assets/flow-logo-400.webp" width="70"/></div></div></div></div></section><section class="r15-tr" aria-labelledby="r15trh"><div class="r15-in"><header class="r15-th"><h2 class="r15-h2" id="r15trh">Rien ne bouge sans votre accord</h2><p class="r15-sub2">Flow travaille dans les outils de l’hôpital, et les données des patients ne passent jamais par une fenêtre de chat. Chaque action attend Do It, est journalisée et peut être annulée.</p></header><div class="r15-fan" aria-hidden="true"><figure class="r15-col r15-c1"><div class="r15-cd r15-ap"><div class="r15-ch"><img class="r15-flw" src="../assets/flow-logo-400.webp" width="400" height="176" alt="" decoding="async"/><small>Exemple</small></div><p class="r15-q">Donner à Camille un RDV en pneumologie le 6/1 et lui envoyer un SMS ?</p><ul class="r15-st"><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Suivi le 6/1 et SMS à Camille</b><small>Salesforce</small></span></li><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Prise en charge liée au RDV</b><small>Prises en charge</small></span></li></ul><div class="r15-cf"><span class="doit r15-di"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><small>En attente de votre validation</small></div></div><figcaption><b>Flow prépare, vous validez</b><span>Chaque action attend votre Do It</span></figcaption></figure><figure class="r15-col r15-c2"><div class="r15-cd r15-log"><div class="r15-lh"><span><b>Journal d’activité</b><small>Dossier patient · Martin</small></span><small class="r15-smp">Exemple</small></div><ol class="r15-le"><li><time>08:12</time><span class="r15-lg"><img src="../assets/orb/outlook.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>E-mail de Camille lu</b><small>Source : e-mail au secrétariat, 08:12</small></span><span class="r15-who is-f">Flow</span></li><li><time>08:12</time><span class="r15-lg"><img src="../assets/orb/commit.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Prise en charge vérifiée</b><small>Source : prises en charge</small></span><span class="r15-who is-f">Flow</span></li><li><time>08:13</time><span class="r15-lg"><img src="../assets/orb/salesforce.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>RDV de suivi pris</b><small>Source : l’agenda du service</small></span><span class="r15-who">Céline a validé</span></li><li class="r15-x"><time>08:13</time><span class="r15-lg"><img src="../assets/orb/commit.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Prise en charge liée au RDV</b><small>Source : le RDV pris</small></span><span class="r15-who">Céline a validé</span></li></ol></div><figcaption><b>Chaque action est consignée</b><span>Avec l’heure, la source et qui a validé</span></figcaption></figure><figure class="r15-col r15-c3"><div class="r15-cd r15-un"><div class="r15-ch"><span class="r15-lg"><img src="../assets/orb/salesforce.webp" width="40" height="40" alt="" decoding="async"/></span><b>RDV de suivi</b><span class="r15-done"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg>Fait</span></div><dl class="r15-row"><div><dt>Patiente</dt><dd>Camille Martin</dd></div><div><dt>Service</dt><dd>Pneumologie</dd></div><div><dt>Quand</dt><dd>06/01 · 09:40</dd></div></dl><div class="r15-cf"><span class="r15-undo"><svg viewBox="0 0 24 24"><path d="M9.8 6 4.5 11.3l5.3 5.3"/><path d="M4.8 11.3h9.2a5.5 5.5 0 0 1 5.5 5.5v1.7"/></svg>Undo</span><small>Mis à jour à 08:13</small></div></div><figcaption><b>Et tout s’annule</b><span>Une action effectuée s’annule avec Undo</span></figcaption></figure></div></div></section><div id="lgdep" class="r15-dp"><section class="dgv-sec sx-dep" id="depsec" data-zone-scope><div class="sx-in"><h2 class="dp-h" id="dpTitle">Où Flow s’exécute</h2><p class="dp-sub">Le cloud sécurisé de Flow, l’ordinateur du collaborateur ou un serveur sur le réseau de l’hôpital. L’hôpital choisit, et les trois options sont disponibles dès aujourd’hui.</p><div class="dep dep2" role="group" aria-label="Où Flow s’exécute"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div><section class="op-sec sx-op" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section></div><section class="r15-ct" aria-labelledby="r15cth"><div class="r15-in"><div class="r15-ctc"><h2 class="r15-h2" id="r15cth">Réservez un court appel et recevez un plan de déploiement pour votre hôpital</h2><ol class="r15-steps"><li><span class="r15-n">1</span><b>Appel de découverte</b><span>Nous repérons où travaille votre équipe aujourd’hui</span></li><li><span class="r15-n">2</span><b>Vous choisissez où Flow s’exécute</b><span>Cloud, Edge ou On-Prem</span></li><li><span class="r15-n">3</span><b>Un pilote avec une équipe</b><span>Chaque action attend votre validation</span></li></ol><a class="doit r15-cta" data-book="" data-ga="sol_hospitals_waitlist" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Réserver un appel</span></a></div></div></section></template>
+<template id="r15-es"><section class="r15-hero" aria-labelledby="r15h1"><div class="r15-in"><h1 class="r15-h1" id="r15h1"><b>Todo lo que rodea la atención está listo,</b> <span class="fx-gw">usted solo aprueba</span></h1><p class="r15-sub">Flow trabaja junto a los sistemas que ya tienen</p><a class="doit r15-cta" data-book="" data-ga="sol_hospitals_hero" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Reservar una llamada</span></a></div><div id="r14s" class="r15-stage"><script>(function(w){var q=new URLSearchParams(location.search),f=q.get("f"),v=q.get("v"),ai=q.get("ai"),rm=matchMedia("(prefers-reduced-motion: reduce)").matches;w.dataset.f=f||(rm?"3":"0");if(v)w.dataset.v=v;w.dataset.ai=ai==="2"?"2":"1";if(rm)w.classList.add("rm");if(q.get("state")==="done")w.dataset.state="done"})(document.getElementById("r14s"))</script><section class="r14" id="r14" aria-roledescription="carousel">
+<div class="track">
+<div class="slide is-active" data-m="1" aria-label="Caso del paciente">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Caso del paciente · Ejemplo</p>
+        <h2 class="h1">TAC recibido, falta revisión</h2>
+      </div>
+      <p class="lead">Flow revisó la autorización y preparó cita y SMS</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> revisó la autorización y encontró cita, y usted aprueba con un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">2</span></div><p class="k">Atención al paciente</p><p class="t">Elena Navarro</p><ul class="lw-fields"><li class="lw-f"><span class="k">Solicitud</span><span class="v">Revisión · neumología</span></li><li class="lw-f"><span class="k">Autorización</span><span class="v">Aseguradora · válida hasta <span class="num">28/02/2027</span></span></li><li class="lw-pair"><span class="lw-f"><span class="k">Documento</span><span class="v">TAC de tórax</span></span><span class="lw-f"><span class="k">Recibido</span><span class="v"><span class="num">17/11</span></span></span></li></ul></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-mail"><div class="mark ol"><img alt="" src="../assets/r15/lg/outlook.webp" width="18" height="18" decoding="async"/> Outlook<span class="ord" aria-hidden="true">1</span></div><h3>Informe de TAC y petición de cita</h3><p class="from"><b>Elena Navarro</b><span class="num"><span class="num">17/11/2026 08:12</span></span></p><p class="meta">A la secretaría de neumología</p><div class="att"><span class="fi pdf" aria-hidden="true">PDF</span><b>TAC de tórax · centro de imagen</b><small dir="ltr">184 KB</small></div><blockquote class="ol-quote">Hola, adjunto el informe del TAC de un centro privado. Mi médica pidió una cita de revisión.</blockquote></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Elena Navarro</b><span class="num">08:12</span></p>
+              <h3 class="ph-mail-subj">Informe de TAC y petición de cita</h3>
+              <p class="ph-mail-meta">A secretaría de neumología · PDF</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> revisó<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Revisó la autorización</b><span>Aseguradora · válida hasta <span class="num">28/02</span></span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Encontró un hueco</b><span>Neumología · <span class="num">06/01</span>, <span class="num">09:40</span></span></div></li></ol>
+          <p class="fl-src">Revisado con: correo · autorización · agenda</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propone 2 acciones</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Cita y SMS a Elena</b><span><span class="num">06/01</span> · <span class="num">09:40</span></span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Autorización para la cita</b><span>Autorizaciones · borrador</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Hecho · cita dada, autorización vinculada</p><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/salesforce.webp" width="18" height="18" decoding="async"/> Salesforce<span class="ord" aria-hidden="true">3</span></div><p class="k">Agenda neumología · enero</p><ul class="lw-list"><li><p class="lw-l1"><b>miér. <span class="num">06/01</span></b><span><span class="num">09:40</span></span></p><p class="lw-l2">Revisión · libre</p><span class="lw-status">Propuesta</span></li><li><p class="lw-l1"><b>jue. <span class="num">07/01</span></b><span><span class="num">11:20</span></span></p><p class="lw-l2">Revisión · libre</p></li><li><p class="lw-l1"><b>lun. <span class="num">11/01</span></b><span><span class="num">08:30</span></span></p><p class="lw-l2">Revisión · libre</p></li></ul><p class="flow-attr"><span class="attr-prep">Preparado por Flow</span><span class="attr-done">Añadido por <span dir="ltr">Flow · 08:13</span></span></p></div>
+          </div>
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/commit.webp" width="18" height="18" decoding="async"/> Autorizaciones<span class="ord" aria-hidden="true">3</span></div><p class="k">Autorización</p><p class="t">Elena Navarro</p><ul class="lw-fields"><li class="lw-f"><span class="k">Servicio</span><span class="v">Revisión · neumología</span></li><li class="lw-f"><span class="k">Cita</span><span class="v"><span class="num">06/01</span> · <span class="num">09:40</span></span></li><li class="lw-pair"><span class="lw-f"><span class="k">Estado</span><span class="v"><span class="lw-status">Borrador</span></span></span><span class="lw-f"><span class="k">Válida hasta</span><span class="v"><span class="num">28/02</span></span></span></li></ul><p class="flow-attr"><span class="attr-prep">Preparado por Flow</span><span class="attr-done">Añadido por <span dir="ltr">Flow · 08:13</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Recibido en Outlook</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg ou"><img alt="" src="../assets/r15/lg/outlook.webp" width="22" height="22" decoding="async"/></span><b>Outlook</b><span class="smp">Ejemplo</span></p>
+          <p class="mail-m"><span>Para</span><b>Secretaría de neumología</b></p>
+          <p class="mail-s">TAC y cita · Navarro <span class="att-i">PDF</span></p>
+          <p class="mail-b">Informe de un centro privado adjunto · <em>pide cita de revisión</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Lo que hizo Flow</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="22" height="22" decoding="async"/></span><p>Autorización válida hasta el <span class="num">28/02</span></p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="22" height="22" decoding="async"/></span><p>Cita libre en neumología el <span class="num">06/01</span>, <span class="num">09:40</span></p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Lo que propone Flow</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/orb/salesforce.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Cita el <span class="num">06/01</span>  y SMS a Elena</p><p class="card-s">Salesforce · SMS sin enviar</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/commit.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Autorización vinculada a la cita</p><p class="card-s">Autorizaciones · borrador</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Solo con su aprobación · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="2" aria-label="Compras">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Compra de fungibles · Ejemplo</p>
+        <h2 class="h1">Quedan pocos guantes</h2>
+      </div>
+      <p class="lead">Flow revisó consumo y proveedor y preparó la solicitud</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> revisó el consumo y el proveedor del concurso, y usted aprueba con un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/orb/powerbi.webp" width="18" height="18" decoding="async"/> Power BI<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Consumo · almacén central</p><table class="tb"><thead><tr><th>Artículo</th><th>Por día</th><th>En stock</th></tr></thead><tbody><tr class="on"><td>Guantes nitrilo M</td><td><span class="num">6</span></td><td><span class="num">18</span></td></tr><tr><td>Batas desechables</td><td><span class="num">4</span></td><td><span class="num">60</span></td></tr><tr><td>Mascarillas quirúrgicas</td><td><span class="num">9</span></td><td><span class="num">140</span></td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">1</span></div><p class="k">Alertas · almacén central</p><ul class="lw-list"><li><p class="lw-l1"><b>Guantes nitrilo M</b><span><span class="num">18</span> cajas</span></p><p class="lw-l2">Bajo mínimo · <span class="num">18/11/2026 07:40</span></p><span class="lw-status">Nuevo</span></li><li><p class="lw-l1"><b>Batas desechables</b><span><span class="num">60</span> cajas</span></p><p class="lw-l2">Para dos semanas</p></li><li><p class="lw-l1"><b>Mascarillas quirúrgicas</b><span><span class="num">140</span> cajas</span></p><p class="lw-l2">Para dos semanas</p></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>SAP · almacén central</b><span class="num">07:40</span></p>
+              <h3 class="ph-mail-subj">Guantes de nitrilo bajo mínimo</h3>
+              <p class="ph-mail-meta">Talla M · <span class="num">18</span> cajas</p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> revisó<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/powerbi.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Revisó el consumo</b><span><span class="num">6</span> cajas al día</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Encontró el proveedor del concurso</b><span>Entrega en <span class="num">3</span> días hábiles</span></div></li></ol>
+          <p class="fl-src">Revisado con: stock · consumo · acuerdo marco</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propone 2 acciones</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Solicitud de compra</b><span><span class="num">120</span> cajas · precio del concurso</span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/supplier.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Pedido al proveedor</b><span>Portal de proveedores · tras liberar</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Hecho · la solicitud espera liberación</p><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/sap.webp" width="18" height="18" decoding="async"/> SAP<span class="ord" aria-hidden="true">3</span></div><p class="k">Solicitudes por liberar</p><ul class="lw-list"><li><p class="lw-l1"><b>Guantes nitrilo M</b><span><span class="num">120</span> cajas</span></p><p class="lw-l2">Proveedor · <span class="num">3</span> días hábiles</p><span class="lw-status">Pendiente</span></li><li><p class="lw-l1"><b>Batas desechables</b><span><span class="num">80</span> cajas</span></p><p class="lw-l2">Proveedor del concurso</p><span class="lw-status">Liberada</span></li></ul><p class="flow-attr"><span class="attr-prep">Preparado por Flow</span><span class="attr-done">Añadido por <span dir="ltr">Flow · 07:46</span></span></p></div>
+          </div>
+          <div class="app outer app-pdf app-gen-doc"><div class="mark pdfm"><img alt="" src="../assets/lg/supplier.webp" width="18" height="18" decoding="async"/> Portal de proveedores<span class="ord" aria-hidden="true">3</span></div><div class="pdf-page"><p class="pdf-h">Pedido al proveedor</p><p class="pdf-s">Proveedor · <span class="num">18/11/2026</span></p><dl class="pdf-f"><div><dt>Artículo</dt><dd>Guantes de nitrilo, talla M</dd></div><div><dt>Cantidad</dt><dd><mark><span class="num">120</span> cajas</mark></dd></div><div><dt>Envío</dt><dd>Tras liberar la solicitud</dd></div></dl></div></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Llegó de SAP</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><b>SAP</b><span class="smp">Ejemplo</span></p>
+          <p class="mail-m"><span>Alerta</span><b>Almacén central</b></p>
+          <p class="mail-s">Guantes nitrilo M · bajo mínimo</p>
+          <p class="mail-b">Quedan <span class="num">18</span> cajas · <em>tres días</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Lo que hizo Flow</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/powerbi.webp" width="22" height="22" decoding="async"/></span><p>Consumo medio: <span class="num">6</span> cajas al día</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="22" height="22" decoding="async"/></span><p>Proveedor: entrega en <span class="num">3</span> días</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Lo que propone Flow</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sap.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Solicitud de compra de <span class="num">120</span> cajas</p><p class="card-s">SAP · lo libera logística</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/supplier.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Pedido en el portal de proveedores</p><p class="card-s">Portal de proveedores · tras liberar</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Solo con su aprobación · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="slide" data-m="3" aria-label="Turnos">
+  <div class="in">
+    <div class="head">
+      <div class="titles">
+        <p class="eye">Cuadrante · Ejemplo</p>
+        <h2 class="h1">Piden cambiar un turno de tarde</h2>
+      </div>
+      <p class="lead">Flow encontró sustituta y preparó el cambio</p>
+      <p class="dk sub"><span dir="ltr">Flow</span> revisó el cuadrante y el cupo de horas extra, y la supervisora aprueba con un clic</p>
+    </div>
+    <div class="dk stage" aria-hidden="true">
+      <div class="cluster">
+        <div class="row-slot">
+        <div class="row-scale">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="row">
+          <div class="app outer app-gen app-tb"><div class="mark lw"><img alt="" src="../assets/lg/ukg.webp" width="18" height="18" decoding="async"/> UKG<span class="ord" aria-hidden="true">2</span></div><p class="tb-file">Medicina B · semana del <span class="num">23 nov.</span></p><table class="tb"><thead><tr><th>Nombre</th><th>mar. <span class="num">24/11</span></th><th>lun. <span class="num">23/11</span></th></tr></thead><tbody><tr><td>Marta Gil</td><td>Tarde</td><td>Mañana</td></tr><tr class="on"><td>Sara Molina</td><td>Libre</td><td>Mañana</td></tr><tr><td>Raquel Ortiz</td><td>Tarde</td><td>Noche</td></tr></tbody></table></div>
+          <div class="col col-mail inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/lg/ukg.webp" width="18" height="18" decoding="async"/> UKG<span class="ord" aria-hidden="true">1</span></div><p class="k">Cambios · Medicina B</p><ul class="lw-list"><li><p class="lw-l1"><b>Marta Gil</b><span>Tarde · mar. <span class="num">24/11</span></span></p><p class="lw-l2">Evento familiar · <span class="num">12/11/2026 09:05</span></p><span class="lw-status">Nuevo</span></li><li><p class="lw-l1"><b>Raquel Ortiz</b><span>Mañana · jue. <span class="num">26/11</span></span></p><p class="lw-l2">Cambiado con Sara</p><span class="lw-status">Aprobado</span></li></ul></div>
+          </div>
+          <div class="ph" aria-hidden="true"><div class="ph-dev"><div class="ph-devi"><div class="ph-frm"><div class="ph-blk"><div class="ph-scr">
+            <div class="ph-sb"><span class="ph-tm">9:41</span><span class="ph-sic"><svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2l2.3-2.6a3.4 3.4 0 0 0-4.6 0zM3.6 6.4a6.4 6.4 0 0 1 8.8 0l1.5-1.6a8.6 8.6 0 0 0-11.8 0zM.6 3.2a10.8 10.8 0 0 1 14.8 0L16 2.5A11.8 11.8 0 0 0 0 2.5z"/></svg><span class="ph-bat"><i></i></span></span></div><span class="ph-isl"></span>
+            <div class="ph-mail">
+              <p class="ph-mail-from"><b>Marta Gil</b><span class="num">09:05</span></p>
+              <h3 class="ph-mail-subj">Solicitud de cambio de turno</h3>
+              <p class="ph-mail-meta">Tarde · mar.  <span class="num">24/11</span></p>
+            </div>
+            <div class="ph-dim" aria-hidden="true"></div>
+            <div class="sheet">
+          <div class="sheet-grab" aria-hidden="true"></div>
+          <p class="fl-k"><span dir="ltr">Flow</span> revisó<span class="ord" aria-hidden="true">2</span></p>
+          <ol class="rows"><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Revisó el cuadrante</b><span>Sara libre, no viene de noche</span></div></li><li class="row"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="24" height="24" decoding="async"/></span><div class="rw"><b>Revisó las horas extra</b><span>Dentro del cupo mensual</span></div></li></ol>
+          <p class="fl-src">Revisado con: la solicitud · el cuadrante · las horas extra</p>
+          <p class="fl-prop"><span dir="ltr">Flow</span> propone 2 acciones</p>
+          <ol class="props"><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Petición a Sara</b><span>Tarde · mar.  <span class="num">24/11</span></span></div></li><li class="prop"><span class="lg sq"><img alt="" src="../assets/lg/sharepoint.webp" width="22" height="22" decoding="async"/></span><div class="rw"><b>Cuadrante</b><span>Medicina B · borrador</span></div></li></ol>
+          <div class="fl-bar fl-bar-prop"><span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+          <div class="fl-bar fl-bar-done"><p class="fl-done">Hecho · enviado a Sara, cuadrante pendiente</p><span class="cue"><span dir="ltr">Undo</span> · solo con su aprobación</span></div>
+            </div>
+            <span class="ph-hb"></span>
+          </div></div></div></div></div></div>
+          <div class="col col-cal inner">
+            <div class="tile tile-lw tile-gen"><div class="mark lw"><img alt="" src="../assets/orb/workday.webp" width="18" height="18" decoding="async"/> Workday<span class="ord" aria-hidden="true">3</span></div><p class="k">Horas extra · noviembre</p><ul class="lw-list"><li><p class="lw-l1"><b>Sara Molina</b><span>Dentro del cupo</span></p><p class="lw-l2">tras el cambio</p></li><li><p class="lw-l1"><b>Marta Gil</b><span>Dentro del cupo</span></p><p class="lw-l2"></p></li><li><p class="lw-l1"><b>Raquel Ortiz</b><span>Cerca del cupo</span></p><p class="lw-l2"></p></li></ul><p class="flow-attr"><span class="attr-prep">Preparado por Flow</span><span class="attr-done">Añadido por <span dir="ltr">Flow · 09:07</span></span></p></div>
+          </div>
+          <div class="app app-law app-gen outer "><div class="mark lw"><img alt="" src="../assets/lg/sharepoint.webp" width="18" height="18" decoding="async"/> SharePoint<span class="ord" aria-hidden="true">3</span></div><p class="k">Cuadrante · Medicina B</p><p class="t">mar. <span class="num">24/11</span>  · tarde</p><ul class="lw-fields"><li class="lw-f"><span class="k">Turno</span><span class="v"><span class="num">15:00</span> a <span class="num">23:00</span></span></li><li class="lw-f"><span class="k">En lugar de</span><span class="v">Marta Gil</span></li><li class="lw-pair"><span class="lw-f"><span class="k">Sustituta</span><span class="v">Sara Molina</span></span><span class="lw-f"><span class="k">Estado</span><span class="v"><span class="lw-status">Pendiente</span></span></span></li></ul><p class="flow-attr"><span class="attr-prep">Preparado por Flow</span><span class="attr-done">Añadido por <span dir="ltr">Flow · 09:07</span></span></p></div>
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="chain">
+      <div class="trail">
+        <div class="arrive">
+        <p class="k">Llegó de UKG</p>
+        <div class="mail">
+          <p class="mail-h"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="22" height="22" decoding="async"/></span><b>UKG</b><span class="smp">Ejemplo</span></p>
+          <p class="mail-m"><span>De</span><b>Marta Gil · Medicina B</b></p>
+          <p class="mail-s">Solicitud de cambio de turno</p>
+          <p class="mail-b">Tarde, mar. <span class="num">24/11</span> · <em>Evento familiar</em></p>
+        </div>
+        </div>
+        <div class="did">
+        <p class="k">Lo que hizo Flow</p>
+        <ol class="steps"><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="22" height="22" decoding="async"/></span><p>Sara Molina está libre, no viene de noche</p></span></li><li class="step"><span class="chk" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3.6 8.3l3 3L12.6 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="tx"><span class="lg sq"><img alt="" src="../assets/orb/workday.webp" width="22" height="22" decoding="async"/></span><p>Sara está dentro de su cupo de horas extra</p></span></li></ol>
+        </div>
+      </div>
+      <div class="offer">
+        <p class="k">Lo que propone Flow</p>
+        <div class="stack" aria-hidden="true"><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/ukg.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Pedir a Sara que confirme</p><p class="card-s">UKG · no enviado</p></article><article class="card"><span class="lg sq"><img alt="" src="../assets/lg/sharepoint.webp" width="24" height="24" decoding="async"/></span><p class="card-t">Cuadrante de Medicina B</p><p class="card-s">SharePoint · hasta que apruebe la supervisora</p></article></div>
+        <div class="bar">
+          <span class="doit" aria-hidden="true"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span>
+          <span class="cue">Solo con su aprobación · Undo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="dots named" role="group" aria-label="Procesos">
+  <button class="dot" type="button" data-i="0" aria-current="true"><span>Caso del paciente</span></button>
+  <button class="dot" type="button" data-i="1"><span>Compras</span></button>
+  <button class="dot" type="button" data-i="2"><span>Turnos</span></button>
+</div>
+</section></div></section><section class="x4 x4-g o20sec x7-tools"><div class="x4-in"><div class="x7-th"><h2 class="x4-h2 rv">Flow prepara el trabajo <span class="g">dentro de los sistemas del hospital</span></h2><p class="x4-sub rv">Flow trabaja junto a los sistemas que ya tienen. Los datos se quedan dentro del hospital.</p></div><div class="o20" data-orbit20=""><div aria-hidden="true" class="o20-plate o20-plate-out"></div><div aria-hidden="true" class="o20-plate o20-plate-in"></div><svg aria-hidden="true" class="o20-tracks"></svg><div class="o20-ring" data-ring="in" data-speed="7.5"><button aria-label="Outlook" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/outlook.webp" width="23"/><span class="o20-tip">Outlook</span></button><button aria-label="Excel" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/excel.webp" width="23"/><span class="o20-tip">Excel</span></button><button aria-label="SAP" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sap.webp" style="width:62%;height:62%" width="23"/><span class="o20-tip">SAP</span></button><button aria-label="Word" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/word.webp" width="23"/><span class="o20-tip">Word</span></button><button aria-label="Power BI" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerbi.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power BI</span></button><button aria-label="SharePoint" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/sharepoint.webp" width="23"/><span class="o20-tip">SharePoint</span></button></div><div class="o20-ring" data-ring="out" data-speed="-4.8"><button aria-label="Workday" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/workday.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Workday</span></button><button aria-label="Salesforce" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/salesforce.webp" style="width:64%;height:64%" width="23"/><span class="o20-tip">Salesforce</span></button><button aria-label="UKG" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/ukg.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">UKG</span></button><button aria-label="Power Automate" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/powerautomate.webp" style="width:46%;height:46%" width="23"/><span class="o20-tip">Power Automate</span></button><button aria-label="Qlik" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qlik.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">Qlik</span></button><button aria-label="ServiceNow" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/servicenow.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">ServiceNow</span></button><button aria-label="SuccessFactors" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/successfactors.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">SuccessFactors</span></button><button aria-label="QGenda" class="o20-orb" type="button"><img alt="" decoding="async" height="23" src="../assets/orb/qgenda.webp" style="width:58%;height:58%" width="23"/><span class="o20-tip">QGenda</span></button></div><div class="o20-core"><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><span aria-hidden="true" class="o20-ripple"></span><div class="o20-disc"><img alt="Flow" class="o20-wm" height="31" src="../assets/flow-logo-400.webp" width="70"/></div></div></div></div></section><section class="r15-tr" aria-labelledby="r15trh"><div class="r15-in"><header class="r15-th"><h2 class="r15-h2" id="r15trh">Nada se mueve sin su aprobación</h2><p class="r15-sub2">Flow trabaja dentro de los sistemas del hospital y los datos de los pacientes nunca pasan por una ventana de chat. Cada acción espera a Do It, queda registrada y se puede deshacer.</p></header><div class="r15-fan" aria-hidden="true"><figure class="r15-col r15-c1"><div class="r15-cd r15-ap"><div class="r15-ch"><img class="r15-flw" src="../assets/flow-logo-400.webp" width="400" height="176" alt="" decoding="async"/><small>Ejemplo</small></div><p class="r15-q">¿Citar a Elena en neumología el 6/1 y enviarle un SMS?</p><ul class="r15-st"><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Revisión el 6/1 y SMS a Elena</b><small>Salesforce</small></span></li><li><span class="r15-ok"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg></span><span><b>Autorización vinculada a la cita</b><small>Autorizaciones</small></span></li></ul><div class="r15-cf"><span class="doit r15-di"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Do It</span></span><small>Pendiente de su aprobación</small></div></div><figcaption><b>Flow prepara, usted aprueba</b><span>Cada acción espera su Do It</span></figcaption></figure><figure class="r15-col r15-c2"><div class="r15-cd r15-log"><div class="r15-lh"><span><b>Registro de actividad</b><small>Caso · Navarro</small></span><small class="r15-smp">Ejemplo</small></div><ol class="r15-le"><li><time>08:12</time><span class="r15-lg"><img src="../assets/orb/outlook.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Correo de Elena leído</b><small>Fuente: correo a la secretaría, 08:12</small></span><span class="r15-who is-f">Flow</span></li><li><time>08:12</time><span class="r15-lg"><img src="../assets/orb/commit.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Autorización revisada</b><small>Fuente: autorizaciones</small></span><span class="r15-who is-f">Flow</span></li><li><time>08:13</time><span class="r15-lg"><img src="../assets/orb/salesforce.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Cita de revisión dada</b><small>Fuente: la agenda de la consulta</small></span><span class="r15-who">Inés aprobó</span></li><li class="r15-x"><time>08:13</time><span class="r15-lg"><img src="../assets/orb/commit.webp" width="40" height="40" alt="" decoding="async"/></span><span class="r15-lt"><b>Autorización vinculada a la cita</b><small>Origen: la cita</small></span><span class="r15-who">Inés aprobó</span></li></ol></div><figcaption><b>Cada acción queda registrada</b><span>Con la hora, el origen y quién aprobó</span></figcaption></figure><figure class="r15-col r15-c3"><div class="r15-cd r15-un"><div class="r15-ch"><span class="r15-lg"><img src="../assets/orb/salesforce.webp" width="40" height="40" alt="" decoding="async"/></span><b>Cita de revisión</b><span class="r15-done"><svg viewBox="0 0 12 12"><path d="M2.6 6.4l2.3 2.3 4.5-4.9"/></svg>Hecho</span></div><dl class="r15-row"><div><dt>Paciente</dt><dd>Elena Navarro</dd></div><div><dt>Consulta</dt><dd>Neumología</dd></div><div><dt>Cuándo</dt><dd>06/01 · 09:40</dd></div></dl><div class="r15-cf"><span class="r15-undo"><svg viewBox="0 0 24 24"><path d="M9.8 6 4.5 11.3l5.3 5.3"/><path d="M4.8 11.3h9.2a5.5 5.5 0 0 1 5.5 5.5v1.7"/></svg>Undo</span><small>Actualizado a las 08:13</small></div></div><figcaption><b>Y se puede deshacer</b><span>Una acción hecha se deshace con Undo</span></figcaption></figure></div></div></section><div id="lgdep" class="r15-dp"><section class="dgv-sec sx-dep" id="depsec" data-zone-scope><div class="sx-in"><h2 class="dp-h" id="dpTitle">Dónde se ejecuta Flow</h2><p class="dp-sub">La nube segura de Flow, el ordenador del empleado o un servidor en la red del hospital. El hospital elige, y las tres opciones están disponibles hoy.</p><div class="dep dep2" role="group" aria-label="Dónde se ejecuta Flow"><div class="d2-seg" role="radiogroup" data-i="0"><i aria-hidden="true"><span class="doit hs-do"><span class="shell"></span><span class="dring"></span><span class="shine"></span></span></i><button type="button" role="radio" aria-checked="true" data-m="0" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b1"></span></button><button type="button" role="radio" aria-checked="false" data-m="1" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b2"></span></button><button type="button" role="radio" aria-checked="false" data-m="2" class="doit d2-opt"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl" data-k="ft.b3"></span></button></div><p class="d2-note" aria-live="polite"><em class="d2-t"><b data-k="ft.d1"></b> <span data-k="ft.d1s"></span></em></p></div><section class="op-sec sx-op" id="onprem" aria-labelledby="opTitle"><div class="op-in"><header class="head"><span class="eyebrow"></span><h2 id="opTitle"></h2><p></p></header><div class="card" id="op-s2"></div><ol class="pts" id="op-pts"></ol></div></section></div></section></div><section class="r15-ct" aria-labelledby="r15cth"><div class="r15-in"><div class="r15-ctc"><h2 class="r15-h2" id="r15cth">Reserve una llamada breve y reciba un plan de implantación para su hospital</h2><ol class="r15-steps"><li><span class="r15-n">1</span><b>Llamada inicial</b><span>Vemos dónde trabaja hoy su equipo</span></li><li><span class="r15-n">2</span><b>Usted elige dónde se ejecuta Flow</b><span>Nube, Edge u On-Prem</span></li><li><span class="r15-n">3</span><b>Piloto con un equipo</b><span>Cada acción espera su aprobación</span></li></ol><a class="doit r15-cta" data-book="" data-ga="sol_hospitals_waitlist" href="/#book"><span class="shell"></span><span class="dring"></span><span class="shine"></span><span class="dlbl">Reservar una llamada</span></a></div></div></section></template>
+<script>(function(){var d=document.documentElement,l=d.dataset.ui,t=document.getElementById('r15-'+l),m=document.getElementById('main');if(!t||!m)return;m.innerHTML='';m.appendChild(t.content.cloneNode(true));m.lang=l;d.lang=l;document.title={"de": "KI für Krankenhäuser: alles rund um die Versorgung, bereit zur Freigabe | Flow", "fr": "IA pour les hôpitaux : tout ce qui entoure les soins, prêt à valider | Flow", "es": "IA para hospitales: todo lo que rodea la atención, listo para aprobar | Flow"}[l];var ds={"de": "KI für Krankenhäuser: Flow bereitet Patientenfälle, Bestellanforderungen und Dienstpläne aus E-Mails und Dateien Ihres Krankenhauses vor, und jemand aus dem Team gibt jeden Schritt frei. Die Daten bleiben in der Organisation: maskierte Cloud, Flow-Edge oder Flow-Onprem.", "fr": "IA pour les hôpitaux : Flow prépare les dossiers patients, les demandes d’achat et les plannings à partir des e-mails et des fichiers de l’hôpital, et un membre de l’équipe valide chaque étape. Les données restent dans l’organisation : cloud masqué, Flow-Edge ou Flow-Onprem.", "es": "IA para hospitales: Flow prepara casos de pacientes, solicitudes de compra y cuadrantes a partir del correo y los archivos del hospital, y alguien del equipo aprueba cada paso. Los datos se quedan dentro de la organización: nube enmascarada, Flow-Edge o Flow-Onprem."}[l];if(ds)document.querySelectorAll('meta[name=description],meta[property="og:description"],meta[name="twitter:description"]').forEach(function(x){x.content=ds})})();</script>
+
+<footer class="site-foot" dir="ltr" id="footer" lang="en">
+<div class="foot-in">
+<div class="foot-cols">
+<div class="foot-col foot-brand">
+<img alt="Flow" height="28" loading="lazy" src="../assets/flow-logo-200.webp" width="64"/>
+<a class="foot-mail" href="mailto:info@theflow-ai.com">info@theflow-ai.com</a>
+</div>
+<nav aria-label="Product" class="foot-col">
+<h3 data-k="ft.hFlow">Product</h3>
+<a data-k='ft.glance' href='/glance'>Glance</a>
+<a data-k='ft.flow' href='/#product'>Flow</a>
+<a data-k='ft.sec' href='/security'>Security</a>
+<a data-k='ft.pricing' href='/pricing'>Pricing</a>
+<a data-k='ft.solutions' href='/solutions'>Solutions</a>
+</nav>
+<nav aria-label="Company" class="foot-col">
+<h3 data-k="ft.hCo">Company</h3>
+<a data-k='ft.about' href='/about'>About</a>
+<a data-k='ft.blog' href='/articles'>Insights</a>
+<a data-k='ft.contact' href='/contact'>Contact</a>
+</nav>
+</div>
+<div class="foot-copy"><span data-k="ft.copy">© Flow</span><nav aria-label="Legal" class="foot-legal"><a data-k='ft.privacy' href='/privacy'>Privacy</a><a data-k='ft.terms' href='/terms'>Terms</a></nav></div>
+</div>
+</footer>
+
+<script src="../assets/flow-header.js"></script><script defer src="../assets/flow-booking.js"></script>
+<script src="../assets/flow-inner.js"></script>
+<script src="../samples/vendor/lenis.min.js"></script>
+<script src="../samples/flow-rich-v5.js?b=2"></script>
+<script src="../samples/v3.js"></script>
+<script src="../assets/flow-orbit-v7.js"></script><script src="../assets/r15/r14s.js?b=1"></script><script>document.write('<script src="../assets/r15/i18n/stack-hosp.'+({de:1,fr:1,es:1}[document.documentElement.dataset.ui]?document.documentElement.dataset.ui:'en')+'.js?b=1"><\/script>')</script><script src="../assets/r15/i18n/dep2-hosp.js?b=1"></script><script src="../assets/r15/i18n/onprem-hosp.js?b=1"></script><script src="../assets/r15/i18n/dg-hosp.js?b=1"></script><script src="../assets/r15/idle-pause.js?b=1"></script><script src="../assets/offscreen-pause.js?b=1"></script><script>(function(){function fit(){var op=document.getElementById("onprem");if(!op)return;var inn=op.parentElement,cs=getComputedStyle(inn),w=inn.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);op.style.setProperty("--dk",Math.min(1.5,Math.max(1,w/1120)).toFixed(3))}fit();addEventListener("resize",fit);addEventListener("load",fit)})();</script><script id="perf1112-dgjs">(function(){
+/* perf1112 glow: the Do It "breathe" ring redone on the compositor (opacity + transform only), same keyframes, offsets, easing and timing as stk-breathe in stack.css */
+var B='#r14s#r14s .stk:not(.used) .sh .doit',T='2.8s ease-in-out .8s infinite';
+function css(w,h){var D=h+18,k0=h/D,k5=(h+10)/D,cx=w-10,r=h/2;
+ function kf(n,f){return '@keyframes '+n+'{0%,64%,100%{'+f(0)+'}76%{'+f(5)+'}88%{'+f(9)+'}}';}
+ return 'html '+B+'{animation-name:stk-breathe-t!important}'+
+ '@keyframes stk-breathe-t{0%,64%,100%{transform:scale(1)}76%{transform:scale(1.05)}88%{transform:scale(1)}}'+
+ kf('dg-o',function(s){return 'opacity:'+(s==5?.14:0)})+
+ kf('dg-s',function(s){return 'transform:scale('+((h+2*s)/D)+')'})+
+ kf('dg-y',function(s){return 'transform:scaleY('+((h+2*s)/D)+')'})+
+ '#r14s#r14s .doit>.dg{position:absolute;inset:-10px;z-index:-3;pointer-events:none;opacity:0;'+
+ '-webkit-mask:none;mask-image:linear-gradient(#000 0 0),linear-gradient(#000 0 0),radial-gradient(circle at '+(10+r)+'px '+(10+r)+'px,#000 '+(r-.5)+'px,#0000 '+(r+.5)+'px),radial-gradient(circle at '+cx+'px '+(10+r)+'px,#000 '+(r-.5)+'px,#0000 '+(r+.5)+'px);'+
+ 'mask-size:100% 100%,'+(w-h)+'px '+h+'px,100% 100%,100% 100%;mask-position:0 0,'+(10+r)+'px 10px,0 0,0 0;mask-repeat:no-repeat;mask-composite:subtract,add,add,add}'+
+ '#r14s#r14s .doit>.dg>i{position:absolute;top:1px;height:'+D+'px;background:rgb(45,94,255)!important}'+
+ '#r14s#r14s .doit>.dg>i.l,#r14s#r14s .doit>.dg>i.r{width:'+D+'px;border-radius:50%;transform:scale('+k0+')}'+
+ '#r14s#r14s .doit>.dg>i.l{left:1px}#r14s#r14s .doit>.dg>i.r{left:'+(cx-r-9)+'px}'+
+ '#r14s#r14s .doit>.dg>i.m{left:'+(10+r)+'px;width:'+(w-h)+'px;transform:scaleY('+k0+')}'+
+ B+'>.dg{animation:dg-o '+T+'!important}'+B+'>.dg>i.l,'+B+'>.dg>i.r{animation:dg-s '+T+'!important}'+B+'>.dg>i.m{animation:dg-y '+T+'!important}'+
+ '@media (max-width:759px) and (prefers-reduced-motion:reduce){html '+B+'>.dg,html '+B+'>.dg>i.l,html '+B+'>.dg>i.m,html '+B+'>.dg>i.r{animation:none!important}}';}
+function run(){var bs=document.querySelectorAll('#r14s .stk .sh .doit');if(!bs.length)return;
+ var b0=bs[0],cs=getComputedStyle(b0),w=parseFloat(cs.width),h=parseFloat(cs.height);if(!(w>0&&h>0))return;
+ var st=document.getElementById('perf1112-dg')||document.head.appendChild(Object.assign(document.createElement('style'),{id:'perf1112-dg'}));
+ st.textContent=css(w,h);
+ bs.forEach(function(b){if(b.querySelector(':scope>.dg'))return;var g=document.createElement('span');g.className='dg';g.setAttribute('aria-hidden','true');g.innerHTML='<i class="l"></i><i class="m"></i><i class="r"></i>';b.insertBefore(g,b.firstChild);});
+ bs.forEach(function(b){sync(b,0)});}
+/* the ring pieces run on the button's clock: copy its stk-breathe-t start time (again whenever either one (re)starts, e.g. a slide shown again) */
+function sync(b,k){requestAnimationFrame(function(){var a=b.getAnimations().filter(function(x){return x.animationName=='stk-breathe-t'})[0];if(!a)return;
+  if(a.startTime==null){if(k<20)sync(b,k+1);return}
+  b.querySelectorAll(':scope>.dg,:scope>.dg>i').forEach(function(e){e.getAnimations().forEach(function(x){if(x.startTime!==a.startTime)x.startTime=a.startTime})})})}
+addEventListener('animationstart',function(e){if(!/^(stk-breathe-t|dg-[osy])$/.test(e.animationName))return;var b=e.target.closest&&e.target.closest('.doit');if(b)sync(b,0)},true);
+if(document.readyState=='complete')run();else addEventListener('load',run);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(run);
+/* stack.js rebuilds the decks when the viewport crosses 760px (teardown/build): give new Do It buttons their ring too */
+var q=0;function need(){return [].some.call(document.querySelectorAll('#r14s .stk .sh .doit'),function(b){return !b.querySelector(':scope>.dg')})}
+function watch(){var r=document.getElementById('r14s');if(!r||!window.MutationObserver)return;new MutationObserver(function(){if(q)return;q=requestAnimationFrame(function(){q=0;if(need())run()})}).observe(r,{childList:true,subtree:true})}
+if(document.readyState=='loading')addEventListener('DOMContentLoaded',watch);else watch();
+})();</script>
+<script src="../assets/r15/r15-i18n.js?b=5"></script>
+<link rel="stylesheet" href="../assets/ux-review-20261119.css?b=1"><script src="../assets/ux-review-20261119.js?b=1" defer></script>
+</body></html>

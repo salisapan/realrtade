@@ -1,0 +1,192 @@
+/* Solutions option B3 · local 13.11: subtract decoration, one depth source (the phone) */
+.op-b3{padding:0 0 40px}
+.b3-in{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 320px;
+  grid-template-areas:"copy stage" "rows stage";
+  column-gap:48px;row-gap:22px;align-items:center;
+  max-width:1120px;margin:0 auto;padding:48px 24px 8px;
+  min-height:min(760px,calc(100svh - 64px));box-sizing:border-box
+}
+.b3-copy{grid-area:copy;align-self:end}
+.b3-copy .fx-h1{margin:0 0 14px;text-align:start}
+.b3-copy .fx-lead{margin:0;text-align:start;max-width:28em}
+.b3-copy .fx-cta{justify-content:flex-start;margin-top:20px}
+.b3-rows{grid-area:rows;align-self:start;display:flex;flex-direction:column}
+.b3-stage{grid-area:stage;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0 48px}
+
+/* Quiet typographic list: hairline only, no lift, no shadow, no chips */
+.b3-row{
+  position:relative;display:block;padding:13px 4px 13px 16px;
+  border:0;border-top:.5px solid rgba(0,0,0,.12);
+  background:transparent;box-shadow:none;border-radius:0;
+  cursor:pointer;text-align:start;outline:none;
+  -webkit-tap-highlight-color:transparent
+}
+.b3-row:last-child{border-bottom:.5px solid rgba(0,0,0,.12)}
+html[dir="rtl"] .b3-row{padding:13px 16px 13px 4px}
+html[data-theme="dark"] .b3-row{border-color:rgba(255,255,255,.14)}
+.b3-row::before{
+  content:"";position:absolute;inset-block:14px;inset-inline-start:0;width:2px;
+  background:transparent;border-radius:1px;transition:background .25s
+}
+.b3-row.on::before{background:#2D5EFF}
+.b3-row:focus-visible{box-shadow:0 0 0 2px #2D5EFF;border-radius:6px}
+.op-b3 .b3-t{
+  margin:0;font-size:21px;line-height:1.2;font-weight:600;letter-spacing:-.02em;
+  color:var(--ink);opacity:.48;transition:opacity .25s,font-weight .25s
+}
+.op-b3 .b3-row.on .b3-t{opacity:1;font-weight:700}
+.op-b3 .b3-d{
+  margin:6px 0 0;font-size:15px;line-height:1.45;color:var(--fx-mut);
+  max-width:36em
+}
+.op-b3 .b3-row:not(.on) .b3-d{opacity:.72}
+.op-b3 .b3-go{
+  display:inline-block;margin-top:8px;font-size:15px;font-weight:600;
+  color:#2D5EFF;text-decoration:none
+}
+html[data-theme="dark"] .op-b3 .b3-go{color:#6E9BFF}
+.op-b3 .b3-row:not(.on) .b3-go{display:none}
+
+/* Phone: the only depth source. Animation lives on the wrapper, not the image */
+.b3-float{position:relative;display:flex;flex-direction:column;align-items:center;animation:b3Float 11s ease-in-out infinite;will-change:transform}
+.b3-phone{width:300px;animation:none}
+.b3-phone .op-ph{
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.05)) drop-shadow(0 8px 16px rgba(15,22,45,.08)) drop-shadow(0 24px 40px rgba(15,22,45,.14)) drop-shadow(0 52px 80px rgba(15,22,45,.16))
+}
+html[data-theme="dark"] .b3-phone .op-ph{
+  filter:drop-shadow(0 0 .5px rgba(255,255,255,.2)) drop-shadow(0 16px 28px rgba(0,0,0,.5)) drop-shadow(0 40px 70px rgba(0,0,0,.65))
+}
+.b3-ground{
+  position:absolute;left:50%;bottom:18px;width:220px;height:28px;margin-left:-110px;
+  border-radius:50%;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(15,22,45,.26),rgba(15,22,45,.08) 58%,transparent);
+  filter:blur(6px);animation:b3Ground 11s ease-in-out infinite
+}
+html[data-theme="dark"] .b3-ground{
+  background:radial-gradient(closest-side,rgba(0,0,0,.8),rgba(0,0,0,.32) 58%,transparent)
+}
+@keyframes b3Float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes b3Ground{0%,100%{transform:scaleX(1);opacity:1}50%{transform:scaleX(.88);opacity:.68}}
+
+/* Apple-style segmented control: used on small screens, sits under the phone, never overlaps it */
+.b3-seg{
+  display:none;position:relative;isolation:isolate;z-index:1;
+  width:100%;max-width:360px;margin:22px auto 0;padding:3px;
+  border-radius:11px;background:rgba(118,118,128,.14);box-sizing:border-box
+}
+html[data-theme="dark"] .b3-seg{background:rgba(118,118,128,.28)}
+.b3-thumb{
+  position:absolute;z-index:0;top:3px;bottom:3px;left:0;width:0;
+  border-radius:8px;background:#fff;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.04),0 3px 8px rgba(0,0,0,.12),0 1px 1px rgba(0,0,0,.04);
+  transition:transform .4s cubic-bezier(.22,1,.36,1),width .4s cubic-bezier(.22,1,.36,1)
+}
+html[data-theme="dark"] .b3-thumb{background:#636366;box-shadow:0 3px 8px rgba(0,0,0,.4)}
+.b3-sb{
+  position:relative;z-index:1;flex:1 1 0;min-width:0;
+  appearance:none;border:0;background:none;color:var(--ink);
+  font:600 14px/1.15 inherit;font-family:inherit;letter-spacing:-.01em;
+  padding:8px 8px;border-radius:8px;cursor:pointer;
+  opacity:.58;transition:opacity .25s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.b3-sb.on{opacity:1}
+.b3-sb:focus-visible{outline:2px solid #2D5EFF;outline-offset:2px}
+
+.op-b3 .hb-dep{margin-top:28px}
+
+
+/* Keep the blue H1 phrase on one line so a single blue word never sits alone */
+.op-b3 .fx-h1 .fx-gw{white-space:nowrap}
+/* Dark: same reading-order ink-to-blue as light .fx-gw, with dark tokens (#EEF2F9 → #5B8CFF → #2D5EFF). RTL reversed. */
+html[data-theme="dark"] .op-b3 .fx-gw{
+  background:linear-gradient(90deg,#EEF2F9 0%,#5B8CFF 62%,#2D5EFF 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent
+}
+html[dir="rtl"][data-theme="dark"] .op-b3 .fx-gw{
+  background:linear-gradient(270deg,#EEF2F9 0%,#5B8CFF 62%,#2D5EFF 100%);
+  -webkit-background-clip:text;background-clip:text
+}
+@media (min-width:1180px){
+  .op-b3 h1.fx-h1{font-size:clamp(48px,4.4vw,64px)}
+  html[lang="fr"] .op-b3 h1.fx-h1{font-size:clamp(44px,4vw,56px)}
+}
+@media (max-width:1179px){
+  .b3-in{
+    grid-template-columns:1fr;grid-template-areas:"copy" "stage" "rows";
+    min-height:0;max-width:560px;padding:40px 20px 8px;row-gap:8px
+  }
+  .b3-copy{text-align:center}
+  .b3-copy .fx-h1,.b3-copy .fx-lead{text-align:center;margin-inline:auto}
+  .b3-copy .fx-cta{justify-content:center}
+  .b3-stage{padding:16px 0 8px}
+  .b3-phone{width:236px}
+  .b3-ground{width:180px;margin-left:-90px;bottom:4px}
+  .b3-seg{display:flex}
+  .b3-row{display:none;border:0;padding:16px 4px 8px;text-align:center}
+  .b3-row.on{display:block}
+  .b3-row.on::before{display:none}
+  html[dir="rtl"] .b3-row{padding:16px 4px 8px}
+  .op-b3 .b3-t{font-size:20px}
+  .op-b3 .b3-d{margin-inline:auto}
+  .b3-rows{align-items:center}
+}
+
+@media (max-width:600px){
+  .op-b3 h1.fx-h1{font-size:clamp(30px,8.4vw,40px)}
+  html[lang="he"] .op-b3 h1.fx-h1{font-size:clamp(32px,8.8vw,42px)}
+  html[lang="de"] .op-b3 h1.fx-h1{font-size:clamp(32px,8.8vw,42px)}
+  html[lang="en"] .op-b3 h1.fx-h1{font-size:clamp(28px,8vw,36px)}
+  html[lang="es"] .op-b3 h1.fx-h1{font-size:clamp(28px,8vw,36px)}
+  html[lang="fr"] .op-b3 h1.fx-h1{font-size:clamp(24px,6.8vw,30px)}
+}
+@media (max-width:360px){
+  .b3-phone{width:214px}
+  .b3-sb{font-size:13px;padding:8px 4px}
+  .b3-seg{max-width:100%}
+  .b3-in{padding:36px 16px 8px}
+  html[lang="he"] .op-b3 h1.fx-h1{font-size:32px}
+  html[lang="en"] .op-b3 h1.fx-h1{font-size:28px}
+  html[lang="de"] .op-b3 h1.fx-h1{font-size:32px}
+  html[lang="es"] .op-b3 h1.fx-h1{font-size:26px}
+  html[lang="fr"] .op-b3 h1.fx-h1{font-size:24px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .b3-float,.b3-ground{animation:none}
+  .b3-thumb{transition:none}
+}
+
+/* 13/11: four professions (hospitals added); segments size to their label so long labels (DE Versicherung) are not cut at 375/390 */
+.b3-sb{flex:1 1 auto}
+
+/* 13/11 15:06 · perf (Solutions swap): the 4-layer drop-shadow filter on the floating phone image re-rasterised on every
+   scroll frame (14 fps at 4x CPU vs 50 without). Same shadow, drawn once by a rounded plate the size of the phone. */
+.b3-phone{position:relative;isolation:isolate}
+.b3-phone::before{content:"";position:absolute;inset:.6% .8%;z-index:-1;border-radius:20.5%/9.8%;pointer-events:none;
+  box-shadow:0 1px 1px rgba(0,0,0,.05),0 8px 16px rgba(15,22,45,.08),0 24px 40px rgba(15,22,45,.14),0 52px 80px rgba(15,22,45,.16)}
+html[data-theme="dark"] .b3-phone::before{box-shadow:0 0 0 .5px rgba(255,255,255,.2),0 16px 28px rgba(0,0,0,.5),0 40px 70px rgba(0,0,0,.65)}
+.b3-phone .op-ph,html[data-theme="dark"] .b3-phone .op-ph{filter:none}
+
+/* 13/11 15:45 · Sali: the switcher must hold every profession page (5+) without crowding.
+   Phone/tablet: the segmented bar keeps its look, segments size to their label and share spare room;
+   when they no longer fit, the bar scrolls sideways (snap, no scrollbar) and the hidden side fades. */
+@media (max-width:1179px){
+  .b3-seg{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    scroll-snap-type:x proximity;overscroll-behavior-x:contain;scroll-padding-inline:3px}
+  .b3-seg::-webkit-scrollbar{display:none}
+  .b3-sb{flex:1 0 auto;padding:8px 14px;overflow:visible;text-overflow:clip;scroll-snap-align:center}
+  .b3-seg.ovf:not(.at-s):not(.at-e){-webkit-mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent)}
+  html:not([dir="rtl"]) .b3-seg.ovf.at-s:not(.at-e),html[dir="rtl"] .b3-seg.ovf.at-e:not(.at-s){-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent)}
+  html:not([dir="rtl"]) .b3-seg.ovf.at-e:not(.at-s),html[dir="rtl"] .b3-seg.ovf.at-s:not(.at-e){-webkit-mask-image:linear-gradient(90deg,transparent,#000 22px);mask-image:linear-gradient(90deg,transparent,#000 22px)}
+}
+@media (max-width:360px){.b3-sb{padding:8px 11px}}
+/* 14/11 final close: at 375 and 320 the stage grew to its content (grid min-width:auto), so the bar ran past the screen edge
+   instead of scrolling inside itself. The bar now stays inside the page and scrolls with the same edge fade. */
+@media (max-width:1179px){.b3-stage,.b3-copy,.b3-rows{min-width:0}.b3-seg{max-width:min(360px,100%)}}
+/* Desktop list: with 5+ rows the rhythm tightens a little so the hero still fits one screen; nothing is truncated */
+@media (min-width:1180px){
+  .b3-rows.many .b3-row{padding-top:10px;padding-bottom:10px}
+  .b3-rows.many .b3-d{margin-top:4px}
+}

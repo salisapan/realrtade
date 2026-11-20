@@ -1,0 +1,66 @@
+/* Security page only. Phone restage of the approved 12/11 "Where Flow runs" component
+   (ported from assets/r15/dep-phone.css, itself ported from homepage r10/r11 home-dep-phone.css).
+   Scoped to #secdep. Phone only (max-width:760px). Desktop is untouched. Do not use on profession pages. */
+@media (max-width:760px){
+html body #secdep #onprem #op-s2{padding-left:0!important;padding-right:0!important}
+html body #secdep #onprem #op-s2>.opf:not(.dg-pan){width:min(400px,88vw)!important;margin-left:auto!important;margin-right:auto!important}
+html body #secdep #onprem #op-s2>.opf:not(.dg-pan)>.opf-box{aspect-ratio:1/1!important}
+
+/* corner labels -> centred above the ask row and below the answer row */
+html body #secdep #onprem #op-s2 .opf.ph .opf-lab{inset-inline:auto!important;left:50%!important;right:auto!important;top:calc(var(--u)*var(--pla,24)*1px)!important;transform:translate(-50%,-50%)!important;font-size:calc(var(--u)*13.6px)!important;letter-spacing:.24em!important}
+html body #secdep #onprem #op-s2 .opf.ph .opf-lab.b{top:calc(var(--u)*var(--plb,430)*1px)!important}
+html[lang=he] body #secdep #onprem #op-s2 .opf.ph .opf-lab,html[data-ui=he] body #secdep #onprem #op-s2 .opf.ph .opf-lab{letter-spacing:.06em!important;font-size:calc(var(--u)*16px)!important}
+
+/* cards: icon tile over a one-line label (three across fits at 15px; inline pills would not) */
+html body #secdep #onprem #op-s2 .opf.ph .opf-cd{border-radius:calc(var(--u)*17px)}
+html body #secdep #onprem #op-s2 .opf.ph .opf-ly{flex-direction:column;justify-content:center;gap:calc(var(--u)*7px)!important;padding:0!important}
+html body #secdep #onprem #op-s2 .opf.ph .opf-t,html body #secdep #onprem #op-s2 .opf.ph .opf-cd.d .opf-t{width:calc(var(--u)*30px);height:calc(var(--u)*30px);border-radius:calc(var(--u)*9px)}
+html body #secdep #onprem #op-s2 .opf.ph .opf-x b,html body #secdep #onprem #op-s2 .opf.ph .opf-cd.d .opf-x b{font-size:calc(var(--u)*19px);line-height:calc(var(--u)*22px);letter-spacing:-.004em;text-align:center}
+/* Answer row: seven icon tiles, like the Glance tool row. r11: Cloud and Edge use the same row as On-Prem */
+html body #secdep #onprem #op-s2>.opf.ph:not(.dg-pan) .opf-cd.d,html body #secdep #onprem #op-s2 .dg-layer .opf.ph .opf-cd.d{border-radius:calc(var(--u)*14px)}
+html body #secdep #onprem #op-s2>.opf.ph:not(.dg-pan) .opf-cd.d .opf-x,html body #secdep #onprem #op-s2 .dg-layer .opf.ph .opf-cd.d .opf-x{display:none}
+html body #secdep #onprem #op-s2>.opf.ph:not(.dg-pan) .opf-cd.d .opf-t,html body #secdep #onprem #op-s2 .dg-layer .opf.ph .opf-cd.d .opf-t{width:calc(var(--u)*30px);height:calc(var(--u)*30px);border-radius:calc(var(--u)*9px)}
+
+/* Flow node: larger, label beside it (Glance places "Glance" beside its tile) */
+html body #secdep #onprem #op-s2 .opf.ph .opf-halo .h0{width:calc(var(--u)*190px);height:calc(var(--u)*190px)}
+html body #secdep #onprem #op-s2 .opf.ph .opf-halo .h1{width:calc(var(--u)*124px);height:calc(var(--u)*124px)}
+html body #secdep #onprem #op-s2 .opf.ph .opf-halo .h2{width:calc(var(--u)*96px);height:calc(var(--u)*96px)}
+html body #secdep #onprem #op-s2 .opf.ph .opf-halo .h3{width:calc(var(--u)*44px);height:calc(var(--u)*44px)}
+html body #secdep #onprem #op-s2 .opf.ph .opf-live{width:calc(var(--u)*42px);height:calc(var(--u)*42px)}
+html body #secdep #onprem #op-s2 .opf.ph .opf-hub{width:auto!important;transform:translateY(-50%)!important;text-align:start!important}
+html body #secdep #onprem #op-s2 .opf.ph .opf-hub b{font-size:calc(var(--u)*20.6px);line-height:calc(var(--u)*24px);white-space:nowrap}
+html body #secdep #onprem #op-s2 .opf.ph .opf-hub small,html body #secdep #onprem #op-s2 .opf.ph .opf-hub .ph-b{display:block;margin-top:calc(var(--u)*3px);font-size:calc(var(--u)*16.2px);font-weight:400;line-height:calc(var(--u)*19px);color:var(--hub-s);white-space:nowrap;letter-spacing:0}
+html body #secdep #onprem #op-s2 .opf.ph .opf-hub .ph-dot{display:none}
+
+/* Cloud: the mask gate sits where the three wires meet, its caption beside it */
+html body #secdep #onprem #op-s2 .opf.ph .dg-gate:before{display:none}
+html body #secdep #onprem #op-s2 .opf.ph .dg-gb{width:calc(var(--u)*32px);height:calc(var(--u)*32px)}
+html body #secdep #onprem #op-s2 .opf.ph .dg-gate em{left:auto;right:auto;inset-inline-start:calc(var(--u)*27px);top:0;transform:translateY(-50%);width:auto;white-space:nowrap;text-align:start;font-size:calc(var(--u)*15.6px)}
+
+/* Edge (r11, On-Prem quietness): the dashed border is the employee's computer, its name sits on the bottom edge;
+   under it one quiet caption line in the On-Prem caption style, "External cloud | Never" (no pill, no stub). The generic answer label is dropped: the border says it. */
+html body #secdep #onprem #op-s2 .opf.ph .dg-bound em{font-size:calc(var(--u)*13.6px);top:auto;bottom:0;transform:translate(-50%,50%);font-weight:400;letter-spacing:.24em;text-transform:uppercase;color:var(--lab);background:var(--bx1);padding:0 calc(var(--u)*10px)}
+html[lang=he] body #secdep #onprem #op-s2 .opf.ph .dg-bound em,html[data-ui=he] body #secdep #onprem #op-s2 .opf.ph .dg-bound em{letter-spacing:.06em;font-size:calc(var(--u)*16px)}
+html body #secdep #onprem #op-s2 .opf.ph .dg-stub{display:none}
+html body #secdep #onprem #op-s2 .dg-edge .opf.ph .opf-lab.b{display:none}
+html body #secdep #onprem #op-s2 .opf.ph .dg-ext{padding:0;background:none;box-shadow:none;border-radius:0;gap:calc(var(--u)*7px);color:var(--lab)}
+html body #secdep #onprem #op-s2 .opf.ph .dg-ext i{width:calc(var(--u)*17px);height:calc(var(--u)*17px)}
+html body #secdep #onprem #op-s2 .opf.ph .dg-ext svg{stroke:var(--lab);stroke-width:1.9}
+html body #secdep #onprem #op-s2 .opf.ph .dg-ext b,html body #secdep #onprem #op-s2 .opf.ph .dg-ext u{font-size:calc(var(--u)*15.4px);line-height:1}
+html body #secdep #onprem #op-s2 .opf.ph .dg-ext b{font-weight:400;color:var(--lab)}
+html body #secdep #onprem #op-s2 .opf.ph .dg-ext u{font-weight:600;color:var(--hub-n);padding-inline-start:calc(var(--u)*7px)}
+html[lang=he] body #secdep #onprem #op-s2 .opf.ph .dg-ext b,html[data-ui=he] body #secdep #onprem #op-s2 .opf.ph .dg-ext b{font-size:calc(var(--u)*16px)}
+
+/* caption: the title on its own line, the subtitle under it */
+html body #secdep .dep2 .d2-note .d2-t b,html body #secdep .dep2 .d2-note .d2-t span{display:block}
+html body #secdep .dep2 .d2-note .d2-t span{margin-top:2px;text-wrap:balance}
+}
+
+
+@media (max-width:760px){
+html body #secdep .dep2{width:min(400px,88vw)!important;margin-left:auto!important;margin-right:auto!important;padding-left:0!important;padding-right:0!important;box-sizing:border-box}
+html body #secdep .dep2 .d2-seg{width:100%!important;max-width:none}
+html body #secdep .dep2 .d2-note{max-width:none;width:100%;box-sizing:border-box}
+html body #secdep #onprem{padding-left:0!important;padding-right:0!important}
+html body #secdep .sx-in{overflow:visible}
+}
