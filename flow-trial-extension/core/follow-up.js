@@ -527,6 +527,22 @@ const FlowFollowUp = (() => {
   // courtesy, and the day it is due (stated, else two business days).
   // text: your own message, quoted history removed. Returns null or a loop-shaped
   // ask with direction 'mine'.
+  // ---- promises the pipeline misses: Hebrew first-person future of a closed verb list, and a passive future with a time word -----------------------------------------------------
+  const PROMISE_VERBS_HE = '(?:אברר|אבדוק|אטפל|אעדכן|אשלח|אעביר|אחזור|אשיב|אתקן|אקפיץ|אצרף|אכין|אעלה|אתאם|אקבע|אתקשר|אדבר|אעשה|אסמן|אגיש|אחתום|אשלם|אסדר|אארגן|אוודא|אבצע|אשמור|אפתח|אסכם|אחזיר|אקפוץ|אכתוב|אשיג|אאשר|נעביר|נשלח|נעדכן|נטפל|נבדוק|נחזור|נתקן|נתאם|נקבע|נשיב|נצרף|נכין|נגיש|נבצע|נסדיר|נאשר|נחזיר|נקפיץ|נברר|נתקשר|נדבר)';
+  const PROMISE_PASSIVE_HE = /(?:^|[\s,.])(?:יועבר|יועברו|תועבר|תועברו|יופק|יופקו|תופק|תישלח|יישלח|יישלחו|יעודכן|יעודכנו|יטופל|יטופלו|תטופל|יוגש|יוגשו|תוגש|יתקבל|תתקבל|יוסדר|תוסדר|יסודר|יצא|תצא|יוחזר|יוחזרו)(?![\u0590-\u05FF])[^.?!]{0,40}(?:בהקדם|עד\s+\S+|ביום\s+\S+|מחר|בשבוע\s+\S+|בימים\s+הקרובים|ב-?\d)/;
+  const PROMISE_FIRST_HE = new RegExp('(?:^|[\\s,.;])' + PROMISE_VERBS_HE + '(?![\\u0590-\\u05FF])');
+  const PROMISE_CONDITIONAL_HE = /(?:^|[\s,])(?:אם|במידה|ככל\s+ש|בהנחה)(?![\u0590-\u05FF])[^.?!]{0,60}$/;
+  function commitmentExtra(s) {
+    const t = String(s || '').trim();
+    if (!hasHebrew(t) || /\?\s*$/.test(t)) return null;
+    if (PROMISE_PASSIVE_HE.test(t) && !/(?:^|\s)(?:אם|במידה)(?![\u0590-\u05FF])/.test(t)) return { type: 'promise', action: null };
+    const m = PROMISE_FIRST_HE.exec(t);
+    if (!m) return null;
+    // an open offer or a condition in front of the verb («במידה וצריך … ואעביר»), a request frame («אשמח ש…») and a thanks/done report are not promises
+    if (PROMISE_CONDITIONAL_HE.test(t.slice(0, m.index + 1))) return null;
+    if (/(?:אשמח|נשמח|אודה|נודה|אבקש\s+ש)(?![\u0590-\u05FF])/.test(t.slice(Math.max(0, m.index - 20), m.index + 1))) return null;
+    return { type: 'promise', action: null };
+  }
   function classifyCommitment(text, ctx) {
     const c = ctx || {};
     const body = String(text || '').trim();
@@ -539,6 +555,12 @@ const FlowFollowUp = (() => {
     for (const s of lines) {
       if (pipe) { const r = pipe.recognize(s); if (r.act === 'PROMISE' && r.commitment) { hit = { line: s, t: r.commitment, tier: r.tier }; break; } }
       else { const t = types.detectCommitmentSentence(s); if (t) { hit = { line: s, t }; break; } }
+    }
+    // Off by default (the product reads promises as before). With ctx.commitmentRecall: the closed-lexicon Hebrew promises the pipeline misses (measured in glance-ai/scoreboard/real-mail/commitment-eval.cjs).
+    // With the flag, an open offer or a condition in the promise sentence («במידה וצריך … אעביר», «אם זה אומר … אתקן») is not a promise; «אם כך, …» («if so, …») is a plain consequence and stays.
+    if (hit && c.commitmentRecall === true && hasHebrew(hit.line) && /(?:^|[\s,])(?:אם|במידה)(?![\u0590-\u05FF])/.test(hit.line) && !/(?:^|[\s,])אם\s+כך(?![\u0590-\u05FF])/.test(hit.line)) hit = null;
+    if (!hit && c.commitmentRecall === true) {
+      for (const s of sentences(body).filter((x) => words(x) >= 2 && !COURTESY.test(x))) { const t = commitmentExtra(s); if (t) { hit = { line: s, t, tier: 'rule' }; break; } }
     }
     if (!hit) return null;
     const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);

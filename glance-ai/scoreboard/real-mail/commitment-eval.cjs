@@ -15,7 +15,7 @@ const HELD = (s) => /heldout/.test(s);
 const S = {}, miss = [], fals = [];
 for (const l of rd('labels.jsonl')) {
   const body = text[l.set + '|' + l.id]; if (body == null) continue;
-  const cx = { now: NOW, lang: /[֐-׿]/.test(body) ? 'he' : 'en' };
+  const cx = { now: NOW, lang: /[֐-׿]/.test(body) ? 'he' : 'en', commitmentRecall: process.env.GLANCE_COMMIT_RECALL === '1' };
   let c = null, a = null; try { c = F.classifyCommitment(body, cx); } catch (e) {} try { a = F.classifyOutgoing(body, cx); } catch (e) {}
   const s = S[l.set] = S[l.set] || { n: 0, gold: 0, pred: 0, tp: 0, fp: 0, fn: 0, unsureGold: 0, predAlsoAsk: 0 };
   s.n++; if (l.commitment) s.gold++; if (l.commitment && l.unsure) s.unsureGold++;
