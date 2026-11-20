@@ -23,6 +23,7 @@ import '../core/google-task-close.js';
 import '../core/google-drive.js';
 import '../core/google-docs.js';
 import '../core/google-sheets.js';
+import '../core/google-slides.js';
 import '../core/google-compose.js';
 import '../core/google-drafts.js';
 import '../core/google-proof.js';
@@ -787,11 +788,15 @@ async function guardedUndo(connectorId, ref, ctx) {
   return result;
 }
 
-function csvRow(csv) {
+function csvRows(csv) {
+  if (typeof FlowGoogleSheets !== 'undefined' && typeof FlowGoogleSheets.parseCsv === 'function') {
+    const rows = FlowGoogleSheets.parseCsv(csv);
+    return rows.length ? rows : null;
+  }
   const line = String(csv || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0] || '';
   if (!line) return null;
   const cells = line.split(',').map((c) => c.trim()).filter(Boolean);
-  return cells.length ? cells : null;
+  return cells.length ? [cells] : null;
 }
 
 // The due day the card showed. The step's own date wins, as before. A card whose step carries no date still showed the
@@ -907,11 +912,28 @@ async function prepareWrite(connectorId, input, cred) {
   }
   if (connectorId === 'googleSheetAppend') {
     const spreadsheetId = i.spreadsheetId || params.spreadsheetId || '';
+    const rows = Array.isArray(params.rows) ? params.rows : (Array.isArray(i.rows) ? i.rows : csvRows(params.csv || i.csv));
+    const threadId = params.threadId || i.threadId || (params.glance && params.glance.threadId) || '';
     return {
       name: params.title || i.title || 'Sheet',
-      row: params.row || i.row || csvRow(params.csv || i.csv),
-      spreadsheetId: spreadsheetId,
-      origin: spreadsheetId ? (i.origin || params.origin || 'picked') : 'created'
+      rows: rows,
+      row: params.row || i.row || (rows && rows.length === 1 ? rows[0] : null),
+      spreadsheetId: params.createNew === true || i.createNew === true ? '' : spreadsheetId,
+      origin: (params.createNew === true || i.createNew === true) ? 'created' : (spreadsheetId ? (i.origin || params.origin || 'picked') : 'created'),
+      createNew: params.createNew === true || i.createNew === true,
+      threadId: threadId,
+      glance: params.glance || i.glance || (threadId ? { threadId: threadId } : null)
+    };
+  }
+  if (connectorId === 'googleSlides') {
+    const threadId = params.threadId || i.threadId || '';
+    return {
+      title: params.title || i.title || 'Meeting summary',
+      name: params.title || i.title || 'Meeting summary',
+      slides: params.slides || i.slides || null,
+      bullets: params.bullets || i.bullets || null,
+      threadId: threadId,
+      glance: params.glance || i.glance || (threadId ? { threadId: threadId } : null)
     };
   }
   return i;
@@ -1092,6 +1114,17 @@ async function verifySteps(steps, tab) {
   return { ok: true, account: picked.email, states: states };
 }
 
+function logSlidesWhy(connectorId, result, err) {
+  if (connectorId !== 'googleSlides') return;
+  if (result && result.ok === true && !err) return;
+  let reason = 'no-result';
+  if (err) reason = 'threw ' + String((err && err.message) || err).slice(0, 180);
+  else if (result && result.reason) reason = String(result.reason);
+  const google = result && result.googleReason ? ' ' + result.googleReason : '';
+  const detail = result && result.error ? ' ' + String(result.error).slice(0, 180) : '';
+  try { console.info('[Glance] slides why-not ' + reason + google + detail); } catch (e) { /* no console */ }
+}
+
 function onLaneMessage(msg, sender, sendResponse) {
   activeTab = msg && typeof msg.tabAccount === 'string' ? msg.tabAccount : '';
   if (msg && msg.type === 'flow:fetch-attachment') {
@@ -1102,8 +1135,45 @@ function onLaneMessage(msg, sender, sendResponse) {
   if (msg.type === 'flow:google-write') {
     preferredLang = msg.lang ? String(msg.lang) : '';
     Promise.resolve(guardedWrite(msg.connectorId, msg.input, { tab: msg.tabAccount, lang: msg.lang }))
+      .then((result) => {
+        const ref = result && result.ref;
+        if (msg.connectorId === 'googleSheetAppend' && result && result.ok && ref && ref.created !== true && ref.spreadsheetId && chrome.storage && chrome.storage.local && typeof chrome.storage.local.set === 'function') {
+          Promise.resolve(chrome.storage.local.set({ glanceLastSheet: { id: String(ref.spreadsheetId), name: String(ref.name || '') } })).catch(() => {});
+        }
+        return result;
+      })
       .then((result) => decorate(result))
-      .then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
+      .then((result) => {
+        logSlidesWhy(msg.connectorId, result);
+        sendResponse(result);
+      }, (err) => {
+        logSlidesWhy(msg.connectorId, null, err);
+        sendResponse({ ok: false, reason: 'unavailable' });
+      });
+    return true;
+  }
+  if (msg.type === 'flow:google-sheet-list') {
+    const Sheets = globalThis.FlowGoogleSheets;
+    Promise.resolve((async () => {
+      if (!Sheets || typeof Sheets.listAccessible !== 'function') return { ok: false, files: [] };
+      const listed = await Sheets.listAccessible((req) => laneHttp(req));
+      let lastId = '';
+      try {
+        const bag = await chrome.storage.local.get('glanceLastSheet');
+        lastId = bag && bag.glanceLastSheet && bag.glanceLastSheet.id ? String(bag.glanceLastSheet.id) : '';
+      } catch (e) { lastId = ''; }
+      return Object.assign({ lastId: lastId }, listed || { ok: false, files: [] });
+    })()).then(sendResponse, () => sendResponse({ ok: false, files: [] }));
+    return true;
+  }
+  if (msg.type === 'flow:google-sheet-probe') {
+    const Sheets = globalThis.FlowGoogleSheets;
+    Promise.resolve((async () => {
+      if (!Sheets || typeof Sheets.parseSheetLink !== 'function') return { ok: false, reason: 'unclear' };
+      const id = Sheets.parseSheetLink(msg.link);
+      if (!id) return { ok: false, reason: 'unclear', message: Sheets.NO_ACCESS };
+      return Sheets.probeSheet((req) => laneHttp(req), id);
+    })()).then(sendResponse, () => sendResponse({ ok: false, reason: 'unavailable' }));
     return true;
   }
   if (msg.type === 'flow:google-event-link-plan') {

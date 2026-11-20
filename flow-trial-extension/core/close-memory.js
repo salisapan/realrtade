@@ -52,6 +52,7 @@ const FlowCloseMemory = (() => {
     calendar: 'calendar',
     driveDoc: 'doc',
     driveSheet: 'sheet',
+    driveSlides: 'slides',
     driveFile: 'drive',
     notion: 'notion',
     tasks: 'tasks',

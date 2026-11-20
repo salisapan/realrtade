@@ -9,7 +9,8 @@ const FlowGoogleProof = (() => {
     googleLaneTask: true,
     googleDriveSave: true,
     googleDoc: true,
-    googleSheetAppend: true
+    googleSheetAppend: true,
+    googleSlides: true
   };
 
   function proofApi() {

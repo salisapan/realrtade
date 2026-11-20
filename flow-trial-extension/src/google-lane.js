@@ -10,6 +10,7 @@ const FlowGoogleLane = (() => {
     googleDoc: 'FlowGoogleDocs',
     googleDocFull: 'FlowGoogleDocs',
     googleSheetAppend: 'FlowGoogleSheets',
+    googleSlides: 'FlowGoogleSlides',
     googleNewFile: 'FlowWorkspaceFile',
     googleEventCallLink: 'FlowEventCallLink',
     googleRecurringReminder: 'FlowRecurringReminder',

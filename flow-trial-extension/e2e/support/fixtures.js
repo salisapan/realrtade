@@ -29,7 +29,7 @@ function gmailLiveSelf(o) {
     '<div role="listitem" data-legacy-thread-id="' + esc(threadId) + '" data-legacy-message-id="' + esc(messageId) + '">' +
     '<h3 class="iw"><span class="gD" email="' + esc(own) + '" name="' + esc(name) + '" data-hovercard-id="' + esc(own) + '">' + esc(name) + '</span></h3>' +
     '<span class="hb">' + (o.toSelfText === 'אליי' ? '' : 'to ') + '<span class="g2">' + esc(o.toSelfText || 'me') + '</span></span>' +
-    '<div class="a3s">' + esc(body) + '</div>' +
+    '<div class="a3s">' + esc(body).replace(/\n/g, '<br>') + '</div>' +
     '</div></div></body></html>';
 }
 
@@ -175,7 +175,7 @@ function gmailHtml(opts) {
     '<span email="' + esc(senderEmail) + '" name="' + esc(senderName) + '">' + esc(senderName) + '</span>' +
     '<span email="' + esc(ownEmail) + '"' + (o.userName ? (' name="' + esc(o.userName) + '"') : '') + '>me</span>' +
     (o.detailsTable ? detailsTable : toLine + ccLine) + chips +
-    '<div class="a3s">' + esc(body) + '</div>' +
+    '<div class="a3s">' + esc(body).replace(/\n/g, '<br>') + '</div>' +
     file +
     '</div>';
   // The inbox list stays in the page when a thread opens. Those rows are

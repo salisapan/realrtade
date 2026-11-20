@@ -318,10 +318,14 @@ test('Sheets append posts one row, reads it back, and Undo removes the sheet', a
   await clickDoIt(page);
   await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
   const id = server.last.sheet;
-  expect(server.calls.some((c) => c.method === 'POST' && c.path.indexOf('/v4/spreadsheets/' + id + '/values/') >= 0 && c.path.indexOf(':append') >= 0)).toBe(true);
-  expect(server.calls.some((c) => c.method === 'GET' && c.path.indexOf('/v4/spreadsheets/' + id + '/values/') >= 0)).toBe(true);
+  const uploads = server.calls.filter((c) => c.method === 'POST' && c.path.indexOf('/upload/drive/v3/files') === 0 && c.body && c.body.mimeType === 'application/vnd.google-apps.spreadsheet');
+  expect(uploads).toHaveLength(1);
+  expect(uploads[0].body.appProperties && uploads[0].body.appProperties.glanceSheet).toBe('1');
+  expect(uploads[0].body.parents && uploads[0].body.parents.length).toBe(1);
+  expect(server.calls.some((c) => c.path.indexOf('sheets.googleapis.com') >= 0 || c.path.indexOf('/v4/spreadsheets/') >= 0)).toBe(false);
+  expect(server.calls.some((c) => c.method === 'GET' && c.path === '/drive/v3/files/' + id + '/export')).toBe(true);
   await page.locator('div[role="main"] button.flow-chip-undo').click();
-  await expect.poll(() => server.calls.some((c) => c.method === 'PATCH' && c.path === '/drive/v3/files/' + id)).toBe(true);
+  await expect.poll(() => server.calls.some((c) => c.method === 'PATCH' && c.path === '/drive/v3/files/' + id && c.body && c.body.trashed === true)).toBe(true);
 });
 
 test('Sheets Undo refuses after the row is edited and leaves it', async ({ glance }) => {
@@ -354,6 +358,141 @@ test('Sheets Undo refuses after the row is edited and leaves it', async ({ glanc
   await expect(page.locator('div[role="main"]')).toContainText('You edited this. Undo left it alone.');
   expect(server.calls.slice(before).every((c) => c.method === 'GET')).toBe(true);
   expect(server.sheet(id).row).toEqual(edited);
+});
+
+test('a table in the mail becomes a sheet in Glance, Hebrew receipt, and the same thread appends', async ({ glance }) => {
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-rows',
+      threadId: 't-rows',
+      subject: 'גיליון כיסאות',
+      lang: 'he',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: 'בבקשה תכין גיליון:\nכיסאות 12\nשולחנות 3'
+    }
+  });
+  await clickDoIt(page);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toContainText('טופל');
+  await expect(page.locator('div[role="main"] button.flow-chip-undo')).toHaveText('בטל');
+  const id = server.last.sheet;
+  expect(server.sheetCsv(id)).toContain('כיסאות');
+  expect(server.files()[id].appProperties.glanceThread).toBe('t-rows');
+  const page2 = await open(glance, {
+    mail: {
+      messageId: 'm-rows-2',
+      threadId: 't-rows',
+      subject: 'גיליון כיסאות',
+      lang: 'he',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: 'בבקשה תכין גיליון:\nמנורות 2\nמדפים 5'
+    }
+  });
+  await clickDoIt(page2);
+  await expect(page2.locator('div[role="main"] .flow-chip-handled')).toContainText('טופל');
+  const creates = server.calls.filter((c) => c.method === 'POST' && c.path.indexOf('/upload/drive/v3/files') === 0 && c.body && c.body.mimeType === 'application/vnd.google-apps.spreadsheet');
+  expect(creates).toHaveLength(1);
+  expect(server.calls.some((c) => c.method === 'POST' && c.path.indexOf('/v4/spreadsheets/' + id + '/values/') >= 0 && c.path.indexOf(':append') >= 0)).toBe(true);
+  expect((server.sheet(id).rows || []).some((row) => String(row).indexOf('מנורות') >= 0 || (row.join && row.join(',').indexOf('מנורות') >= 0))).toBe(true);
+});
+
+test('append chooser lists Glance sheets, refuses a link it cannot open, and Undo deletes the rows', async ({ glance }) => {
+  const made = await open(glance, {
+    mail: {
+      messageId: 'm-made',
+      threadId: 't-made',
+      subject: 'Vendor payments',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: 'Please put these in a sheet:\n- chairs 12\n- desks 3'
+    }
+  });
+  await clickDoIt(made);
+  await expect(made.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  const id = server.last.sheet;
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-append',
+      threadId: 't-append',
+      subject: 'More rows',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: 'Please add these to the existing sheet:\n- lamps 2\n- shelves 4'
+    }
+  });
+  const chosen = page.locator('.flow-sheet-choose input[type="radio"]');
+  await expect(chosen).toBeChecked({ timeout: 20000 });
+  server.denyFile('notoursheet0123456789ab', 403);
+  await page.locator('.flow-sheet-choose-link').fill('https://docs.google.com/spreadsheets/d/notoursheet0123456789ab/edit');
+  await page.locator('.flow-sheet-choose-check').click();
+  await expect(page.locator('.flow-sheet-choose-note')).toContainText('ל-Glance אין גישה לגיליון הזה');
+  await expect(page.locator('.flow-chip-host')).toHaveAttribute('data-glance-sheet-id', id);
+  await clickDoIt(page);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 20000 });
+  expect(server.calls.some((c) => c.method === 'POST' && c.path.indexOf('/v4/spreadsheets/' + id + '/values/') >= 0 && c.path.indexOf(':append') >= 0 && (c.search || '').indexOf('valueInputOption=USER_ENTERED') >= 0 && (c.search || '').indexOf('insertDataOption=INSERT_ROWS') >= 0)).toBe(true);
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect.poll(() => server.calls.some((c) => c.method === 'POST' && c.path === '/v4/spreadsheets/' + id + ':batchUpdate' && c.body && c.body.requests && c.body.requests[0].deleteDimension)).toBe(true);
+});
+
+test('a meeting summary becomes a Slides deck, read back, and Undo trashes it', async ({ glance }) => {
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-deck',
+      threadId: 't-deck',
+      subject: 'סיכום פגישה — תקציב',
+      lang: 'he',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: 'סיכום פגישה\n- דנה שולחת את החוזה\n- התקציב נשאר'
+    }
+  });
+  await clickDoIt(page);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toContainText('טופל');
+  const id = server.last.slides;
+  const uploads = server.calls.filter((c) => c.method === 'POST' && c.path.indexOf('/upload/drive/v3/files') === 0 && c.body && c.body.mimeType === 'application/vnd.google-apps.presentation');
+  expect(uploads).toHaveLength(1);
+  expect(uploads[0].media.indexOf('rtl="1"')).toBeGreaterThan(-1);
+  expect(server.calls.some((c) => c.path.indexOf('slides.googleapis.com') >= 0)).toBe(false);
+  expect(server.slideText(id)).toContain('דנה שולחת את החוזה');
+  await page.locator('div[role="main"] button.flow-chip-undo').click();
+  await expect.poll(() => server.calls.some((c) => c.method === 'PATCH' && c.path === '/drive/v3/files/' + id && c.body && c.body.trashed === true)).toBe(true);
+});
+
+test('a sheet whose read-back is empty is trashed and is not Handled', async ({ glance }) => {
+  server.blankNextExports(2);
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-blank-sheet',
+      threadId: 't-blank-sheet',
+      subject: 'Chairs',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: 'Please put these in a sheet:\n- chairs 12\n- desks 3'
+    }
+  });
+  await clickDoIt(page);
+  await expect.poll(() => server.last.sheet).toBeTruthy();
+  const id = server.last.sheet;
+  await expect.poll(() => server.calls.some((c) => c.method === 'PATCH' && c.path === '/drive/v3/files/' + id && c.body && c.body.trashed === true)).toBe(true);
+  await expect(page.locator('div[role="main"] .flow-chip-handled')).toHaveCount(0);
+});
+
+test('the Drive picker page stays not set up until the API key is injected', async ({ glance }) => {
+  const page = await open(glance, {
+    mail: {
+      messageId: 'm-picker-page',
+      threadId: 't-picker-page',
+      subject: 'Hello',
+      senderEmail: S.SENDER,
+      senderName: 'flow',
+      body: 'Please confirm the transfer by Friday.'
+    }
+  });
+  const picker = await page.context().newPage();
+  await picker.goto('chrome-extension://' + glance.extensionId + '/picker/picker.html?requestId=e2e-picker');
+  await expect(picker.locator('#status')).toContainText('set up');
+  await picker.close();
 });
 
 testIfGmailCompose(
