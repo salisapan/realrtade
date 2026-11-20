@@ -175,7 +175,7 @@ const FlowStyle = (() => {
     return bits.join(', ');
   }
 
-  return { MIN_MESSAGES, GREETINGS, SIGNOFFS, LENGTHS, emptyProfile, observe, summary, restyle, hints, note, greetingOf, signoffOf };
+  return { MIN_MESSAGES, GREETINGS, SIGNOFFS, SIGN_TEXT, LENGTHS, emptyProfile, observe, summary, restyle, hints, note, greetingOf, signoffOf };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStyle };

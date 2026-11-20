@@ -143,9 +143,18 @@ const FlowIncomingJudge = (() => {
     return CONTACTS_HE.test(s) || CONTACTS_EN.test(s);
   }
 
+  // «מצורף מסמך הסיכום.» hands over a file. It is not an ask, so it is not a task and not a Do It.
+  function attachmentNotice(rawText) {
+    const s = String(rawText || '').replace(/\s+/g, ' ').trim();
+    if (!s || s.length > 80) return false;
+    if (/(?:תעבור|תגיד|תגידי|תשלח|עד\s|נא\s|בבקשה|אפשר|תוכל|הכן|תכין|לנסח|לכתוב)/.test(s)) return false;
+    return /^(?:(?:היי|הי|שלום)[,!\s]+)?מצורף(?:ה|ים|ות)?\s+מסמך\s+[\u0590-\u05FF]{2,24}[.!]?\s*$/.test(s);
+  }
+
   function namedQuietOf(rawText, i) {
     const raw = String(rawText || '').replace(/\s+/g, ' ').trim();
     if (!raw) return null;
+    if (attachmentNotice(raw)) return 'not-a-request';
     const hasDeadline = /\b(?:by|before|until|tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}[:\/]\d{2})\b|עד\s|מחר|היום|ביום|בשעה/i.test(raw);
     if (/\b(?:nothing (?:else|more) (?:is )?needed|no (?:further )?(?:action|reply|response) (?:is )?(?:needed|required|necessary)|all set|all done|that'?s (?:all|it))\b/i.test(raw)
       || /(?:אין צורך בעוד|לא\s+צריך\s+(?:עוד\s+)?כלום|הכול\s+(?:מוכן|סגור)|הכל\s+(?:מוכן|סגור))/.test(raw)) {
@@ -546,6 +555,9 @@ const FlowIncomingJudge = (() => {
 
     const bodyOnly = withoutPhoneSignature(prepareForJudge(i.text));
     const text = textForJudge(i.text, i.subject, selfSent(i));
+    if (attachmentNotice(bodyOnly) || attachmentNotice(text)) {
+      return { show: false, reason: 'quiet:not-a-request', intent: { type: null, quiet: 'not-a-request' } };
+    }
     const factProbe = (bodyOnly.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(bodyOnly) : null;
     const shortAsk = typeof FlowJudgment !== 'undefined' && typeof FlowJudgment.shortAskText === 'function' && FlowJudgment.shortAskText(bodyOnly);
     if (text.length < MIN_TEXT && !factProbe && !shortAsk) return { show: false, reason: 'too-short', intent: null };

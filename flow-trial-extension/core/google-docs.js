@@ -370,6 +370,140 @@ const FlowGoogleDocs = (() => {
     return Object.assign({ ok: true, ref: ref, proof: proof }, base);
   }
 
+  function clipProp(value, max) {
+    return String(value || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, max);
+  }
+
+  // Private to this app, so drive.file can find the Doc later by thread and type.
+  function glanceMeta(extra, text) {
+    const g = extra && extra.glance;
+    if (!g) return null;
+    const props = { glanceDoc: '1' };
+    const thread = clipProp(g.threadId, 80);
+    const type = clipProp(g.docType, 40);
+    const title = clipProp(g.titleKey, 60);
+    const at = clipProp(g.at, 20);
+    const message = clipProp(g.messageId, 120);
+    if (thread) props.glanceThread = thread;
+    if (message) props.glanceMessage = message;
+    if (type) props.glanceType = type;
+    if (title) props.glanceTitle = title;
+    if (at) props.glanceAt = at;
+    props.glanceHash = hash(normalizeText(text)).slice(0, 16);
+    return props;
+  }
+
+  function withGlance(meta, extra, text) {
+    const props = glanceMeta(extra, text);
+    if (!props) return meta;
+    meta.appProperties = props;
+    meta.description = 'glance ' + JSON.stringify({
+      glance: true,
+      thread: props.glanceThread || '',
+      message: props.glanceMessage || '',
+      type: props.glanceType || '',
+      title: props.glanceTitle || '',
+      at: props.glanceAt || ''
+    });
+    return meta;
+  }
+
+  async function listGlanceDocs(http) {
+    const q = "mimeType='" + DOC_MIME + "' and trashed=false and appProperties has { key='glanceDoc' and value='1' }";
+    const fields = 'files(id,name,mimeType,trashed,webViewLink,description,appProperties,createdTime)';
+    const listed = await call(http, {
+      method: 'GET',
+      url: FILES + '?q=' + encodeURIComponent(q) + '&pageSize=20&fields=' + encodeURIComponent(fields)
+    });
+    const denied = authFail(listed);
+    if (denied) return denied;
+    if (!listed.ok) return { ok: false, reason: 'skipped', files: null };
+    const files = listed.json && Array.isArray(listed.json.files) ? listed.json.files : [];
+    return { ok: true, files: files };
+  }
+
+  async function uploadHtml(http, url, meta, html) {
+    const packed = multipart(meta, 'text/html; charset=UTF-8', utf8Bytes(html));
+    return call(http, {
+      method: url.indexOf('/upload/drive/v3/files/') >= 0 ? 'PATCH' : 'POST',
+      url: url,
+      headers: { 'Content-Type': packed.contentType },
+      body: packed.body
+    });
+  }
+
+  async function replaceAndRead(id, name, text, htmlIn, http, clock, extraRef, expectedHash) {
+    const C = cfg();
+    const got = await call(http, { method: 'GET', url: fileUrl(id) });
+    const gotDenied = authFail(got);
+    if (gotDenied) return gotDenied;
+    if (!got.ok || !got.json || got.json.id !== id || got.json.trashed === true || got.json.mimeType !== DOC_MIME) {
+      return { ok: false, reason: 'verify_failed', ref: null, proof: null, where: 'Google Docs', target: name };
+    }
+    const exportUrl = FILES + '/' + encodeURIComponent(id) + '/export?mimeType=' + encodeURIComponent('text/plain');
+    const prior = await call(http, { method: 'GET', url: exportUrl });
+    if (prior.status === 401 || prior.status === 403) return authFail(prior) || { ok: false, reason: 'not-connected' };
+    if (!prior.ok) return { ok: false, reason: 'unconfirmed', error: "Couldn't confirm it's unchanged. Undo left it alone." };
+    const previous = normalizeText(prior.text || '');
+    if (expectedHash && hash(previous).slice(0, 16) !== String(expectedHash)) {
+      return { ok: false, reason: 'user-edited', error: 'You edited this. Undo left it alone.' };
+    }
+    const html = htmlIn ? wrapDocHtml(htmlIn, text) : asHtml(text);
+    const meta = withGlance({ mimeType: DOC_MIME }, extraRef, text);
+    if (name) meta.name = name;
+    const posted = await uploadHtml(http, 'https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(id) + '?uploadType=multipart&fields=' + encodeURIComponent(FILE_FIELDS), meta, html);
+    const denied = authFail(posted);
+    if (denied) return denied;
+    const base = { where: 'Google Docs', target: name, written: 'Doc · ' + name, url: null };
+    if (!posted.ok) return Object.assign({ ok: false, reason: 'http-' + posted.status, ref: null, proof: null }, base);
+    const again = await call(http, { method: 'GET', url: exportUrl });
+    if (!again.ok || !exportContains(again.text || '', text, html)) {
+      const back = asHtml(previous);
+      await uploadHtml(http, 'https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(id) + '?uploadType=multipart', { mimeType: DOC_MIME }, back);
+      return Object.assign({ ok: false, reason: 'verify_failed', cleanedUp: true, ref: { documentId: id, externalId: id, updated: true } }, base);
+    }
+    const link = docLink(got.json, id);
+    base.url = link;
+    const proof = C && C.proofOf(SYSTEM, id, link, C.clockIso(clock));
+    const ref = {
+      documentId: id,
+      externalId: id,
+      created: false,
+      updated: true,
+      fullDocument: true,
+      name: name || (got.json && got.json.name) || '',
+      contentText: normalizeText(again.text || ''),
+      previousText: previous,
+      snapshot: fileSnapshot(posted.json || got.json)
+    };
+    if (!proof) return Object.assign({ ok: false, reason: 'proof_pending', ref: ref, proof: null }, base);
+    return Object.assign({ ok: true, ref: ref, proof: proof }, base);
+  }
+
+  async function restoreUpdated(ref, http) {
+    const id = docId(ref && (ref.documentId || ref.externalId));
+    if (!id) return { ok: false, reason: 'unclear' };
+    const got = await call(http, { method: 'GET', url: fileUrl(id) });
+    if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
+    if (got.status === 404) return { ok: true, reason: 'restored', written: 'Doc restored.' };
+    if (!got.ok || got.status === 0) return unconfirmedResult();
+    if (got.json && got.json.trashed === true) return { ok: true, reason: 'restored', written: 'Doc restored.' };
+    if (ref.name && got.json && got.json.name && String(got.json.name) !== String(ref.name)) return editedResult();
+    const want = normalizeText(ref.contentText || '');
+    const exported = await call(http, {
+      method: 'GET',
+      url: FILES + '/' + encodeURIComponent(id) + '/export?mimeType=' + encodeURIComponent('text/plain')
+    });
+    if (exported.status === 401 || exported.status === 403) return { ok: false, reason: 'not-connected' };
+    if (!exported.ok || exported.status === 0) return unconfirmedResult();
+    if (want && normalizeText(exported.text || '') !== want) return editedResult();
+    const back = asHtml(ref.previousText || '');
+    const posted = await uploadHtml(http, 'https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(id) + '?uploadType=multipart', { mimeType: DOC_MIME, name: ref.name || '' }, back);
+    if (posted.status === 401 || posted.status === 403) return { ok: false, reason: 'not-connected' };
+    if (!posted.ok) return { ok: false, reason: 'http-' + posted.status };
+    return { ok: true, reason: 'restored', written: 'Doc restored.' };
+  }
+
   async function write(input, http, clock) {
     const C = cfg();
     const i = input || {};
@@ -377,14 +511,19 @@ const FlowGoogleDocs = (() => {
     if (blocked) return blocked;
     const text = textOf(i);
     if (!text) return { ok: false, reason: 'unclear' };
+    const name = safeName(i.name || i.title || 'Note');
+    const extra = {};
+    if (i.fullDocument) extra.fullDocument = true;
+    if (i.glance) extra.glance = i.glance;
+    const extraRef = Object.keys(extra).length ? extra : null;
     const existing = docId(i.documentId);
     if (existing) {
       if (!ours(i)) return { ok: false, reason: 'not-ours' };
-      return insertAndRead(existing, text, http, clock, false, safeName(i.name || i.title || '') || existing);
+      if (i.fullDocument && (i.html || text)) return replaceAndRead(existing, name || existing, text, i.html, http, clock, extraRef, String(i.expectedHash || ''));
+      return insertAndRead(existing, text, http, clock, false, name || existing);
     }
-    const name = safeName(i.name || i.title || 'Note');
     if (!name) return { ok: false, reason: 'unclear' };
-    return createAndRead(name, text, i.html, http, clock, i.fullDocument ? { fullDocument: true } : null);
+    return createAndRead(name, text, i.html, http, clock, extraRef);
   }
 
   // The Glance folder is one this lane made, so drive.file can see it.
@@ -417,11 +556,8 @@ const FlowGoogleDocs = (() => {
     const folder = await glanceFolder(http);
     if (folder && folder.ok === false) return folder;
     const html = htmlIn ? wrapDocHtml(htmlIn, text) : asHtml(text);
-    const packed = multipart(
-      Object.assign({ name: name, mimeType: DOC_MIME }, folder && folder.id ? { parents: [folder.id] } : {}),
-      'text/html; charset=UTF-8',
-      utf8Bytes(html)
-    );
+    const meta = withGlance(Object.assign({ name: name, mimeType: DOC_MIME }, folder && folder.id ? { parents: [folder.id] } : {}), extraRef, text);
+    const packed = multipart(meta, 'text/html; charset=UTF-8', utf8Bytes(html));
     const posted = await call(http, {
       method: 'POST',
       url: UPLOAD,
@@ -491,6 +627,7 @@ const FlowGoogleDocs = (() => {
   async function undo(ref, http) {
     const id = docId(ref && (ref.documentId || ref.externalId));
     if (!id) return { ok: false, reason: 'unclear' };
+    if (ref.updated === true && ref.created !== true) return restoreUpdated(ref, http);
     if (ref.created === true) {
       const got = await call(http, { method: 'GET', url: fileUrl(id) });
       if (got.status === 401 || got.status === 403) return { ok: false, reason: 'not-connected' };
@@ -580,6 +717,7 @@ const FlowGoogleDocs = (() => {
     htmlToPlain: htmlToPlain,
     normalizeText: normalizeText,
     exportContains: exportContains,
+    listGlanceDocs: listGlanceDocs,
     FOLDER_NAME: FOLDER_NAME
   };
 })();

@@ -109,6 +109,10 @@ check('B10: worker plan path offers a non-blank built doc (GFD wiring)', hostPla
 
 const docPreviewSlice = gmail.slice(gmail.indexOf('function showDocPreviewReceipt'), gmail.indexOf('function showPreviewReceipt'));
 check('B10: doc preview receipt learns approved only with fetchedBack proof', /response\.proof/.test(docPreviewSlice) && /fetchedBack === true/.test(docPreviewSlice) && /type: 'approved'/.test(docPreviewSlice) && /fetchedBack: true/.test(docPreviewSlice));
+check('the created Doc receipt offers the same-thread עדכן without a Picker',
+  gmail.indexOf("he ? 'עדכן' : 'Update'") >= 0 && gmail.indexOf("origin: 'created'") >= 0 && gmail.indexOf('flow-doc-thread-update') >= 0);
+check('עדכן מסמך קיים is rendered only when pickerUpdateAvailable says the Picker is real',
+  gmail.indexOf('pickerUpdateAvailable') >= 0 && gmail.indexOf('עדכן מסמך קיים') >= 0 && /if \(!FlowBuild\.pickerUpdateAvailable\(/.test(gmail));
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL PASS');
 process.exit(failures ? 1 : 0);

@@ -178,8 +178,20 @@ function installE2EHooks() {
       return Promise.reject(new Error(e2e.webFlowError || 'e2e-no-window'));
     };
   }
+  // A spec may replace googleAuthToken for one consent window. Reset has to
+  // put the shared helper back, or the next test's Connect records a call
+  // and then fails it.
+  function bindGlanceE2eAuthToken(e2e) {
+    if (!e2e) return;
+    e2e.googleAuthToken = function (interactive) {
+      e2e.authCalls.push({ interactive: Boolean(interactive), at: Date.now() });
+      if (e2e.authFail) return Promise.reject(new Error('The user did not approve access.'));
+      return Promise.resolve(e2e.identityToken || 'ya29.e2e');
+    };
+  }
   if (globalThis.__glanceE2e && globalThis.__glanceE2e.installed) {
     bindGlanceE2eWebAuth(globalThis.__glanceE2e);
+    bindGlanceE2eAuthToken(globalThis.__glanceE2e);
     return { ok: true, already: true };
   }
   const e2e = globalThis.__glanceE2e || {};
@@ -698,11 +710,7 @@ function installE2EHooks() {
     return Promise.resolve(json(599, { error: 'e2e-unmocked' }));
   };
 
-  e2e.googleAuthToken = function (interactive) {
-    e2e.authCalls.push({ interactive: Boolean(interactive), at: Date.now() });
-    if (e2e.authFail) return Promise.reject(new Error('The user did not approve access.'));
-    return Promise.resolve(e2e.identityToken || 'ya29.e2e');
-  };
+  bindGlanceE2eAuthToken(e2e);
   bindGlanceE2eWebAuth(e2e);
 
   const identity = chrome.identity;

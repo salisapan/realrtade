@@ -902,6 +902,8 @@ async function prepareWrite(connectorId, input, cred) {
       origin: documentId ? (i.origin || params.origin || 'picked') : 'created'
     };
     if (html) out.html = html;
+    if (params.glance || i.glance) out.glance = params.glance || i.glance;
+    if (params.expectedHash || i.expectedHash) out.expectedHash = String(params.expectedHash || i.expectedHash || '');
     if (i.fullDocument === true || params.fullDocument === true || connectorId === 'googleDocFull') out.fullDocument = true;
     return out;
   }
@@ -1181,13 +1183,29 @@ function onLaneMessage(msg, sender, sendResponse) {
       if (Config && typeof Config.hasScope === 'function' && Config.hasScope(scopes, Config.SCOPE_DRIVE_FILE) === false) {
         return { action: 'reconnect', reason: 'drive-scope' };
       }
+      // Docs Glance created, and only those: drive.file cannot see the rest.
+      // A list that fails is skipped; the offer does not invent a match.
+      let existingDocs = null;
+      const Docs = globalThis.FlowGoogleDocs;
+      if (Docs && typeof Docs.listGlanceDocs === 'function') {
+        try {
+          const listed = await Docs.listGlanceDocs(laneHttp);
+          if (listed && listed.ok && Array.isArray(listed.files)) existingDocs = listed.files;
+        } catch (e) { existingDocs = null; }
+      }
       return F.plan({
         flags: { [F.SWITCH]: true },
         text: String(msg.text || '').slice(0, 8000),
         lang: msg.lang === 'he' ? 'he' : 'en',
         styleSummary: msg.styleSummary || null,
         companyTemplate: msg.companyTemplate || null,
-        template: msg.companyTemplate || msg.template || null
+        template: msg.companyTemplate || msg.template || null,
+        threadId: String(msg.threadId || ''),
+        messageId: String(msg.messageId || ''),
+        ownDocumentIds: Array.isArray(msg.ownDocumentIds) ? msg.ownDocumentIds.slice(0, 8) : [],
+        attachments: Array.isArray(msg.attachments) ? msg.attachments.slice(0, 12) : [],
+        drafts: Array.isArray(msg.drafts) ? msg.drafts.slice(0, 8) : [],
+        existingDocs: existingDocs
       });
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;

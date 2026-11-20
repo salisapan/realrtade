@@ -2100,6 +2100,12 @@ function glanceUiCopy(kind) {
       logScanSkip(messageId, 'lane-receipt');
       return;
     }
+    const docReceipt = await readDocReceipt(stable.legacy || messageId, stable.laneIds);
+    if (docReceipt && message.isConnected && !message.querySelector('.flow-chip-host')) {
+      mountDocReceipt(message, docReceipt, messageId);
+      logScanSkip(messageId, 'doc-receipt');
+      return;
+    }
 
     // A message can reach "seen" with no live chip in front of you two very
     // different ways: you dismissed it, or Gmail rebuilt the DOM out from
@@ -2366,7 +2372,7 @@ function glanceUiCopy(kind) {
     // A new empty Google Doc, Sheet or Slides deck asked for by name ("Can you create a shared doc called
     // Q4 launch plan?"). The worker decides and only when the owner's switch WORKSPACE_FILE is on (off by
     // default); otherwise nothing here changes. It is the canonical Do It card with the existing step list.
-    if (usingGoogle && await showFullDocumentChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
+    if (usingGoogle && await showFullDocumentChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent, attachments: attachmentsEarly })) return;
     if (inboundMail && usingGoogle && await showGoogleContactsChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showEventLinkChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
     if (inboundMail && usingGoogle && await showRecurringChip(message, { messageId, stable, legacyId, threadId, sender, subject, text, intent })) return;
@@ -3410,8 +3416,40 @@ function glanceUiCopy(kind) {
     else message.appendChild(host);
   }
 
-  // A full quote/proposal Doc in the person's writing style (switch FULL_DOCUMENT_CLOSE, off).
-  // One Do It creates the Doc for preview; Glance never sends mail.
+  // A full document in the person's writing style (switch FULL_DOCUMENT_CLOSE, off).
+  // One click creates it, opens one that already exists, or updates the Doc
+  // Glance already made in this thread. Glance never sends mail.
+  function localIsoDay(d) {
+    const dt = d ? new Date(d) : new Date();
+    if (isNaN(dt.getTime())) return '';
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  // A Gmail draft badge already on the thread. A reply draft with no subject
+  // is not the document. Nothing here calls Gmail's API.
+  function pageDrafts(message) {
+    const root = (message && message.closest && (message.closest('[role="main"]') || message.parentElement)) || message;
+    if (!root || !root.querySelectorAll) return [];
+    const out = [];
+    const nodes = root.querySelectorAll('span, div');
+    for (let i = 0; i < nodes.length && out.length < 4; i++) {
+      const n = nodes[i];
+      if (n.closest && (n.closest('.a3s') || n.closest('.flow-chip-host'))) continue;
+      if (n.children && n.children.length) continue;
+      const t = String(n.textContent || '').trim();
+      if (t !== 'Draft' && t !== 'טיוטה') continue;
+      const named = n.parentElement && n.parentElement.querySelector('[data-draft-subject]');
+      const subject = named ? String(named.getAttribute('data-draft-subject') || named.textContent || '').trim() : '';
+      const link = n.parentElement && n.parentElement.querySelector('a[href]');
+      const href = link ? String(link.getAttribute('href') || '') : '';
+      out.push({ subject: subject, href: href, source: 'page' });
+    }
+    return out;
+  }
+
   async function showFullDocumentChip(message, c) {
     if (glanceLabsLocked() || !(await glanceSwitchOn('FULL_DOCUMENT_CLOSE'))) {
       try { console.info('[Glance] full-document plan', 'off', glanceLabsLocked() ? 'labs-locked' : 'switch-off'); } catch (e) { /* no console */ }
@@ -3428,12 +3466,20 @@ function glanceUiCopy(kind) {
     const started = Date.now();
     let plan = null;
     try {
+      const files = Array.isArray(c.attachments) ? c.attachments : [];
       plan = await sendRuntime(Object.assign({
         type: 'flow:google-full-document-plan',
         text: String(c.subject || '').trim() ? c.subject + '. ' + c.text : c.text,
         lang: lang,
         styleSummary: styleSummary,
-        companyTemplate: template
+        companyTemplate: template,
+        threadId: c.threadId || '',
+        messageId: c.messageId || '',
+        attachments: files.slice(0, 12).map((file) => ({
+          filename: String((file && (file.filename || file.name)) || '').slice(0, 180),
+          mimeType: String((file && (file.mimeType || file.mime)) || '').slice(0, 120)
+        })),
+        drafts: pageDrafts(message)
       }, laneAccountContext()));
     } catch (e) { plan = null; }
     try {
@@ -3476,7 +3522,20 @@ function glanceUiCopy(kind) {
       messageId: c.messageId, legacyMessageId: c.legacyId || null, messageIds: c.stable.messageIds, laneIds: c.stable.laneIds,
       intent: intent, process: process, sender: c.sender, subject: c.subject, attachment: null, attachments: [],
       threadUrl: threadUrl(c.legacyId), threadId: c.threadId, bodyText: c.text, executionMemory: {}, app: 'gmail',
-      googleBuilt: plan.built, previewOnly: true
+      googleBuilt: plan.built, previewOnly: true,
+      doItLabel: plan.doItLabel || '',
+      noDoIt: plan.noDoIt === true,
+      fullDocument: {
+        mode: plan.mode || 'create',
+        documentId: plan.existing && plan.existing.id || '',
+        url: plan.existing && plan.existing.url || '',
+        hash: plan.existing && plan.existing.hash || '',
+        docType: plan.docType || (plan.googleClose && plan.googleClose.artifact) || 'quote',
+        titleKey: plan.titleKey || '',
+        threadId: c.threadId || '',
+        messageId: c.messageId || '',
+        at: localIsoDay()
+      }
     });
     const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === c.messageId);
     if (!shownAlready) {
@@ -3942,7 +4001,8 @@ function glanceUiCopy(kind) {
         lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
         uiLang: lang,
         surface: 'gmail',
-        doItLabel: ctx.needsGoogleConnect ? glanceShow(glanceUiCopy('connectGoogle')) : null,
+        doItLabel: ctx.doItLabel || (ctx.needsGoogleConnect ? glanceShow(glanceUiCopy('connectGoogle')) : null),
+        noDoIt: ctx.noDoIt === true,
         dateChoices: ctx.process.dateChoices || null,
         onDateChoice: (iso) => {
           if (typeof FlowActions !== 'undefined' && FlowActions.chooseDate) FlowActions.chooseDate(ctx.process, iso);
@@ -4182,6 +4242,21 @@ function glanceUiCopy(kind) {
         csv: action.kind === 'driveSheet' ? built.csv : null
       };
       if (action.kind === 'driveDocFull' || (ctx && ctx.previewOnly)) params.fullDocument = true;
+      if (ctx && ctx.fullDocument) {
+        const mark = ctx.fullDocument;
+        params.glance = {
+          threadId: String(mark.threadId || '').slice(0, 80),
+          messageId: String(mark.messageId || (ctx && ctx.messageId) || '').slice(0, 120),
+          docType: String(mark.docType || '').slice(0, 40),
+          titleKey: String(mark.titleKey || '').slice(0, 60),
+          at: String(mark.at || '').slice(0, 20)
+        };
+        if (mark.mode === 'update' && mark.documentId) {
+          params.documentId = mark.documentId;
+          params.origin = 'created';
+          params.expectedHash = mark.hash || '';
+        }
+      }
       return Object.assign(base, { params: params });
     }
 
@@ -5828,8 +5903,139 @@ function glanceUiCopy(kind) {
     if (chip && typeof chip.replaceWith === 'function') chip.replaceWith(done);
   }
 
-  function showDocPreviewReceipt(host, chip, result, ctx) {
-    const response = result.response || {};
+  const DOC_RECEIPT_KEY = 'glanceDocReceipt';
+
+  function docReceiptKeys(messageId, extraIds) {
+    const keys = [];
+    function add(id) {
+      const s = String(id || '').trim();
+      if (!s || keys.indexOf(s) >= 0) return;
+      keys.push(s);
+    }
+    add(messageId);
+    (extraIds || []).forEach(add);
+    return keys;
+  }
+
+  function rememberDocReceipt(ctx, response) {
+    const ref = response && response.ref;
+    const documentId = ref && (ref.documentId || ref.externalId);
+    const keys = docReceiptKeys(ctx && ctx.messageId, [ctx && ctx.legacyMessageId].concat((ctx && ctx.laneIds) || []));
+    if (!keys.length || !documentId || !chromeLive()) return Promise.resolve();
+    const store = chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') return Promise.resolve();
+    const row = {
+      expires: Date.now() + LANE_UNDO_TTL_MS,
+      documentId: String(documentId),
+      threadId: String((ctx && ctx.threadId) || ''),
+      written: String((response && response.written) || ''),
+      url: String((response && response.url) || ''),
+      title: String((ctx && ctx.googleBuilt && ctx.googleBuilt.title) || ''),
+      html: String((ctx && ctx.googleBuilt && ctx.googleBuilt.html) || ''),
+      ref: ref,
+      ids: keys
+    };
+    return Promise.resolve()
+      .then(() => store.get(DOC_RECEIPT_KEY))
+      .then((bag) => {
+        const all = bag && bag[DOC_RECEIPT_KEY] && typeof bag[DOC_RECEIPT_KEY] === 'object' ? bag[DOC_RECEIPT_KEY] : {};
+        const now = Date.now();
+        Object.keys(all).forEach((key) => { if (!all[key] || !all[key].expires || all[key].expires < now) delete all[key]; });
+        keys.forEach((id) => { all[id] = row; });
+        return store.set({ [DOC_RECEIPT_KEY]: all });
+      })
+      .then(() => { try { console.info('[Glance] full-document receipt stored'); } catch (e) { /* no console */ } })
+      .catch(() => {});
+  }
+
+  function readDocReceipt(messageId, extraIds) {
+    const keys = docReceiptKeys(messageId, extraIds);
+    if (!keys.length || !chromeLive()) return Promise.resolve(null);
+    const store = chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function') return Promise.resolve(null);
+    return Promise.resolve()
+      .then(() => store.get(DOC_RECEIPT_KEY))
+      .then((bag) => {
+        const all = bag && bag[DOC_RECEIPT_KEY] && typeof bag[DOC_RECEIPT_KEY] === 'object' ? bag[DOC_RECEIPT_KEY] : {};
+        const now = Date.now();
+        for (let i = 0; i < keys.length; i++) {
+          const row = all[keys[i]];
+          if (row && row.documentId && row.expires && row.expires >= now) return row;
+        }
+        return null;
+      })
+      .catch(() => null);
+  }
+
+  function forgetDocReceipt(messageId, extraIds) {
+    const keys = docReceiptKeys(messageId, extraIds);
+    if (!keys.length || !chromeLive()) return Promise.resolve();
+    const store = chrome.storage && chrome.storage.local;
+    if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') return Promise.resolve();
+    return Promise.resolve()
+      .then(() => store.get(DOC_RECEIPT_KEY))
+      .then((bag) => {
+        const all = bag && bag[DOC_RECEIPT_KEY] && typeof bag[DOC_RECEIPT_KEY] === 'object' ? bag[DOC_RECEIPT_KEY] : {};
+        const drop = {};
+        keys.forEach((id) => { drop[id] = true; });
+        Object.keys(all).forEach((key) => {
+          const row = all[key];
+          if (drop[key] || (row && (row.ids || []).some((id) => drop[id]))) delete all[key];
+        });
+        return store.set({ [DOC_RECEIPT_KEY]: all });
+      })
+      .catch(() => {});
+  }
+
+  // The Picker button exists only when picker/ is in this build and its key is
+  // not the placeholder. A missing key resolves the click to nothing, so the
+  // button is not drawn. No disabled control and no retry line.
+  function maybePickerDocUpdate(actionsRow, done, response, he, ctx) {
+    if (!response || !response.html) return;
+    if (typeof FlowBuild === 'undefined' || FlowBuild.PICKER_BUNDLED !== true || typeof FlowBuild.pickerUpdateAvailable !== 'function') return;
+    if (typeof chrome === 'undefined' || !chrome.runtime || typeof chrome.runtime.getURL !== 'function') return;
+    let text = '';
+    try { text = chrome.runtime.getURL('picker/picker.js'); } catch (e) { text = ''; }
+    if (!text) return;
+    fetch(text).then((res) => (res && res.ok ? res.text() : '')).then((src) => {
+      const found = String(src || '').match(/GOOGLE_PICKER_API_KEY\s*=\s*'([^']*)'/);
+      if (!FlowBuild.pickerUpdateAvailable(true, found && found[1])) return;
+      if (!actionsRow.isConnected) return;
+      const updateBtn = el('button', 'flow-doc-update', he ? 'עדכן מסמך קיים' : 'Update an existing document');
+      updateBtn.type = 'button';
+      updateBtn.addEventListener('click', () => {
+        updateBtn.disabled = true;
+        openDrivePicker().then((file) => {
+          const picked = file && (file.id || file.documentId);
+          if (!picked) {
+            updateBtn.disabled = false;
+            return null;
+          }
+          return sendExecuteAction({
+            connectorId: 'driveDocFull',
+            params: {
+              title: response.title || 'Document',
+              html: response.html,
+              fullDocument: true,
+              documentId: picked,
+              origin: 'picked'
+            }
+          });
+        }).then((res) => {
+          if (!res) return;
+          updateBtn.disabled = false;
+          if (res.ok) {
+            const written = done.querySelector('.flow-chip-written');
+            if (written && res.written) written.textContent = res.written;
+          }
+        }).catch(() => { updateBtn.disabled = false; });
+      });
+      actionsRow.appendChild(updateBtn);
+    }).catch(() => {});
+  }
+
+  function paintDocReceipt(host, chip, receipt, ctx) {
+    const response = receipt || {};
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('role', 'status');
     const he = glanceUiHebrew();
@@ -5841,19 +6047,23 @@ function glanceUiCopy(kind) {
       link.rel = 'noopener';
       done.appendChild(link);
     }
+    let undoRef = response.ref;
     const undo = el('button', 'flow-chip-undo', glanceShow(glanceUiCopy('undo') || 'Undo'));
     undo.type = 'button';
     undo.addEventListener('click', () => {
       undo.disabled = true;
       undo.textContent = he ? 'מבטל…' : 'Undoing…';
-      sendLaneUndo('googleDocFull', response.ref).then((undone) => {
+      sendLaneUndo('googleDocFull', undoRef).then((undone) => {
         const word = (undone && undone.ok) ? (undone.reason || 'trashed') : ((undone && undone.reason) || 'failed');
         try { console.log('[Glance] full-document undo ' + word); } catch (e) {}
         if (undone && undone.ok) {
-          const line = glanceUiCopy('undoneDocTrash') || (he ? 'בוטל · המסמך הועבר לאשפה' : 'Undone · the document was moved to the trash');
+          const line = undone.reason === 'restored'
+            ? (he ? 'בוטל · המסמך חזר לגרסה הקודמת' : 'Undone · the previous version is back')
+            : (glanceUiCopy('undoneDocTrash') || (he ? 'בוטל · המסמך הועבר לאשפה' : 'Undone · the document was moved to the trash'));
           const written = done.querySelector('.flow-chip-written');
           if (written) written.textContent = line;
           undo.textContent = line;
+          forgetDocReceipt(ctx && ctx.messageId, [ctx && ctx.legacyMessageId].concat((ctx && ctx.laneIds) || []));
           userContextEvent({ type: 'undo', partyKey: userContextParty(ctx), intentFamily: userContextFamily(ctx), at: new Date().toISOString() });
           return;
         }
@@ -5872,8 +6082,57 @@ function glanceUiCopy(kind) {
     // expanded), which left this Undo invisible and unclickable.
     const actionsRow = el('span', 'flow-chip-actions');
     actionsRow.appendChild(undo);
+    const threadId = response.documentId || (response.ref && (response.ref.documentId || response.ref.externalId)) || '';
+    if (response.html && threadId) {
+      const threadBtn = el('button', 'flow-doc-thread-update', he ? 'עדכן' : 'Update');
+      threadBtn.type = 'button';
+      threadBtn.addEventListener('click', () => {
+        threadBtn.disabled = true;
+        const previous = threadBtn.textContent;
+        threadBtn.textContent = he ? 'מעדכן…' : 'Updating…';
+        sendExecuteAction({
+          connectorId: 'driveDocFull',
+          params: {
+            title: response.title || 'Document',
+            html: response.html,
+            fullDocument: true,
+            documentId: threadId,
+            origin: 'created'
+          }
+        }).then((res) => {
+          if (res && res.ok) {
+            if (res.ref) undoRef = res.ref;
+            const written = done.querySelector('.flow-chip-written');
+            if (written && res.written) written.textContent = res.written;
+            threadBtn.disabled = false;
+            threadBtn.textContent = previous;
+            rememberDocReceipt(Object.assign({}, ctx, { googleBuilt: { html: response.html, title: response.title || '' } }), res);
+            return;
+          }
+          threadBtn.disabled = false;
+          threadBtn.textContent = previous;
+        }).catch(() => {
+          threadBtn.disabled = false;
+          threadBtn.textContent = previous;
+        });
+      });
+      actionsRow.appendChild(threadBtn);
+    }
+    maybePickerDocUpdate(actionsRow, done, response, he, ctx);
     done.appendChild(actionsRow);
-    placeReceipt(host, chip, done);
+    if (host) placeReceipt(host, chip, done);
+    return done;
+  }
+
+  function showDocPreviewReceipt(host, chip, result, ctx) {
+    const ref = (result.response && result.response.ref) || {};
+    const response = Object.assign({}, result.response || {}, {
+      html: (ctx && ctx.googleBuilt && ctx.googleBuilt.html) || '',
+      title: (ctx && ctx.googleBuilt && ctx.googleBuilt.title) || '',
+      documentId: ref.documentId || ref.externalId || ''
+    });
+    rememberDocReceipt(ctx, result.response || {});
+    paintDocReceipt(host, chip, response, ctx);
     if (response.proof && response.proof.fetchedBack === true) {
       userContextEvent({
         type: 'approved',
@@ -5883,6 +6142,15 @@ function glanceUiCopy(kind) {
         at: new Date().toISOString()
       });
     }
+  }
+
+  function mountDocReceipt(messageNode, receipt, messageId) {
+    if (!messageNode || messageNode.querySelector('.flow-chip-host')) return;
+    const host = el('div', 'flow-chip-host flow-chip-settled');
+    host.setAttribute('data-glance-message', messageId || '');
+    const done = paintDocReceipt(null, null, receipt, { messageId: messageId, legacyMessageId: messageId, laneIds: receipt && receipt.ids });
+    host.appendChild(done);
+    messageNode.insertBefore(host, messageNode.firstChild);
   }
 
   function showPreviewReceipt(host, chip, result, ctx) {
@@ -6446,6 +6714,25 @@ function glanceUiCopy(kind) {
     // one failure this product has never accepted as tolerable. See
     // storage.js's hasTerminalOutcome for the one shared definition of
     // "already decided."
+    if (ctx.fullDocument && ctx.fullDocument.mode === 'ambiguous') return;
+    if (ctx.fullDocument && ctx.fullDocument.mode === 'open') {
+      const url = ctx.fullDocument.url || '';
+      if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* popup blocked */ } }
+      const heOpen = glanceUiHebrew();
+      const opened = el('div', 'flow-chip flow-chip-done');
+      opened.setAttribute('role', 'status');
+      opened.appendChild(el('span', 'flow-chip-written', heOpen ? 'נפתח המסמך הקיים — לא נוצר מסמך חדש.' : 'Opened the existing document — nothing new was created.'));
+      if (url) {
+        const link = el('a', 'flow-chip-written', heOpen ? 'פתח ב-Docs' : 'Open in Docs');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        opened.appendChild(link);
+      }
+      placeReceipt(host, chip, opened);
+      try { console.log('[Glance] full-document write opened existing'); } catch (e) {}
+      return;
+    }
     if (await FlowStorage.hasTerminalOutcome(ctx.messageId)) {
       setChipState(chip, 'flow-chip-error', 'Already closed elsewhere — nothing to do.');
       checkBrief();
