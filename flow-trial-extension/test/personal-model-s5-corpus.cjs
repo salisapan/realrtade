@@ -7,7 +7,7 @@ const { FlowPersonalInference: Inf } = require('../core/personal-inference.js');
 const { FlowPersonalThompson: Th } = require('../core/personal-thompson.js');
 const Store = require('../src/personal-model-idb.js');
 let phone = null;
-try { phone = require('../../personal-model/node_modules/libphonenumber-js/min'); } catch (e) { phone = null; }
+try { phone = require('../src/libphonenumber-min.js'); } catch (e) { phone = null; }
 
 const ROOT = path.join(__dirname, '..', '..');
 let failures = 0;
