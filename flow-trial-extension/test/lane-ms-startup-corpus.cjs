@@ -34,6 +34,7 @@ function backgroundSource(stripHook) {
 
 function boot(stripHook) {
   const log = [];
+  const notes = [];
   const listeners = [];
   let registered = [];
   const stored = { surfaces: { outlook: { enabled: true } } };
@@ -96,7 +97,12 @@ function boot(stripHook) {
     contextMenus: { create: () => {}, removeAll: (cb) => cb && cb(), onClicked: { addListener() {} } }
   };
   const sandbox = {
-    console: { log() {}, info() {}, warn() {}, error() {} },
+    console: {
+      log() {},
+      info() { notes.push(Array.prototype.slice.call(arguments).join(' ')); },
+      warn() {},
+      error() {}
+    },
     URLSearchParams, URL, TextEncoder, Uint8Array, crypto: webcrypto,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     atob: (s) => Buffer.from(s, 'base64').toString('binary'),
@@ -115,6 +121,7 @@ function boot(stripHook) {
     registerContentScripts: registerContentScripts,
     addListener: addListener,
     chrome: chrome,
+    notes: notes,
     settle: () => new Promise((r) => setTimeout(r, 50))
   };
 }
@@ -162,6 +169,12 @@ function boot(stripHook) {
   const foreign = lane({ type: 'flow:build-stamp' }, {}, (r) => replies.push(r));
   check('a listener for another connector is left alone', ignored === undefined && foreign === undefined && replies.length === 0, replies);
   check('the lane listener claims only its own message types', claimed === true && undoClaimed === true);
+  const whyReplies = [];
+  const whyClaimed = lane({ type: 'flow:contacts-why', reason: 'contacts-not-granted' }, {}, (r) => whyReplies.push(r));
+  check('a missing Contacts.Read logs on the worker',
+    whyClaimed === true && whyReplies[0] && whyReplies[0].reason === 'contacts-not-granted' &&
+    withHook.notes.some((n) => n.indexOf('[Glance] contacts why-not') >= 0 && n.indexOf('contacts-not-granted') >= 0),
+    withHook.notes);
 
   if (failures) process.exit(1);
   console.log('lane-ms-startup-corpus: all passed');

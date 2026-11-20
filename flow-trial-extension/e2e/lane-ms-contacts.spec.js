@@ -26,3 +26,28 @@ test('Contacts.Read drafts one contact card and does not write', async ({ glance
     await expect(card).not.toContainText('Handled');
   });
 });
+
+test('without Contacts.Read the card says how to grant it and does not call Graph', async ({ glance }) => {
+  await glance.seedOutlook();
+  await lane.prepare(glance, { scenario: FIX.SCENARIO });
+  const page = await glance.openOutlook({
+    id: 'AQMkLaneMsContactsWhy',
+    subject: 'Contacts',
+    senderEmail: S.SENDER,
+    body: FIX.BODY
+  });
+  try {
+    const card = page.locator('#ReadingPaneContainerId .flow-lane-ms');
+    await expect(card).toBeVisible({ timeout: 20000 });
+    await expect(card).toContainText('שורת Outlook');
+    await expect(card).toContainText('אנשי קשר');
+    await expect(card.locator('button.flow-lane-do')).toHaveCount(0);
+    const calls = await glance.apiCalls();
+    expect(calls.some((c) => String(c.url).indexOf('/me/contacts') >= 0)).toBe(false);
+    expect(calls.some((c) => String(c.url).indexOf('/me/people') >= 0)).toBe(false);
+    expect(calls.some((c) => String(c.url).indexOf('sendMail') >= 0)).toBe(false);
+    await expect(card).not.toContainText('Handled');
+  } finally {
+    await lane.release(glance);
+  }
+});

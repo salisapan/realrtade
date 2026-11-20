@@ -67,7 +67,24 @@ function danaRoutes(readBack) {
 
   const judge = C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Contacts.Read'] });
   check('judgeInput offers lane-ms', judge.action === 'lane-ms' && judge.connectorId === 'outlookContacts');
-  check('judgeInput missing scope stays silent', C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Mail.Read'] }).reason === 'missing-scope');
+  const missing = C.judgeInput({ text: "What's Dana's email?" }, { grantedScopes: ['Mail.Read'] });
+  check('missing Contacts.Read is a visible why, not a lookup',
+    missing.action === 'why' && missing.reason === 'contacts-not-granted' && missing.action !== 'lane-ms' &&
+    /שורת Outlook/.test(missing.written) && /אנשי קשר/.test(missing.written),
+    missing);
+  const grant = C.offer({ text: "What's Dana Cohen's email?" }, { grantedScopes: ['Mail.Read'] });
+  check('missing scope card names the Outlook row and does not close',
+    grant.show === true && grant.grant === true && grant.button === '' && grant.closes === false &&
+    grant.reason === 'contacts-not-granted' && /שורת Outlook/.test(grant.written) && /אנשי קשר/.test(grant.written),
+    grant);
+  let called = false;
+  const denied = await C.run(
+    { params: { name: 'Dana Cohen', mode: 'email', lang: 'en' } },
+    { call: () => { called = true; return { ok: true, body: {} }; }, grantedScopes: ['Mail.Read'], now: now }
+  );
+  check('missing scope does not call Graph and does not send',
+    called === false && denied.ok === false && denied.posted === false && denied.reason === 'contacts-not-granted' && /אנשי קשר/.test(denied.written),
+    denied);
 
   const hit = danaRoutes();
   const resolved = await C.run(
@@ -135,8 +152,13 @@ function danaRoutes(readBack) {
   const hooks = bg.split('\n').filter((line) => line.indexOf('lane-ms-host.js') >= 0);
   check('background.js has one lane hook', hooks.length === 1 && bg.indexOf('outlook-contacts.js') < 0, hooks);
   const page = fs.readFileSync(path.join(__dirname, '../src/lane-ms-page.js'), 'utf8');
+  const host = fs.readFileSync(path.join(__dirname, '../core/lane-ms-host.js'), 'utf8');
+  const outlook = fs.readFileSync(path.join(__dirname, '../src/content-outlook.js'), 'utf8');
   check('lane page paints contact draft', page.indexOf('flow-lane-draft') >= 0 && page.indexOf('Draft ready') >= 0);
   check('You send is the contacts lane only', page.indexOf("res.connectorId === 'outlookContacts' && res.draft && res.posted === false") >= 0 && page.indexOf("status.textContent = 'Not posted.'") >= 0);
+  check('the card says how to grant Contacts.Read', page.indexOf('data-glance-contacts-why') >= 0 && page.indexOf('flow:contacts-why') >= 0 && page.indexOf('שורת Outlook') >= 0);
+  check('the worker logs the contacts why', host.indexOf("[Glance] contacts why-not") >= 0 && host.indexOf("type === 'flow:contacts-why'") >= 0);
+  check('Outlook leaves a contacts ask to that card', outlook.indexOf('contactsLaneOwns') >= 0 && outlook.indexOf('contacts-unavailable') >= 0);
 
   if (failures) process.exit(1);
   console.log('outlook-contacts-corpus: all passed');

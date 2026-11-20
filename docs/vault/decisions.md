@@ -1,7 +1,8 @@
 ---
 tags: [decisions]
-updated: 2026-10-28
+updated: 2026-11-20
 ---
+- 2026-11-20 · MC1: a contact ask without Contacts.Read shows a Hebrew line on the card telling the person to tick Contacts on the Outlook row in the popup, and the service worker logs `[Glance] contacts why-not`. The card still only drafts. Nothing is sent. No new scope. Gate: not run live. · Cursor agent · [[open-tasks]] row 73, `flow-trial-extension/core/outlook-contacts.js`
 - 2026-11-13 · #222 live web Gate, second install: a reply compose event has no message id. The message card offers הכן תשובה, which opens a reply draft with createDraftReply under gmail.addons.current.action.compose and never sends. The compose window matches the draft subject to that reply, remembered for six hours, and Do it inserts it at the cursor. Gate: not installed yet. · Cursor agent · `glance-gmail-addon/Code.js`, `flow-landing/privacy.html`, [[open-tasks]]
 - 2026-11-13 · #222 live web Gate: the compose card reads the replied-to message from `gmail.messageId` and the current-message token, then Do it inserts at the cursor. A compose event with no message id says why. No mailbox scope. Gate: the previous install failed at compose; this head is not installed yet. · Cursor agent · `glance-gmail-addon/Code.js`, [[open-tasks]]
 - 2026-11-13 · #222 live Apps Script install: compose `draftAccess: METADATA` declares `gmail.addons.current.message.metadata`. Compose Do it inserts the reply at the cursor through `UpdateDraftBodyAction` and does not read or undo that draft, because both need a mailbox scope. Nothing sends. Gate: not run live. Not deployed. · Cursor agent · `glance-gmail-addon/appsscript.json`, `flow-landing/privacy.html`, [[open-tasks]]

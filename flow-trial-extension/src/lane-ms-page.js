@@ -76,6 +76,12 @@
     document.querySelectorAll('.flow-lane-ms').forEach((node) => node.remove());
   }
 
+  const GRANT_HE = 'כדי למצוא את איש הקשר, פתח את חלון Glance וסמן אנשי קשר בשורת Outlook.';
+
+  function quietGrantLine() {
+    return GRANT_HE;
+  }
+
   function line(label, value) {
     const row = document.createElement('div');
     row.className = 'flow-lane-line';
@@ -181,10 +187,17 @@
       status.textContent = 'Not sent.';
       return;
     }
+    if (res.reason === 'contacts-not-granted') {
+      status.textContent = res.written || quietGrantLine();
+      status.setAttribute('dir', 'rtl');
+      const button = card.querySelector('.flow-lane-do');
+      if (button) button.hidden = true;
+      return;
+    }
     const quiet = {
       'not-found': 'No match.',
       ambiguous: 'More than one match.',
-      'contacts-not-granted': 'Contacts is not on for this sign-in.',
+      'contacts-not-granted': 'כדי למצוא את איש הקשר, פתח את חלון Glance וסמן אנשי קשר בשורת Outlook.',
       'files-not-granted': 'OneDrive is not on for this sign-in.',
       'chat-not-granted': 'Teams chat is not on for this sign-in.',
       unclear: '',
@@ -255,6 +268,7 @@
 
   function paintOffer(offer, pane, text) {
     clearCard();
+    if (offer && offer.connectorId === 'outlookContacts') clearStaleContactsWhy();
     const card = document.createElement('div');
     card.className = 'flow-lane-ms';
     card.setAttribute('data-connector', offer.connectorId || '');
@@ -308,8 +322,61 @@
   }
 
   let paneKey = '';
+  let whyKey = '';
   let timer = null;
   let busy = false;
+
+  function readGrantedScopes() {
+    return new Promise((resolve) => {
+      try {
+        const store = chrome && chrome.storage && chrome.storage.local;
+        if (!store || typeof store.get !== 'function') { resolve(null); return; }
+        store.get('outlookAuth', (bag) => {
+          try { void chrome.runtime.lastError; } catch (e) { /* the read still settles */ }
+          const token = bag && bag.outlookAuth && bag.outlookAuth.token;
+          if (!token) { resolve([]); return; }
+          resolve(token.grantedScopes || token.scopes || token.scope || []);
+        });
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  function reportContactsWhy(reason, key) {
+    if (whyKey === key) return;
+    whyKey = key;
+    try {
+      chrome.runtime.sendMessage({ type: 'flow:contacts-why', reason: reason || 'contacts-not-granted' }, () => {
+        try { void chrome.runtime.lastError; } catch (e) { /* the log is on the worker */ }
+      });
+    } catch (e) { /* the card still says how to grant it */ }
+  }
+
+  function clearStaleContactsWhy() {
+    document.querySelectorAll('.flow-why-not').forEach((node) => {
+      const why = (node.getAttribute && node.getAttribute('data-glance-why')) || '';
+      if (why.indexOf('contacts-unavailable') >= 0) node.remove();
+    });
+  }
+
+  function paintGrant(offer, key) {
+    clearCard();
+    clearStaleContactsWhy();
+    const card = document.createElement('div');
+    card.className = 'flow-lane-ms';
+    card.setAttribute('data-connector', offer.connectorId || 'outlookContacts');
+    card.setAttribute('data-glance-contacts-why', offer.reason || 'contacts-not-granted');
+    const title = document.createElement('div');
+    title.className = 'flow-lane-title';
+    title.textContent = offer.title || '';
+    card.appendChild(title);
+    const row = document.createElement('div');
+    row.className = 'flow-lane-line';
+    row.setAttribute('dir', 'rtl');
+    row.textContent = offer.written || quietGrantLine();
+    card.appendChild(row);
+    place(card);
+    reportContactsWhy(offer.reason || 'contacts-not-granted', key);
+  }
 
   async function tick() {
     if (busy) return;
@@ -330,6 +397,13 @@
       if (paneKey !== key) return;
       const log = (state && state.log) || [];
       const mods = modules();
+      const chipUp = cardHost && cardHost.isConnected;
+      const list = chipUp ? mods : mods.filter((mod) => mod && mod.CONNECTOR === 'outlookContacts');
+      let scopes = null;
+      if (list.some((mod) => mod && mod.CONNECTOR === 'outlookContacts')) {
+        try { scopes = await readGrantedScopes(); } catch (e) { scopes = null; }
+      }
+      const offerDeps = scopes == null ? undefined : { grantedScopes: scopes };
       for (let i = 0; i < mods.length; i++) {
         if (typeof mods[i].receiptFromLog !== 'function') continue;
         const row = mods[i].receiptFromLog(log, pane);
@@ -338,9 +412,13 @@
           return;
         }
       }
-      for (let i = 0; i < mods.length; i++) {
+      for (let i = 0; i < list.length; i++) {
         let offer = null;
-        try { offer = mods[i].offer(ctx); } catch (e) { offer = null; }
+        try { offer = list[i].offer(ctx, list[i].CONNECTOR === 'outlookContacts' ? offerDeps : undefined); } catch (e) { offer = null; }
+        if (offer && offer.grant) {
+          paintGrant(offer, key);
+          return;
+        }
         if (offer && offer.show) {
           paintOffer(offer, pane, text);
           return;
@@ -382,6 +460,19 @@
     watch();
     return true;
   }
+
+  function bootWatch() {
+    if (named('FlowOwaParse')) {
+      if (!watching) {
+        watching = true;
+        watch();
+      }
+      return;
+    }
+    setTimeout(bootWatch, 250);
+  }
+
+  bootWatch();
 
   globalThis.FlowLaneMsPage = { attach: attach };
 })();

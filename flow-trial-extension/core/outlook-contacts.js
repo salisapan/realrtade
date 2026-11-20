@@ -7,6 +7,10 @@ const FlowOutlookContacts = (() => {
   const CONNECTOR = 'outlookContacts';
   const SYSTEM = 'microsoft/contacts';
   const READ_SCOPE = 'Contacts.Read';
+  const WHY_REASON = 'contacts-not-granted';
+  // The Outlook row in the Glance popup is where Contacts is ticked. The card
+  // says so in Hebrew. Nothing is looked up and nothing is sent.
+  const GRANT_HE = 'כדי למצוא את איש הקשר, פתח את חלון Glance וסמן אנשי קשר בשורת Outlook.';
 
   const ANSWER_EMAIL_EN = /\bwhat(?:'s| is)\s+([\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z\w.'\s-]{0,60}?)['']?s\s+(?:email|e-mail)\b/i;
   const ANSWER_EMAIL_EN2 = /\b(?:email|e-mail)\s+(?:for|of)\s+([\u0590-\u05FFA-Za-z][\u0590-\u05FFA-Za-z\w.'\s-]{0,60}?)\b/i;
@@ -89,7 +93,9 @@ const FlowOutlookContacts = (() => {
     const text = [i.subject, i.text].filter(Boolean).join('\n');
     const rec = recognize(text);
     if (rec.kind !== 'clear') return { action: 'silence', reason: 'no-ask' };
-    if (hasReadScope(deps && deps.grantedScopes) === false) return { action: 'silence', reason: 'missing-scope' };
+    if (hasReadScope(deps && deps.grantedScopes) === false) {
+      return { action: 'why', reason: WHY_REASON, written: GRANT_HE, connectorId: CONNECTOR };
+    }
     return {
       action: 'lane-ms',
       connectorId: CONNECTOR,
@@ -273,10 +279,26 @@ const FlowOutlookContacts = (() => {
     });
   }
 
-  function offer(ctx) {
+  function grantOffer(rec) {
+    return {
+      show: true,
+      connectorId: CONNECTOR,
+      title: titleFor(rec),
+      lines: [{ label: '', value: GRANT_HE }],
+      written: GRANT_HE,
+      button: '',
+      grant: true,
+      reason: WHY_REASON,
+      closes: false,
+      params: { name: rec.name, mode: rec.mode, lang: rec.lang }
+    };
+  }
+
+  function offer(ctx, deps) {
     const text = String((ctx && (ctx.text || ctx.body)) || '');
     const rec = recognize(text);
     if (rec.kind !== 'clear') return { show: false };
+    if (hasReadScope(deps && deps.grantedScopes) === false) return grantOffer(rec);
     return {
       show: true,
       connectorId: CONNECTOR,
@@ -300,7 +322,9 @@ const FlowOutlookContacts = (() => {
     if (!name) return { ok: false, reason: 'unclear' };
     const call = deps && deps.call;
     if (typeof call !== 'function') return { ok: false, reason: 'unclear' };
-    if (hasReadScope(deps.grantedScopes) === false) return { ok: false, reason: 'contacts-not-granted' };
+    if (hasReadScope(deps.grantedScopes) === false) {
+      return { ok: false, reason: WHY_REASON, written: GRANT_HE, connectorId: CONNECTOR, posted: false, closes: false };
+    }
 
     const contacts = await call({
       method: 'GET',
@@ -366,6 +390,8 @@ const FlowOutlookContacts = (() => {
     CONNECTOR: CONNECTOR,
     SYSTEM: SYSTEM,
     READ_SCOPE: READ_SCOPE,
+    WHY_REASON: WHY_REASON,
+    GRANT_HE: GRANT_HE,
     hasReadScope: hasReadScope,
     recognize: recognize,
     judgeInput: judgeInput,

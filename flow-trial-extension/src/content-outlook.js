@@ -470,6 +470,18 @@
     return Boolean(existing && existing.epoch === renderEpoch);
   }
 
+  // A named-person contact ask is the contacts card. The "not in this version"
+  // why is the Gmail line. On Outlook the card says how to tick Contacts.
+  function contactsLaneOwns(pane) {
+    let mod = null;
+    try { mod = (typeof FlowOutlookContacts !== 'undefined') ? FlowOutlookContacts : null; } catch (e) { mod = null; }
+    if (!mod || typeof mod.recognize !== 'function') return false;
+    const text = ((pane && pane.subject) ? String(pane.subject) + '\n' : '') + String((pane && pane.text) || '');
+    let rec = null;
+    try { rec = mod.recognize(text); } catch (e) { rec = null; }
+    return !!(rec && rec.kind === 'clear');
+  }
+
   function genericTextQuiet(pane) {
     const id = decisionIdFrom(pane) || openDecisionId;
     const existing = decisionFor(id);
@@ -4591,9 +4603,20 @@
       return;
     }
     const earlyHost = document.querySelector('#ReadingPaneContainerId .flow-chip-host');
+    const laneCard = document.querySelector('#ReadingPaneContainerId .flow-lane-ms');
     const undoneOnly = earlyHost && earlyHost.getAttribute('data-glance-undone') === '1';
     const openGen = mailOpenGen;
-    if (sig === lastSig && openGen === reconciledOpenGen && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && earlyHost && !undoneOnly))) {
+    if (sig === lastSig && openGen === reconciledOpenGen && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && (earlyHost || laneCard) && !undoneOnly))) {
+      if (String(lastLoggedReason || '').indexOf('contacts-unavailable') >= 0 && contactsLaneOwns(pane)) {
+        try {
+          const whyMount = mountPoint();
+          if (whyMount) clearWhyNot(whyMount);
+        } catch (e) { /* the contacts card is the explanation */ }
+        lastOutcome = 'card';
+        lastLoggedReason = 'contacts-lane';
+        dbg('decision', { shown: true, reason: 'contacts-lane', subject: pane.subject });
+        return;
+      }
       if (lastOutcome === 'reason') {
         const whyMount = mountPoint();
         if (whyMount && !whyMount.querySelector('.flow-chip-host') && !whyMount.querySelector('.flow-why-not')) {
@@ -4971,8 +4994,19 @@
           const keepFile = typeof FlowOutlookSync !== 'undefined' && typeof FlowOutlookSync.keepMailboxFileCard === 'function'
             && FlowOutlookSync.keepMailboxFileCard(decided, entry);
           if (!keepFile) {
-            dropStuckCard(pane);
             const named = (decided && decided.reason) || 'intent-null';
+            if (String(named).indexOf('contacts-unavailable') >= 0 && contactsLaneOwns(pane)) {
+              dropStuckCard(pane);
+              try {
+                const whyMount = mountPoint();
+                if (whyMount) clearWhyNot(whyMount);
+              } catch (e) { /* the contacts card is the explanation */ }
+              lastOutcome = 'card';
+              lastLoggedReason = 'contacts-lane';
+              dbg('decision', { shown: true, reason: 'contacts-lane', subject: pane.subject });
+              return;
+            }
+            dropStuckCard(pane);
             const quiet = /:/.test(String(named)) ? String(named) : ('page:' + named);
             await pageReason(quiet, pane);
             return;
