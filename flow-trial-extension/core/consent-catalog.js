@@ -27,7 +27,7 @@ const FlowConsentCatalog = (() => {
       steps: [{ type: 'microsoft-service', service: 'sharepoint' }] },
     { id: 'ms-contacts', label: 'Outlook contacts', detail: 'Read contacts.', group: 'microsoft', state: 'built',
       steps: [{ type: 'microsoft-service', service: 'contacts' }] },
-    { id: 'ms-teams', label: 'Teams chats', detail: 'Read chats you are in.', group: 'microsoft', state: 'built',
+    { id: 'ms-teams', label: 'Teams chats', detail: 'Glance reads the open one-to-one chat in Teams and only places a reply in the compose box. It never sends, and Undo removes any write it made.', group: 'microsoft', state: 'built',
       steps: [{ type: 'microsoft-service', service: 'teams' }] },
     { id: 'notion', label: 'Notion', detail: 'Add one row to the Notion database you pick, then read it back. Undo archives it. Nothing else in your workspace is read.', group: 'tasks', state: 'experimental',
       steps: [{ type: 'oauth-relay', vendor: 'notion' }, { type: 'host-permission', origin: 'https://api.notion.com/*' }] },

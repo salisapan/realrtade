@@ -784,7 +784,7 @@ async function boot() {
   context = await chromium.launchPersistentContext(userData, contextOpts);
 
   const documents = new Map();
-  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|web\.whatsapp\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com|www\.instagram\.com)\//, async (route) => {
+  await context.route(/https:\/\/(mail\.google\.com|outlook\.live\.com|web\.whatsapp\.com|www\.messenger\.com|messenger\.com|business\.facebook\.com|www\.business\.facebook\.com|www\.instagram\.com|teams\.microsoft\.com|teams\.live\.com)\//, async (route) => {
     const req = route.request();
     const bare = req.url().split('#')[0];
     if (req.resourceType() === 'document' && documents.has(bare)) {
@@ -932,7 +932,7 @@ async function boot() {
     const closing = [];
     for (const p of context.pages()) {
       const url = p.url();
-      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('instagram.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0) {
+      if (url.indexOf('popup/popup.html') >= 0 || url.indexOf('mail.google.com') >= 0 || url.indexOf('outlook.live.com') >= 0 || url.indexOf('messenger.com') >= 0 || url.indexOf('web.whatsapp.com') >= 0 || url.indexOf('business.facebook.com') >= 0 || url.indexOf('instagram.com') >= 0 || url.indexOf('/dev/messenger-fixture.html') >= 0 || url.indexOf('/dev/teams-fixture.html') >= 0 || url.indexOf('teams.live.com') >= 0 || url.indexOf('teams.microsoft.com') >= 0) {
         closing.push(p.close().catch(() => {}));
       }
     }

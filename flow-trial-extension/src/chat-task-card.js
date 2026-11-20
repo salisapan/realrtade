@@ -17,7 +17,7 @@ const FlowChatTaskCard = (() => {
   // The person's own dated promise in a chat ("אשלח לך את ההצעה עד יום חמישי") has its own switch, off by default.
   const SWITCH_OWN = 'CHAT_PROMISE_CARD';
   const CHAIN = 'chat-task';
-  const OPEN_LABELS = { whatsapp: 'Open in WhatsApp', messenger: 'Open in Messenger', instagram: 'Open in Instagram' };
+  const OPEN_LABELS = { whatsapp: 'Open in WhatsApp', messenger: 'Open in Messenger', instagram: 'Open in Instagram', teams: 'Open in Teams' };
   const dismissed = new Set();
 
   function runtimeAlive() {
@@ -537,7 +537,8 @@ const FlowChatTaskCard = (() => {
     const own = i.fromMe === true && i.own === true;
     if ((i.fromMe && !own) || i.group || i.oneToOne === false || i.quoted) return { shown: false, reason: 'not-an-inbound-one-to-one' };
     if (typeof FlowChipHost === 'undefined' || typeof FlowStorage === 'undefined') return { shown: false, reason: 'missing' };
-    if (!(await switchOn(own ? SWITCH_OWN : SWITCH))) return { shown: false, reason: 'switch-off' };
+    const teamsLane = i.channel === 'teams';
+    if (!teamsLane && !(await switchOn(own ? SWITCH_OWN : SWITCH))) return { shown: false, reason: 'switch-off' };
     const chatKey = chatKeyOf(i);
     if (dismissed.has(chatKey)) return { shown: false, reason: 'dismissed' };
     const mount = mountNode();
@@ -856,7 +857,7 @@ const FlowChatTaskCard = (() => {
 
     if (calStep && (await findHeldHold(chatKey, calStep.params))) return { shown: false, reason: 'already-on-calendar' };
 
-    const target = await send({ type: 'flow:chat-task-target', kind: calStep ? 'calendar' : 'task', own: own });
+    const target = await send({ type: 'flow:chat-task-target', kind: calStep ? 'calendar' : 'task', own: own, channel: i.channel || '' });
     if (!target || !target.connectorId) return { shown: false, reason: (target && target.reason) || 'not-connected' };
     const kind = target.connectorId === 'outlookTask' ? 'outlookTask' : (target.connectorId === 'googleHold' || target.connectorId === 'outlookCalendar') ? 'calendar' : 'googleTask';
     const he = uiLangOf(i.text) === 'he';

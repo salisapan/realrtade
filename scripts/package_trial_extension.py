@@ -197,11 +197,12 @@ def manifest_pages(manifest: dict) -> list[str]:
 
 SURFACE_TABLE_RE = re.compile(r"const SURFACES = \{(.*?)\n\};", re.S)
 LANE_TABLE_RE = re.compile(r"const LANE_CHAT = \[(.*?)\n\];", re.S)
+LANE_TEAMS_RE = re.compile(r"const LANE_TEAMS = \{(.*?)\n\};", re.S)
 SURFACE_FILE_RE = re.compile(r"['\"]((?:src|core)/[A-Za-z0-9_./-]+\.(?:js|css))['\"]")
 
 
 def registered_surface_files(worker: Path) -> list[Path]:
-    """Files the worker registers at runtime: SURFACES, and the Meta lane scripts."""
+    """Files the worker registers at runtime: SURFACES, the Meta lane scripts, and the Teams web lane."""
     text = worker.read_text(encoding="utf-8")
     blocks = []
     table = SURFACE_TABLE_RE.search(text)
@@ -210,6 +211,9 @@ def registered_surface_files(worker: Path) -> list[Path]:
     lanes = LANE_TABLE_RE.search(text)
     if lanes:
         blocks.append(lanes.group(1))
+    teams = LANE_TEAMS_RE.search(text)
+    if teams:
+        blocks.append(teams.group(1))
     out: list[Path] = []
     seen: set[str] = set()
     for block in blocks:
@@ -257,8 +261,8 @@ def collect(profile: str = "full") -> dict[str, Path]:
         die("manifest.json has no background.service_worker")
     referenced.append(EXTENSION_ROOT / worker)
     # Content scripts the worker registers at runtime (chrome.scripting.registerContentScripts) are named in
-    # background.js's SURFACES table and in LANE_CHAT, not in the manifest. Without this they were missing from
-    # the install zip, so a grant registered files the install did not contain.
+    # background.js's SURFACES table, in LANE_CHAT, and in LANE_TEAMS, not in the manifest. Without this they
+    # were missing from the install zip, so a grant registered files the install did not contain.
     referenced.extend(registered_surface_files(EXTENSION_ROOT / worker))
     for content in manifest.get("content_scripts") or []:
         for name in (content.get("js") or []) + (content.get("css") or []):

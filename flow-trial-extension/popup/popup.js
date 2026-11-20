@@ -1909,7 +1909,7 @@
           calendar: 'שם קובץ אחד על היומן. ביטול מסיר את האירוע. לא מזמין אף אחד.',
           onedrive: 'שומר קובץ אחד ב-OneDrive > Glance, קורא אותו, וביטול מוחק אותו. מייל לא מחפש בקבצים.',
           contacts: 'קורא אנשי קשר.',
-          teams: 'קורא צ׳אטים שאתה בהם.',
+          teams: (globalThis.FlowTeamsHostConsent && FlowTeamsHostConsent.PRIVACY_HE) || 'Glance קורא את הצ׳אט האישי הפתוח ב-Teams ומניח תשובה רק בתיבת הכתיבה. הוא לא שולח, וביטול מוחק כל כתיבה שהוא עשה.',
           sharepoint: 'יוצר קובץ ריק, או שומר את הקובץ המצורף, בתיקיית Glance של אתר SharePoint אחד ששמו נכתב במייל. קורא בחזרה, וביטול מוחק אם לא ערכת. לא משתף.'
         };
         const detail = uiLang() === 'he' ? (heDetail[svc.id] || '') : svc.detail;
@@ -1930,15 +1930,34 @@
         const opt = optionalBoxes();
         allBox.checked = opt.length > 0 && opt.every((box) => box.checked);
       }
-      allBox.addEventListener('change', () => {
+      allBox.addEventListener('change', async () => {
+        const teamsBox = boxes.teams;
+        const teamsWas = Boolean(teamsBox && teamsBox.checked);
         optionalBoxes().forEach((box) => { box.checked = allBox.checked; });
+        if (allBox.checked && teamsBox && teamsBox.checked) {
+          const ok = await askTeamsWebHosts({ box: teamsBox, note: note, button: c });
+          if (!ok) syncAll();
+        } else if (!allBox.checked && teamsWas) {
+          await releaseTeamsWebHosts({ box: teamsBox, note: note, button: c });
+        }
       });
       optionalBoxes().forEach((box) => box.addEventListener('change', syncAll));
+      if (boxes.teams) {
+        boxes.teams.addEventListener('change', async () => {
+          if (boxes.teams.checked) await askTeamsWebHosts({ box: boxes.teams, note: note, button: c });
+          else await releaseTeamsWebHosts({ box: boxes.teams, note: note, button: c });
+          syncAll();
+        });
+      }
       const connectBtnLabel = (link === 'missing') ? 'התחבר' : 'התחבר מחדש';
       const c = el('button', 'ghost sm', connectBtnLabel);
       c.type = 'button';
       c.setAttribute('data-glance-connect-go', '1');
       c.addEventListener('click', async () => {
+        if (boxes.teams && boxes.teams.checked) {
+          const hostOk = await askTeamsWebHosts({ box: boxes.teams, note: note, button: c });
+          if (!hostOk) return;
+        }
         c.disabled = true;
         const ids = services.filter((svc) => {
           const box = boxes[svc.id];
@@ -1998,7 +2017,19 @@
       const addScope = el('button', 'ghost sm', 'הוסף הרשאה');
       addScope.type = 'button';
       addScope.setAttribute('data-glance-add-scope', '1');
+      if (scopeBoxes.teams) {
+        scopeBoxes.teams.addEventListener('change', async () => {
+          if (scopeBoxes.teams.checked) await askTeamsWebHosts({ box: scopeBoxes.teams, note: note, button: addScope });
+          else await releaseTeamsWebHosts({ box: scopeBoxes.teams, note: note, button: addScope });
+        });
+      }
       addScope.addEventListener('click', async () => {
+        const teamsBox = scopeBoxes.teams;
+        const teamsOn = !!(teamsBox && teamsBox.checked && !teamsBox.disabled);
+        if (teamsOn) {
+          const teamsHostOk = await askTeamsWebHosts({ box: teamsBox, note: note, button: addScope });
+          if (!teamsHostOk) return;
+        }
         addScope.disabled = true;
         const add = scopeServices.filter((svc) => {
           const box = scopeBoxes[svc.id];
@@ -2008,8 +2039,8 @@
         let consentedNow = [];
         const ticked = scopeServices.some((svc) => { const b = scopeBoxes[svc.id]; return b && b.checked && !b.disabled; });
         if (ticked && !add.length) {
-          // Ticked, and every scope of it is already on the token: nothing to ask, and the person is told so.
           addScope.disabled = false;
+          // Ticked, and every scope of it is already on the token: nothing to ask, and the person is told so.
           note.hidden = false;
           note.textContent = 'ההרשאות שסימנת כבר ניתנו.';
           return;
@@ -2371,6 +2402,84 @@
       if (chrome.permissions && chrome.permissions.contains) on = await chrome.permissions.contains({ origins: FlowMetaConsent.ORIGINS.slice() });
     } catch (e) { on = false; }
     FlowMetaConsent.paintConnection(host, { granted: on, lang: metaLang(), chrome: chrome });
+  }
+
+  function teamsWebHosts() {
+    const listed = globalThis.FlowConnectEcosystem && FlowConnectEcosystem.TEAMS_OPTIONAL_HOST_ORIGINS;
+    return (listed && listed.length) ? listed.slice() : ['https://teams.microsoft.com/*', 'https://teams.live.com/*'];
+  }
+
+  // The browser prompt has to start on this tick or on התחבר. A later await is not a user gesture.
+  function requestTeamsWebHosts() {
+    if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) return Promise.resolve(false);
+    return chrome.permissions.request({ origins: teamsWebHosts() }).then((ok) => Boolean(ok)).catch(() => false);
+  }
+
+  // The side panel is already open on a Teams tab that has not granted the optional hosts.
+  // The button asks for those two origins only. It does not add a scope.
+  function wireTeamsPageGrant() {
+    const btn = document.getElementById('teams-page-grant-btn');
+    const row = document.getElementById('teams-page-grant');
+    if (!btn || btn.__glanceTeamsGrant) return;
+    btn.__glanceTeamsGrant = true;
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      requestTeamsWebHosts().then((ok) => {
+        btn.disabled = false;
+        if (ok && row) row.hidden = true;
+      });
+    });
+  }
+
+  async function renderTeamsPageGrant() {
+    wireTeamsPageGrant();
+    const row = document.getElementById('teams-page-grant');
+    const btn = document.getElementById('teams-page-grant-btn');
+    if (!row || !btn) return;
+    let url = '';
+    try {
+      if (chrome.tabs && chrome.tabs.query) {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        url = (tabs && tabs[0] && tabs[0].url) || '';
+      }
+    } catch (e) { url = ''; }
+    const onTeams = /https:\/\/teams\.(?:live|microsoft)\.com\//i.test(url);
+    if (!onTeams) {
+      if (!row.hidden) row.hidden = true;
+      return;
+    }
+    let granted = true;
+    try {
+      if (chrome.permissions && chrome.permissions.contains) granted = await chrome.permissions.contains({ origins: teamsWebHosts() });
+    } catch (e) { granted = true; }
+    const show = granted !== true;
+    if (row.hidden === show) row.hidden = !show;
+  }
+
+  function askTeamsWebHosts(ui) {
+    const consent = globalThis.FlowTeamsHostConsent;
+    if (consent && typeof consent.ask === 'function') return consent.ask(() => requestTeamsWebHosts(), ui);
+    return requestTeamsWebHosts().then((ok) => {
+      if (!ok && ui && ui.box) ui.box.checked = false;
+      if (!ok && ui && ui.note) { ui.note.hidden = false; ui.note.textContent = 'הדפדפן לא נתן גישה ל-Teams. Glance לא קורא את הצ׳אט.'; }
+      if (!ok && ui && ui.button) ui.button.disabled = false;
+      return ok;
+    });
+  }
+
+  function releaseTeamsWebHosts(ui) {
+    const consent = globalThis.FlowTeamsHostConsent;
+    const remove = () => {
+      if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.remove) return Promise.resolve(false);
+      return chrome.permissions.remove({ origins: teamsWebHosts() }).then((ok) => Boolean(ok)).catch(() => false);
+    };
+    if (consent && typeof consent.release === 'function') return consent.release(remove, ui);
+    return remove().then((ok) => {
+      if (ui && ui.box) ui.box.checked = false;
+      if (ui && ui.note) { ui.note.hidden = false; ui.note.textContent = 'Teams כבוי. Glance לא קורא את הצ׳אט.'; }
+      if (ui && ui.button) ui.button.disabled = false;
+      return ok;
+    });
   }
 
   async function labsOptionalScopeAfterFlip(switchId) {
@@ -3260,6 +3369,7 @@
     if (priorExpired && priorExpired.parentNode && priorExpired.parentNode.removeChild) priorExpired.parentNode.removeChild(priorExpired);
     // Expired rows are not open work. The empty line stays when nothing is still open.
     empty.hidden = openCount > 0;
+    renderTeamsPageGrant().catch(() => {});
     // Suggested and Added are list headings, including a single Do It and a
     // Handled row that has no step list. The chip alone is not the heading.
     function loopsHeading(which) {

@@ -127,8 +127,9 @@ test.describe('2. a read-back that lags', () => {
 
   test('a read that is late by two answers is retried and the event is verified', async ({ glance }) => {
     await glance.seedGmail({});
-    server.lagGets('/calendar/v3/calendars/primary/events/', 2);
     const page = await glance.openGmail(opts('lag-short', 'en'));
+    // Arm the lag after the page is up. A read during load must not spend the two late answers.
+    server.lagGets('/calendar/v3/calendars/primary/events/', 2);
     await click(page);
     await expect(page.locator('div[role="main"] .flow-chip-handled')).toBeVisible({ timeout: 25000 });
     await expect(tick(page)).toHaveCount(1);
