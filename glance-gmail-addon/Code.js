@@ -61,20 +61,40 @@ function composeReplyId_(e) {
   return '';
 }
 
+function stripSubjectMarks_(value) {
+  return String(value || '')
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\u061c\ufeff\u00ad]/g, '')
+    .replace(/[\u00a0\u202f\u2000-\u200a]/g, ' ');
+}
+
 function normalizeSubject_(subject) {
-  // Bidi and zero-width marks (RLM/LRM, embeddings, isolates, BOM) are invisible in a Hebrew subject
-  // but change the key, so the compose lookup would miss the reply «הכן תשובה» stored.
-  var text = String(subject || '').replace(/[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+  // Gmail's Hebrew reply prefix is «תשובה:», and the forward prefix is «הועבר:».
+  // Bidi marks and doubled spaces sit inside that prefix. They must not change the key
+  // the message card stored for «הכן תשובה».
+  var text = stripSubjectMarks_(subject).replace(/\s+/g, ' ').trim();
+  var prefix = /^(?:re|fw|fwd|תשובה|הועבר|השב)\s*:\s*/i;
   var changed = true;
   while (changed && text) {
     changed = false;
-    var next = text.replace(/^(?:re|fw|fwd)\s*:\s*/i, '').replace(/^\[[^\]]{0,40}\]\s*/, '');
+    var next = text.replace(prefix, '').replace(/^\[[^\]]{0,40}\]\s*/, '');
     if (next !== text) {
-      text = next.replace(/^\s+/, '');
+      text = stripSubjectMarks_(next).replace(/\s+/g, ' ').trim();
       changed = true;
     }
   }
   return text;
+}
+
+function enterZone_(e) {
+  if (typeof FlowExtract !== 'undefined' && typeof FlowExtract.setZone === 'function') {
+    FlowExtract.setZone(timeZoneOf_(e));
+  }
+}
+
+function leaveZone_() {
+  if (typeof FlowExtract !== 'undefined' && typeof FlowExtract.setZone === 'function') {
+    FlowExtract.setZone('');
+  }
 }
 
 function subjectKey_(subject) {
@@ -122,6 +142,7 @@ function composeSubject_(e) {
 function onGmailCompose(e) {
   logEventKeys_('compose', e);
   var lang = Glance.i18n.locale(localeOf_(e));
+  enterZone_(e);
   try {
     var saved = readReplyCache_(composeSubject_(e));
     if (!saved || !saved.text) return [render_(Glance.cards.composeAskFirst(lang))];
@@ -130,6 +151,8 @@ function onGmailCompose(e) {
   } catch (err) {
     errorLog_(err);
     return [render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose'))];
+  } finally {
+    leaveZone_();
   }
 }
 
@@ -147,6 +170,7 @@ function onPrepareReply(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
   var messageId = composeReplyId_(e);
   if (!messageId) return update_(render_(Glance.cards.composeAskFirst(lang)));
+  enterZone_(e);
   try {
     if (!e.gmail || !e.gmail.accessToken) throw readFail_('no-token', emptyRead_(e));
     GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
@@ -162,6 +186,8 @@ function onPrepareReply(e) {
   } catch (err) {
     errorLog_(err);
     return update_(render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose')));
+  } finally {
+    leaveZone_();
   }
 }
 
@@ -175,12 +201,51 @@ function draftInsertResponse_(text) {
 
 function draftTextForOpen_(opened) {
   var process = draftProcessForOpen_(opened);
-  if (!process) return null;
-  if (typeof FlowIncomingJudge === 'undefined' || typeof FlowIncomingJudge.draftText !== 'function') return null;
-  return FlowIncomingJudge.draftText(process, {
+  if (process && typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.draftText === 'function') {
+    var fromPlan = FlowIncomingJudge.draftText(process, {
+      sender: { email: opened.fromEmail || null, name: opened.fromName || null },
+      subject: opened.subject || null
+    });
+    if (fromPlan) return fromPlan;
+  }
+  return selfReplyDraft_(opened);
+}
+
+function selfReplyAsk_(opened) {
+  if (!opened || !opened.isSelf) return false;
+  var blob = String(opened.subject || '') + '\n' + String(opened.body || '');
+  if (/[?]/.test(blob)) return true;
+  return /(?:תוכל|תוכלי|תוכלו|תשלח|תשלחי)/.test(blob) || /\b(?:please\s+(?:send|reply)|could you|can you)\b/i.test(blob);
+}
+
+function selfReplyDraft_(opened) {
+  if (!selfReplyAsk_(opened)) return null;
+  if (typeof FlowDraftReply === 'undefined' || typeof FlowDraftReply.bodyFromIntent !== 'function') return null;
+  if (typeof Glance.judge !== 'function') return null;
+  var judged = Glance.judge({
+    text: opened.body || opened.subject || '',
+    subject: opened.subject || '',
     sender: { email: opened.fromEmail || null, name: opened.fromName || null },
-    subject: opened.subject || null
+    to: opened.toList || [],
+    toRecipients: opened.toRecipients || [],
+    ccRecipients: opened.ccRecipients || [],
+    ownAddresses: opened.ownAddresses || [],
+    userName: opened.userName || null,
+    ownNames: opened.ownNames || [],
+    readerEmail: opened.readerEmail || null,
+    namesWaitDone: Boolean(opened.readerEmail),
+    now: new Date(),
+    surface: 'gmail',
+    attachmentCount: opened.attachmentCount == null ? 0 : opened.attachmentCount,
+    inbound: true,
+    directAskOn: true
   });
+  if (!judged || !judged.intent) return null;
+  var text = FlowDraftReply.bodyFromIntent(judged.intent, opened.fromName, opened.fromEmail, {
+    text: opened.body || '',
+    subject: opened.subject || ''
+  });
+  return text ? String(text) : null;
 }
 
 function draftProcessForOpen_(opened) {
@@ -217,6 +282,7 @@ function draftProcessForOpen_(opened) {
 function onGmailMessageOpen(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
   var read = emptyRead_(e);
+  enterZone_(e);
   try {
     var calendarService = noteCalendar_();
     var opened = readOpen_(e, read);
@@ -246,6 +312,8 @@ function onGmailMessageOpen(e) {
     var snap = err && err.read ? err.read : read;
     logOpen_(snap, { speak: false, reason: 'error', planId: null, calendarService: calendarReady_() });
     return [render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'open'))];
+  } finally {
+    leaveZone_();
   }
 }
 
@@ -268,20 +336,25 @@ function onRemindMe(e) {
 
 function onDoIt(e) {
   var lang = Glance.i18n.locale(localeOf_(e));
-  var job;
+  enterZone_(e);
   try {
-    job = stageDoIt_(e, lang);
-  } catch (err) {
-    return finishDoError_(err, lang);
-  }
-  if (job.card) return job.card;
-  // requireScopes must not be caught. Apps Script turns that exception
-  // into its own authorization prompt. A caught copy never shows it.
-  requireScopesNow_(job.scopes);
-  try {
-    return job.write();
-  } catch (err) {
-    return finishDoError_(err, lang);
+    var job;
+    try {
+      job = stageDoIt_(e, lang);
+    } catch (err) {
+      return finishDoError_(err, lang);
+    }
+    if (job.card) return job.card;
+    // requireScopes must not be caught. Apps Script turns that exception
+    // into its own authorization prompt. A caught copy never shows it.
+    requireScopesNow_(job.scopes);
+    try {
+      return job.write();
+    } catch (err) {
+      return finishDoError_(err, lang);
+    }
+  } finally {
+    leaveZone_();
   }
 }
 
@@ -1229,7 +1302,12 @@ function button_(widget) {
     .setFunctionName(widget.action)
     .setLoadIndicator(CardService.LoadIndicator.SPINNER)
     .setParameters(params);
-  var button = CardService.newTextButton().setText(String(widget.text || '')).setOnClickAction(action);
+  var button = CardService.newTextButton().setText(String(widget.text || ''));
+  if (widget.action === 'onPrepareReply' && button.setComposeAction && CardService.ComposedEmailType && CardService.ComposedEmailType.REPLY_AS_DRAFT) {
+    button.setComposeAction(action, CardService.ComposedEmailType.REPLY_AS_DRAFT);
+  } else {
+    button.setOnClickAction(action);
+  }
   if (widget.style === 'filled' && CardService.TextButtonStyle && CardService.TextButtonStyle.FILLED) {
     button.setTextButtonStyle(CardService.TextButtonStyle.FILLED);
   }

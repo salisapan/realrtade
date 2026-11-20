@@ -780,6 +780,12 @@ console.log('\n--- message path parity ---');
     const node = { type: kind, text: '', action: '', params: {}, style: '' };
     node.setText = function (value) { node.text = value; return node; };
     node.setOnClickAction = function (action) { node.action = action.functionName; node.params = action.params; return node; };
+    node.setComposeAction = function (action, emailType) {
+      node.action = action.functionName;
+      node.params = action.params;
+      node.composeType = emailType;
+      return node;
+    };
     node.setAuthorizationAction = function (action) { node.action = 'authorize'; node.authUrl = action.url; return node; };
     node.setTextButtonStyle = function (value) { node.style = value; return node; };
     return node;
@@ -930,6 +936,7 @@ console.log('\n--- message path parity ---');
         nav.updateCard = function (card) { nav.card = card; return nav; };
         return nav;
       },
+      ComposedEmailType: { REPLY_AS_DRAFT: 'REPLY_AS_DRAFT' },
       ContentType: { TEXT: 'text' },
       UpdateDraftBodyType: { IN_PLACE_INSERT: 'IN_PLACE_INSERT' },
       newUpdateDraftBodyAction: function () {
@@ -965,7 +972,7 @@ console.log('\n--- message path parity ---');
     getActiveUser: function () {
       return { getEmail: function () { return 'owner@ai.local.flow@gmail.com'; } };
     },
-    getScriptTimeZone: function () { return 'Etc/UTC'; }
+    getScriptTimeZone: function () { return 'Asia/Jerusalem'; }
   };
   sandbox.GLANCE_BUILD_SHA = 'testsha';
   const RealDate = Date;
@@ -1855,9 +1862,11 @@ console.log('\n--- message path parity ---');
   });
   check('הכן תשובה builds a ComposeActionResponse and does not send',
     draftReads === 0 &&
+    prepareButtons[0].composeType === 'REPLY_AS_DRAFT' &&
     prepared.composeDraft &&
     prepared.composeDraft.body.indexOf('Hi') !== -1 &&
-    state.messages[replyId].calls.indexOf('createDraftReply') !== -1,
+    state.messages[replyId].calls.indexOf('createDraftReply') !== -1 &&
+    state.messages[replyId].calls.indexOf('send') === -1,
     prepared);
   const composeEvent = {
     gmail: {
@@ -1881,7 +1890,16 @@ console.log('\n--- message path parity ---');
     composeLog.indexOf('draftMetadata.subject') !== -1 &&
     composeLog.indexOf('פגישה') === -1,
     { buttons: composeButtons.map((item) => plain(item.text)), log: composeLog });
-  for (const marked of ['\u200fRe: \u200fפגישה עם דנה', '\u202bRE:  פגישה עם דנה\u202c ', '\u2067Re: Fwd: פגישה עם דנה\u2069']) {
+  for (const marked of [
+    '\u200fRe: \u200fפגישה עם דנה',
+    '\u202bRE:  פגישה עם דנה\u202c ',
+    '\u2067Re: Fwd: פגישה עם דנה\u2069',
+    'תשובה: פגישה עם דנה',
+    '\u200fתשובה:\u200f פגישה עם דנה',
+    'Re: תשובה: Fwd: פגישה עם דנה',
+    '  RE:\u00a0 פגישה   עם   דנה  ',
+    '\u202bתשובה: \u200fRe:  פגישה עם דנה\u202c'
+  ]) {
     const markedCard = openCompose(Object.assign({}, composeEvent, { draftMetadata: { subject: marked } }))[0];
     check('compose finds the stored reply when the subject carries bidi marks ' + JSON.stringify(marked),
       buttonsOf(markedCard).length === 1 && buttonsOf(markedCard)[0].action === 'onComposeDoIt' &&
@@ -1910,9 +1928,45 @@ console.log('\n--- message path parity ---');
     bareLines.indexOf('אין מה לסגור') === -1,
     bareLines);
 
-  // Gate 04e115ab: ai.local.flow mailed itself. A note to self has no reply (FlowIntent: selfTask, noReplyDraft),
-  // so «הכן תשובה» is not offered and compose has nothing to insert. That is the product rule, not a bug.
-  // A self-note meeting is a task unless it asks for the calendar («תשריין ביומן») — then it is the hold.
+  const normalizeSubject = vm.runInContext('normalizeSubject_', sandbox);
+  check('subject keys drop תשובה:/Re:/Fwd:, RTL marks, and extra spaces',
+    normalizeSubject('\u202bתשובה: \u200fRe:  פגישה   עם   דנה\u202c') === 'פגישה עם דנה' &&
+    normalizeSubject('הועבר: Fwd: פגישה עם דנה') === 'פגישה עם דנה' &&
+    normalizeSubject('  RE:\u00a0 פגישה עם דנה  ') === 'פגישה עם דנה',
+    normalizeSubject('\u202bתשובה: \u200fRe:  פגישה   עם   דנה\u202c'));
+  const missed = openCompose(Object.assign({}, composeEvent, { draftMetadata: { subject: 'תשובה: חשבונית אחרת' } }))[0];
+  const missedLines = linesOf(missed).join('\n');
+  check('a compose subject with no stored reply shows the Hebrew empty state and no בצע',
+    buttonsOf(missed).length === 0 &&
+    missedLines.indexOf('פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».') !== -1 &&
+    missedLines.indexOf('אין מה לסגור') === -1,
+    missedLines);
+
+  // Gate 04e115ab: the 18th became the 17th because the day was read from UTC midnight.
+  // 2026-11-17T22:30:00Z is 00:30 on 2026-11-18 in Asia/Jerusalem (UTC+2, after the October fall-back).
+  {
+    const zoneApi = sandbox.FlowExtract;
+    zoneApi.setZone('Asia/Jerusalem');
+    const jerusalemMidnight = new RealDate('2026-11-17T22:30:00Z');
+    check('Jerusalem midnight keeps 18 not 17 (Gate 04e115ab, 2026-11-18)',
+      zoneApi.todayIso(jerusalemMidnight) === '2026-11-18' &&
+      zoneApi.parseDate('ביום רביעי 18/11 בשעה 10:00', jerusalemMidnight).iso === '2026-11-18',
+      { today: zoneApi.todayIso(jerusalemMidnight), parsed: zoneApi.parseDate('ביום רביעי 18/11 בשעה 10:00', jerusalemMidnight) });
+    const springBefore = new RealDate('2026-03-26T23:30:00Z');
+    const springAfter = new RealDate('2026-03-27T00:30:00Z');
+    check('DST spring-forward morning in Asia/Jerusalem stays on 2026-03-27',
+      zoneApi.todayIso(springBefore) === '2026-03-27' && zoneApi.todayIso(springAfter) === '2026-03-27',
+      { before: zoneApi.todayIso(springBefore), after: zoneApi.todayIso(springAfter) });
+    const fallBefore = new RealDate('2026-10-24T22:30:00Z');
+    const fallAfter = new RealDate('2026-10-24T23:30:00Z');
+    check('DST fall-back morning in Asia/Jerusalem stays on 2026-10-25',
+      zoneApi.todayIso(fallBefore) === '2026-10-25' && zoneApi.todayIso(fallAfter) === '2026-10-25',
+      { before: zoneApi.todayIso(fallBefore), after: zoneApi.todayIso(fallAfter) });
+    zoneApi.setZone('');
+  }
+
+  // Gate 04e115ab: ai.local.flow mailed itself. A question still gets «הכן תשובה».
+  // A meeting with a date and a time is a calendar event, not a task due the day before.
   {
     const realSession = sandbox.Session;
     sandbox.Session = {
@@ -1929,18 +1983,30 @@ console.log('\n--- message path parity ---');
       return { ev: ev, card: openMessage(ev)[0] };
     };
     const selfR = selfOpen('self04eR', 'שאלה על החשבונית 13/11 ב', 'היי, תוכל לשלוח לי את החשבונית של חודש אוקטובר? תודה, רוני');
-    check('a self-sent question offers its task, not «הכן תשובה», and stores no reply',
-      buttonsOf(selfR.card).filter((b) => b.action === 'onPrepareReply').length === 0 &&
+    const selfPrepare = buttonsOf(selfR.card).filter((b) => b.action === 'onPrepareReply');
+    check('a self-sent question offers its task and «הכן תשובה»',
+      selfPrepare.length === 1 &&
+      plain(selfPrepare[0].text) === 'הכן תשובה' &&
+      selfPrepare[0].composeType === 'REPLY_AS_DRAFT' &&
       buttonsOf(selfR.card).filter((b) => b.action === 'onDoIt').length === 1 &&
-      Object.keys(state.cache).length === 0,
-      { lines: linesOf(selfR.card), buttons: buttonsOf(selfR.card).map((b) => plain(b.text)) });
+      Object.keys(state.cache).length === 1,
+      { lines: linesOf(selfR.card), buttons: buttonsOf(selfR.card).map((b) => plain(b.text)), cache: state.cache });
+    const selfPrepared = prepareReply(Object.assign({}, selfR.ev, { parameters: { messageId: 'self04eR', source: 'message' } }));
+    check('«הכן תשובה» on a self-sent question returns a draft and does not send',
+      selfPrepared.composeDraft &&
+      state.messages.self04eR.calls.indexOf('createDraftReply') !== -1 &&
+      state.messages.self04eR.calls.indexOf('send') === -1,
+      selfPrepared);
     const selfC = selfOpen('self04eC', '[G-Calendar] פגישה עם דנה על הספקים', 'נקבעה פגישה ביום ד\' הקרוב ב-11:00.');
     const selfCDo = doIt(Object.assign({}, selfC.ev, { parameters: { messageId: 'self04eC', source: 'message' } })).card;
-    const selfCTask = state.tasks[Object.keys(state.tasks)[0]];
-    check('a self-note meeting without a calendar ask is a task due that Wednesday, kept on that day by Google Tasks',
-      Object.keys(state.events).length === 0 && selfCTask && selfCTask.due === '2026-10-21T00:00:00.000Z' &&
-      linesOf(selfCDo).join('\n').indexOf('2026-10-21') !== -1,
-      { task: selfCTask, lines: linesOf(selfCDo) });
+    const selfCIds = Object.keys(state.events);
+    const selfCEvent = selfCIds.length === 1 ? state.events[selfCIds[0]] : null;
+    check('a self-note meeting with a date and a time is a calendar event that Wednesday, not a task',
+      selfCEvent && selfCEvent.start.dateTime === '2026-10-21T11:00:00' &&
+      selfCEvent.start.timeZone === 'Asia/Jerusalem' &&
+      Object.keys(state.tasks).length === 0 &&
+      linesOf(selfCDo).join('\n').indexOf('2026-10-21 11:00') !== -1,
+      { event: selfCEvent, tasks: state.tasks, lines: linesOf(selfCDo) });
     const selfHold = selfOpen('self04eH', '[G-Calendar] פגישה עם דנה על הספקים', 'בוא נקבע פגישה עם דנה על הספקים ביום רביעי 21/10 בשעה 11:00 עד 11:30. תשריין ביומן.');
     doIt(Object.assign({}, selfHold.ev, { parameters: { messageId: 'self04eH', source: 'message' } }));
     const holdIds = Object.keys(state.events);
@@ -1948,6 +2014,41 @@ console.log('\n--- message path parity ---');
     check('a self-note that says «תשריין ביומן» writes the hold at 11:00 on 21/10 and no task',
       holdEv && holdEv.start.dateTime === '2026-10-21T11:00:00' && Object.keys(state.tasks).length === 0,
       { events: state.events, tasks: state.tasks });
+    const prevDate = sandbox.Date;
+    const stamp = new RealDate('2026-11-17T22:30:00Z').getTime();
+    function AtNow() {
+      const args = Array.prototype.slice.call(arguments);
+      if (!args.length) return new RealDate(stamp);
+      if (args.length === 1) return new RealDate(args[0]);
+      return new (RealDate.bind.apply(RealDate, [null].concat(args)));
+    }
+    AtNow.now = function () { return stamp; };
+    AtNow.parse = RealDate.parse;
+    AtNow.UTC = RealDate.UTC;
+    AtNow.prototype = RealDate.prototype;
+    sandbox.Date = AtNow;
+    try {
+      const day18 = selfOpen('day18', '[G-Calendar] פגישה', 'נקבעה פגישה ביום רביעי 18/11 בשעה 10:00.');
+      const day18Do = doIt(Object.assign({}, day18.ev, { parameters: { messageId: 'day18', source: 'message' } })).card;
+      const day18Ids = Object.keys(state.events);
+      const day18Event = day18Ids.length === 1 ? state.events[day18Ids[0]] : null;
+      check('a calendar mail for 18/11 at Jerusalem midnight is an event on the 18th, not a task due the 17th',
+        day18Event && day18Event.start.dateTime === '2026-11-18T10:00:00' &&
+        day18Event.start.timeZone === 'Asia/Jerusalem' &&
+        Object.keys(state.tasks).length === 0 &&
+        linesOf(day18Do).join('\n').indexOf('2026-11-17') === -1 &&
+        linesOf(day18.card).join('\n').indexOf('2026-11-18') !== -1,
+        { event: day18Event, lines: linesOf(day18.card), proof: linesOf(day18Do) });
+      const tomorrow = selfOpen('day19', '[G-Calendar] פגישה', 'נקבעה פגישה מחר בשעה 10:00.');
+      doIt(Object.assign({}, tomorrow.ev, { parameters: { messageId: 'day19', source: 'message' } }));
+      const tomorrowIds = Object.keys(state.events);
+      const tomorrowEvent = tomorrowIds.length === 1 ? state.events[tomorrowIds[0]] : null;
+      check('מחר at Jerusalem midnight on the 18th is the 19th, not the UTC tomorrow',
+        tomorrowEvent && tomorrowEvent.start.dateTime === '2026-11-19T10:00:00' && Object.keys(state.tasks).length === 0,
+        { event: tomorrowEvent, tasks: state.tasks, lines: linesOf(tomorrow.card) });
+    } finally {
+      sandbox.Date = prevDate;
+    }
     sandbox.Session = realSession;
   }
   check('compose does not send', !/GmailDraft\.send|GmailApp\.sendEmail|gmail\.send|sendEmail|Drafts\.send|MailApp|\.send\(/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));

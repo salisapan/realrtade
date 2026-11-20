@@ -112,8 +112,84 @@ const FlowExtract = (() => {
     return target === 0 ? delta : delta + 7;
   }
 
+  // Empty unless a host set the user's zone (the Gmail add-on: calendar zone,
+  // then Session.getScriptTimeZone(), Asia/Jerusalem in tests). Unset, every
+  // helper below is the local Date the extension has always used.
+  var activeZone = '';
+  var WEEKDAY_SHORT = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+  function setZone(zone) {
+    activeZone = '';
+    if (typeof zone !== 'string' || !zone) return '';
+    var text = zone.trim();
+    if (!/^[A-Za-z0-9_+\-\/]{1,80}$/.test(text)) return '';
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: text });
+      activeZone = text;
+    } catch (err) {
+      activeZone = '';
+    }
+    return activeZone;
+  }
+
+  function currentZone() { return activeZone; }
+
+  function zoneParts(date) {
+    if (!activeZone || !date || typeof date.getTime !== 'function' || isNaN(date.getTime())) return null;
+    var fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: activeZone,
+      hourCycle: 'h23',
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    var map = {};
+    fmt.formatToParts(date).forEach(function (part) {
+      if (part.type !== 'literal') map[part.type] = part.value;
+    });
+    if (!map.year || !map.month || !map.day) return null;
+    return {
+      year: Number(map.year),
+      month: Number(map.month),
+      day: Number(map.day),
+      weekday: WEEKDAY_SHORT[map.weekday]
+    };
+  }
+
+  function isoFromParts(year, month, day) {
+    return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  }
+
   function iso(d) {
+    var p = zoneParts(d);
+    if (p) return isoFromParts(p.year, p.month, p.day);
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function weekdayOf(d) {
+    var p = zoneParts(d);
+    if (p && Number.isInteger(p.weekday)) return p.weekday;
+    return d.getDay();
+  }
+
+  function yearOf(d) {
+    var p = zoneParts(d);
+    return p ? p.year : d.getFullYear();
+  }
+
+  // Civil days in the user's zone. UTC midnight of a wanted day is not that
+  // day in a zone ahead of UTC: 2026-11-18T00:00:00+02:00 is 2026-11-17T22:00Z.
+  // Noon UTC of the civil day stays on that day across the Israel offset,
+  // including the spring-forward and fall-back mornings.
+  function addCivilDays(d, n) {
+    var p = zoneParts(d);
+    if (!p) {
+      var x = new Date(d.getTime());
+      x.setDate(x.getDate() + n);
+      return x;
+    }
+    return new Date(Date.UTC(p.year, p.month - 1, p.day + n, 12, 0, 0));
   }
 
   // `new Date(y, m, d)` silently rolls impossible days forward: February 30
@@ -123,7 +199,12 @@ const FlowExtract = (() => {
   // the only way to tell a valid date from a rolled-over one.
   function buildDate(year, monthIdx, day) {
     if (!(monthIdx >= 0 && monthIdx <= 11) || !(day >= 1 && day <= 31)) return null;
-    const d = new Date(year, monthIdx, day);
+    if (activeZone) {
+      var utc = new Date(Date.UTC(year, monthIdx, day));
+      if (utc.getUTCFullYear() !== year || utc.getUTCMonth() !== monthIdx || utc.getUTCDate() !== day) return null;
+      return new Date(Date.UTC(year, monthIdx, day, 12, 0, 0));
+    }
+    var d = new Date(year, monthIdx, day);
     if (d.getFullYear() !== year || d.getMonth() !== monthIdx || d.getDate() !== day) return null;
     return d;
   }
@@ -150,7 +231,7 @@ const FlowExtract = (() => {
       const d = buildDate(+explicitYear, monthIdx, day);
       return d ? { raw, iso: iso(d) } : null;
     }
-    const y = now.getFullYear();
+    const y = yearOf(now);
     const inWindow = [y - 1, y, y + 1]
       .map((yy) => buildDate(yy, monthIdx, day))
       .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
@@ -164,9 +245,12 @@ const FlowExtract = (() => {
   }
 
   function localToday(now) {
-    const d = now || new Date();
-    const p = (n) => String(n).padStart(2, '0');
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    var d = now || new Date();
+    if (isNaN(d.getTime())) d = new Date();
+    var p = zoneParts(d);
+    if (p) return isoFromParts(p.year, p.month, p.day);
+    var pad2 = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
   // An invoice number, a version, or a phone is not a day.
   function slashRejected(text, index) {
@@ -269,19 +353,21 @@ const FlowExtract = (() => {
     return null;
   }
   function choiceLabel(date, he) {
+    const p = zoneParts(date);
+    const day = p ? p.weekday : date.getDay();
+    const dom = p ? p.day : date.getDate();
+    const month = p ? p.month : date.getMonth() + 1;
     const name = he
-      ? DAYS_HE[date.getDay()]
-      : DAYS[date.getDay()].charAt(0).toUpperCase() + DAYS[date.getDay()].slice(1);
-    return name + ' ' + date.getDate() + '/' + (date.getMonth() + 1);
+      ? DAYS_HE[day]
+      : DAYS[day].charAt(0).toUpperCase() + DAYS[day].slice(1);
+    return name + ' ' + dom + '/' + month;
   }
   function nearestWeekday(anchor, weekday) {
     for (let delta = 1; delta <= 3; delta++) {
-      const before = new Date(anchor.getTime());
-      before.setDate(anchor.getDate() - delta);
-      if (before.getDay() === weekday) return before;
-      const after = new Date(anchor.getTime());
-      after.setDate(anchor.getDate() + delta);
-      if (after.getDay() === weekday) return after;
+      const before = addCivilDays(anchor, -delta);
+      if (weekdayOf(before) === weekday) return before;
+      const after = addCivilDays(anchor, delta);
+      if (weekdayOf(after) === weekday) return after;
     }
     return null;
   }
@@ -311,14 +397,14 @@ const FlowExtract = (() => {
       written = buildDate(year, num.month - 1, num.day);
       if (!written) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
     } else {
-      const y = now.getFullYear();
+      const y = yearOf(now);
       const inWindow = [y - 1, y, y + 1]
         .map((yy) => buildDate(yy, num.month - 1, num.day))
         .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
       if (inWindow.length !== 1) return clock ? { raw: raw, iso: null, invalidDate: true } : null;
       written = inWindow[0];
     }
-    if (written.getDay() === dayName.index) {
+    if (weekdayOf(written) === dayName.index) {
       return { raw: raw, iso: iso(written), statedWeekday: true };
     }
     // No clock: leave the day to the older parser. A conflict with no
@@ -410,8 +496,8 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('\\b(?:by|on|before|due|until|no later than|signing|closing|starting|effective|kick(?:ing)? off)\\s+(?:(?:eod|end of (?:the )?day|end of business|close of business|cob)\\s+)?(?:on\\s+)?(?:next\\s+)?(' + DAYS.join('|') + ')\\b', 'i'));
     if (m) {
       const target = DAYS.indexOf(m[1].toLowerCase());
-      const d = new Date(now);
-      let delta = (target - d.getDay() + 7) % 7;
+      let d = new Date(now.getTime());
+      let delta = (target - weekdayOf(d) + 7) % 7;
       // "next Friday" has to land at least a week further out than plain
       // "Friday" — otherwise the word "next" is captured by the regex but
       // has no effect on the computed date, and a sender who explicitly
@@ -421,7 +507,7 @@ const FlowExtract = (() => {
       // a full week regardless of "next", so it needs no separate bump.
       if (delta === 0) delta = 7;
       else if (/next\s/i.test(m[0])) delta = nextWeekDelta(d, target, delta);
-      d.setDate(d.getDate() + delta);
+      d = addCivilDays(d, delta);
       // "by Friday 23/10": the number is the day. The weekday name is the same Friday.
       const numbered = slashDate(text, now);
       if (numbered && numbered.iso) return numbered;
@@ -436,11 +522,11 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('\\bnext\\s+(' + DAYS.join('|') + ')\\b', 'i'));
     if (m) {
       const target = DAYS.indexOf(m[1].toLowerCase());
-      const d = new Date(now);
-      let delta = (target - d.getDay() + 7) % 7;
+      let d = new Date(now.getTime());
+      let delta = (target - weekdayOf(d) + 7) % 7;
       if (delta === 0) delta = 7;
       else delta = nextWeekDelta(d, target, delta);
-      d.setDate(d.getDate() + delta);
+      d = addCivilDays(d, delta);
       return { raw: m[0], iso: iso(d) };
     }
 
@@ -451,13 +537,13 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('\\b(this\\s+|next\\s+)?(' + DAYS.join('|') + ')\\b(?=\\s+at\\s+\\d)', 'i'));
     if (m) {
       const target = DAYS.indexOf(m[2].toLowerCase());
-      const d = new Date(now);
-      let delta = (target - d.getDay() + 7) % 7;
+      let d = new Date(now.getTime());
+      let delta = (target - weekdayOf(d) + 7) % 7;
       const flagged = (m[1] || '').toLowerCase();
       if (delta === 0) {
         if (flagged.indexOf('this') !== 0) delta = 7;
       } else if (flagged.indexOf('next') === 0) delta += 7;
-      d.setDate(d.getDate() + delta);
+      d = addCivilDays(d, delta);
       return { raw: m[0], iso: iso(d) };
     }
 
@@ -481,12 +567,12 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('(?:עד|ב-?|ל|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')(?:\\s+הבא(?![\\u0590-\\u05FF]))?'));
     if (m) {
       const target = DAYS_HE.indexOf(m[1]);
-      const d = new Date(now);
-      let delta = (target - d.getDay() + 7) % 7;
+      let d = new Date(now.getTime());
+      let delta = (target - weekdayOf(d) + 7) % 7;
       const isNext = /הבא(?![\u0590-\u05FF])/.test(m[0]);
       if (delta === 0) delta = 7;
       else if (isNext) delta = nextWeekDelta(d, target, delta);
-      d.setDate(d.getDate() + delta);
+      d = addCivilDays(d, delta);
       return { raw: m[0], iso: iso(d) };
     }
 
@@ -503,9 +589,7 @@ const FlowExtract = (() => {
     if (m) {
       const word = m[1].toLowerCase();
       const days = word === 'tomorrow' ? 1 : 2;
-      const d = new Date(now);
-      d.setDate(d.getDate() + days);
-      return { raw: m[0], iso: iso(d) };
+      return { raw: m[0], iso: iso(addCivilDays(now, days)) };
     }
     m = text.match(/\b(?:by|due|before|until|no later than)\s+today\b|\b(?:meet(?:ing)?|call|sync)\s+today\b|\btoday\s+at\b/i);
     if (m) {
@@ -527,9 +611,7 @@ const FlowExtract = (() => {
     m = text.match(/(?:^|[^\u0590-\u05FF])ל?(מחרתיים|מחר)(?![\u0590-\u05FF])/);
     if (m) {
       const days = m[1] === 'מחר' ? 1 : 2;
-      const d = new Date(now);
-      d.setDate(d.getDate() + days);
-      return { raw: m[1], iso: iso(d) };
+      return { raw: m[1], iso: iso(addCivilDays(now, days)) };
     }
     m = text.match(/(?:פגישה|שיחה|עד)\s+היום(?![\u0590-\u05FF])|היום\s+בשעה/);
     if (m) {
@@ -740,7 +822,14 @@ const FlowExtract = (() => {
     };
   }
 
-  return { extract, parseMoney, parseDate, parseTime, fmtMoney, fmtTime, decisiveSentence, senderIsAutomated };
+  return {
+    extract, parseMoney, parseDate, parseTime, fmtMoney, fmtTime, decisiveSentence, senderIsAutomated,
+    setZone: setZone,
+    zone: currentZone,
+    parts: zoneParts,
+    todayIso: function (d) { return localToday(d || new Date()); },
+    addDays: addCivilDays
+  };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExtract };

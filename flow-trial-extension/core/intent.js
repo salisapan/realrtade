@@ -192,7 +192,12 @@ const FlowIntent = (() => {
   function isPastDate(dateIso, now) {
     if (!dateIso) return false;
     const n = now || new Date();
-    const todayIso = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+    let todayIso;
+    if (typeof FlowExtract !== 'undefined' && FlowExtract.zone && FlowExtract.zone() && typeof FlowExtract.todayIso === 'function') {
+      todayIso = FlowExtract.todayIso(n);
+    } else {
+      todayIso = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+    }
     return dateIso < todayIso;
   }
 

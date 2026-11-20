@@ -10,8 +10,30 @@ const FlowDayWords = (() => {
   const EN_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, a: 1 };
 
   function pad(n) { return String(n).padStart(2, '0'); }
-  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-  function plus(at, days) { return iso(new Date(at.getFullYear(), at.getMonth(), at.getDate() + days)); }
+  function zoned() {
+    try {
+      if (typeof FlowExtract !== 'undefined' && FlowExtract.zone && FlowExtract.zone() && FlowExtract.todayIso && FlowExtract.addDays) return FlowExtract;
+    } catch (e) { /* extension path: no zone */ }
+    return null;
+  }
+  function iso(d) {
+    var Z = zoned();
+    if (Z) return Z.todayIso(d);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function plus(at, days) {
+    var Z = zoned();
+    if (Z) return Z.todayIso(Z.addDays(at, days));
+    return iso(new Date(at.getFullYear(), at.getMonth(), at.getDate() + days));
+  }
+  function civil(at) {
+    var Z = zoned();
+    if (Z && Z.parts) {
+      var p = Z.parts(at);
+      if (p) return p;
+    }
+    return { year: at.getFullYear(), month: at.getMonth() + 1, day: at.getDate(), weekday: at.getDay() };
+  }
 
   function normalize(text, now) {
     let s = String(text == null ? '' : text);
@@ -27,11 +49,12 @@ const FlowDayWords = (() => {
       const dn = parseInt(d, 10); const mn = parseInt(mo, 10);
       if (dn < 1 || dn > 31 || mn < 1 || mn > 12) return m;
       // Always an ISO date: "5/11" is ambiguous (day or month first) to a reader, an ISO date is not. No year means the next such day.
-      let y = at.getFullYear();
-      if (yr) { y = parseInt(yr.slice(1), 10); if (y < 100) y += 2000; } else if (new Date(y, mn - 1, dn) < new Date(at.getFullYear(), at.getMonth(), at.getDate())) y += 1;
-      const probe = new Date(y, mn - 1, dn);
-      if (probe.getMonth() !== mn - 1 || probe.getDate() !== dn) return m;
-      return pre + mark + iso(probe);
+      const today = civil(at);
+      let y = today.year;
+      if (yr) { y = parseInt(yr.slice(1), 10); if (y < 100) y += 2000; } else if (new Date(Date.UTC(y, mn - 1, dn, 12)) < new Date(Date.UTC(today.year, today.month - 1, today.day, 12))) y += 1;
+      const probe = new Date(Date.UTC(y, mn - 1, dn));
+      if (probe.getUTCMonth() !== mn - 1 || probe.getUTCDate() !== dn) return m;
+      return pre + mark + (y + '-' + pad(mn) + '-' + pad(dn));
     });
     // Clocks written the other ways: «ב-8 וחצי», «ב-8 ורבע», "half past 8", "quarter to 9", and a dotted clock («ב-20.00»,
     // "at 8.30 pm"). The date reader would take "at 8.30 pm" for 8:00, a wrong hour, so these are made explicit first.
@@ -63,14 +86,20 @@ const FlowDayWords = (() => {
     s = s.replace(/\bthe\s+(\d{1,2})(?:st|nd|rd|th)\s+of\s+(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi, (m, d, mo) => mo + ' ' + d);
     // End of the week (Friday) and of the month, and a day of the month by itself: "by the 30th", «עד ה-30», «עד 30 לחודש».
     // English: Friday. Hebrew «סוף השבוע» follows the product's Israeli work week, as core/follow-up.js does: Thursday.
-    s = s.replace(/\b(?:end\s+of\s+(?:the\s+)?week|EOW)\b/gi, () => plus(at, (5 - at.getDay() + 7) % 7));
-    s = s.replace(/סוף\s+השבוע(?![\u0590-\u05FF])/g, () => plus(at, (4 - at.getDay() + 7) % 7));
-    s = s.replace(/\bend\s+of\s+(?:the\s+)?month\b|סוף\s+החודש(?![\u0590-\u05FF])/gi, () => iso(new Date(at.getFullYear(), at.getMonth() + 1, 0)));
+    s = s.replace(/\b(?:end\s+of\s+(?:the\s+)?week|EOW)\b/gi, () => plus(at, (5 - civil(at).weekday + 7) % 7));
+    s = s.replace(/סוף\s+השבוע(?![\u0590-\u05FF])/g, () => plus(at, (4 - civil(at).weekday + 7) % 7));
+    s = s.replace(/\bend\s+of\s+(?:the\s+)?month\b|סוף\s+החודש(?![\u0590-\u05FF])/gi, () => {
+      const today = civil(at);
+      const last = new Date(Date.UTC(today.year, today.month, 0));
+      return last.getUTCFullYear() + '-' + pad(last.getUTCMonth() + 1) + '-' + pad(last.getUTCDate());
+    });
     const dayOfMonth = (dn) => {
       if (dn < 1 || dn > 31) return null;
+      const today = civil(at);
+      const todayNoon = Date.UTC(today.year, today.month - 1, today.day, 12);
       for (let k = 0; k < 3; k++) {
-        const probe = new Date(at.getFullYear(), at.getMonth() + k, dn);
-        if (probe.getDate() === dn && probe >= new Date(at.getFullYear(), at.getMonth(), at.getDate())) return iso(probe);
+        const probe = new Date(Date.UTC(today.year, today.month - 1 + k, dn));
+        if (probe.getUTCDate() === dn && probe.getTime() + 12 * 3600000 >= todayNoon) return probe.getUTCFullYear() + '-' + pad(probe.getUTCMonth() + 1) + '-' + pad(dn);
       }
       return null;
     };
