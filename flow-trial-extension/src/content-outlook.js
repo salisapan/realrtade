@@ -1020,12 +1020,16 @@
 
   function newestOther(list, own, openSender, userSet) {
     const open = String(openSender || '').trim().toLowerCase();
+    const known = [];
+    (own || []).forEach((a) => known.push(a));
+    if (userSet && typeof userSet.forEach === 'function') userSet.forEach((a) => known.push(a));
     const rows = (list || []).filter((m) => {
       const a = fromAddress(m);
       if (!a) return false;
-      if ((own || []).indexOf(a) < 0) return true;
-      if (open && open === a) return true;
-      return Boolean(userSet && open && userSet.has(a) && userSet.has(open));
+      const mine = (own || []).indexOf(a) >= 0 || (userSet && userSet.has && userSet.has(a));
+      if (!mine) return true;
+      if (open && (open === a || (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.sameMailbox(a, open, known)))) return true;
+      return false;
     });
     rows.sort((a, b) => (Date.parse(b.receivedDateTime) || 0) - (Date.parse(a.receivedDateTime) || 0));
     return rows[0] || null;
@@ -1103,14 +1107,19 @@
 
   // Equal ignoring case, or both addresses are the user's own. A delegate
   // (Graph sender is not Graph from) is a different person either way.
-  async function sameOpenSender(from, openEmail, graphSender) {
-    if (behalfSplit(from, graphSender)) return false;
+  async function sameOpenSender(from, openEmail, graphSender, own) {
     const a = String(from || '').trim().toLowerCase();
     const b = String(openEmail || '').trim().toLowerCase();
+    const s = String(graphSender || '').trim().toLowerCase();
+    const known = [];
+    (own || []).forEach((addr) => known.push(addr));
+    const loaded = await loadUserAddresses();
+    if (loaded && typeof loaded.forEach === 'function') loaded.forEach((addr) => known.push(addr));
+    const same = (x, y) => typeof FlowOwaParse !== 'undefined' && FlowOwaParse.sameMailbox(x, y, known);
+    if (a && s && a !== s && !same(a, s)) return false;
     if (!a || !b) return false;
     if (a === b) return true;
-    const known = await loadUserAddresses();
-    return Boolean(known && known.has(a) && known.has(b));
+    return same(a, b);
   }
 
   // Same session the mailbox check uses. The open-page reads used to send headers: {}
@@ -1250,14 +1259,14 @@
     if (direct && direct.id) {
       const open = String(openSender || '').trim().toLowerCase();
       const from = String(direct.from || '').trim().toLowerCase();
-      if (behalfSplit(direct.from, direct.sender) || (open && from && !(await sameOpenSender(from, open, direct.sender)))) {
+      if (open && from && !(await sameOpenSender(from, open, direct.sender, own))) {
         return senderMismatch(direct, openSender);
       }
       return direct;
     }
     const found = await messageIdForConversation(convId || pathId, own, openSender);
     if (!found || !found.id) return null;
-    if (!(await sameOpenSender(found.from, openSender, found.sender))) {
+    if (!(await sameOpenSender(found.from, openSender, found.sender, own))) {
       return senderMismatch(found, openSender);
     }
     return found;
@@ -1272,9 +1281,10 @@
     try { own = ownAddressesOf(await FlowStorage.get()); } catch (e) { own = []; }
     let found = null;
     try { found = await resolveOutlookMessageId(pathId || convId, convId || pathId, own, pane && pane.senderEmail); } catch (e) { found = null; }
-    if (found && found.id && found.unread !== true) return { id: found.id, immutable: found.immutable === true };
-    if (pane && pane.itemId) return { id: String(pane.itemId), immutable: false };
-    return { id: '', immutable: false };
+    if (found && found.id && found.unread !== true) {
+      return { id: found.id, immutable: found.immutable === true, how: found.how || 'resolved' };
+    }
+    return { id: '', immutable: false, how: (found && found.reason) || 'unproven' };
   }
   try { globalThis.FlowOutlookDraftTarget = outlookDraftTarget; } catch (e) { /* the page is gone */ }
 

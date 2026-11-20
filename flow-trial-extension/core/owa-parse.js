@@ -37,6 +37,35 @@ const FlowOwaParse = (() => {
   }
 
   // One spelling for an Exchange id, whatever alphabet and padding it arrived in.
+  // Personal Outlook's mailbox id is outlook_<hex>@outlook.com. The alias on the
+  // message header is the same account even when /me never listed the CID.
+  function opaqueMailbox(addr) {
+    return /^outlook_[0-9a-f]+@outlook\.com$/i.test(String(addr || '').trim());
+  }
+
+  function addressSet(known) {
+    const set = new Set();
+    function add(raw) {
+      const e = String(raw || '').trim().toLowerCase();
+      if (e && e.indexOf('@') > 0) set.add(e);
+    }
+    if (!known) return set;
+    if (typeof known.forEach === 'function') known.forEach(add);
+    else if (Array.isArray(known)) known.forEach(add);
+    return set;
+  }
+
+  function sameMailbox(a, b, known) {
+    const x = String(a || '').trim().toLowerCase();
+    const y = String(b || '').trim().toLowerCase();
+    if (!x || !y) return false;
+    if (x === y) return true;
+    const set = addressSet(known);
+    if (set.has(x) && set.has(y)) return true;
+    if ((opaqueMailbox(x) || opaqueMailbox(y)) && (set.has(x) || set.has(y))) return true;
+    return false;
+  }
+
   function canonId(id) {
     if (!id) return '';
     let s = String(id);
@@ -1450,7 +1479,7 @@ const FlowOwaParse = (() => {
     return out;
   }
 
-  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, subjectFallbackRows, minuteKey, clockToIso, clockPair, pageProves24h, stripReadingChrome, readingPaneRoots, openBodyRoot, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
+  return { itemIdFromUrl, urlIds, canonId, opaqueMailbox, sameMailbox, matchEntry, matchEntryHow, uniqueGraphMessage, subjectFallbackRows, minuteKey, clockToIso, clockPair, pageProves24h, stripReadingChrome, readingPaneRoots, openBodyRoot, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

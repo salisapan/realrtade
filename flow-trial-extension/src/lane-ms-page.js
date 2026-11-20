@@ -380,20 +380,27 @@
       : 'Contact details in the draft. You send it.';
   }
 
+  function draftCandidates(pane) {
+    const out = [];
+    [pane && pane.pathId, pane && pane.rawUrlId, pane && pane.itemId, pane && pane.conversationId].forEach((id) => {
+      const s = String(id || '').trim();
+      if (s && out.indexOf(s) < 0) out.push(s);
+    });
+    return out;
+  }
+
   function draftTarget(pane) {
+    const candidates = draftCandidates(pane);
     const resolve = globalThis.FlowOutlookDraftTarget;
     if (typeof resolve !== 'function') {
-      const id = (pane && (pane.itemId || pane.rawUrlId || pane.pathId)) || '';
-      return Promise.resolve({ id: id, immutable: false });
+      return Promise.resolve({ id: '', immutable: false, how: 'resolver-missing', candidates: candidates });
     }
-    return Promise.resolve(resolve(pane)).then((found) => {
-      if (found && found.id) return found;
-      const id = (pane && (pane.itemId || pane.rawUrlId || pane.pathId)) || '';
-      return { id: id, immutable: false };
-    }, () => {
-      const id = (pane && (pane.itemId || pane.rawUrlId || pane.pathId)) || '';
-      return { id: id, immutable: false };
-    });
+    return Promise.resolve(resolve(pane)).then((found) => ({
+      id: found && found.id ? String(found.id) : '',
+      immutable: !!(found && found.immutable),
+      how: (found && found.how) || (found && found.id ? 'resolved' : 'unproven'),
+      candidates: candidates
+    }), () => ({ id: '', immutable: false, how: 'resolver-failed', candidates: candidates }));
   }
 
   function markInDraft(card, button, lang) {
@@ -423,20 +430,18 @@
       return;
     }
     draftTarget(pane).then((target) => {
-      if (!target || !target.id) {
-        button.disabled = false;
-        statusNode(card).textContent = draftStatus(lang, false);
-        return;
-      }
       chrome.runtime.sendMessage({
         type: 'flow:execute-action',
         payload: {
           connectorId: 'outlookDraft',
           body: res.draft,
           comment: res.draft,
-          outlookIncomingId: target.id,
-          messageId: target.id,
-          outlookImmutableId: target.immutable === true,
+          requireProvenId: true,
+          outlookCandidates: (target && target.candidates) || [],
+          outlookIncomingId: (target && target.id) || '',
+          messageId: (target && target.id) || '',
+          outlookImmutableId: !!(target && target.immutable),
+          outlookIdHow: (target && target.how) || '',
           explicitClick: true
         }
       }, (graph) => {
@@ -456,7 +461,9 @@
             graph && graph.ref ? 'ref' : 'no-ref',
             graph && graph.fetchedBack === false ? 'fetchedBack-false' : '',
             graph && graph.reason ? String(graph.reason) : '',
-            !target.id ? 'no-message' : ''
+            graph && graph.errorCode ? String(graph.errorCode) : '',
+            graph && graph.how ? String(graph.how) : (target && target.how) || '',
+            target && target.id ? '' : 'unproven'
           ].filter(Boolean).join(' ');
           card.appendChild(why);
           if (!card.querySelector('.flow-lane-copy')) card.appendChild(copyButton(res.draft));

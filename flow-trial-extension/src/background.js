@@ -6239,8 +6239,95 @@ async function outlookRefuseIfEdited(url, snapshot, prefer) {
   return null;
 }
 
+function outlookIdSpellings(id) {
+  const raw = String(id || '').trim();
+  if (!raw) return [];
+  let canon = raw;
+  try { canon = decodeURIComponent(raw); } catch (e) { /* already decoded */ }
+  canon = canon.replace(/^ol:/, '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '').trim();
+  const out = [];
+  if (canon) out.push(canon);
+  if (raw && raw !== canon && out.indexOf(raw) < 0) out.push(raw);
+  return out;
+}
+
+async function outlookReadError(res) {
+  const status = res && typeof res.status === 'number' ? res.status : 0;
+  let code = '';
+  let message = '';
+  try {
+    const text = res && typeof res.text === 'function' ? await res.text() : '';
+    if (text) {
+      try {
+        const body = JSON.parse(text);
+        const err = body && body.error;
+        if (err) {
+          code = String(err.code || '').slice(0, 80);
+          message = String(err.message || '');
+        } else message = text;
+      } catch (e) { message = text; }
+    }
+  } catch (e) { /* the status is still the fact */ }
+  message = message.replace(/bearer\s+\S+/gi, '').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Za-z]{2,}/gi, '').replace(/\s+/g, ' ').trim().slice(0, 180);
+  return { status: status, code: code, message: message };
+}
+
+function logContactsDraftFail(status, err, how, immutable) {
+  const code = err && err.code ? err.code : '';
+  const message = err && err.message ? err.message : '';
+  try {
+    console.info('[Glance] contacts draft http=' + (status || 0) + ' code=' + code + ' message=' + message + ' how=' + (how || '') + ' immutable=' + (immutable ? '1' : '0'));
+  } catch (e) { /* no console */ }
+}
+
+// GET /me/messages/{id} with both spellings and both Prefer values. The id
+// createReply may use is the id in a 200 body, with the Prefer that got it.
+async function outlookProveMessage(candidates) {
+  const seen = new Set();
+  const ids = [];
+  (candidates || []).forEach((id) => {
+    outlookIdSpellings(id).forEach((spelling) => {
+      if (!spelling || seen.has(spelling)) return;
+      seen.add(spelling);
+      ids.push(spelling);
+    });
+  });
+  const prefers = [null, 'IdType="ImmutableId"'];
+  for (let i = 0; i < ids.length; i++) {
+    for (let p = 0; p < prefers.length; p++) {
+      const headers = prefers[p] ? { Prefer: prefers[p] } : {};
+      const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ids[i]) + '?$select=id';
+      outlookAssertNotSend(url);
+      let res = null;
+      try { res = await outlookFetch(url, { method: 'GET', headers: headers }); } catch (e) { res = null; }
+      if (!res || !res.ok) continue;
+      let body = null;
+      try { body = await res.json(); } catch (e) { body = null; }
+      if (body && body.id && !Array.isArray(body.value)) {
+        return { id: String(body.id), immutable: Boolean(prefers[p]), how: 'get-message' };
+      }
+    }
+  }
+  return null;
+}
+
 async function outlookDraftWrite(p) {
-  const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
+  let incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
+  let immutable = p && p.outlookImmutableId === true;
+  let how = (p && p.outlookIdHow) || '';
+  if (p && p.requireProvenId === true) {
+    const candidates = [];
+    if (incomingId) candidates.push(incomingId);
+    (p.outlookCandidates || []).forEach((id) => { if (id) candidates.push(id); });
+    const proven = await outlookProveMessage(candidates);
+    if (!proven || !proven.id) {
+      logContactsDraftFail(0, { code: 'unproven', message: 'no GET accepted a message id' }, how || 'unproven', false);
+      return { ok: false, reason: 'unproven-id', status: 0, how: how || 'unproven', immutable: false, errorCode: 'unproven' };
+    }
+    incomingId = proven.id;
+    immutable = proven.immutable === true;
+    how = proven.how + (how ? '/' + how : '');
+  }
   if (!incomingId) return { ok: false, reason: 'no-message' };
   const remembered = await outlookDraftMap();
   const priorId = remembered.map[String(incomingId)] || '';
@@ -6277,14 +6364,23 @@ async function outlookDraftWrite(p) {
   }
   const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
   outlookAssertNotSend(url);
-  const immutable = p && p.outlookImmutableId === true;
-  const prefer = immutable ? { Prefer: 'IdType="ImmutableId"' } : {};
-  const res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }), timeoutMs: outlookWriteMs() });
+  const preferFor = (flag) => (flag ? { Prefer: 'IdType="ImmutableId"' } : {});
+  let prefer = preferFor(immutable);
+  let res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }), timeoutMs: outlookWriteMs() });
+  if (p && p.requireProvenId === true && res && res.status === 400) {
+    immutable = !immutable;
+    prefer = preferFor(immutable);
+    res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }), timeoutMs: outlookWriteMs() });
+  }
   if (res.notConnected) return { ok: false, reason: 'not-connected' };
   if (res.timedOut) return { ok: false, reason: 'timeout' };
   if (res.status === 401) return { ok: false, reason: 'not-connected', needsSignIn: true };
   if (res.status === 403) return { ok: false, reason: 'consent', error: 'Outlook draft permission not granted yet: open Glance and reconnect Outlook once.' };
-  if (!res.ok) return { ok: false, reason: 'http-' + res.status };
+  if (!res.ok) {
+    const err = await outlookReadError(res);
+    if (p && p.requireProvenId === true) logContactsDraftFail(err.status || res.status, err, how, immutable);
+    return { ok: false, reason: 'http-' + res.status, status: res.status, errorCode: err.code, errorMessage: err.message, how: how, immutable: immutable };
+  }
   const draft = await res.json();
   if (!draft || !draft.id) return { ok: false, reason: 'no-draft' };
   // Prefer connected human From alias over opaque outlook_HEX@outlook.com CID.
