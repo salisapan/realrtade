@@ -31,7 +31,7 @@ STORE_DESCRIPTION = (
     "what others asked of you. One click to close."
 )
 # Must match flow-trial-extension/manifest.json version on this branch.
-STORE_VERSION = "0.9.18"
+STORE_VERSION = "0.9.56"
 CWS_ZIP_PATH = package.EXTENSION_ROOT / "dist" / "glance-cws.zip"
 
 
