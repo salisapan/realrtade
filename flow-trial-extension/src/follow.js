@@ -118,10 +118,10 @@ const FlowFollow = (() => {
     return host;
   }
 
-  function dayLabel(iso) {
+  function dayLabel(iso, he) {
     const d = new Date(iso + 'T00:00:00');
     if (isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(he ? 'he-IL' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
   function button(label, cls, onClick) {
@@ -881,24 +881,42 @@ const FlowFollow = (() => {
   }
 
   function offerCard(ask, base) {
+    const he = ask.lang === 'he';
     const isPay = ask.kind === FlowFollowUp.KINDS.PAYMENT;
-    const h = card(ask.lang === 'he');
+    const h = card(he);
+    const day = dayLabel(ask.chaseIso, he);
     if (ask.direction === 'mine') {
-      h.appendChild(el('div', 'flow-fu-title', 'You promised something'));
+      h.appendChild(el('div', 'flow-fu-title', he ? 'הבטחת משהו' : 'You promised something'));
       h.appendChild(el('div', 'flow-fu-quote', ask.what));
-      h.appendChild(el('div', 'flow-fu-line', 'I can remind you on ' + dayLabel(ask.chaseIso) + ' so it does not slip, and close it when you send it.'));
+      h.appendChild(el('div', 'flow-fu-line', he ? 'אפשר להמשיך לעקוב. אבדוק שוב ב־' + day + ', ואסגור כשתשלח את זה.' : 'I can remind you on ' + day + ' so it does not slip, and close it when you send it.'));
       const mrow = el('div', 'flow-fu-actions');
-      mrow.appendChild(button('Remind me', 'primary', () => { track1(ask, base); }));
-      mrow.appendChild(button('Not now', 'ghost', () => { declined(ask, base); }));
+      mrow.appendChild(button(he ? 'להמשיך לעקוב' : 'Remind me', 'primary', () => { track1(ask, base); }));
+      mrow.appendChild(button(he ? 'לא עכשיו' : 'Not now', 'ghost', () => { declined(ask, base); }));
       h.appendChild(mrow);
       return;
     }
-    h.appendChild(el('div', 'flow-fu-title', isPay ? 'Waiting on a payment?' : ask.file ? 'Waiting on the ' + ask.file.label + '?' : 'Waiting on a reply?'));
+    const title = he
+      ? (isPay ? 'האם אתה מחכה לתשלום על זה?' : ask.file ? 'האם אתה מחכה ל' + ask.file.label + '?' : 'האם אתה מחכה לתשובה על זה?')
+      : (isPay ? 'Waiting on a payment?' : ask.file ? 'Waiting on the ' + ask.file.label + '?' : 'Waiting on a reply?');
+    const close = he
+      ? (isPay ? 'כשהתשלום מגיע' : ask.file ? 'כשהקובץ מגיע' : 'כשתגיע תשובה')
+      : (isPay ? 'it is paid.' : ask.file ? 'the ' + ask.file.label + ' arrives.' : 'they answer.');
+    let line = he
+      ? 'אפשר להמשיך לעקוב עד שזה נסגר: לבדוק שוב ב־' + day + ', ולסגור ' + close + '.'
+      : 'I can stay on this until it is closed: look again on ' + day + ', and close it myself when ' + close;
+    if (ask.personal) {
+      const who = FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) || '';
+      const days = Math.max(1, Math.round(ask.personal.typical));
+      line += he
+        ? ' (' + (ask.personal.level === 'colleagues' ? 'אנשים ב־' + ask.personal.domain + ' בדרך כלל לוקחים' : (who ? who + ' בדרך כלל לוקח' : 'בדרך כלל זה לוקח')) + ' כ־' + days + ' ימי עסקים)'
+        : ' (' + (ask.personal.level === 'colleagues' ? 'people at ' + ask.personal.domain + ' usually take' : (who ? who + ' usually takes' : 'they usually take')) + ' about ' + days + ' business days)';
+    }
+    h.appendChild(el('div', 'flow-fu-title', title));
     h.appendChild(el('div', 'flow-fu-quote', ask.what));
-    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + (ask.personal ? ' (' + (ask.personal.level === 'colleagues' ? 'people at ' + ask.personal.domain + ' usually take' : ((FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) || '') ? FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) + ' usually takes' : 'they usually take')) + ' about ' + Math.max(1, Math.round(ask.personal.typical)) + ' business days)' : '') + ', and close it myself when ' + (isPay ? 'it is paid.' : ask.file ? 'the ' + ask.file.label + ' arrives.' : 'they answer.')));
+    h.appendChild(el('div', 'flow-fu-line', line));
     const row = el('div', 'flow-fu-actions');
-    row.appendChild(button('Stay on it', 'primary', () => { track1(ask, base); }));
-    row.appendChild(button('Not now', 'ghost', () => { declined(ask, base); }));
+    row.appendChild(button(he ? 'להמשיך לעקוב' : 'Stay on it', 'primary', () => { track1(ask, base); }));
+    row.appendChild(button(he ? 'לא עכשיו' : 'Not now', 'ghost', () => { declined(ask, base); }));
     h.appendChild(row);
   }
 

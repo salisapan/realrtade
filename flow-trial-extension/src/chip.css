@@ -283,6 +283,8 @@
   -webkit-tap-highlight-color: transparent;
   transition: transform .2s cubic-bezier(.2,.8,.2,1);
 }
+/* display: inline-flex above beats the user-agent [hidden] { display: none }. */
+.flow-chip[hidden], [data-glance-undo][hidden], [data-glance-do-it][hidden] { display: none !important; }
 .flow-chip .shell {
   position: absolute; inset: 0; border-radius: inherit; z-index: -2;
   background: linear-gradient(180deg, rgba(255,255,255,.95) 0%, transparent 24%),
