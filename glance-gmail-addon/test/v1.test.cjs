@@ -784,6 +784,7 @@ console.log('\n--- message path parity ---');
       node.action = action.functionName;
       node.params = action.params;
       node.composeType = emailType;
+      node.indicator = action.indicator;
       return node;
     };
     node.setAuthorizationAction = function (action) { node.action = 'authorize'; node.authUrl = action.url; return node; };
@@ -884,7 +885,7 @@ console.log('\n--- message path parity ---');
       }
     },
     CardService: {
-      LoadIndicator: { SPINNER: 'spinner' },
+      LoadIndicator: { SPINNER: 'spinner', NONE: 'none' },
       TextButtonStyle: { FILLED: 'filled' },
       newTextParagraph: function () { return widget('text'); },
       newTextButton: function () { return widget('button'); },
@@ -927,7 +928,7 @@ console.log('\n--- message path parity ---');
       newAction: function () {
         const action = { functionName: '', params: {} };
         action.setFunctionName = function (name) { action.functionName = name; return action; };
-        action.setLoadIndicator = function () { return action; };
+        action.setLoadIndicator = function (value) { action.indicator = value; return action; };
         action.setParameters = function (params) { action.params = params; return action; };
         return action;
       },
@@ -1843,8 +1844,13 @@ console.log('\n--- message path parity ---');
   })[0];
   const prepareButtons = buttonsOf(messageCard).filter((item) => item.action === 'onPrepareReply');
   check('the message card has הכן תשובה for a reply intent',
-    prepareButtons.length === 1 && plain(prepareButtons[0].text) === 'הכן תשובה',
-    buttonsOf(messageCard).map((item) => plain(item.text)));
+    prepareButtons.length === 1 && plain(prepareButtons[0].text) === 'הכן תשובה' &&
+    prepareButtons[0].composeType === 'REPLY_AS_DRAFT' &&
+    prepareButtons[0].indicator === 'none',
+    buttonsOf(messageCard).map((item) => plain(item.text) + ':' + item.indicator));
+  check('the message card shows the build line',
+    linesOf(messageCard).some((line) => line.indexOf('בנייה') !== -1 && line.indexOf('dev') !== -1),
+    linesOf(messageCard));
   const cacheValues = Object.keys(state.cache).map((key) => JSON.parse(state.cache[key]));
   check('the message card stores the reply text for six hours, not the mail body',
     cacheValues.length === 1 &&
@@ -1855,19 +1861,6 @@ console.log('\n--- message path parity ---');
     !cacheValues[0].body &&
     Object.keys(state.cacheTtl).every((key) => state.cacheTtl[key] === 21600),
     cacheValues);
-  const prepared = prepareReply({
-    gmail: { messageId: replyId, accessToken: 'token', threadId: 'thread16a2' },
-    parameters: { messageId: replyId, source: 'message' },
-    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
-  });
-  check('הכן תשובה builds a ComposeActionResponse and does not send',
-    draftReads === 0 &&
-    prepareButtons[0].composeType === 'REPLY_AS_DRAFT' &&
-    prepared.composeDraft &&
-    prepared.composeDraft.body.indexOf('Hi') !== -1 &&
-    state.messages[replyId].calls.indexOf('createDraftReply') !== -1 &&
-    state.messages[replyId].calls.indexOf('send') === -1,
-    prepared);
   const composeEvent = {
     gmail: {
       accessToken: 'token',
@@ -1919,6 +1912,32 @@ console.log('\n--- message path parity ---');
     insertedContent.content.indexOf('Hi') !== -1 &&
     !inserted.card,
     inserted);
+  const prepared = prepareReply({
+    gmail: { messageId: replyId, accessToken: 'token', threadId: 'thread16a2' },
+    parameters: { messageId: replyId, source: 'message' },
+    commonEventObject: { userLocale: 'he', timeZone: 'Asia/Jerusalem' }
+  });
+  const replyCreates = state.messages[replyId].calls.filter((name) => name === 'createDraftReply');
+  check('the first הכן תשובה returns the draft and creates it once',
+    draftReads === 0 &&
+    prepared.composeDraft &&
+    prepared.composeDraft.body.indexOf('Hi') !== -1 &&
+    replyCreates.length === 1 &&
+    state.messages[replyId].calls.indexOf('send') === -1,
+    prepared);
+  const already = openCompose(composeEvent)[0];
+  const alreadyLines = linesOf(already).join('\n');
+  check('a reply compose whose draft already has the text does not insert it again',
+    buttonsOf(already).length === 0 &&
+    alreadyLines.indexOf('התשובה כבר בטיוטה.') !== -1,
+    alreadyLines);
+  const again = composeDoIt(Object.assign({}, composeEvent, {
+    parameters: { replyKey: composeButtons[0].params.replyKey, source: 'compose' }
+  }));
+  const againLines = again.card ? linesOf(again.card).join('\n') : '';
+  check('בצע on a prefilled draft shows that the reply is already there',
+    !again.draftAction && againLines.indexOf('התשובה כבר בטיוטה.') !== -1,
+    again);
   state.cache = {};
   const bareCompose = openCompose(composeEvent)[0];
   const bareLines = linesOf(bareCompose).join('\n');
@@ -2051,6 +2070,83 @@ console.log('\n--- message path parity ---');
     }
     sandbox.Session = realSession;
   }
+  function withClock(iso, fn) {
+    const prev = sandbox.Date;
+    const stamp = new RealDate(iso).getTime();
+    function Clock() {
+      const args = Array.prototype.slice.call(arguments);
+      if (!args.length) return new RealDate(stamp);
+      if (args.length === 1) return new RealDate(args[0]);
+      return new (RealDate.bind.apply(RealDate, [null].concat(args)));
+    }
+    Clock.now = function () { return stamp; };
+    Clock.parse = RealDate.parse;
+    Clock.UTC = RealDate.UTC;
+    Clock.prototype = RealDate.prototype;
+    sandbox.Date = Clock;
+    try { return fn(); } finally { sandbox.Date = prev; }
+  }
+  function liveBudgetMeeting(id, nowIso) {
+    return withClock(nowIso, function () {
+      reset();
+      const body = 'נקבעה פגישה ב-18/11 בשעה 10:00, תשריין ביומן.';
+      state.messages[id] = gmailMessage({
+        id: id,
+        threadId: 't' + id,
+        subject: 'פגישה על התקציב 2e34',
+        plain: body,
+        html: '<div>' + body + '</div>',
+        from: 'Owner <owner@ai.local.flow@gmail.com>',
+        to: 'owner@ai.local.flow@gmail.com',
+        date: new RealDate(nowIso)
+      });
+      const ev = {
+        gmail: { messageId: id, accessToken: 'token', threadId: 't' + id },
+        commonEventObject: { userLocale: 'he', timeZone: { id: 'Asia/Jerusalem', offset: 7200000 } }
+      };
+      const card = openMessage(ev)[0];
+      const proof = doIt(Object.assign({}, ev, { parameters: { messageId: id, source: 'message' } })).card;
+      const ids = Object.keys(state.events);
+      const event = ids.length === 1 ? state.events[ids[0]] : null;
+      const taskCount = Object.keys(state.tasks).length;
+      const undone = undo(Object.assign({}, ev, { parameters: { messageId: id, source: 'message' } })).card;
+      return {
+        card: card,
+        proof: proof,
+        event: event,
+        taskCount: taskCount,
+        undone: undone,
+        left: Object.keys(state.events).length
+      };
+    });
+  }
+  const ahead = liveBudgetMeeting('budgetAhead', '2026-11-01T08:00:00Z');
+  check('the exact budget mail is a calendar event on 18/11/2026 10:00 Asia/Jerusalem',
+    ahead.event &&
+    ahead.event.start.dateTime === '2026-11-18T10:00:00' &&
+    ahead.event.start.timeZone === 'Asia/Jerusalem' &&
+    ahead.event.end.dateTime === '2026-11-18T10:30:00' &&
+    ahead.taskCount === 0 &&
+    linesOf(ahead.card).join('\n').indexOf('2026-11-18') !== -1 &&
+    linesOf(ahead.card).join('\n').indexOf('10:00') !== -1 &&
+    linesOf(ahead.proof).join('\n').indexOf('2026-11-18') !== -1,
+    { event: ahead.event, tasks: ahead.taskCount, card: linesOf(ahead.card), proof: linesOf(ahead.proof) });
+  check('Undo deletes that 18/11/2026 event',
+    ahead.left === 0 && linesOf(ahead.undone).join('\n').indexOf('בוטל') !== -1,
+    { left: ahead.left, lines: linesOf(ahead.undone) });
+  const liveDay = liveBudgetMeeting('budgetLive', '2026-11-20T08:00:00Z');
+  check('on 20/11 an omitted 18/11 is the next occurrence, a calendar event, not a dateless task',
+    liveDay.event &&
+    liveDay.event.start.dateTime === '2027-11-18T10:00:00' &&
+    liveDay.event.start.timeZone === 'Asia/Jerusalem' &&
+    liveDay.taskCount === 0 &&
+    linesOf(liveDay.card).join('\n').indexOf('2027-11-18') !== -1 &&
+    linesOf(liveDay.card).join('\n').indexOf('10:00') !== -1 &&
+    linesOf(liveDay.proof).join('\n').indexOf('2027-11-18') !== -1,
+    { event: liveDay.event, tasks: liveDay.taskCount, card: linesOf(liveDay.card), proof: linesOf(liveDay.proof) });
+  check('Undo deletes the next-occurrence event',
+    liveDay.left === 0 && linesOf(liveDay.undone).join('\n').indexOf('בוטל') !== -1,
+    { left: liveDay.left, lines: linesOf(liveDay.undone) });
   check('compose does not send', !/GmailDraft\.send|GmailApp\.sendEmail|gmail\.send|sendEmail|Drafts\.send|MailApp|\.send\(/.test(fs.readFileSync(path.join(addon, 'Code.js'), 'utf8')));
 }
 

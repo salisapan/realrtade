@@ -304,9 +304,20 @@ const FlowExtract = (() => {
       }
       else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
       let year = m[3] ? +m[3] : null;
+      const yearOmitted = year == null;
       if (year != null && year < 100) year += 2000;
-      const built = monthDay(m[0], monthIdx, day, year, now || new Date());
-      const iso = built && built.iso;
+      let built = monthDay(m[0], monthIdx, day, year, now || new Date());
+      let iso = built && built.iso;
+      // The add-on sets the user's zone. An omitted year that has already
+      // passed (18/11 read on 20/11) is the next occurrence, not "no date".
+      // With no zone the extension still drops a past slash date.
+      if (activeZone && yearOmitted && iso && iso < today) {
+        const rolled = monthDay(m[0], monthIdx, day, +iso.slice(0, 4) + 1, now || new Date());
+        if (rolled && rolled.iso && rolled.iso >= today) {
+          built = rolled;
+          iso = rolled.iso;
+        }
+      }
       if (!iso || !slashDateContext(src, m.index, m[0]) || iso < today) {
         if (!ambiguous) ambiguous = { raw: m[0], iso: null };
         continue;

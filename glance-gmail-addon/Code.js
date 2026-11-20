@@ -109,15 +109,17 @@ function userCache_() {
   return CacheService.getUserCache();
 }
 
-function rememberReply_(subject, text, messageId) {
+function rememberReply_(subject, text, messageId, placedInDraft) {
   var cache = userCache_();
   var norm = normalizeSubject_(subject);
   if (!cache || !norm || !text) return '';
   var key = subjectKey_(norm);
+  var prior = readReplyCache_(key);
   cache.put(key, JSON.stringify({
     subject: norm,
     text: String(text),
-    messageId: String(messageId || '')
+    messageId: String(messageId || (prior && prior.messageId) || ''),
+    placedInDraft: placedInDraft === true || (prior && prior.placedInDraft === true && placedInDraft !== false)
   }), REPLY_CACHE_TTL);
   return key;
 }
@@ -146,6 +148,7 @@ function onGmailCompose(e) {
   try {
     var saved = readReplyCache_(composeSubject_(e));
     if (!saved || !saved.text) return [render_(Glance.cards.composeAskFirst(lang))];
+    if (saved.placedInDraft) return [render_(Glance.cards.composeAlready(lang))];
     var preview = Glance.intent.sanitizeTitle(saved.text).slice(0, 240);
     return [render_(Glance.cards.composeProposal(preview, subjectKey_(saved.subject), lang))];
   } catch (err) {
@@ -162,6 +165,7 @@ function onComposeDoIt(e) {
   var key = e && e.parameters && e.parameters.replyKey ? String(e.parameters.replyKey) : '';
   var saved = readReplyCache_(key || composeSubject_(e));
   if (!saved || !saved.text) return update_(render_(Glance.cards.composeAskFirst(lang)));
+  if (saved.placedInDraft) return update_(render_(Glance.cards.composeAlready(lang)));
   return draftInsertResponse_(saved.text);
 }
 
@@ -171,24 +175,31 @@ function onPrepareReply(e) {
   var messageId = composeReplyId_(e);
   if (!messageId) return update_(render_(Glance.cards.composeAskFirst(lang)));
   enterZone_(e);
+  var response;
   try {
     if (!e.gmail || !e.gmail.accessToken) throw readFail_('no-token', emptyRead_(e));
     GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
     var opened = readOpen_(e, emptyRead_(e));
     if (!opened) throw readFail_('open', emptyRead_(e));
-    var draftText = draftTextForOpen_(opened);
-    if (!draftText) return update_(render_(Glance.cards.composeNoReply(lang)));
-    rememberReply_(opened.subject, draftText, opened.messageId);
-    var message = GmailApp.getMessageById(messageId);
-    if (!message || typeof message.createDraftReply !== 'function') throw readFail_('reply', emptyRead_(e));
-    var draft = message.createDraftReply(draftText);
-    return CardService.newComposeActionResponseBuilder().setGmailDraft(draft).build();
+    // The message card already stored the reply. Re-judging here is slow enough
+    // that Gmail creates the draft and drops the first compose response.
+    var saved = readReplyCache_(opened.subject);
+    var draftText = saved && saved.text ? saved.text : draftTextForOpen_(opened);
+    if (!draftText) {
+      response = update_(render_(Glance.cards.composeNoReply(lang)));
+    } else {
+      var message = GmailApp.getMessageById(messageId);
+      if (!message || typeof message.createDraftReply !== 'function') throw readFail_('reply', emptyRead_(e));
+      var draft = message.createDraftReply(draftText);
+      rememberReply_(opened.subject, draftText, opened.messageId, true);
+      response = CardService.newComposeActionResponseBuilder().setGmailDraft(draft).build();
+    }
   } catch (err) {
     errorLog_(err);
-    return update_(render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose')));
-  } finally {
-    leaveZone_();
+    response = update_(render_(Glance.cards.readError(lang, err && err.diag ? err.diag : 'compose')));
   }
+  leaveZone_();
+  return response;
 }
 
 function draftInsertResponse_(text) {
@@ -1261,7 +1272,25 @@ function clearPrefetch_() {
   props_().deleteProperty(PREFETCH_KEY);
 }
 
+function ensureBuild_(model) {
+  var sha = buildSha_();
+  if (!sha || !model) return model;
+  var lang = model.lang || 'en';
+  var label = Glance.i18n.t(lang, 'build') + ':';
+  var widgets = model.widgets || [];
+  for (var i = 0; i < widgets.length; i++) {
+    if (widgets[i] && widgets[i].type === 'text' && String(widgets[i].text).indexOf(label) !== -1) return model;
+  }
+  widgets.push({
+    type: 'text',
+    text: Glance.i18n.embed(lang, label + ' ' + Glance.i18n.isolateLtr(sha))
+  });
+  model.widgets = widgets;
+  return model;
+}
+
 function render_(model) {
+  ensureBuild_(model);
   var section = CardService.newCardSection();
   var widgets = (model && model.widgets) || [];
   for (var i = 0; i < widgets.length; i++) {
@@ -1298,9 +1327,15 @@ function button_(widget) {
   for (var key in source) {
     if (Object.prototype.hasOwnProperty.call(source, key)) params[key] = String(source[key]);
   }
+  // A spinner tells Gmail to wait for a new card. The first «הכן תשובה»
+  // then creates the draft and does not open it. No indicator lets that
+  // first ComposeActionResponse open the draft.
+  var indicator = widget.action === 'onPrepareReply' && CardService.LoadIndicator && CardService.LoadIndicator.NONE
+    ? CardService.LoadIndicator.NONE
+    : CardService.LoadIndicator.SPINNER;
   var action = CardService.newAction()
     .setFunctionName(widget.action)
-    .setLoadIndicator(CardService.LoadIndicator.SPINNER)
+    .setLoadIndicator(indicator)
     .setParameters(params);
   var button = CardService.newTextButton().setText(String(widget.text || ''));
   if (widget.action === 'onPrepareReply' && button.setComposeAction && CardService.ComposedEmailType && CardService.ComposedEmailType.REPLY_AS_DRAFT) {

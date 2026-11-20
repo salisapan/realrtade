@@ -220,6 +220,10 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'composeAskFirst'))]);
   }
 
+  function composeAlready(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'alreadyInDraft'))]);
+  }
+
   function composeNeedsReply(lang) {
     return card(lang, [text(lang, i18n().t(lang, 'composeNeedsReply'))]);
   }
@@ -271,6 +275,7 @@ var GlanceCards = (function () {
     composeNeedsReply: composeNeedsReply,
     composeNoReply: composeNoReply,
     composeAskFirst: composeAskFirst,
+    composeAlready: composeAlready,
     prepareReplyButton: prepareReplyButton,
     replyOnly: replyOnly,
     spottedUnsupported: spottedUnsupported,

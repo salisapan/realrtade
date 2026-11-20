@@ -535,9 +535,20 @@ const FlowExtract = (() => {
       }
       else { if (!ambiguous) ambiguous = { raw: m[0], iso: null }; continue; }
       let year = m[3] ? +m[3] : null;
+      const yearOmitted = year == null;
       if (year != null && year < 100) year += 2000;
-      const built = monthDay(m[0], monthIdx, day, year, now || new Date());
-      const iso = built && built.iso;
+      let built = monthDay(m[0], monthIdx, day, year, now || new Date());
+      let iso = built && built.iso;
+      // The add-on sets the user's zone. An omitted year that has already
+      // passed (18/11 read on 20/11) is the next occurrence, not "no date".
+      // With no zone the extension still drops a past slash date.
+      if (activeZone && yearOmitted && iso && iso < today) {
+        const rolled = monthDay(m[0], monthIdx, day, +iso.slice(0, 4) + 1, now || new Date());
+        if (rolled && rolled.iso && rolled.iso >= today) {
+          built = rolled;
+          iso = rolled.iso;
+        }
+      }
       if (!iso || !slashDateContext(src, m.index, m[0]) || iso < today) {
         if (!ambiguous) ambiguous = { raw: m[0], iso: null };
         continue;
@@ -11845,7 +11856,8 @@ var GlanceI18n = (function () {
       draftNoUndo: 'Glance does not read this draft back, and does not undo it.',
       composeNeedsReply: 'Open Glance from a reply. This compose has no message to read.',
       composeNoReply: 'This message has no reply to insert.',
-      composeAskFirst: 'Open the message in Glance first and press Prepare a reply.'
+      composeAskFirst: 'Open the message in Glance first and press Prepare a reply.',
+      alreadyInDraft: 'The reply is already in the draft.'
     },
     he: {
       doIt: 'בצע',
@@ -11877,7 +11889,8 @@ var GlanceI18n = (function () {
       draftNoUndo: 'Glance לא קורא את הטיוטה בחזרה, ולא מבטל אותה.',
       composeNeedsReply: 'פתחו את Glance מתשובה. לכתיבה הזו אין הודעה לקרוא.',
       composeNoReply: 'בהודעה הזו אין תשובה להכניס.',
-      composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».'
+      composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».',
+      alreadyInDraft: 'התשובה כבר בטיוטה.'
     }
   };
 
@@ -13362,6 +13375,10 @@ var GlanceCards = (function () {
     return card(lang, [text(lang, i18n().t(lang, 'composeAskFirst'))]);
   }
 
+  function composeAlready(lang) {
+    return card(lang, [text(lang, i18n().t(lang, 'alreadyInDraft'))]);
+  }
+
   function composeNeedsReply(lang) {
     return card(lang, [text(lang, i18n().t(lang, 'composeNeedsReply'))]);
   }
@@ -13413,6 +13430,7 @@ var GlanceCards = (function () {
     composeNeedsReply: composeNeedsReply,
     composeNoReply: composeNoReply,
     composeAskFirst: composeAskFirst,
+    composeAlready: composeAlready,
     prepareReplyButton: prepareReplyButton,
     replyOnly: replyOnly,
     spottedUnsupported: spottedUnsupported,

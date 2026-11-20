@@ -34,7 +34,8 @@ var GlanceI18n = (function () {
       draftNoUndo: 'Glance does not read this draft back, and does not undo it.',
       composeNeedsReply: 'Open Glance from a reply. This compose has no message to read.',
       composeNoReply: 'This message has no reply to insert.',
-      composeAskFirst: 'Open the message in Glance first and press Prepare a reply.'
+      composeAskFirst: 'Open the message in Glance first and press Prepare a reply.',
+      alreadyInDraft: 'The reply is already in the draft.'
     },
     he: {
       doIt: 'בצע',
@@ -66,7 +67,8 @@ var GlanceI18n = (function () {
       draftNoUndo: 'Glance לא קורא את הטיוטה בחזרה, ולא מבטל אותה.',
       composeNeedsReply: 'פתחו את Glance מתשובה. לכתיבה הזו אין הודעה לקרוא.',
       composeNoReply: 'בהודעה הזו אין תשובה להכניס.',
-      composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».'
+      composeAskFirst: 'פתחו קודם את ההודעה ב-Glance ולחצו «הכן תשובה».',
+      alreadyInDraft: 'התשובה כבר בטיוטה.'
     }
   };
 
