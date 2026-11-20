@@ -7,6 +7,10 @@
 // batchUpdate deleteDimension and reads the range again. There is no
 // spreadsheets OAuth scope and no Google Picker. A pasted link that Drive
 // answers 403 or 404 is not accessible under drive.file.
+// sheets.googleapis.com is not in host_permissions. Checked on Chromium 140
+// (2026-11-20): a service worker with no host permission can fetch that
+// host (POST with Authorization returns Google's 401). example.com is
+// blocked. Google echoes the extension origin on CORS. No permission prompt.
 // Portable: no chrome.*, no DOM, no network.
 const FlowGoogleSheets = (() => {
   const SYSTEM = 'google/sheets';

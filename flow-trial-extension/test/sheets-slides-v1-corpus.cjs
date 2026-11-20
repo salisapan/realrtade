@@ -102,7 +102,7 @@ console.log('\n--- same thread, and a failed read-back ---\n');
 {
   const manifest = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
   const hosts = (manifest.host_permissions || []).concat(manifest.optional_host_permissions || []);
-  check('sheets.googleapis.com is not a host', hosts.every((h) => h.indexOf('sheets.googleapis.com') < 0));
+  check('sheets.googleapis.com is not a host and is not requested', hosts.every((h) => h.indexOf('sheets.googleapis.com') < 0) && !/permissions\.request\(/.test(fs.readFileSync(path.join(EXT, 'src', 'background.js'), 'utf8') + fs.readFileSync(path.join(EXT, 'src', 'google-lane-host.js'), 'utf8') + fs.readFileSync(path.join(EXT, 'src', 'content-gmail.js'), 'utf8')));
   check('slides.googleapis.com is not a host', hosts.every((h) => h.indexOf('slides.googleapis.com') < 0));
   const scopes = (manifest.oauth2 && manifest.oauth2.scopes) || [];
   check('no spreadsheets or presentations scope', scopes.every((s) => s.indexOf('spreadsheet') < 0 && s.indexOf('presentation') < 0));
