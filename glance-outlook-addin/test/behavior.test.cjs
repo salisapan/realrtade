@@ -183,12 +183,25 @@ async function scenario(o) {
   };
   mailbox.addHandlerAsync = (type, cb) => { handlers.push({ type: type, cb: cb }); };
   const rootNode = new Node('main');
-  const document = { createElement: (t) => new Node(t), getElementById: () => rootNode };
+  const footer = new Node('footer');
+  footer.textContent = 'Build dev';
+  footer.setAttribute('data-glance-build', 'Build dev');
+  const document = {
+    createElement: (t) => new Node(t),
+    getElementById: (id) => id === 'glance-build' ? footer : rootNode
+  };
   class FixedDate extends Date {
     constructor(...a) { if (a.length === 0) super(NOW_MS); else super(...a); }
     static now() { return NOW_MS; }
   }
-  const sandbox = { console, Office, document, Date: FixedDate, fetch: makeGraph(o, calls) };
+  const logs = [];
+  const sandbox = {
+    console: {
+      log: function () { logs.push(Array.prototype.join.call(arguments, ' ')); },
+      error: console.error
+    },
+    Office, document, Date: FixedDate, fetch: makeGraph(o, calls)
+  };
   if (o.token !== null) sandbox.GlanceOutlookAuth = { getToken: o.tokenFn || (() => Promise.resolve(o.token)) };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
@@ -203,6 +216,8 @@ async function scenario(o) {
     root: rootNode, calls, trip, writes, body, mailbox, raw, state,
     why: () => rootNode.attrs['data-glance-why'],
     text: () => rootNode.textContent,
+    footer: footer,
+    logs: logs,
     fireItemChanged: () => handlers.filter((h) => h.type === 'itemChanged').forEach((h) => h.cb())
   };
 }
@@ -552,6 +567,73 @@ process.on('unhandledRejection', (e) => { if (!/send is not reachable/.test(Stri
     check('compose with no parseable quote uses the cached original',
       cached.state() === 'card' && /Thursday morning/.test(cached.text()) && cached.calls.length === 0,
       [cached.state(), cached.why(), cached.text()]);
+
+    const CONTACTS = 'מה כתובת המייל של דנה כהן? אני צריך לשלוח לה את המסמכים';
+    const fromOther = await scenario({
+      mode: 'read', token: null, priorHtml: CONTACTS, subject: 'מסמכים',
+      itemFrom: { emailAddress: 'noam@client.example', displayName: 'Noam' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('contacts ask from another sender: the documents ask is offered, not contacts-unavailable',
+      fromOther.state() === 'card' && /לשלוח לה את המסמכים/.test(fromOther.text()) && fromOther.why() !== 'quiet:contacts-unavailable',
+      [fromOther.state(), fromOther.why(), fromOther.text()]);
+    const fromSelf = await scenario({
+      mode: 'read', token: null, priorHtml: CONTACTS, subject: 'מסמכים',
+      itemFrom: { emailAddress: ME, displayName: 'sali' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('contacts ask self-sent: the documents ask is offered, not contacts-unavailable',
+      fromSelf.state() === 'card' && /לשלוח לה את המסמכים/.test(fromSelf.text()) && fromSelf.why() !== 'quiet:contacts-unavailable',
+      [fromSelf.state(), fromSelf.why(), fromSelf.text()]);
+    const onlyContacts = await scenario({
+      mode: 'read', token: null, priorHtml: 'מה כתובת המייל של דנה כהן?',
+      itemFrom: { emailAddress: 'noam@client.example', displayName: 'Noam' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('a contacts question with no other ask stays quiet',
+      onlyContacts.state() === 'quiet' && !onlyContacts.root.button('insert'),
+      [onlyContacts.state(), onlyContacts.why(), onlyContacts.text()]);
+
+    const quotedContacts = '<html><body><div id="appendonsend"></div><div id="divRplyFwdMsg">'
+      + '<b>From:</b> Noam &lt;noam@client.example&gt;<br><b>Sent:</b> Tuesday<br><b>To:</b> Sali<br><b>Subject:</b> מסמכים</div>'
+      + '<div>' + CONTACTS + '</div></body></html>';
+    const composeContacts = await scenario({ mode: 'compose', token: null, priorHtml: quotedContacts });
+    check('compose quoted contacts ask: the documents ask is offered',
+      composeContacts.state() === 'card' && /לשלוח לה את המסמכים/.test(composeContacts.text())
+      && Boolean(composeContacts.root.button('insert')) && composeContacts.why() !== 'quiet:contacts-unavailable',
+      [composeContacts.state(), composeContacts.why(), composeContacts.text()]);
+
+    const pinned = await scenario({
+      mode: 'read', token: null, priorHtml: 'רק לעדכנכם, הכול בסדר, אין צורך לעשות כלום.',
+      itemFrom: { emailAddress: 'dana@client.example', displayName: 'Dana' },
+      itemTo: [{ emailAddress: ME, displayName: 'Sali Sapan' }]
+    });
+    check('ItemChanged handler is registered after the pane is ready', pinned.fireItemChanged && true);
+    pinned.mailbox.item = null;
+    pinned.fireItemChanged();
+    await settleAll();
+    check('ItemChanged with no item yet does not keep the previous card',
+      pinned.state() === 'reading' && !/לעדכנכם/.test(pinned.text()),
+      [pinned.state(), pinned.text()]);
+    pinned.mailbox.item = {
+      itemId: 'EWS:contract',
+      conversationId: 'CONV-contract',
+      subject: 'Supplier contract',
+      from: { emailAddress: 'dana@client.example', displayName: 'Dana' },
+      to: [{ emailAddress: ME, displayName: 'Sali Sapan' }],
+      cc: [],
+      body: pinned.body,
+      displayReplyForm: () => {},
+      displayReplyAllForm: () => {}
+    };
+    pinned.body.html = ASK;
+    pinned.fireItemChanged();
+    await settleAll();
+    check('ItemChanged logs the new item and the footer shows its id',
+      pinned.state() === 'card' && /Thursday morning/.test(pinned.text())
+      && pinned.logs.some((line) => line === '[Glance addin] itemchanged EWS:contract')
+      && /EWS:contract/.test(pinned.footer.textContent),
+      [pinned.state(), pinned.logs, pinned.footer.textContent, pinned.text()]);
   }
 
   // 11. The tests above bite: break the code on purpose, and the matching check must notice.

@@ -190,7 +190,8 @@
     }
     var drafted = GlanceOutlookEngine.draftText(process, { sender: sender, subject: message.subject });
     if (drafted && !genericDraft(drafted)) return drafted;
-    var ask = message && message.text ? message.text : '';
+    var titled = taskStep && taskStep.params && (taskStep.params.title || taskStep.params.what);
+    var ask = (message && message.text) || titled || '';
     if (ask) {
       var synthetic = { steps: [{ kind: 'outlookDraft', id: 'draft', params: { what: ask, askText: ask } }] };
       var built = GlanceOutlookEngine.draftText(synthetic, { sender: sender, subject: message.subject });
@@ -231,7 +232,49 @@
       judgedInput.inSent = true;
       judgedInput.inbound = false;
     }
-    var judged = GlanceOutlookEngine.judge(judgedInput);
+    var verdict = verdictFromJudge(judgedInput, last, sender, office, to, cc, messages.length);
+    if (verdict.show || !office || verdict.reason !== 'quiet:contacts-unavailable') return verdict;
+    // A contacts lookup is not in this add-in. That miss must not hide the rest of the mail.
+    // The shared judge, on a self-sent copy of this mail, titles the next ask «לשלוח לה את המסמכים».
+    var rest = withoutContactsAsk(last.text);
+    if (!rest) return verdict;
+    var again = verdictFromJudge(Object.assign({}, judgedInput, { text: rest }), Object.assign({}, last, { text: rest }), sender, office, to, cc);
+    if (again.show) return again;
+    var quoted = draftForCard({ process: { steps: [] }, intent: { label: rest } }, { text: rest, subject: last.subject }, sender);
+    if (!quoted || genericDraft(quoted) || quoted.indexOf(rest) === -1) quoted = rest;
+    return {
+      show: true,
+      draft: quoted,
+      sender: sender,
+      count: messages.length,
+      source: 'office-item',
+      to: to,
+      cc: cc,
+      subject: last.subject || '',
+      conversationId: last.conversationId || ''
+    };
+  }
+
+  function contactsSentence(text) {
+    if (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.contactsAsk === 'function') {
+      return FlowIncomingJudge.contactsAsk(text);
+    }
+    return /מה\s+(?:ה)?(?:כתובת\s+)?(?:המייל|אימייל|דוא["']?ל|הטלפון|המספר)\s+של\s+[\u0590-\u05FF]/.test(String(text || ''));
+  }
+
+  function withoutContactsAsk(text) {
+    var parts = String(text || '').split(/(?<=[.!?؟])\s+|\n+/);
+    var kept = [];
+    for (var i = 0; i < parts.length; i++) {
+      var part = String(parts[i] || '').trim();
+      if (!part || contactsSentence(part)) continue;
+      kept.push(part);
+    }
+    return kept.join(' ').trim();
+  }
+
+  function verdictFromJudge(input, last, sender, office, to, cc, count) {
+    var judged = GlanceOutlookEngine.judge(input);
     if (!judged || !judged.show || !judged.process) return { show: false, reason: (judged && judged.reason) || 'intent-null' };
     var draft = office
       ? draftForCard(judged, last, sender)
@@ -241,7 +284,7 @@
       show: true,
       draft: draft,
       sender: sender,
-      count: messages.length,
+      count: count || 1,
       source: office ? 'office-item' : 'thread',
       to: to,
       cc: cc,
@@ -407,17 +450,51 @@
   }
 
   var shownGeneration = 0;
+  var lastRenderedId = '';
+  var buildStamp = '';
+
+  function itemDebugId(item) {
+    if (!item) return 'none';
+    return String(item.itemId || item.conversationId || 'open');
+  }
+
+  function paintDebug(item) {
+    var foot = document.getElementById('glance-build');
+    if (!foot) return;
+    if (!buildStamp) {
+      var raw = foot.getAttribute('data-glance-build') || foot.textContent || 'Build dev';
+      buildStamp = String(raw).replace(/\s·.*$/, '').trim();
+      if (buildStamp.indexOf('Build') !== 0) buildStamp = 'Build ' + buildStamp;
+    }
+    foot.textContent = buildStamp + ' · ' + itemDebugId(item);
+  }
+
+  function renderReading(root) {
+    root.replaceChildren();
+    root.setAttribute('data-glance-state', 'reading');
+    root.setAttribute('data-glance-why', 'item-changing');
+    root.appendChild(el('p', 'Reading this message.'));
+  }
+
   function showCurrentItem() {
     var token = ++shownGeneration;
     var root = document.getElementById('glance-card');
     var item = Office.context.mailbox && Office.context.mailbox.item;
-    if (!item) return Promise.resolve(renderQuiet(root, 'no-item'));
+    paintDebug(item);
+    if (!item) {
+      renderReading(root);
+      return Promise.resolve();
+    }
     var compose = isCompose(item);
     var auth = typeof GlanceOutlookAuth !== 'undefined' ? GlanceOutlookAuth : null;
     var authed = Boolean(auth && typeof auth.getToken === 'function');
     var pending = authed ? loadThread(item, compose) : loadOpenItem(item, compose);
     return pending.then(function (t) {
       if (token !== shownGeneration) return;
+      var current = Office.context.mailbox && Office.context.mailbox.item;
+      if (current !== item) return;
+      lastRenderedId = itemDebugId(item);
+      paintDebug(item);
       if (!t.res.ok) return renderQuiet(root, t.res.why);
       var verdict = judgeThread(t.res.messages, t.me, t.name);
       if (!verdict.show) return renderQuiet(root, verdict.reason);
@@ -428,13 +505,58 @@
     });
   }
 
+  // Outlook on the web can fire ItemChanged before mailbox.item is the new message, or not fire it
+  // and only update mailbox.item. Re-read until the id changes, and keep watching the id.
+  function noteItemChanged(item) {
+    var seen = itemDebugId(item);
+    console.log('[Glance addin] itemchanged ' + seen);
+    paintDebug(item);
+    if (!item) {
+      var root = document.getElementById('glance-card');
+      if (root) renderReading(root);
+    } else {
+      showCurrentItem();
+    }
+    if (typeof setTimeout !== 'function') return;
+    var attempt = 0;
+    function again() {
+      attempt++;
+      if (attempt > 10) return;
+      setTimeout(function () {
+        var next = Office.context.mailbox && Office.context.mailbox.item;
+        var nextId = itemDebugId(next);
+        if (next && nextId !== 'none' && nextId !== seen) {
+          console.log('[Glance addin] itemchanged ' + nextId);
+          showCurrentItem();
+          return;
+        }
+        again();
+      }, 400);
+    }
+    again();
+  }
+
   function watchItemChanges() {
     var mailbox = Office.context && Office.context.mailbox;
+    var type = (Office.EventType && Office.EventType.ItemChanged) || 'olkItemSelectedChanged';
     if (!mailbox || typeof mailbox.addHandlerAsync !== 'function') return;
-    if (!Office.EventType || !Office.EventType.ItemChanged) return;
     try {
-      mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () { showCurrentItem(); });
-    } catch (err) { /* the pane still reads the item it opened on */ }
+      mailbox.addHandlerAsync(type, function () {
+        noteItemChanged(Office.context.mailbox && Office.context.mailbox.item);
+      }, function (result) {
+        var ok = result && Office.AsyncResultStatus && result.status === Office.AsyncResultStatus.Succeeded;
+        if (!ok) console.log('[Glance addin] itemchanged handler ' + ((result && result.error && result.error.message) || 'not registered'));
+      });
+    } catch (err) {
+      console.log('[Glance addin] itemchanged handler ' + (err && err.message ? err.message : 'not registered'));
+    }
+    if (typeof setInterval === 'function') {
+      setInterval(function () {
+        var item = Office.context.mailbox && Office.context.mailbox.item;
+        var id = itemDebugId(item);
+        if (item && id !== 'none' && id !== lastRenderedId) showCurrentItem();
+      }, 1000);
+    }
   }
 
   function boot() {

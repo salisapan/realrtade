@@ -18,7 +18,7 @@ The manifest id is `87851e39-e51b-439a-bbf5-459ab69b3615`. Command buttons for O
 
 ## What the pane does
 
-`GlanceOutlookAuth` is not in this bundle. A sideloaded pane reads the open message with Office.js (`item.body.getAsync`, subject, from, to, cc, conversationId). HTML from Outlook on the web is read as text before it is judged. A self-sent ask is still judged. An FYI stays quiet. That uses the manifest's existing `ReadWriteItem` permission. It does not call Microsoft Graph. The task pane is pinnable (`SupportsPinning` in VersionOverrides 1.1) and re-reads when the selected message changes.
+`GlanceOutlookAuth` is not in this bundle. A sideloaded pane reads the open message with Office.js (`item.body.getAsync`, subject, from, to, cc, conversationId). HTML from Outlook on the web is read as text before it is judged. A self-sent ask is still judged. An FYI stays quiet. That uses the manifest's existing `ReadWriteItem` permission. It does not call Microsoft Graph. The task pane is pinnable (`SupportsPinning` on the VersionOverrides 1.1 task pane action, not in 1.1's parent 1.0 block) and re-reads when the selected message changes. The compose ribbon button is the `MessageComposeCommandSurface` already declared in VersionOverrides 1.0 and 1.1. Outlook on the web supports that surface. A sideload can still place the button under Apps rather than on the visible ribbon. The manifest has no further element that forces the ribbon slot.
 
 When a page does provide `GlanceOutlookAuth.getToken`, the pane still reads the whole conversation through Microsoft Graph (`GET /me/messages`, `Mail.Read` only) or it shows no card. A failed page, a missing open message, or a body it cannot read is not replaced with the latest message.
 
