@@ -380,6 +380,41 @@
       : 'Contact details in the draft. You send it.';
   }
 
+  function draftTarget(pane) {
+    const resolve = globalThis.FlowOutlookDraftTarget;
+    if (typeof resolve !== 'function') {
+      const id = (pane && (pane.itemId || pane.rawUrlId || pane.pathId)) || '';
+      return Promise.resolve({ id: id, immutable: false });
+    }
+    return Promise.resolve(resolve(pane)).then((found) => {
+      if (found && found.id) return found;
+      const id = (pane && (pane.itemId || pane.rawUrlId || pane.pathId)) || '';
+      return { id: id, immutable: false };
+    }, () => {
+      const id = (pane && (pane.itemId || pane.rawUrlId || pane.pathId)) || '';
+      return { id: id, immutable: false };
+    });
+  }
+
+  function markInDraft(card, button, lang) {
+    card.setAttribute('data-glance-draft-state', 'in-draft');
+    const status = statusNode(card);
+    status.textContent = draftStatus(lang, true);
+    status.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    button.hidden = true;
+  }
+
+  function restoreInsert(card, button, lang) {
+    card.removeAttribute('data-glance-draft-state');
+    const status = statusNode(card);
+    status.textContent = '';
+    button.hidden = false;
+    button.disabled = false;
+    button.textContent = lang === 'he' ? 'הכנס לטיוטה' : 'Put in draft';
+    const undo = card.querySelector('.flow-lane-undo');
+    if (undo) undo.hidden = true;
+  }
+
   function finishContactsDraft(card, pane, offer, res, button) {
     const lang = offer && offer.params && offer.params.lang === 'he' ? 'he' : 'en';
     if (!res || res.ok !== true || !res.draft) {
@@ -387,67 +422,64 @@
       paintResult(card, res);
       return;
     }
-    let messageId = (pane && (pane.itemId || pane.rawUrlId || pane.pathId)) || '';
-    if (!messageId) {
-      const parse = named('FlowOwaParse');
-      if (parse && typeof parse.urlIds === 'function') {
-        try {
-          const ids = parse.urlIds(location.href) || {};
-          messageId = ids.itemId || ids.raw || '';
-        } catch (e) { messageId = ''; }
-      }
-    }
-    chrome.runtime.sendMessage({
-      type: 'flow:execute-action',
-      payload: {
-        connectorId: 'outlookDraft',
-        body: res.draft,
-        comment: res.draft,
-        outlookIncomingId: messageId,
-        messageId: messageId,
-        explicitClick: true
-      }
-    }, (graph) => {
-      const err = chrome.runtime.lastError;
-      const opened = insertCompose(res.draft);
-      const graphOk = !!(graph && graph.ok === true && graph.ref);
-      const verified = !err && opened.ok === true && graphOk && graph.fetchedBack !== false;
-      const status = statusNode(card);
-      let draft = card.querySelector('.flow-lane-draft');
-      if (!draft) {
-        draft = document.createElement('div');
-        draft.className = 'flow-lane-draft';
-        card.appendChild(draft);
-      }
-      draft.textContent = res.draft;
-      if (!verified) {
-        abandonCompose(res.draft);
-        status.textContent = draftStatus(lang, false);
-        status.setAttribute('dir', 'rtl');
-        const why = document.createElement('span');
-        why.className = 'flow-lane-draft-why';
-        why.hidden = true;
-        why.textContent = [
-          err ? 'channel' : '',
-          graph && graph.ok === true ? 'graph-ok' : 'graph-not-ok',
-          graph && graph.ref ? 'ref' : 'no-ref',
-          graph && graph.fetchedBack === false ? 'fetchedBack-false' : '',
-          graph && graph.reason ? String(graph.reason) : '',
-          graph && graph.error ? String(graph.error).slice(0, 80) : '',
-          opened.ok ? 'compose-ok' : (opened.reason || 'compose-no')
-        ].filter(Boolean).join(' ');
-        card.appendChild(why);
-        if (!card.querySelector('.flow-lane-copy')) card.appendChild(copyButton(res.draft));
+    draftTarget(pane).then((target) => {
+      if (!target || !target.id) {
         button.disabled = false;
+        statusNode(card).textContent = draftStatus(lang, false);
         return;
       }
-      status.textContent = draftStatus(lang, true);
-      button.hidden = true;
-      showDraftUndo(card, graph, res.draft, lang);
+      chrome.runtime.sendMessage({
+        type: 'flow:execute-action',
+        payload: {
+          connectorId: 'outlookDraft',
+          body: res.draft,
+          comment: res.draft,
+          outlookIncomingId: target.id,
+          messageId: target.id,
+          outlookImmutableId: target.immutable === true,
+          explicitClick: true
+        }
+      }, (graph) => {
+        const err = chrome.runtime.lastError;
+        const graphOk = !err && !!(graph && graph.ok === true && graph.ref);
+        const readBack = graphOk && graph.fetchedBack !== false;
+        if (!graphOk || !readBack) {
+          const status = statusNode(card);
+          status.textContent = draftStatus(lang, false);
+          status.setAttribute('dir', 'rtl');
+          const why = document.createElement('span');
+          why.className = 'flow-lane-draft-why';
+          why.hidden = true;
+          why.textContent = [
+            err ? 'channel' : '',
+            graph && graph.ok === true ? 'graph-ok' : 'graph-not-ok',
+            graph && graph.ref ? 'ref' : 'no-ref',
+            graph && graph.fetchedBack === false ? 'fetchedBack-false' : '',
+            graph && graph.reason ? String(graph.reason) : '',
+            !target.id ? 'no-message' : ''
+          ].filter(Boolean).join(' ');
+          card.appendChild(why);
+          if (!card.querySelector('.flow-lane-copy')) card.appendChild(copyButton(res.draft));
+          button.disabled = false;
+          return;
+        }
+        const opened = insertCompose(res.draft);
+        let draft = card.querySelector('.flow-lane-draft');
+        if (!draft) {
+          draft = document.createElement('div');
+          draft.className = 'flow-lane-draft';
+          card.appendChild(draft);
+        }
+        draft.textContent = res.draft;
+        draft.setAttribute('data-glance-draft-id', String(graph.ref));
+        if (!opened.ok) abandonCompose(res.draft);
+        markInDraft(card, button, lang);
+        showDraftUndo(card, graph, res.draft, lang, button, target.immutable === true);
+      });
     });
   }
 
-  function showDraftUndo(card, graph, text, lang) {
+  function showDraftUndo(card, graph, text, lang, button, immutable) {
     let undo = card.querySelector('.flow-lane-undo');
     if (!undo) {
       undo = document.createElement('button');
@@ -467,7 +499,8 @@
         type: 'flow:undo-action',
         connectorId: 'outlookDraft',
         ref: graph.ref,
-        created: graph.created
+        created: graph.created,
+        outlookImmutableId: immutable === true
       }, (u) => {
         const err = chrome.runtime.lastError;
         if (err || !u || u.ok !== true) {
@@ -475,8 +508,7 @@
           undo.disabled = false;
           return;
         }
-        statusNode(card).textContent = 'Undone.';
-        undo.hidden = true;
+        restoreInsert(card, button, lang);
       });
     };
   }

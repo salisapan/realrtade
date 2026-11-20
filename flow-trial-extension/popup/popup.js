@@ -739,7 +739,11 @@
         ? FlowOutlookConfig.connectServiceUi(svc, connectCtx)
         : { checked: Boolean(svc.required || svc.id === 'mail'), disabled: Boolean(svc.required || svc.id === 'mail'), granted: false };
       box.checked = !ui.granted && Object.prototype.hasOwnProperty.call(choices, svc.id) ? choices[svc.id] : ui.checked;
-      box.addEventListener('change', () => { choices[svc.id] = box.checked; });
+      if (svc.id === 'contacts' && tokenStatus === 'valid') box.checked = !!(state && state.glanceContactsChoice === true);
+      box.addEventListener('change', () => {
+        choices[svc.id] = box.checked;
+        if (svc.id === 'contacts') syncContactsOff();
+      });
       box.disabled = ui.disabled;
       if (ui.granted) lab.setAttribute('data-glance-granted', '1');
       boxes[svc.id] = box;
@@ -755,6 +759,24 @@
       screen.appendChild(lab);
     });
     card.appendChild(screen);
+    const contactsOff = el('button', 'ghost sm', 'כבה');
+    contactsOff.type = 'button';
+    contactsOff.hidden = true;
+    contactsOff.setAttribute('data-glance-contacts-off', '1');
+    function syncContactsOff() {
+      const box = boxes.contacts;
+      contactsOff.hidden = !box || box.checked === true || !(state && state.glanceContactsChoice === true);
+    }
+    contactsOff.addEventListener('click', async () => {
+      contactsOff.disabled = true;
+      if (state) state.glanceContactsChoice = false;
+      if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+        try { await FlowStorage.set({ glanceContactsChoice: false }); } catch (e) { /* the next paint reads storage */ }
+      }
+      try { await send({ type: 'flow:contacts-why', reason: 'contacts-not-granted', detail: 'contacts-toggle-off' }); } catch (e) { /* the worker log is the record */ }
+      contactsOff.hidden = true;
+    });
+    card.appendChild(contactsOff);
     const err = el('p', 'conn-err');
     err.hidden = true;
     const btn = el('button', 'primary sm');
@@ -782,7 +804,16 @@
         });
         if (!add.length) {
           btn.disabled = false; setBtnLabel(btn, 'הוסף הרשאה');
-          err.textContent = 'סמן את השירות שברצונך לחבר.';
+          const contactsReady = boxes.contacts && boxes.contacts.checked === true && granted.indexOf('Contacts.Read') >= 0;
+          if (contactsReady) {
+            err.textContent = 'אנשי קשר כבר כלולים בכניסה.';
+            if (state) state.glanceContactsChoice = true;
+            if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+              try { await FlowStorage.set({ glanceContactsChoice: true }); } catch (e) { /* the tick is already on */ }
+            }
+          } else {
+            err.textContent = 'סמן את השירות שברצונך לחבר.';
+          }
           err.hidden = false;
           return;
         }

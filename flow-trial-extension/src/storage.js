@@ -222,6 +222,9 @@ const FlowStorage = (() => {
     // src/outlook.js: the Microsoft sign-in (kept only on this device), the last check, and what waits for an answer. Never message text beyond the loop's own sentence.
     outlookAuth: null,
     outlookSync: {},
+    // The Contacts tick on the Microsoft card. Off until the person leaves it on.
+    // A missing key would not come back from get(), so an untick could not stick.
+    glanceContactsChoice: false,
     // The Hold calendar choice (once / always). Settings reads it through get().
     // Null is no policy. A missing key would never arrive, so Always could not be revoked.
     glanceCalendarConsent: null,

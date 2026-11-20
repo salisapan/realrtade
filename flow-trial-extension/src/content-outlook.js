@@ -1263,6 +1263,21 @@
     return found;
   }
 
+  // The contacts card calls this. The URL id is often a conversation id; createReply
+  // needs the Graph message id, or the reply stays an unsaved compose pane.
+  async function outlookDraftTarget(pane) {
+    const pathId = (pane && (pane.pathId || pane.rawUrlId || pane.itemId)) || '';
+    const convId = (pane && pane.conversationId) || '';
+    let own = [];
+    try { own = ownAddressesOf(await FlowStorage.get()); } catch (e) { own = []; }
+    let found = null;
+    try { found = await resolveOutlookMessageId(pathId || convId, convId || pathId, own, pane && pane.senderEmail); } catch (e) { found = null; }
+    if (found && found.id && found.unread !== true) return { id: found.id, immutable: found.immutable === true };
+    if (pane && pane.itemId) return { id: String(pane.itemId), immutable: false };
+    return { id: '', immutable: false };
+  }
+  try { globalThis.FlowOutlookDraftTarget = outlookDraftTarget; } catch (e) { /* the page is gone */ }
+
   async function ensureOutlookMessageId(ctx) {
     const have = ctx && (ctx.outlookIncomingId || ctx.messageId);
     if (have) return have;

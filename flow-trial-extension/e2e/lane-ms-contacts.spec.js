@@ -56,6 +56,18 @@ test('Contacts.Read puts the contact into a reply draft and does not send', asyn
     expect(calls.some((c) => c.method === 'POST' && c.url.indexOf('/createReply') >= 0)).toBe(true);
     expect(calls.some((c) => c.url.indexOf('sendMail') >= 0)).toBe(false);
     await expect(card).toContainText('בטיוטה');
+    await expect(card).toHaveAttribute('data-glance-draft-state', 'in-draft');
+    await expect(card.locator('.flow-lane-undo')).toBeVisible();
+    await expect(card.locator('button.flow-lane-do')).toBeHidden();
+    const drafted = (await glance.apiCalls()).filter((c) => c.method === 'POST' && c.url.indexOf('/createReply') >= 0);
+    expect(drafted.length).toBeGreaterThan(0);
+    await card.locator('.flow-lane-undo').click();
+    await expect(card.locator('button.flow-lane-do')).toBeVisible();
+    await expect(card.locator('button.flow-lane-do')).toContainText('הכנס לטיוטה');
+    await expect(card).not.toHaveAttribute('data-glance-draft-state', 'in-draft');
+    const after = await glance.apiCalls();
+    expect(after.some((c) => c.method === 'DELETE' && c.url.indexOf('/me/messages/') >= 0)).toBe(true);
+    expect(after.some((c) => c.url.indexOf('sendMail') >= 0)).toBe(false);
     await expect(card).not.toContainText('Handled');
   });
 });
