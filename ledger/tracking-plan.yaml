@@ -79,6 +79,9 @@ events:
       - { name: weekday, type: weekday, required: true, since: 1-0-0, purpose: Local weekday. }
       - { name: hour_bucket, type: hour, required: true, since: 1-0-0, purpose: Six-hour local bucket. }
       - { name: locale, type: locale, required: true, since: 1-0-0, purpose: UI language bucket. }
+      - { name: model_assist, type: token, max_length: 16, required: false, since: 1-0-1, purpose: Personal model on, off, or holdout. }
+      - { name: style_edit_q, type: number, required: false, since: 1-0-1, purpose: Quantized edit distance. A number only. }
+      - { name: bandit_mode, type: token, max_length: 16, required: false, since: 1-0-1, purpose: off, passive, or blocked. }
   - name: shown
     type: ai.theflow.glance.intent.shown.v1
     schema: iglu:ai.theflow.glance/stage/jsonschema/1-0-0

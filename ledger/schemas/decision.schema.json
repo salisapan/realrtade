@@ -123,6 +123,24 @@
       ],
       "maxLength": 5
     },
+    "model_assist": {
+      "type": "string",
+      "maxLength": 16,
+      "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$",
+      "description": "Optional. Default applied on read."
+    },
+    "style_edit_q": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Optional. Default applied on read."
+    },
+    "bandit_mode": {
+      "type": "string",
+      "maxLength": 16,
+      "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$",
+      "description": "Optional. Default applied on read."
+    },
     "candidates": {
       "type": "array",
       "maxItems": 5,

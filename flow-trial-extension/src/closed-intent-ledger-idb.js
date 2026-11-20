@@ -176,7 +176,14 @@ var FlowClosedIntentStore = (function () {
   }
 
   function appendInput(input) {
-    batch.push(input || {});
+    var row = input || {};
+    try {
+      if (!row.modelAssist && typeof FlowPersonalModel !== 'undefined' && typeof FlowPersonalModel.modelAssistFor === 'function') {
+        var assist = FlowPersonalModel.modelAssistFor(row.intentHint || row.intentType);
+        if (assist === 'on' || assist === 'off' || assist === 'holdout') row.modelAssist = assist;
+      }
+    } catch (e) { /* the close is still recorded */ }
+    batch.push(row);
     var wait = flush();
     return wait;
   }

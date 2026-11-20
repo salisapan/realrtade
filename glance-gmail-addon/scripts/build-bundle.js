@@ -31,6 +31,7 @@ const files = [
   'actions.js',
   'resolution.js',
   'system-notice.js',
+  'personal-model.js',
   'draft-reply.js',
   'closed-intent-ledger.js',
   'incoming-judge.js'
@@ -67,6 +68,7 @@ const footer = [
   '  remote: GlanceRemote,',
   '  draftCompose: GlanceDraftCompose,',
   '  closedIntentLedger: (typeof FlowClosedIntentLedger !== "undefined" ? FlowClosedIntentLedger : null),',
+  '  personalModel: (typeof FlowPersonalModel !== "undefined" ? { confirmed: function (state) { return FlowPersonalModel.confirmedFrom(state); } } : null),',
   '  classify: function (text, ctx) { return FlowIntent.classify(text, ctx || {}); },',
   '  plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },',
   '  judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }',

@@ -57,6 +57,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | Value test on the test mailbox: which ask kinds Glance misses, for the ecosystems routines | `docs/glance-ai/real-mail-misses-2026-10-21.md` | `flow-trial-extension/core/judgment.js`, `flow-trial-extension/test/status-intro-ask-corpus.cjs` | - |
 | When Glance is worth paying for. The chief of staff reads the yaml. Flow is not this bar | `docs/glance-ai/paid-readiness-bar.md` | `core/pmf-metrics.js`, `core/close-quality-metrics.js`, `docs/human-eval.md`, `docs/real-mail-eval/2026-10-08.md` | - |
 | Closed-intent ledger: a consented CloudEvents log of what got done. Off until opt-in. Types only. Nothing leaves the device in this slice | `closed-intent-ledger.md` | `closed-intent-ledger.js`, `closed-intent-ledger.README.md` | `closed-intent-ledger-corpus.cjs` |
+| Personal model: what Glance knows about the person, on this computer, off until a category is accepted | `personal-model.md` | `personal-model.js`, `personal-model/README.md` | `personal-model-corpus.cjs` |
 
 ## 2. When X changes, update these in the SAME commit
 

@@ -22,6 +22,9 @@ Consent is required. Retention is 365 days. pii: none.
 | `weekday` | Local weekday. | Mail text, names, addresses, message ids. |
 | `hour_bucket` | Six-hour local bucket. | Mail text, names, addresses, message ids. |
 | `locale` | UI language bucket. | Mail text, names, addresses, message ids. |
+| `model_assist` | Personal model assist: on, off, or holdout. | Mail text, names, addresses, message ids. |
+| `style_edit_q` | Quantized edit distance. A number only. | Mail text, names, addresses, message ids. |
+| `bandit_mode` | Bandit mode: off, passive, or blocked. | Mail text, names, addresses, message ids. |
 | `candidates` | Up to five types, with a score quantized to 0.05. | Mail text, names, addresses, message ids. |
 | `intent_type` | Intent type from the taxonomy. | Mail text, names, addresses, message ids. |
 | `target_system` | System that received the close. | Mail text, names, addresses, message ids. |
@@ -55,6 +58,9 @@ Consent is required. Retention is 365 days. pii: none.
 | `weekday` | יום בשבוע מקומי. | Mail text, names, addresses, message ids. |
 | `hour_bucket` | דלי של שש שעות. | Mail text, names, addresses, message ids. |
 | `locale` | דלי שפת ממשק. | Mail text, names, addresses, message ids. |
+| `model_assist` | סיוע המודל האישי: פועל, כבוי, או מדגם החזקה. | Mail text, names, addresses, message ids. |
+| `style_edit_q` | מרחק עריכה מקוונט. מספר בלבד. | Mail text, names, addresses, message ids. |
+| `bandit_mode` | מצב הבנדיט: כבוי, סביל, או חסום. | Mail text, names, addresses, message ids. |
 | `candidates` | עד חמישה סוגים, עם ציון מקוונט 0.05. | Mail text, names, addresses, message ids. |
 | `intent_type` | סוג כוונה מהטקסונומיה. | Mail text, names, addresses, message ids. |
 | `target_system` | המערכת שקיבלה את הסגירה. | Mail text, names, addresses, message ids. |

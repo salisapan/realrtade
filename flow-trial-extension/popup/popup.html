@@ -79,6 +79,19 @@
         <p id="closedIntentNote" class="saved-note" hidden></p>
       </div>
 
+      <div class="block" id="personalModelBlock" lang="he" dir="rtl">
+        <p class="label" id="pmTitle">Glance יודע עליי</p>
+        <p class="hint" id="pmHint">כבוי עד שמדליקים קטגוריה. נשאר על המחשב הזה. אפשר לראות, לתקן ולמחוק.</p>
+        <div id="pmConsent"></div>
+        <div id="pmDisclosure" class="pm-disclosure" hidden></div>
+        <div id="pmCards"></div>
+        <div class="recipe-row">
+          <button type="button" class="ghost sm" id="pmForgetAll">שכח הכל</button>
+          <button type="button" class="ghost sm" id="pmExport">ייצוא JSON</button>
+        </div>
+        <p id="pmNote" class="saved-note" hidden></p>
+      </div>
+
       <div class="block recipe-block">
         <p class="label">שתף את ההגדרה</p>
         <p class="hint">קובץ .glance נושא רק את הדומיין והמחבר שבחרת — בלי אסימון, ובלי שום דבר ש-Glance כתב.</p>
@@ -230,6 +243,8 @@
        Must load after both, and after close-quality-metrics.js, before popup.js. -->
   <script src="../core/closed-intent-ledger.js"></script>
   <script src="../src/closed-intent-ledger-idb.js"></script>
+  <script src="../core/personal-model.js"></script>
+  <script src="../src/personal-model-idb.js"></script>
   <script src="../src/chrome-storage-adapter.js"></script>
   <script src="../core/proof-of-close.js"></script>
   <script src="../src/receipt-copy.js"></script>

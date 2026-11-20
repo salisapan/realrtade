@@ -395,6 +395,12 @@ const FlowClosedIntentLedger = (() => {
       }, common), Object.assign({}, c, { seq: seq, decisionId: decisionId, intentId: intentId, surface: surface }));
       if (!decision) return { ok: false, reason: 'rejected', events: [] };
       decision.data.explore_epsilon = 0;
+      const assist = token(i.modelAssist);
+      if (assist === 'on' || assist === 'off' || assist === 'holdout') decision.data.model_assist = assist;
+      const editQ = Number(i.styleEditQ);
+      if (Number.isFinite(editQ) && editQ >= 0 && editQ <= 1) decision.data.style_edit_q = Math.round(editQ * 20) / 20;
+      const band = token(i.banditMode);
+      if (band === 'off' || band === 'passive' || band === 'blocked') decision.data.bandit_mode = band;
       events.push(decision);
       seq += 1;
     }

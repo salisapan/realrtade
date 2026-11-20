@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "iglu:ai.theflow.glance/personal-tombstone/jsonschema/1-0-0",
+  "description": "A one-way hash so a forgotten fact is not learned again.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "key_hash",
+    "predicate",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Random tombstone id."
+    },
+    "key_hash": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "Hash of the forgotten key. Not the key itself."
+    },
+    "predicate": {
+      "type": "string",
+      "enum": [
+        "person.tie_strength",
+        "person.reply_latency_to",
+        "person.reply_latency_from",
+        "person.channel",
+        "person.language",
+        "person.relation",
+        "identity.name",
+        "identity.role",
+        "identity.org",
+        "work.org",
+        "work.works_on",
+        "work.client_of",
+        "work.commitment",
+        "habit.meeting_hour",
+        "habit.duration",
+        "habit.tool",
+        "habit.working_hours",
+        "place.city",
+        "style.greeting",
+        "style.signoff",
+        "style.length",
+        "style.formality",
+        "style.emoji",
+        "style.mixing",
+        "style.edit_distance",
+        "style.vector"
+      ],
+      "maxLength": 64,
+      "description": "Predicate that must not be relearned."
+    },
+    "created_at": {
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{3})?Z$",
+      "description": "When the person forgot this."
+    }
+  }
+}

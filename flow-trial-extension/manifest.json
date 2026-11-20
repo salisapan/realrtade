@@ -93,6 +93,8 @@
         "core/recurrence.js",
         "core/entitlements.js",
         "core/closed-intent-ledger.js",
+        "core/personal-model.js",
+        "src/personal-model-wire.js",
         "src/chrome-storage-adapter.js",
         "src/storage.js",
         "core/privacyShield.js",

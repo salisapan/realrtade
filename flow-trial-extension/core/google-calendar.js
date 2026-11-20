@@ -260,13 +260,17 @@ const FlowGoogleCalendar = (() => {
     if (!process || process.id !== 'file-on-hold' || !step || step.kind !== 'calendar') {
       return { move: 'silent', reason: 'no-calendar-step' };
     }
-    return {
+    const held = {
       move: 'hold',
       intent: intent,
       process: process,
       fileTerm: (intent.googleClose && intent.googleClose.fileTerm) || step.params.fileTerm,
       params: step.params || {}
     };
+    if (typeof FlowPersonalModel !== 'undefined' && typeof FlowPersonalModel.gateHold === 'function') {
+      return FlowPersonalModel.gateHold(held, i);
+    }
+    return held;
   }
 
   async function call(http, req) {
@@ -311,6 +315,10 @@ const FlowGoogleCalendar = (() => {
   async function write(input, http, clock) {
     const C = cfg();
     const i = input || {};
+    if (i.hour == null && i.minute == null && typeof FlowPersonalModel !== 'undefined' && typeof FlowPersonalModel.gateHold === 'function') {
+      const gated = FlowPersonalModel.gateHold({ move: 'hold' }, i);
+      if (gated && gated.reason === 'personal-model-ask') return { ok: false, reason: 'personal-model-ask' };
+    }
     const blocked = C && C.gate(i.scopes, C.SCOPE_CALENDAR, 'calendar-not-granted');
     if (blocked) return blocked;
     const body = eventBody(i);

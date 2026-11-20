@@ -4573,6 +4573,22 @@
     if (pane) {
       pane.text = stripGlanceLines(pane.text);
       pane.__epoch = mailEpoch;
+      if (typeof FlowPersonalModelWire !== 'undefined' && FlowPersonalModelWire.offer) {
+        try {
+          FlowPersonalModelWire.offer({
+            surface: 'outlook',
+            messageId: pane.itemId || pane.conversationId || '',
+            threadId: pane.conversationId || '',
+            ts: Date.parse(pane.receivedDateTime) || Date.now(),
+            from: { email: pane.senderEmail || '', name: pane.senderName || '' },
+            to: pane.to || [],
+            cc: pane.cc || [],
+            isOwn: own.indexOf(String(pane.senderEmail || '').toLowerCase()) >= 0,
+            ownEmail: own[0] || '',
+            ownName: userNameOf(st) || ''
+          });
+        } catch (e) { /* header learning is optional */ }
+      }
     }
     bindMailToken(pane, token);
     const earlyPlanned = plannedRow(st, pane);

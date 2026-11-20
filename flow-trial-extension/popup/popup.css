@@ -375,3 +375,6 @@ main{padding:var(--space-5); flex:1; min-height:0; overflow-y:auto; overflow-anc
 .log-age.late{color:#E5484D}
 .debrief-text{width:100%; box-sizing:border-box; min-height:64px; resize:vertical; font:.78rem/1.4 inherit; padding:var(--space-2) var(--space-3); border:1px solid var(--line,rgba(127,127,127,.35)); border-radius:8px; background:var(--surface,transparent); color:var(--ink)}
 .debrief-text:focus{outline:2px solid var(--accent); outline-offset:1px}
+.pm-card{border:1px solid var(--line); border-radius:12px; padding:8px 10px; margin:8px 0}
+.pm-actions{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:6px 0}
+.pm-disclosure{border:1px solid var(--line-2); border-radius:12px; padding:10px; margin:8px 0}
