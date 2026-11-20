@@ -79,12 +79,13 @@ async function graphCall(access, req) {
 
 async function makeDeps() {
   let bag = {};
-  try { bag = await globalThis.chrome.storage.local.get('outlookAuth'); } catch (e) { bag = {}; }
+  try { bag = await globalThis.chrome.storage.local.get(['outlookAuth', 'glanceContactsChoice']); } catch (e) { bag = {}; }
   const token = bag && bag.outlookAuth && bag.outlookAuth.token;
   const access = token && token.accessToken ? String(token.accessToken) : '';
   const scopes = token ? (token.grantedScopes || token.scopes || token.scope || null) : null;
   return {
     grantedScopes: scopes,
+    contactsChoice: !!(bag && bag.glanceContactsChoice === true),
     now: function () { return new Date().toISOString(); },
     call: function (req) { return graphCall(access, req || {}); }
   };
