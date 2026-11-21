@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "iglu:ai.theflow.glance/personal-alias/jsonschema/1-0-0",
+  "description": "A display name for an entity. Encrypted at rest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "subject_id",
+    "alias",
+    "lang"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Random alias id."
+    },
+    "subject_id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Entity this alias names."
+    },
+    "alias": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "Hebrew or Latin display name. Encrypted at rest."
+    },
+    "lang": {
+      "type": "string",
+      "enum": [
+        "he",
+        "en",
+        "mixed",
+        "other"
+      ],
+      "maxLength": 8,
+      "description": "he en or other."
+    }
+  }
+}

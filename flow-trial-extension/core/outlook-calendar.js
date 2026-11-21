@@ -290,13 +290,17 @@ const FlowOutlookCalendar = (() => {
     if (!process || process.id !== 'file-on-hold' || !step || step.kind !== 'calendar') {
       return { move: 'silent', reason: 'no-calendar-step' };
     }
-    return {
+    const held = {
       move: 'hold',
       intent: intent,
       process: process,
       fileTerm: (intent.googleClose && intent.googleClose.fileTerm) || step.params.fileTerm,
       params: step.params || {}
     };
+    if (typeof FlowPersonalModel !== 'undefined' && typeof FlowPersonalModel.gateHold === 'function') {
+      return FlowPersonalModel.gateHold(held, i);
+    }
+    return held;
   }
 
   // Calendar holds use the mailbox zone from Graph mailboxSettings.timeZone.

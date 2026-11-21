@@ -164,6 +164,7 @@
       if (ch.glanceHostLanguage) state.glanceHostLanguage = ch.glanceHostLanguage.newValue;
       if (ch.glanceUiLanguage) state.glanceUiLanguage = ch.glanceUiLanguage.newValue;
       if (uiLang() === before) return;
+      paintClosedIntent();
       const panel = document.querySelector && document.querySelector('.panel[data-panel="log"]');
       if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
       else paintActivityShell();
@@ -224,6 +225,9 @@
   wireTabs();
   wireSave();
   wireRecipe();
+  wireClosedIntent();
+  wirePersonalModel();
+  paintClosedIntent();
   wirePro();
   wireLoopView();
   await renderConnectors();
@@ -1070,6 +1074,241 @@
     a.download = 'glance-recipe' + (connector ? '-' + connector.id : '') + (domain ? '-' + domain.id : '') + '.glance';
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function closedIntentNote(text, isError) {
+    const n = document.getElementById('closedIntentNote');
+    if (!n) return;
+    n.textContent = text || '';
+    n.hidden = !text;
+    n.classList.toggle('err', Boolean(isError));
+  }
+
+  function paintClosedIntent() {
+    const api = typeof FlowClosedIntentLedger !== 'undefined' ? FlowClosedIntentLedger : null;
+    const block = document.getElementById('closedIntentBlock');
+    if (!api || !block || typeof api.copy !== 'function') return;
+    const lang = uiLang();
+    const L = api.copy(lang);
+    block.lang = lang;
+    block.dir = lang === 'he' ? 'rtl' : 'ltr';
+    const title = document.getElementById('closedIntentTitle');
+    const hint = document.getElementById('closedIntentHint');
+    const toggle = document.getElementById('closedIntentToggle');
+    const exp = document.getElementById('closedIntentExport');
+    const del = document.getElementById('closedIntentDelete');
+    if (title) title.textContent = L.title;
+    if (hint) hint.textContent = L.hint;
+    if (exp) exp.textContent = L.export;
+    if (del) del.textContent = L.deleteAll;
+    const store = typeof FlowClosedIntentStore !== 'undefined' ? FlowClosedIntentStore : null;
+    const enabled = store ? store.isEnabled() : api.isEnabled();
+    Promise.resolve(enabled).then(async (on) => {
+      if (toggle) {
+        toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+        toggle.textContent = on ? L.toggleOn : L.toggleOff;
+      }
+      const value = document.getElementById('closedIntentValue');
+      if (!value || typeof api.view !== 'function' || typeof api.valueLine !== 'function') return;
+      const view = store ? await store.view() : await api.view(Date.now());
+      value.textContent = api.valueLine(lang, view);
+    }).catch(() => {});
+  }
+
+  function downloadLedger(doc) {
+    const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'glance-closed-intents.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function wireClosedIntent() {
+    const api = typeof FlowClosedIntentLedger !== 'undefined' ? FlowClosedIntentLedger : null;
+    const toggle = document.getElementById('closedIntentToggle');
+    const exp = document.getElementById('closedIntentExport');
+    const del = document.getElementById('closedIntentDelete');
+    if (!api || !toggle || !exp || !del) return;
+    const store = typeof FlowClosedIntentStore !== 'undefined' ? FlowClosedIntentStore : null;
+    toggle.addEventListener('click', async () => {
+      const L = api.copy(uiLang());
+      const on = store ? await store.isEnabled() : await api.isEnabled();
+      if (store) await store.setEnabled(!on);
+      else await api.setEnabled(!on);
+      paintClosedIntent();
+      closedIntentNote(on ? L.stopped : L.started, false);
+    });
+    exp.addEventListener('click', async () => {
+      const L = api.copy(uiLang());
+      const doc = store ? await store.exportAll() : await api.exportAll();
+      downloadLedger(doc);
+      closedIntentNote(doc.events && doc.events.length ? L.exported : L.empty, false);
+    });
+    del.addEventListener('click', async () => {
+      const L = api.copy(uiLang());
+      if (!window.confirm(L.deleteConfirm)) return;
+      if (store) await store.deleteAll();
+      else await api.deleteAll();
+      paintClosedIntent();
+      closedIntentNote(L.deleted, false);
+    });
+  }
+
+  function pmSend(msg) {
+    return new Promise((resolve) => {
+      try {
+        if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) { resolve({ ok: false }); return; }
+        chrome.runtime.sendMessage(msg, (res) => resolve(res || { ok: false }));
+      } catch (e) { resolve({ ok: false }); }
+    });
+  }
+
+  function pmNote(text, isError) {
+    const n = document.getElementById('pmNote');
+    if (!n) return;
+    n.textContent = text || '';
+    n.hidden = !text;
+    n.classList.toggle('err', Boolean(isError));
+  }
+
+  async function paintPersonalModel() {
+    const api = typeof FlowPersonalModel !== 'undefined' ? FlowPersonalModel : null;
+    const block = document.getElementById('personalModelBlock');
+    if (!api || !block) return;
+    const lang = uiLang();
+    const L = api.copy(lang);
+    block.lang = lang;
+    block.dir = lang === 'he' ? 'rtl' : 'ltr';
+    const title = document.getElementById('pmTitle');
+    const hint = document.getElementById('pmHint');
+    if (title) title.textContent = L.title;
+    if (hint) hint.textContent = L.hint;
+    const forget = document.getElementById('pmForgetAll');
+    const exp = document.getElementById('pmExport');
+    if (forget) forget.textContent = L.forgetAll;
+    if (exp) exp.textContent = L.export;
+    const view = await pmSend({ type: 'flow:personal-model-view' });
+    const data = view && view.view ? view.view : null;
+    const consent = document.getElementById('pmConsent');
+    const cards = document.getElementById('pmCards');
+    if (!consent || !cards || !data) return;
+    consent.textContent = '';
+    cards.textContent = '';
+    (data.categories || []).forEach((cat) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ghost sm';
+      btn.setAttribute('aria-pressed', cat.enabled ? 'true' : 'false');
+      btn.textContent = cat.id;
+      btn.addEventListener('click', () => openDisclosure(cat, L));
+      consent.appendChild(btn);
+      if (!cat.facts || !cat.facts.length) return;
+      const card = document.createElement('div');
+      card.className = 'pm-card';
+      const head = document.createElement('p');
+      head.className = 'label';
+      head.textContent = cat.id;
+      card.appendChild(head);
+      cat.facts.slice(0, 8).forEach((fact) => {
+        const row = document.createElement('div');
+        row.className = 'pm-actions';
+        const why = document.createElement('span');
+        why.className = 'hint';
+        why.textContent = fact.predicate + ' · ' + L.why.replace('{count}', String(fact.evidenceCount || 0)).replace('{from}', fact.from || '').replace('{to}', fact.to || '');
+        row.appendChild(why);
+        [['confirm', L.confirmFact, 'flow:personal-model-confirm'], ['forget', L.forget, 'flow:personal-model-forget'], ['never', L.never, 'flow:personal-model-never']].forEach((spec) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'ghost sm';
+          b.textContent = spec[1];
+          b.addEventListener('click', async () => {
+            const msg = { type: spec[2], id: fact.id, predicate: fact.predicate, object: fact.object };
+            await pmSend(msg);
+            pmNote(spec[0] === 'confirm' ? L.saved : L.deleted, false);
+            paintPersonalModel();
+          });
+          row.appendChild(b);
+        });
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'ghost sm';
+        edit.textContent = L.edit;
+        edit.addEventListener('click', async () => {
+          const next = window.prompt(L.edit, fact.object || '');
+          if (!next) return;
+          await pmSend({ type: 'flow:personal-model-edit', id: fact.id, object: next });
+          pmNote(L.saved, false);
+          paintPersonalModel();
+        });
+        row.appendChild(edit);
+        if (fact.messageId) {
+          const source = document.createElement('span');
+          source.className = 'hint';
+          source.textContent = L.source;
+          row.appendChild(source);
+        }
+        card.appendChild(row);
+      });
+      cards.appendChild(card);
+    });
+  }
+
+  function openDisclosure(cat, L) {
+    const box = document.getElementById('pmDisclosure');
+    if (!box) return;
+    if (cat.enabled) {
+      pmSend({ type: 'flow:personal-model-consent', category: cat.id, enabled: false }).then(() => paintPersonalModel());
+      return;
+    }
+    box.hidden = false;
+    box.textContent = '';
+    const p = document.createElement('p');
+    p.className = 'hint';
+    p.textContent = (L.disclosure && L.disclosure[cat.id]) || L.hint;
+    box.appendChild(p);
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'ghost sm';
+    yes.textContent = L.confirm;
+    yes.addEventListener('click', async () => {
+      await pmSend({ type: 'flow:personal-model-consent', category: cat.id, enabled: true, disclosure: true });
+      box.hidden = true;
+      pmNote(L.saved, false);
+      paintPersonalModel();
+    });
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'ghost sm';
+    no.textContent = L.later;
+    no.addEventListener('click', () => { box.hidden = true; });
+    box.appendChild(yes);
+    box.appendChild(no);
+  }
+
+  function wirePersonalModel() {
+    const forget = document.getElementById('pmForgetAll');
+    const exp = document.getElementById('pmExport');
+    if (forget) forget.addEventListener('click', async () => {
+      const L = FlowPersonalModel.copy(uiLang());
+      if (!window.confirm(L.forgetAll)) return;
+      await pmSend({ type: 'flow:personal-model-forget-all' });
+      pmNote(L.deleted, false);
+      paintPersonalModel();
+    });
+    if (exp) exp.addEventListener('click', async () => {
+      const res = await pmSend({ type: 'flow:personal-model-export' });
+      const doc = res && res.doc ? res.doc : {};
+      const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'glance-personal-model.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    paintPersonalModel();
   }
 
   function wireRecipe() {

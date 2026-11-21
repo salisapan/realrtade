@@ -1,0 +1,580 @@
+# Personal model contract. Single source for schemas, types, and the dictionary.
+# Every field below must declare purpose, purpose_he, consent_category, pii,
+# half_life_days, retention_days, and third_party. check.cjs fails closed.
+model: 1-0-0
+legal_basis: consent
+owner: Glance
+categories: [people, habits, style, work, places, identity]
+pii_levels: [none, indirect, direct, sensitive]
+sources: [observed, inferred, user_stated]
+audiences: [client, colleague, family, unknown]
+languages: [he, en, mixed, other]
+tie_weights:
+  recency: 0.45
+  frequency: 0.35
+  reciprocity: 0.20
+recency_half_life_days: 30
+frequency_cap: 20
+holdout_percent: 10
+exemplar_cap: 24
+exemplar_max_chars: 160
+bandit_guard: 0.8
+bandit_enabled: false
+predicates:
+  - person.tie_strength
+  - person.reply_latency_to
+  - person.reply_latency_from
+  - person.channel
+  - person.language
+  - person.relation
+  - identity.name
+  - identity.role
+  - identity.org
+  - work.org
+  - work.works_on
+  - work.client_of
+  - work.commitment
+  - habit.meeting_hour
+  - habit.duration
+  - habit.tool
+  - habit.working_hours
+  - place.city
+  - style.greeting
+  - style.signoff
+  - style.length
+  - style.formality
+  - style.emoji
+  - style.mixing
+  - style.edit_distance
+  - style.vector
+third_party_predicates:
+  - person.tie_strength
+  - person.reply_latency_to
+  - person.reply_latency_from
+  - person.channel
+  - person.language
+  - person.relation
+objects:
+  - name: fact
+    purpose: One bi-temporal statement. A change inserts a new row and closes the old one.
+    fields:
+      - name: id
+        type: uuid
+        required: true
+        purpose: Random id. Not derived from mail.
+        purpose_he: מזהה אקראי. לא נגזר מדואר.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: false
+      - name: subject_id
+        type: uuid
+        required: true
+        purpose: The entity this fact is about.
+        purpose_he: הישות שהעובדה עליה.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: predicate
+        type: predicate
+        required: true
+        purpose: Controlled predicate token.
+        purpose_he: פרדיקט מאוצר מילים סגור.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: object
+        type: token
+        max_length: 80
+        required: true
+        purpose: Short object token. Never a mail body.
+        purpose_he: אובייקט קצר. אף פעם לא גוף דואר.
+        consent_category: identity
+        pii: indirect
+        half_life_days: 30
+        retention_days: 365
+        third_party: true
+      - name: source
+        type: source
+        required: true
+        purpose: observed or inferred or user_stated.
+        purpose_he: נצפה או הוסק או נאמר על ידי האדם.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: confidence
+        type: number
+        required: true
+        purpose: Score from 0 to 1. User-confirmed facts stay at 1.
+        purpose_he: ציון מ-0 עד 1. עובדה שאושרה נשארת 1.
+        consent_category: identity
+        pii: none
+        half_life_days: 30
+        retention_days: 365
+        third_party: true
+      - name: valid_from
+        type: time
+        required: true
+        purpose: When this value became true.
+        purpose_he: מתי הערך הזה נעשה נכון.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: valid_to
+        type: time
+        required: false
+        purpose: When this value stopped being current. Empty while current.
+        purpose_he: מתי הערך חדל להיות עדכני. ריק כל עוד הוא עדכני.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: learned_at
+        type: time
+        required: true
+        purpose: When Glance recorded the row.
+        purpose_he: מתי Glance רשם את השורה.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: retired_at
+        type: time
+        required: false
+        purpose: When the row was invalidated. Empty while current.
+        purpose_he: מתי השורה בוטלה. ריק כל עוד היא עדכנית.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: consent_category
+        type: category
+        required: true
+        purpose: Which consent gate allows this row.
+        purpose_he: איזה שער הסכמה מתיר את השורה.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: schema_ver
+        type: token
+        max_length: 16
+        required: true
+        purpose: Schema version token.
+        purpose_he: אסימון גרסת סכמה.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: false
+  - name: evidence
+    purpose: A pointer to a message or event. Never the body.
+    fields:
+      - name: surface
+        type: token
+        max_length: 16
+        required: true
+        purpose: gmail outlook or calendar.
+        purpose_he: גימייל אאוטלוק או יומן.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: message_or_event_id
+        type: token
+        max_length: 128
+        required: true
+        purpose: Opaque id. Not a body and not an address.
+        purpose_he: מזהה אטום. לא גוף ולא כתובת.
+        consent_category: people
+        pii: indirect
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: ts
+        type: time
+        required: true
+        purpose: When that message or event happened.
+        purpose_he: מתי ההודעה או האירוע קרו.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: span_start
+        type: integer
+        required: false
+        purpose: Start offset of the cited span. The characters are not stored.
+        purpose_he: תחילת הטווח המצוטט. התווים עצמם לא נשמרים.
+        consent_category: work
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: false
+      - name: span_end
+        type: integer
+        required: false
+        purpose: End offset of the cited span. The characters are not stored.
+        purpose_he: סוף הטווח המצוטט. התווים עצמם לא נשמרים.
+        consent_category: work
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: false
+  - name: entity
+    purpose: The user or another person. Address payload is encrypted at rest.
+    fields:
+      - name: id
+        type: uuid
+        required: true
+        purpose: Random entity id.
+        purpose_he: מזהה ישות אקראי.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: kind
+        type: token
+        max_length: 16
+        required: true
+        purpose: user or person.
+        purpose_he: משתמש או אדם.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: canonical_email
+        type: token
+        max_length: 254
+        required: true
+        purpose: Lower-case address. Encrypted in IndexedDB.
+        purpose_he: כתובת באותיות קטנות. מוצפנת ב-IndexedDB.
+        consent_category: people
+        pii: direct
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+  - name: alias
+    purpose: A display name for an entity. Encrypted at rest.
+    fields:
+      - name: id
+        type: uuid
+        required: true
+        purpose: Random alias id.
+        purpose_he: מזהה כינוי אקראי.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: subject_id
+        type: uuid
+        required: true
+        purpose: Entity this alias names.
+        purpose_he: הישות שהכינוי שייך לה.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: alias
+        type: token
+        max_length: 80
+        required: true
+        purpose: Hebrew or Latin display name. Encrypted at rest.
+        purpose_he: שם תצוגה בעברית או בלטינית. מוצפן במנוחה.
+        consent_category: people
+        pii: direct
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: lang
+        type: lang
+        required: true
+        purpose: he en or other.
+        purpose_he: עברית אנגלית או אחר.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+  - name: consent
+    purpose: One category switch. Off until the person accepts the disclosure.
+    fields:
+      - name: category
+        type: category
+        required: true
+        purpose: people habits style work places or identity.
+        purpose_he: אנשים הרגלים סגנון עבודה מקומות או זהות.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: false
+      - name: enabled
+        type: boolean
+        required: true
+        purpose: False until the disclosure is accepted.
+        purpose_he: שקר עד שהגילוי מאושר.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: false
+      - name: granted_at
+        type: time
+        required: false
+        purpose: When the person accepted. Empty while off.
+        purpose_he: מתי האדם אישר. ריק כל עוד כבוי.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: false
+  - name: tombstone
+    purpose: A one-way hash so a forgotten fact is not learned again.
+    fields:
+      - name: id
+        type: uuid
+        required: true
+        purpose: Random tombstone id.
+        purpose_he: מזהה מחיקה אקראי.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: true
+      - name: key_hash
+        type: token
+        max_length: 64
+        required: true
+        purpose: Hash of the forgotten key. Not the key itself.
+        purpose_he: גיבוב של המפתח שנשכח. לא המפתח עצמו.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: true
+      - name: predicate
+        type: predicate
+        required: true
+        purpose: Predicate that must not be relearned.
+        purpose_he: הפרדיקט שאסור ללמוד שוב.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: true
+      - name: created_at
+        type: time
+        required: true
+        purpose: When the person forgot this.
+        purpose_he: מתי האדם שכח את זה.
+        consent_category: identity
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: true
+  - name: exemplar
+    purpose: A short scrubbed snippet of the user's own sent mail. Encrypted. Capped.
+    fields:
+      - name: id
+        type: uuid
+        required: true
+        purpose: Random exemplar id.
+        purpose_he: מזהה דוגמה אקראי.
+        consent_category: style
+        pii: none
+        half_life_days: 0
+        retention_days: 180
+        third_party: false
+      - name: audience
+        type: audience
+        required: true
+        purpose: client colleague family or unknown.
+        purpose_he: לקוח עמית משפחה או לא ידוע.
+        consent_category: style
+        pii: none
+        half_life_days: 0
+        retention_days: 180
+        third_party: false
+      - name: lang
+        type: lang
+        required: true
+        purpose: he en or mixed.
+        purpose_he: עברית אנגלית או מעורב.
+        consent_category: style
+        pii: none
+        half_life_days: 0
+        retention_days: 180
+        third_party: false
+      - name: snippet
+        type: token
+        max_length: 160
+        required: true
+        purpose: Scrubbed text from the user's own send. Addresses and phones removed. Encrypted.
+        purpose_he: טקסט מנוקה משליחה של האדם. כתובות וטלפונים הוסרו. מוצפן.
+        consent_category: style
+        pii: indirect
+        half_life_days: 90
+        retention_days: 180
+        third_party: false
+      - name: greeting
+        type: token
+        max_length: 32
+        required: true
+        purpose: Greeting enum.
+        purpose_he: סוג פתיח.
+        consent_category: style
+        pii: none
+        half_life_days: 90
+        retention_days: 180
+        third_party: false
+      - name: signoff
+        type: token
+        max_length: 32
+        required: true
+        purpose: Sign-off enum.
+        purpose_he: סוג חתימה.
+        consent_category: style
+        pii: none
+        half_life_days: 90
+        retention_days: 180
+        third_party: false
+  - name: style_rule
+    purpose: A style rule the person edited. No decay.
+    fields:
+      - name: id
+        type: uuid
+        required: true
+        purpose: Random rule id.
+        purpose_he: מזהה כלל אקראי.
+        consent_category: style
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: false
+      - name: audience
+        type: audience
+        required: true
+        purpose: Who the rule is for.
+        purpose_he: למי הכלל.
+        consent_category: style
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: false
+      - name: lang
+        type: lang
+        required: true
+        purpose: Language the rule applies to.
+        purpose_he: השפה שהכלל חל עליה.
+        consent_category: style
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: false
+      - name: greeting
+        type: token
+        max_length: 32
+        required: true
+        purpose: Greeting the person chose.
+        purpose_he: הפתיח שהאדם בחר.
+        consent_category: style
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: false
+      - name: signoff
+        type: token
+        max_length: 32
+        required: true
+        purpose: Sign-off the person chose.
+        purpose_he: החתימה שהאדם בחר.
+        consent_category: style
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: false
+      - name: formality
+        type: token
+        max_length: 16
+        required: true
+        purpose: casual neutral or formal.
+        purpose_he: יומיומי ניטרלי או רשמי.
+        consent_category: style
+        pii: none
+        half_life_days: 0
+        retention_days: 3650
+        third_party: false
+  - name: review
+    purpose: An ambiguous merge waiting for the person. Ids only.
+    fields:
+      - name: id
+        type: uuid
+        required: true
+        purpose: Random review id.
+        purpose_he: מזהה ביקורת אקראי.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: left_id
+        type: uuid
+        required: true
+        purpose: First entity id.
+        purpose_he: מזהה הישות הראשונה.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: right_id
+        type: uuid
+        required: true
+        purpose: Second entity id.
+        purpose_he: מזהה הישות השנייה.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: reason
+        type: token
+        max_length: 32
+        required: true
+        purpose: Why Glance did not merge.
+        purpose_he: למה Glance לא מיזג.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true
+      - name: status
+        type: token
+        max_length: 16
+        required: true
+        purpose: pending merged or denied.
+        purpose_he: ממתין מוזג או נדחה.
+        consent_category: people
+        pii: none
+        half_life_days: 0
+        retention_days: 365
+        third_party: true

@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "iglu:ai.theflow.glance/stage/jsonschema/1-0-0",
+  "description": "stage payload. Types only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision_id",
+    "intent_type",
+    "surface",
+    "target_system",
+    "confidence_bucket",
+    "latency_ms",
+    "local_day",
+    "tz_offset_bucket",
+    "weekday",
+    "hour_bucket",
+    "engine_version",
+    "locale",
+    "negative"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "intent_type": {
+      "type": "string",
+      "enum": [
+        "send_quote",
+        "create_event",
+        "create_task",
+        "draft_reply",
+        "create_document",
+        "save_file",
+        "other"
+      ],
+      "maxLength": 32
+    },
+    "surface": {
+      "type": "string",
+      "enum": [
+        "gmail",
+        "outlook",
+        "teams",
+        "slack",
+        "telegram",
+        "addon",
+        "other"
+      ],
+      "maxLength": 16
+    },
+    "target_system": {
+      "type": "string",
+      "enum": [
+        "calendar",
+        "drive",
+        "onedrive",
+        "todo",
+        "tasks",
+        "drafts",
+        "docs",
+        "sheets",
+        "teams",
+        "other"
+      ],
+      "maxLength": 16
+    },
+    "confidence_bucket": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ],
+      "maxLength": 8
+    },
+    "latency_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400000
+    },
+    "local_day": {
+      "type": "string",
+      "maxLength": 10,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "tz_offset_bucket": {
+      "type": "string",
+      "maxLength": 8,
+      "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$"
+    },
+    "weekday": {
+      "type": "string",
+      "enum": [
+        "sun",
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat"
+      ],
+      "maxLength": 3
+    },
+    "hour_bucket": {
+      "type": "string",
+      "enum": [
+        "h00",
+        "h06",
+        "h12",
+        "h18"
+      ],
+      "maxLength": 3
+    },
+    "engine_version": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$"
+    },
+    "locale": {
+      "type": "string",
+      "enum": [
+        "he",
+        "en",
+        "other"
+      ],
+      "maxLength": 5
+    },
+    "negative": {
+      "type": "boolean"
+    }
+  }
+}

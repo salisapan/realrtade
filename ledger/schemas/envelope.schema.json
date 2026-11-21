@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "iglu:ai.theflow.glance/envelope/jsonschema/1-0-0",
+  "description": "CloudEvents 1.0 envelope. seq is the per-install extension.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specversion",
+    "id",
+    "source",
+    "type",
+    "time",
+    "dataschema",
+    "subject",
+    "seq",
+    "data"
+  ],
+  "properties": {
+    "specversion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "source": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^urn:glance:[a-z]+:[0-9a-f-]{36}$"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "ai.theflow.glance.intent.decision.v1",
+        "ai.theflow.glance.intent.shown.v1",
+        "ai.theflow.glance.intent.clicked.v1",
+        "ai.theflow.glance.intent.closed.v1",
+        "ai.theflow.glance.intent.undone.v1",
+        "ai.theflow.glance.intent.failed.v1",
+        "ai.theflow.glance.intent.dismissed.v1",
+        "ai.theflow.glance.intent.missed.v1"
+      ],
+      "maxLength": 64
+    },
+    "time": {
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$"
+    },
+    "dataschema": {
+      "type": "string",
+      "maxLength": 96,
+      "pattern": "^iglu:ai\\.theflow\\.glance/[a-z]+/jsonschema/[0-9]+-[0-9]+-[0-9]+$"
+    },
+    "subject": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000
+    },
+    "data": {
+      "type": "object"
+    }
+  }
+}

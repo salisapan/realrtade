@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "iglu:ai.theflow.glance/personal-review/jsonschema/1-0-0",
+  "description": "An ambiguous merge waiting for the person. Ids only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "left_id",
+    "right_id",
+    "reason",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Random review id."
+    },
+    "left_id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "First entity id."
+    },
+    "right_id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Second entity id."
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "Why Glance did not merge."
+    },
+    "status": {
+      "type": "string",
+      "maxLength": 16,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "pending merged or denied."
+    }
+  }
+}

@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "iglu:ai.theflow.glance/decision/jsonschema/1-0-0",
+  "description": "decision payload. Types only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision_id",
+    "policy_id",
+    "propensity",
+    "deterministic",
+    "explore_epsilon",
+    "engine_feature_hash",
+    "engine_version",
+    "surface",
+    "local_day",
+    "tz_offset_bucket",
+    "weekday",
+    "hour_bucket",
+    "locale",
+    "candidates"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "policy_id": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$"
+    },
+    "chosen_intent_type": {
+      "type": "string",
+      "enum": [
+        "send_quote",
+        "create_event",
+        "create_task",
+        "draft_reply",
+        "create_document",
+        "save_file",
+        "other"
+      ],
+      "maxLength": 32,
+      "description": "Optional. Default applied on read."
+    },
+    "propensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "deterministic": {
+      "type": "boolean"
+    },
+    "explore_epsilon": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "engine_feature_hash": {
+      "type": "string",
+      "maxLength": 16,
+      "pattern": "^[0-9a-f]{8,16}$"
+    },
+    "engine_version": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$"
+    },
+    "surface": {
+      "type": "string",
+      "enum": [
+        "gmail",
+        "outlook",
+        "teams",
+        "slack",
+        "telegram",
+        "addon",
+        "other"
+      ],
+      "maxLength": 16
+    },
+    "local_day": {
+      "type": "string",
+      "maxLength": 10,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "tz_offset_bucket": {
+      "type": "string",
+      "maxLength": 8,
+      "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$"
+    },
+    "weekday": {
+      "type": "string",
+      "enum": [
+        "sun",
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat"
+      ],
+      "maxLength": 3
+    },
+    "hour_bucket": {
+      "type": "string",
+      "enum": [
+        "h00",
+        "h06",
+        "h12",
+        "h18"
+      ],
+      "maxLength": 3
+    },
+    "locale": {
+      "type": "string",
+      "enum": [
+        "he",
+        "en",
+        "other"
+      ],
+      "maxLength": 5
+    },
+    "model_assist": {
+      "type": "string",
+      "maxLength": 16,
+      "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$",
+      "description": "Optional. Default applied on read."
+    },
+    "style_edit_q": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Optional. Default applied on read."
+    },
+    "bandit_mode": {
+      "type": "string",
+      "maxLength": 16,
+      "pattern": "^[a-z0-9][a-z0-9_.:-]{0,63}$",
+      "description": "Optional. Default applied on read."
+    },
+    "candidates": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intent_type",
+          "confidence_bucket",
+          "raw_score_q"
+        ],
+        "properties": {
+          "intent_type": {
+            "type": "string",
+            "enum": [
+              "send_quote",
+              "create_event",
+              "create_task",
+              "draft_reply",
+              "create_document",
+              "save_file",
+              "other"
+            ],
+            "maxLength": 32
+          },
+          "confidence_bucket": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ],
+            "maxLength": 8
+          },
+          "raw_score_q": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}

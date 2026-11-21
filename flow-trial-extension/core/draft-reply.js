@@ -165,7 +165,28 @@ const FlowDraftReply = (() => {
   // Same contract as the former background.js draftBodyText: fact reply, share link,
   // or a rich acknowledgment of what/when (with optional ask text), else a short
   // follow-up + fill-in placeholder.
+  function withPersonalModel(text, p) {
+    const PM = typeof FlowPersonalModel !== 'undefined' ? FlowPersonalModel : null;
+    if (!PM || typeof PM.conditionDraftSync !== 'function') return text;
+    try {
+      const params = (p && p.params) || {};
+      const out = PM.conditionDraftSync(text, {
+        lang: params.lang,
+        audience: params.audience,
+        recipient: p && p.senderEmail,
+        name: p && p.senderName
+      });
+      if (out && out.status === 'ask') return text;
+      if (out && out.applied && out.status === 'one' && typeof out.text === 'string') return out.text;
+    } catch (e) { /* the draft stays as written */ }
+    return text;
+  }
+
   function draftBodyText(p, attachment, attachmentSource, shareUrl) {
+    return withPersonalModel(draftBodyCore(p, attachment, attachmentSource, shareUrl), p);
+  }
+
+  function draftBodyCore(p, attachment, attachmentSource, shareUrl) {
     const params = (p && p.params) || {};
     if (params.inviteFile) {
       if (params.body) return params.body;

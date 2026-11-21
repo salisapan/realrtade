@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "iglu:ai.theflow.glance/personal-exemplar/jsonschema/1-0-0",
+  "description": "A short scrubbed snippet of the user's own sent mail. Encrypted. Capped.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "audience",
+    "lang",
+    "snippet",
+    "greeting",
+    "signoff"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Random exemplar id."
+    },
+    "audience": {
+      "type": "string",
+      "enum": [
+        "client",
+        "colleague",
+        "family",
+        "unknown"
+      ],
+      "maxLength": 16,
+      "description": "client colleague family or unknown."
+    },
+    "lang": {
+      "type": "string",
+      "enum": [
+        "he",
+        "en",
+        "mixed",
+        "other"
+      ],
+      "maxLength": 8,
+      "description": "he en or mixed."
+    },
+    "snippet": {
+      "type": "string",
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "Scrubbed text from the user's own send. Addresses and phones removed. Encrypted."
+    },
+    "greeting": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "Greeting enum."
+    },
+    "signoff": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9\\u0590-\\u05FF][A-Za-z0-9\\u0590-\\u05FF _.:@+-]{0,253}$",
+      "description": "Sign-off enum."
+    }
+  }
+}

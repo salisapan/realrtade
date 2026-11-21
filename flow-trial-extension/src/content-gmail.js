@@ -2053,6 +2053,23 @@ function glanceUiCopy(kind) {
           .catch((e) => console.error('[Glance] failed to drop an inbox snapshot after the thread was opened', e));
       }
       checkContextualResurface(messages, currentContext.messageId);
+      if (typeof FlowPersonalModelWire !== 'undefined' && FlowPersonalModelWire.offer) {
+        try {
+          const aud = audienceOf(message, ownEmail);
+          FlowPersonalModelWire.offer({
+            surface: 'gmail',
+            messageId: stable.messageId,
+            threadId: threadIdFrom(message),
+            ts: Date.now(),
+            from: currentContext.sender,
+            to: ((aud && aud.to) || []).map(function (email) { return { email: email }; }),
+            cc: ((aud && aud.cc) || []).map(function (email) { return { email: email }; }),
+            isOwn: senderIsOwn(currentContext.sender && currentContext.sender.email, ownEmail),
+            ownEmail: ownEmail,
+            ownName: gmailAccountName() || (aud && aud.userName) || ''
+          });
+        } catch (e) { /* header learning is optional */ }
+      }
     }
     // Attachment summaries are a Glance Pro feature (see applyProState()).
     if (proActive) wireAttachmentHoverCards(message);

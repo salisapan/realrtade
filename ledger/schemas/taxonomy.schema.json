@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "iglu:ai.theflow.glance/taxonomy/jsonschema/1-0-0",
+  "description": "Intent taxonomy. domain > type > subtype. superseded_by is empty when current.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "domain",
+    "type",
+    "subtype",
+    "deprecated",
+    "superseded_by"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "enum": [
+        "send_quote",
+        "create_event",
+        "create_task",
+        "draft_reply",
+        "create_document",
+        "save_file",
+        "other"
+      ],
+      "maxLength": 32
+    },
+    "domain": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[a-z]+$"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "send_quote",
+        "create_event",
+        "create_task",
+        "draft_reply",
+        "create_document",
+        "save_file",
+        "other"
+      ],
+      "maxLength": 32
+    },
+    "subtype": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[a-z_]+$"
+    },
+    "deprecated": {
+      "type": "boolean"
+    },
+    "superseded_by": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[a-z_]*$"
+    }
+  }
+}

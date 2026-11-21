@@ -1104,6 +1104,14 @@ function onLaneMessage(msg, sender, sendResponse) {
       const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=100&timeMin=' + encodeURIComponent(from.toISOString()) + '&timeMax=' + encodeURIComponent(to.toISOString());
       const listed = await laneHttp({ method: 'GET', url: url });
       if (!listed || !listed.ok || !listed.json || !Array.isArray(listed.json.items)) return { action: 'silence', reason: 'not-searched' };
+      try {
+        const PM = globalThis.FlowPersonalModel;
+        const store = globalThis.FlowPersonalModelStore;
+        if (PM && store && typeof PM.reduceCalendarItems === 'function' && typeof store.ingestCalendar === 'function') {
+          const rows = PM.reduceCalendarItems(listed.json.items);
+          if (rows.length) store.ingestCalendar(rows);
+        }
+      } catch (e) { /* habits stay quiet when the model is off */ }
       return E.plan({ flags: { [E.SWITCH]: true }, text: text, events: listed.json.items, now: from });
     })()).then(sendResponse, () => sendResponse({ action: 'silence', reason: 'error' }));
     return true;

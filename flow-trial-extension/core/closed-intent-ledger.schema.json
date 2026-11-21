@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "glance:closed-intent-ledger:v1",
+  "title": "Glance closed-intent ledger record",
+  "description": "One consented, types-only record of a close. No mail text, subject, name, address, or identifier. Flow templates and Flow Shadow can read this schema later. Version 1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "intentType", "surface", "targetSystem", "outcome", "confidence", "latencyMs", "day"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "intentType": {
+      "enum": ["send_quote", "create_event", "create_task", "draft_reply", "create_document", "save_file", "other"]
+    },
+    "surface": {
+      "enum": ["gmail", "outlook", "teams", "whatsapp", "messenger", "instagram", "slack", "telegram", "chat", "addon", "other"]
+    },
+    "targetSystem": {
+      "enum": ["calendar", "drive", "onedrive", "todo", "tasks", "drafts", "docs", "sheets", "teams", "other"]
+    },
+    "outcome": { "enum": ["closed", "undone", "failed"] },
+    "confidence": { "enum": ["high", "medium", "low", "unknown"] },
+    "latencyMs": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+    "day": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+  }
+}

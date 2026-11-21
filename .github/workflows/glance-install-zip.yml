@@ -21,6 +21,10 @@ jobs:
         run: python3 scripts/verify_trial_install.py
       - name: Scope allowlist (strict final Google OAuth scope list)
         run: node flow-trial-extension/test/scope-allowlist-corpus.cjs
+      - name: Closed-intent ledger contract
+        run: node ledger/check.cjs && node flow-trial-extension/test/closed-intent-ledger-corpus.cjs
+      - name: Personal model contract
+        run: node personal-model/check.cjs && node flow-trial-extension/test/personal-model-corpus.cjs
       - name: Gmail add-on bundle and corpora
         run: |
           node glance-gmail-addon/scripts/check-core-bundle.cjs
