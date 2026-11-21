@@ -6859,6 +6859,25 @@ async function outlookDraftWriteJob(p) {
   if (p && p.requireProvenId === true) {
     prior = await outlookReuseContactsDraft(p, incomingId, aliasIds, lookedConv, lookedNet);
     if (prior && prior.reuse) return prior.result;
+  } else {
+    const remembered = await outlookDraftMap();
+    const priorId = remembered.map[String(incomingId)] || '';
+    if (priorId) {
+      const got = await outlookReadDraftMessage(priorId, immutable === true);
+      if (got.ok && got.isDraft !== false) {
+        return {
+          ok: true,
+          ref: got.id || priorId,
+          reused: true,
+          reason: 'draft-already',
+          written: 'Reply draft already in Outlook Drafts. Not sent.'
+        };
+      }
+      if (!got.ok && String(got.status || '').split(',').indexOf('404') >= 0) {
+        delete remembered.map[String(incomingId)];
+        await outlookSaveDraftMap(remembered.st, remembered.map);
+      }
+    }
   }
   // Same draft as Gmail: the payload Gmail's buildActionPayload sends ({ params, senderName, senderEmail, subject }) through the
   // same composer gmailDraftWrite uses (FlowDraftReply.draftBodyText). A ready-made body is only a fallback for older callers.
