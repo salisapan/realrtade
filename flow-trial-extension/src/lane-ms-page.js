@@ -526,7 +526,7 @@
         draft.textContent = res.draft;
         draft.setAttribute('data-glance-draft-id', String(graph.ref));
         markInDraft(card, button, lang);
-        showDraftUndo(card, graph, res.draft, lang, button, target.immutable === true);
+        showDraftUndo(card, graph, res.draft, lang, button, graph.immutable === true || target.immutable === true);
         heldDraft = card;
         if (!card.isConnected) keepDraftCard();
       });
@@ -554,17 +554,78 @@
         connectorId: 'outlookDraft',
         ref: graph.ref,
         created: graph.created,
+        createdBodyHash: graph.createdBodyHash || '',
         outlookImmutableId: immutable === true
       }, (u) => {
         const err = chrome.runtime.lastError;
         if (err || !u || u.ok !== true) {
-          statusNode(card).textContent = (u && u.written) || (lang === 'he' ? 'שינית את הטיוטה, השארתי אותה' : 'You edited this. Undo left it alone.');
+          const edited = u && (u.reason === 'user-edited' || u.reason === 'unconfirmed');
+          statusNode(card).textContent = (lang === 'he' && edited)
+            ? 'שינית את הטיוטה, השארתי אותה'
+            : ((u && u.written) || (lang === 'he' ? 'שינית את הטיוטה, השארתי אותה' : 'You edited this. Undo left it alone.'));
           undo.disabled = false;
           return;
         }
         restoreInsert(card, button, lang);
       });
     };
+  }
+
+  function recallPayload(pane) {
+    return {
+      subject: (pane && pane.subject) || '',
+      conversationId: (pane && pane.conversationId) || '',
+      internetMessageId: (pane && pane.internetMessageId) || '',
+      openFolder: (pane && pane.openFolder) || '',
+      senderEmail: (pane && pane.senderEmail) || '',
+      ownSenderEmail: (pane && pane.ownSenderEmail) || '',
+      openSenderEmail: (pane && (pane.openSenderEmail || pane.senderEmail || pane.ownSenderEmail)) || ''
+    };
+  }
+
+  function recallDraft(pane) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'flow:outlook-draft-recall', payload: recallPayload(pane) }, (res) => {
+          try { void chrome.runtime.lastError; } catch (e) { /* the card still offers insert */ }
+          resolve(res || null);
+        });
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  function paintRecalledDraft(pane, rec) {
+    clearCard();
+    const lang = /[\u0590-\u05FF]/.test(String((pane && pane.subject) || '') + String((pane && pane.text) || '') + String((rec && rec.body) || '')) ? 'he' : 'en';
+    const card = document.createElement('div');
+    card.className = 'flow-lane-ms';
+    card.setAttribute('data-glance-ms-card', '1');
+    card.setAttribute('data-connector', 'outlookContacts');
+    card.setAttribute('data-glance-draft-hold', '1');
+    card.setAttribute('data-glance-draft-state', 'in-draft');
+    const status = statusNode(card);
+    status.textContent = draftStatus(lang, true);
+    status.setAttribute('dir', lang === 'he' ? 'rtl' : 'ltr');
+    const draft = document.createElement('div');
+    draft.className = 'flow-lane-draft';
+    draft.textContent = (rec && rec.body) || '';
+    draft.setAttribute('data-glance-draft-id', String((rec && rec.ref) || ''));
+    card.appendChild(draft);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'flow-lane-do';
+    button.hidden = true;
+    button.textContent = lang === 'he' ? 'הכנס לטיוטה' : 'Put in draft';
+    card.appendChild(button);
+    place(card);
+    showDraftUndo(card, {
+      ref: rec && rec.ref,
+      created: rec && rec.created,
+      createdBodyHash: (rec && rec.createdBodyHash) || '',
+      immutable: !!(rec && rec.immutable)
+    }, (rec && rec.body) || '', lang, button, !!(rec && rec.immutable));
+    heldDraft = card;
+    holdMail = mailIdentity(pane);
   }
 
   function paintOffer(offer, pane, text) {
@@ -828,6 +889,15 @@
         try { access = await readContactsAccess(); } catch (e) { access = null; }
       }
       const offerDeps = access || { grantedScopes: [], contactsChoice: false };
+      if (list.some((mod) => mod && mod.CONNECTOR === 'outlookContacts')) {
+        let recalled = null;
+        try { recalled = await recallDraft(pane); } catch (e) { recalled = null; }
+        if (paneKey !== key) return;
+        if (recalled && recalled.ok === true && recalled.ref) {
+          paintRecalledDraft(pane, recalled);
+          return;
+        }
+      }
       for (let i = 0; i < mods.length; i++) {
         if (typeof mods[i].receiptFromLog !== 'function') continue;
         const row = mods[i].receiptFromLog(log, pane);
@@ -919,4 +989,5 @@
   globalThis.FlowLaneMsPage.draftCardStays = draftCardStays;
   globalThis.FlowLaneMsPage.finishContactsDraft = finishContactsDraft;
   globalThis.FlowLaneMsPage.keepDraftCard = keepDraftCard;
+  globalThis.FlowLaneMsPage.paintRecalledDraft = paintRecalledDraft;
 })();

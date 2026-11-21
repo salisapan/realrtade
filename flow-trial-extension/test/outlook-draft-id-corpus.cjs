@@ -40,6 +40,7 @@ function background(routes) {
   });
   const sandbox = {
     console: Object.assign({}, console, { info: (...args) => { notes.push(args.join(' ')); } }),
+    setTimeout, clearTimeout,
     URLSearchParams, URL, TextEncoder, Uint8Array, crypto: webcrypto,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     atob: (s) => Buffer.from(s, 'base64').toString('binary'),
@@ -111,6 +112,12 @@ function background(routes) {
   check('a second insert reuses the mapped Graph draft and does not createReply again',
     again.ok === true && again.reused === true && alias.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url)).length === 1,
     { ok: again.ok, reused: again.reused, posts: alias.calls.filter((c) => c.method === 'POST').map((c) => c.url) });
+  const reuseLog = alias.notes.join('\n');
+  check('a reused draft logs mapHit, the prior GET, and skipReason',
+    reuseLog.indexOf('contacts draft reuse incomingId=') >= 0 && reuseLog.indexOf('mapHit=1') >= 0 &&
+    reuseLog.indexOf('priorGetStatus=200') >= 0 && reuseLog.indexOf('skipReason=reused') >= 0 &&
+    reuseLog.indexOf(PROVEN) < 0 && reuseLog.indexOf('DRAFT-ALIAS') < 0,
+    reuseLog);
 
   const raw = background([
     { method: 'GET', test: /\/me\/messages\//, reply: () => ({ ok: false, status: 400, json: async () => ({}), text: async () => JSON.stringify({ error: { code: 'ErrorInvalidIdMalformed', message: 'Id is malformed.' } }) }) }
@@ -532,8 +539,84 @@ function background(routes) {
     w.FlowLaneMsPage.keepDraftCard();
     check('the same in-draft card comes back with בטל',
       card.isConnected === true && card.textContent.indexOf('בטיוטה') >= 0 && card.querySelector('.flow-lane-undo').textContent === 'בטל');
+    w.document.body.innerHTML = '<div id="ReadingPaneContainerId"><div id="mailMessageBodyContainer"></div></div>';
+    w.FlowLaneMsPage.paintRecalledDraft(
+      { subject: 'שאלה קטנה 317b', text: 'מה כתובת המייל של דנה כהן?' },
+      { ok: true, ref: 'AAMkGRAPH', body: 'דנה כהן', createdBodyHash: 'abc', immutable: false }
+    );
+    const recalledCard = w.document.querySelector('.flow-lane-ms');
+    const recalledButton = recalledCard && recalledCard.querySelector('.flow-lane-do');
+    check('a stored draft paints בטיוטה and בטל and hides insert',
+      recalledCard && recalledCard.textContent.indexOf('בטיוטה') >= 0 &&
+      recalledCard.querySelector('.flow-lane-undo').textContent === 'בטל' &&
+      recalledButton && recalledButton.hidden === true,
+      recalledCard && recalledCard.textContent);
     w.close();
   }
+
+  const SIB_IN = 'AAMkSIBBOX';
+  const SIB_SENT = 'AAMkSIBSENT';
+  const sibRows = [
+    { id: SIB_IN, subject: 'שאלה קטנה 317b', isDraft: false, parentFolderId: 'FOLDER_INBOX', conversationId: 'AAQkSIB', from: { emailAddress: { address: CID } } },
+    { id: SIB_SENT, subject: 'שאלה קטנה 317b', isDraft: false, parentFolderId: 'FOLDER_SENT', conversationId: 'AAQkSIB', from: { emailAddress: { address: ALIAS } } }
+  ];
+  const sib = background([
+    { method: 'GET', test: /\/me\/mailFolders\/inbox/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'FOLDER_INBOX' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/mailFolders\/sentitems/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'FOLDER_SENT' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/mailFolders\/drafts/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'FOLDER_DRAFTS' }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/messages\/DRAFT-SIB/, prefer: (p) => !p, reply: (url) => {
+      if (String(url).indexOf('subject') >= 0) return { ok: true, status: 200, json: async () => ({ id: 'DRAFT-SIB', isDraft: true, body: { contentType: 'Text', content: 'דנה כהן' } }), text: async () => '' };
+      return { ok: false, status: 400, json: async () => ({}), text: async () => '' };
+    } },
+    { method: 'GET', test: /\/me\/messages\/DRAFT-SIB/, prefer: (p) => /ImmutableId/.test(p || ''), reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-SIB', isDraft: true, body: { contentType: 'Text', content: 'דנה כהן' } }), text: async () => '' }) },
+    { method: 'GET', test: /\/me\/messages\/[^/?]+/, reply: (url, prefer) => {
+      if ((url.indexOf(SIB_IN) >= 0 || url.indexOf(SIB_SENT) >= 0) && !/ImmutableId/.test(prefer || '')) {
+        const id = url.indexOf(SIB_SENT) >= 0 ? SIB_SENT : SIB_IN;
+        return { ok: true, status: 200, json: async () => ({ id: id }), text: async () => JSON.stringify({ id: id }) };
+      }
+      return { ok: false, status: 400, json: async () => ({}), text: async () => '' };
+    } },
+    { method: 'GET', test: /\$filter=/, reply: () => ({ ok: true, status: 200, json: async () => ({ value: sibRows }), text: async () => '' }) },
+    { method: 'POST', test: /\/createReply$/, reply: () => ({ ok: true, status: 201, json: async () => ({ id: 'DRAFT-SIB', isDraft: true, body: { contentType: 'Text', content: 'דנה כהן' } }), text: async () => '' }) },
+    { method: 'PATCH', test: /\/me\/messages\/DRAFT-SIB/, reply: () => ({ ok: true, status: 200, json: async () => ({ id: 'DRAFT-SIB' }), text: async () => '' }) },
+    { method: 'DELETE', test: /\/me\/messages\/DRAFT-SIB/, reply: () => ({ ok: true, status: 204, json: async () => ({}), text: async () => '' }) }
+  ]);
+  const sibFirst = await sib.fn('outlookDraftWrite')({
+    requireProvenId: true,
+    outlookCandidates: [CONV],
+    outlookIncomingId: CONV,
+    subject: 'שאלה קטנה 317b',
+    openFolder: 'inbox',
+    senderEmail: '',
+    body: 'דנה כהן'
+  });
+  const sibSecond = await sib.fn('outlookDraftWrite')({
+    requireProvenId: true,
+    outlookCandidates: [CONV],
+    outlookIncomingId: CONV,
+    subject: 'שאלה קטנה 317b',
+    openFolder: 'sentitems',
+    senderEmail: '',
+    body: 'דנה כהן'
+  });
+  const sibPosts = sib.calls.filter((c) => c.method === 'POST' && /createReply$/.test(c.url));
+  const sibLog = sib.notes.join('\n');
+  check('the Sent copy reuses the Inbox draft and logs why',
+    sibFirst.ok === true && sibSecond.ok === true && sibSecond.reused === true && sibPosts.length === 1 &&
+    sibLog.indexOf('mapHit=1') >= 0 && sibLog.indexOf('skipReason=reused') >= 0 &&
+    sibLog.indexOf('priorGetStatus=400,200') >= 0 && sibLog.indexOf(SIB_IN) < 0 && sibLog.indexOf(SIB_SENT) < 0 && sibLog.indexOf('DRAFT-SIB') < 0,
+    { first: sibFirst.ok, second: sibSecond, posts: sibPosts.length, log: sibLog });
+
+  const editedHash = sib.fn('hashCandidate')('Xדנה כהן');
+  const kept = await sib.fn('outlookDraftUndo')('DRAFT-SIB', { createdBodyHash: editedHash, outlookImmutableId: true });
+  check('an edited Graph body is kept',
+    kept.ok === false && kept.reason === 'user-edited' && !sib.calls.some((c) => c.method === 'DELETE'),
+    kept);
+  const sameHash = sib.fn('outlookBodyHash')('דנה כהן');
+  const same = await sib.fn('outlookDraftUndo')('DRAFT-SIB', { createdBodyHash: sameHash, outlookImmutableId: true });
+  check('an unchanged Graph body is deleted',
+    same.ok === true && sib.calls.some((c) => c.method === 'DELETE' && c.url.indexOf('DRAFT-SIB') >= 0),
+    same);
 
   if (failures) process.exit(1);
   console.log('outlook-draft-id-corpus: all passed');
