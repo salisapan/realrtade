@@ -324,6 +324,10 @@ const FlowExtract = (() => {
     // No clock: leave the day to the older parser. A conflict with no
     // clock must not become a new event the base judge does not make.
     if (!clock) return null;
+    return weekdayConflict(raw, written, dayName);
+  }
+  // The weekday and the calendar day the sender wrote disagree: neither is chosen, both dates come back as choices.
+  function weekdayConflict(raw, written, dayName) {
     const other = nearestWeekday(written, dayName.index);
     if (!other) return { raw: raw, iso: null, contradictsWeekday: true };
     return {
@@ -335,6 +339,34 @@ const FlowExtract = (() => {
         { iso: iso(written), label: choiceLabel(written, dayName.he) }
       ]
     };
+  }
+  // A weekday written right beside a month-name date («Tuesday, November 25», «Thursday 25 November», «ביום שלישי 25 בנובמבר») is one statement, like
+  // the numeric form above. When the two disagree and a clock was written, no day is booked: both dates come back as choices (2026-11-21). Without a clock
+  // the older read stands, and an agreeing weekday falls through to the normal date reader.
+  function weekdayMonthName(text, now) {
+    const src = String(text || '');
+    if (!now || !hasStatedClock(src)) return null;
+    const abbr = Object.keys(MONTH_ABBR).sort((a, b) => b.length - a.length);
+    const monthAlt = MONTHS.concat(abbr).join('|');
+    const days = DAYS.join('|');
+    const monthIndex = (name) => { const k = String(name).toLowerCase(); return MONTHS.indexOf(k) >= 0 ? MONTHS.indexOf(k) : MONTH_ABBR[k]; };
+    let m = src.match(new RegExp('\\b(' + days + ')\\b[,\\s]+(?:the\\s+)?(' + monthAlt + ')\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?![\\d:])(?:,?\\s+(\\d{4}))?', 'i'));
+    let dayIdx, month, day, yearRaw, he = false;
+    if (m) { dayIdx = DAYS.indexOf(m[1].toLowerCase()); month = monthIndex(m[2]); day = +m[3]; yearRaw = m[4]; }
+    else if ((m = src.match(new RegExp('\\b(' + days + ')\\b[,\\s]+(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(' + monthAlt + ')\\b(?:,?\\s+(\\d{4}))?', 'i')))) { dayIdx = DAYS.indexOf(m[1].toLowerCase()); day = +m[2]; month = monthIndex(m[3]); yearRaw = m[4]; }
+    else if ((m = src.match(new RegExp('(?:ביום|יום)\\s+(' + DAYS_HE.join('|') + ')(?![\\u0590-\\u05FF])[\\s,]+(?:ה-?)?(\\d{1,2})\\s+ב-?(' + MONTHS_HE.join('|') + ')(?![\\u0590-\\u05FF])(?:\\s+(\\d{4}))?')))) { dayIdx = DAYS_HE.indexOf(m[1]); day = +m[2]; month = MONTHS_HE.indexOf(m[3]); yearRaw = m[4]; he = true; }
+    else return null;
+    if (month == null || month < 0 || day < 1 || day > 31 || dayIdx < 0) return null;
+    let written = null;
+    if (yearRaw) written = buildDate(+yearRaw, month, day);
+    else {
+      const y = now.getFullYear();
+      const inWindow = [y - 1, y, y + 1].map((yy) => buildDate(yy, month, day)).filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
+      if (inWindow.length !== 1) return null;
+      written = inWindow[0];
+    }
+    if (!written || written.getDay() === dayIdx) return null;
+    return weekdayConflict(m[0], written, { index: dayIdx, he: he });
   }
 
   // Only dates the message states outright. A date guessed from context is worse
@@ -370,6 +402,9 @@ const FlowExtract = (() => {
       if (d) return { raw: m[0], iso: m[0] };
       return null;
     }
+
+    const conflicted = weekdayMonthName(text, now);
+    if (conflicted) return conflicted;
 
     const monthNames = MONTHS.join('|');
     // A bare "March 3" carries no year, so resolving it means guessing. Guessing
