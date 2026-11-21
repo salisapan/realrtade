@@ -164,6 +164,7 @@
       if (ch.glanceHostLanguage) state.glanceHostLanguage = ch.glanceHostLanguage.newValue;
       if (ch.glanceUiLanguage) state.glanceUiLanguage = ch.glanceUiLanguage.newValue;
       if (uiLang() === before) return;
+      paintClosedIntent();
       const panel = document.querySelector && document.querySelector('.panel[data-panel="log"]');
       if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
       else paintActivityShell();
@@ -224,6 +225,8 @@
   wireTabs();
   wireSave();
   wireRecipe();
+  wireClosedIntent();
+  paintClosedIntent();
   wirePro();
   wireLoopView();
   await renderConnectors();
@@ -1070,6 +1073,86 @@
     a.download = 'glance-recipe' + (connector ? '-' + connector.id : '') + (domain ? '-' + domain.id : '') + '.glance';
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function closedIntentNote(text, isError) {
+    const n = document.getElementById('closedIntentNote');
+    if (!n) return;
+    n.textContent = text || '';
+    n.hidden = !text;
+    n.classList.toggle('err', Boolean(isError));
+  }
+
+  function paintClosedIntent() {
+    const api = typeof FlowClosedIntentLedger !== 'undefined' ? FlowClosedIntentLedger : null;
+    const block = document.getElementById('closedIntentBlock');
+    if (!api || !block || typeof api.copy !== 'function') return;
+    const lang = uiLang();
+    const L = api.copy(lang);
+    block.lang = lang;
+    block.dir = lang === 'he' ? 'rtl' : 'ltr';
+    const title = document.getElementById('closedIntentTitle');
+    const hint = document.getElementById('closedIntentHint');
+    const toggle = document.getElementById('closedIntentToggle');
+    const exp = document.getElementById('closedIntentExport');
+    const del = document.getElementById('closedIntentDelete');
+    if (title) title.textContent = L.title;
+    if (hint) hint.textContent = L.hint;
+    if (exp) exp.textContent = L.export;
+    if (del) del.textContent = L.deleteAll;
+    const store = typeof FlowClosedIntentStore !== 'undefined' ? FlowClosedIntentStore : null;
+    const enabled = store ? store.isEnabled() : api.isEnabled();
+    Promise.resolve(enabled).then(async (on) => {
+      if (toggle) {
+        toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+        toggle.textContent = on ? L.toggleOn : L.toggleOff;
+      }
+      const value = document.getElementById('closedIntentValue');
+      if (!value || typeof api.view !== 'function' || typeof api.valueLine !== 'function') return;
+      const view = store ? await store.view() : await api.view(Date.now());
+      value.textContent = api.valueLine(lang, view);
+    }).catch(() => {});
+  }
+
+  function downloadLedger(doc) {
+    const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'glance-closed-intents.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function wireClosedIntent() {
+    const api = typeof FlowClosedIntentLedger !== 'undefined' ? FlowClosedIntentLedger : null;
+    const toggle = document.getElementById('closedIntentToggle');
+    const exp = document.getElementById('closedIntentExport');
+    const del = document.getElementById('closedIntentDelete');
+    if (!api || !toggle || !exp || !del) return;
+    const store = typeof FlowClosedIntentStore !== 'undefined' ? FlowClosedIntentStore : null;
+    toggle.addEventListener('click', async () => {
+      const L = api.copy(uiLang());
+      const on = store ? await store.isEnabled() : await api.isEnabled();
+      if (store) await store.setEnabled(!on);
+      else await api.setEnabled(!on);
+      paintClosedIntent();
+      closedIntentNote(on ? L.stopped : L.started, false);
+    });
+    exp.addEventListener('click', async () => {
+      const L = api.copy(uiLang());
+      const doc = store ? await store.exportAll() : await api.exportAll();
+      downloadLedger(doc);
+      closedIntentNote(doc.events && doc.events.length ? L.exported : L.empty, false);
+    });
+    del.addEventListener('click', async () => {
+      const L = api.copy(uiLang());
+      if (!window.confirm(L.deleteConfirm)) return;
+      if (store) await store.deleteAll();
+      else await api.deleteAll();
+      paintClosedIntent();
+      closedIntentNote(L.deleted, false);
+    });
   }
 
   function wireRecipe() {

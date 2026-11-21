@@ -66,6 +66,7 @@ it, not touching the module.
 
 | Module | What it owns |
 |---|---|
+| `closed-intent-ledger.js` | Consented append-only CloudEvents log of decisions and closes. Types only. A v1 row upcasts in memory and is not rewritten. Off until opt-in. Export, delete, and the estimate stay on the device. Aggregate upload and local DP stay disabled. Portable: no browser globals, no network. |
 | `active-question.js` | One question to the person, only when the on-device engine is torn about a sentence of their own message; rationed hard (one a day, three a week). The answer is also a label for the model. |
 | `ai-ladder.js` | **The deeper read** (`docs/ai-ladder.md`): the policy for the one external step: who may be asked about what (the pipeline's residual), the Free and Pro allowance in units, consent/state/popup copy, the hash cache, and the checks every answer passes on the device. Portable; the network and the counter live in `src/background.js` and `glance-assist/ladder.js`. |
 | `capability.js` | The silent WebGPU / memory / disk check that runs BEFORE anything is downloaded for the hybrid path; returns a permanent or transient reason plus GPU diagnostics for the log (`[glance:hybrid:gpu]`). Dormant while `config/hybrid.public.js` is off. |

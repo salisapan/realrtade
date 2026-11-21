@@ -32,3 +32,6 @@ if (typeof FlowExecutionMemory !== 'undefined') {
 if (typeof FlowCloseMemory !== 'undefined') {
   FlowCloseMemory.setStorageAdapter(glanceLocalAdapter());
 }
+
+// The closed-intent event log lives in IndexedDB via closed-intent-ledger-idb.js.
+// This adapter is settings for other modules only.

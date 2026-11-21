@@ -32,6 +32,7 @@ const files = [
   'resolution.js',
   'system-notice.js',
   'draft-reply.js',
+  'closed-intent-ledger.js',
   'incoming-judge.js'
 ].map((name) => path.join(core, name)).concat([
   'i18n.js',
@@ -65,6 +66,7 @@ const footer = [
   '  prefetch: GlancePrefetch,',
   '  remote: GlanceRemote,',
   '  draftCompose: GlanceDraftCompose,',
+  '  closedIntentLedger: (typeof FlowClosedIntentLedger !== "undefined" ? FlowClosedIntentLedger : null),',
   '  classify: function (text, ctx) { return FlowIntent.classify(text, ctx || {}); },',
   '  plan: function (intent, ctx) { return FlowActions.planFor(intent, ctx || {}); },',
   '  judge: function (input) { return FlowIncomingJudge.judge(input || {}, {}); }',

@@ -505,6 +505,9 @@ function stageUndo_(e, lang) {
       }
       if (result.action === 'deleted') {
         clearUndo_(id);
+        var kind = record.snapshot.kind === 'event' || record.snapshot.kind === 'schedule' ? 'create_event' : 'create_task';
+        var target = kind === 'create_event' ? 'calendar' : 'tasks';
+        ledgerAddon_('undone', kind, target);
         return update_(render_(Glance.cards.undone(lang)));
       }
       if (result.action === 'refuse') return update_(render_(Glance.cards.edited(lang, result.which)));
@@ -742,11 +745,41 @@ function eventNotes_(opened, quote) {
   return lines.join('\n').slice(0, 2000);
 }
 
+function ledgerAddon_(stage, intentType, target) {
+  try {
+    if (typeof FlowClosedIntentLedger === 'undefined' || typeof PropertiesService === 'undefined') return;
+    var props = PropertiesService.getUserProperties();
+    if (props.getProperty('glanceClosedIntentOptIn') !== '1') return;
+    var L = FlowClosedIntentLedger;
+    L.setStorageAdapter({
+      sync: true,
+      get: function () {
+        var raw = props.getProperty('glanceClosedIntentLedger');
+        if (!raw) return null;
+        try { return JSON.parse(raw); } catch (err) { return null; }
+      },
+      set: function (_key, value) { props.setProperty('glanceClosedIntentLedger', JSON.stringify(value)); }
+    });
+    L.noteActivity({
+      stage: stage,
+      app: 'addon',
+      intentType: intentType,
+      connectorId: target,
+      fetchedBack: stage === 'closed',
+      ts: Date.now()
+    });
+  } catch (err) { /* a ledger miss never blocks the card */ }
+}
+
 function finishCreate_(proposal, messageId, lang) {
   stepLog_({ step: 'write', target: 'task', title: proposal.title, due: proposal.due || null });
   var result = Glance.execute.performCreate(proposal, tasksApi_());
   logReadBack_('task', result);
-  if (!result.confirmed || !result.view) return unconfirmedResult_(result, lang, 'task');
+  if (!result.confirmed || !result.view) {
+    ledgerAddon_('failed', 'create_task', 'tasks');
+    return unconfirmedResult_(result, lang, 'task');
+  }
+  ledgerAddon_('closed', 'create_task', 'tasks');
   var saved = saveUndo_(messageId, { view: result.view, snapshot: result.snapshot });
   return update_(render_(Glance.cards.proof(result.view, lang, {
     messageId: messageId,

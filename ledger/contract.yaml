@@ -1,0 +1,48 @@
+# ODCS-style data contract for a future Flow export.
+# This revision has no server and no network. Aggregates are on-device only.
+apiVersion: v3.0.0
+kind: DataContract
+id: ai.theflow.glance.closed-intent
+version: 1-0-0
+status: draft
+domain: glance
+description: >
+  Types and frequencies from the consented Glance ledger.
+  Flow templates may read this shape later. Mail text is out of scope.
+servers: []
+schema:
+  - name: template_candidates
+    physicalType: json
+    properties:
+      - name: intent_type
+        type: string
+        enum: [send_quote, create_event, create_task, draft_reply, create_document, save_file, other]
+        pii: none
+        description: Controlled type from the taxonomy.
+      - name: frequency
+        type: integer
+        minimum: 0
+        description: How many proved closes of this type are in the export.
+      - name: inputs
+        type: array
+        description: Token names of inputs. No mail content.
+      - name: steps
+        type: array
+        description: Token names of steps.
+      - name: human_approval
+        type: boolean
+        description: True. Glance does not auto-send.
+      - name: outputs
+        type: array
+        description: Token names of outputs.
+quality:
+  - type: kAnonymity
+    threshold: 5
+    description: A future federated aggregate drops a type below k. The person's own export is not suppressed.
+  - type: pii
+    value: none
+sla:
+  retention_days: 365
+  legal_basis: consent
+team:
+  owner: Glance
