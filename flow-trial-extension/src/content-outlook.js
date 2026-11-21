@@ -470,6 +470,50 @@
     return Boolean(existing && existing.epoch === renderEpoch);
   }
 
+  // A named-person contact ask is the contacts card. The "not in this version"
+  // why is the Gmail line. On Outlook the card says how to tick Contacts.
+  let contactsSkipKey = '';
+
+  function contactsLaneOwns(pane) {
+    let mod = null;
+    try { mod = (typeof FlowOutlookContacts !== 'undefined') ? FlowOutlookContacts : null; } catch (e) { mod = null; }
+    if (!mod || typeof mod.recognize !== 'function') return false;
+    const text = ((pane && pane.subject) ? String(pane.subject) + '\n' : '') + String((pane && pane.text) || '');
+    let rec = null;
+    try { rec = mod.recognize(text); } catch (e) { rec = null; }
+    return !!(rec && rec.kind === 'clear');
+  }
+
+  // The mail judge runs here. A skipped contact lookup has to reach the service
+  // worker console, not only this page. One line per mail, again after the tick changes.
+  function noteContactsSkip(pane) {
+    if (!contactsLaneOwns(pane)) return;
+    let mod = null;
+    try { mod = (typeof FlowOutlookContacts !== 'undefined') ? FlowOutlookContacts : null; } catch (e) { mod = null; }
+    if (!mod || typeof mod.accessOf !== 'function') return;
+    const key = (pane && (pane.itemId || pane.conversationId || pane.subject)) || '';
+    try {
+      chrome.storage.local.get(['outlookAuth', 'glanceContactsChoice'], (bag) => {
+        try { void chrome.runtime.lastError; } catch (e) { /* the read still settles */ }
+        const token = bag && bag.outlookAuth && bag.outlookAuth.token;
+        const scopes = token ? (token.grantedScopes || token.scopes || token.scope || []) : [];
+        let access = null;
+        try {
+          access = mod.accessOf({
+            grantedScopes: scopes,
+            contactsChoice: !!(bag && bag.glanceContactsChoice === true)
+          });
+        } catch (e) { access = null; }
+        if (access && access.granted) return;
+        const detail = (access && access.detail) || 'contacts-not-granted';
+        const mark = key + '|' + detail;
+        if (contactsSkipKey === mark) return;
+        contactsSkipKey = mark;
+        send({ type: 'flow:contacts-why', reason: 'contacts-not-granted', detail: detail });
+      });
+    } catch (e) { /* the card still says how to grant it */ }
+  }
+
   function genericTextQuiet(pane) {
     const id = decisionIdFrom(pane) || openDecisionId;
     const existing = decisionFor(id);
@@ -976,12 +1020,16 @@
 
   function newestOther(list, own, openSender, userSet) {
     const open = String(openSender || '').trim().toLowerCase();
+    const known = [];
+    (own || []).forEach((a) => known.push(a));
+    if (userSet && typeof userSet.forEach === 'function') userSet.forEach((a) => known.push(a));
     const rows = (list || []).filter((m) => {
       const a = fromAddress(m);
       if (!a) return false;
-      if ((own || []).indexOf(a) < 0) return true;
-      if (open && open === a) return true;
-      return Boolean(userSet && open && userSet.has(a) && userSet.has(open));
+      const mine = (own || []).indexOf(a) >= 0 || (userSet && userSet.has && userSet.has(a));
+      if (!mine) return true;
+      if (open && (open === a || (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.sameMailbox(a, open, known)))) return true;
+      return false;
     });
     rows.sort((a, b) => (Date.parse(b.receivedDateTime) || 0) - (Date.parse(a.receivedDateTime) || 0));
     return rows[0] || null;
@@ -1059,14 +1107,19 @@
 
   // Equal ignoring case, or both addresses are the user's own. A delegate
   // (Graph sender is not Graph from) is a different person either way.
-  async function sameOpenSender(from, openEmail, graphSender) {
-    if (behalfSplit(from, graphSender)) return false;
+  async function sameOpenSender(from, openEmail, graphSender, own) {
     const a = String(from || '').trim().toLowerCase();
     const b = String(openEmail || '').trim().toLowerCase();
+    const s = String(graphSender || '').trim().toLowerCase();
+    const known = [];
+    (own || []).forEach((addr) => known.push(addr));
+    const loaded = await loadUserAddresses();
+    if (loaded && typeof loaded.forEach === 'function') loaded.forEach((addr) => known.push(addr));
+    const same = (x, y) => typeof FlowOwaParse !== 'undefined' && FlowOwaParse.sameMailbox(x, y, known);
+    if (a && s && a !== s && !same(a, s)) return false;
     if (!a || !b) return false;
     if (a === b) return true;
-    const known = await loadUserAddresses();
-    return Boolean(known && known.has(a) && known.has(b));
+    return same(a, b);
   }
 
   // Same session the mailbox check uses. The open-page reads used to send headers: {}
@@ -1206,18 +1259,34 @@
     if (direct && direct.id) {
       const open = String(openSender || '').trim().toLowerCase();
       const from = String(direct.from || '').trim().toLowerCase();
-      if (behalfSplit(direct.from, direct.sender) || (open && from && !(await sameOpenSender(from, open, direct.sender)))) {
+      if (open && from && !(await sameOpenSender(from, open, direct.sender, own))) {
         return senderMismatch(direct, openSender);
       }
       return direct;
     }
     const found = await messageIdForConversation(convId || pathId, own, openSender);
     if (!found || !found.id) return null;
-    if (!(await sameOpenSender(found.from, openSender, found.sender))) {
+    if (!(await sameOpenSender(found.from, openSender, found.sender, own))) {
       return senderMismatch(found, openSender);
     }
     return found;
   }
+
+  // The contacts card calls this. The URL id is often a conversation id; createReply
+  // needs the Graph message id, or the reply stays an unsaved compose pane.
+  async function outlookDraftTarget(pane) {
+    const pathId = (pane && (pane.pathId || pane.rawUrlId || pane.itemId)) || '';
+    const convId = (pane && pane.conversationId) || '';
+    let own = [];
+    try { own = ownAddressesOf(await FlowStorage.get()); } catch (e) { own = []; }
+    let found = null;
+    try { found = await resolveOutlookMessageId(pathId || convId, convId || pathId, own, pane && pane.senderEmail); } catch (e) { found = null; }
+    if (found && found.id && found.unread !== true) {
+      return { id: found.id, immutable: found.immutable === true, how: found.how || 'resolved' };
+    }
+    return { id: '', immutable: false, how: (found && found.reason) || 'unproven' };
+  }
+  try { globalThis.FlowOutlookDraftTarget = outlookDraftTarget; } catch (e) { /* the page is gone */ }
 
   async function ensureOutlookMessageId(ctx) {
     const have = ctx && (ctx.outlookIncomingId || ctx.messageId);
@@ -4591,9 +4660,34 @@
       return;
     }
     const earlyHost = document.querySelector('#ReadingPaneContainerId .flow-chip-host');
+    const laneCard = document.querySelector('#ReadingPaneContainerId [data-glance-ms-card="1"]');
     const undoneOnly = earlyHost && earlyHost.getAttribute('data-glance-undone') === '1';
     const openGen = mailOpenGen;
-    if (sig === lastSig && openGen === reconciledOpenGen && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && earlyHost && !undoneOnly))) {
+    const quietCached = lastOutcome === 'reason' && /intent-null|no-outcome|too-short|contacts-unavailable|scan-skipped/.test(String(lastLoggedReason || ''));
+    const skipCache = quietCached && contactsLaneOwns(pane) && !laneCard;
+    if (!skipCache && sig === lastSig && openGen === reconciledOpenGen && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && (earlyHost || laneCard) && !undoneOnly))) {
+      if (laneCard && /intent-null|no-outcome|too-short|contacts-unavailable|scan-skipped/.test(String(lastLoggedReason || ''))) {
+        try {
+          const whyMount = mountPoint();
+          if (whyMount) clearWhyNot(whyMount);
+        } catch (e) { /* the contacts card is the one verdict */ }
+        lastOutcome = 'card';
+        lastLoggedReason = 'contacts-lane';
+        noteContactsSkip(pane);
+        dbg('decision', { shown: true, reason: 'contacts-lane', subject: pane.subject });
+        return;
+      }
+      if (String(lastLoggedReason || '').indexOf('contacts-unavailable') >= 0 && contactsLaneOwns(pane)) {
+        try {
+          const whyMount = mountPoint();
+          if (whyMount) clearWhyNot(whyMount);
+        } catch (e) { /* the contacts card is the explanation */ }
+        lastOutcome = 'card';
+        lastLoggedReason = 'contacts-lane';
+        noteContactsSkip(pane);
+        dbg('decision', { shown: true, reason: 'contacts-lane', subject: pane.subject });
+        return;
+      }
       if (lastOutcome === 'reason') {
         const whyMount = mountPoint();
         if (whyMount && !whyMount.querySelector('.flow-chip-host') && !whyMount.querySelector('.flow-why-not')) {
@@ -4971,8 +5065,20 @@
           const keepFile = typeof FlowOutlookSync !== 'undefined' && typeof FlowOutlookSync.keepMailboxFileCard === 'function'
             && FlowOutlookSync.keepMailboxFileCard(decided, entry);
           if (!keepFile) {
-            dropStuckCard(pane);
             const named = (decided && decided.reason) || 'intent-null';
+            if (String(named).indexOf('contacts-unavailable') >= 0 && contactsLaneOwns(pane)) {
+              dropStuckCard(pane);
+              try {
+                const whyMount = mountPoint();
+                if (whyMount) clearWhyNot(whyMount);
+              } catch (e) { /* the contacts card is the explanation */ }
+              lastOutcome = 'card';
+              lastLoggedReason = 'contacts-lane';
+              noteContactsSkip(pane);
+              dbg('decision', { shown: true, reason: 'contacts-lane', subject: pane.subject });
+              return;
+            }
+            dropStuckCard(pane);
             const quiet = /:/.test(String(named)) ? String(named) : ('page:' + named);
             await pageReason(quiet, pane);
             return;
@@ -5365,6 +5471,20 @@
     if (timer) return;
     timer = setTimeout(runScan, SCAN_EVERY_MS);
   }
+
+  try {
+    if (chrome.storage && chrome.storage.onChanged && typeof chrome.storage.onChanged.addListener === 'function') {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        if (!changes.glanceContactsChoice && !changes.outlookAuth) return;
+        lastSig = '';
+        lastOutcome = '';
+        lastLoggedReason = '';
+        contactsSkipKey = '';
+        schedule();
+      });
+    }
+  } catch (e) { /* the next open mail still reads the choice */ }
 
   async function appendSuggestLog(entry) {
     if (!entry || typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return;

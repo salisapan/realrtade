@@ -110,6 +110,7 @@ function load(stored, opts) {
     runtime: {
       sendMessage: (msg, cb) => {
         (opts.messages = opts.messages || []).push(msg && msg.type);
+        (opts.sent = opts.sent || []).push(msg);
         // popup.js's only two-way call is flow:connector-status; everything
         // else (flow:pending-count, flow:track) is fire-and-forget in the
         // real extension too, so an empty reply is a faithful stub.
@@ -1339,6 +1340,64 @@ async function run() {
   check('a tab the dead script could not paint shows the same refresh line in the popup',
     refreshWords.indexOf('Glance התעדכן — רענן את הדף כדי להתחבר מחדש') >= 0 && refreshWords.indexOf('רענן') >= 0,
     refreshWords);
+
+  console.log('\n--- popup.js: Contacts already granted, and כבה is contacts only ---\n');
+  {
+    const sent = [];
+    const store = {
+      glanceContactsChoice: true,
+      outlookAuth: {
+        token: {
+          accessToken: 'AT',
+          expiresAt: Date.now() + 3600e3,
+          grantedScopes: ['Mail.ReadWrite', 'Files.ReadWrite', 'Contacts.Read']
+        }
+      },
+      outlookSync: {}
+    };
+    const panel = load(store, { activeTabs: [{ url: 'https://outlook.live.com/mail/0/inbox' }], sent: sent });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), panel.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const list = panel.document.getElementById('connector-list');
+    const nodes = [];
+    (function walk(n) { if (n) nodes.push(n); (n && n.children || []).forEach(walk); })(list);
+    function underMicrosoft(node) {
+      let n = node;
+      while (n) {
+        if (n.getAttribute && n.getAttribute('data-glance-connect') === 'microsoft') return true;
+        n = n.parentNode;
+      }
+      return false;
+    }
+    const contacts = nodes.filter((n) => underMicrosoft(n) && n.getAttribute && n.getAttribute('data-glance-service') === 'contacts')[0];
+    const add = nodes.filter((n) => underMicrosoft(n) && n.listeners && n.listeners.click && (n.children || []).some((c) => c.textContent === 'הוסף הרשאה'))[0];
+    check('Contacts starts ticked when the choice is on and the token already has Contacts.Read',
+      contacts && contacts.checked === true, contacts && contacts.checked);
+    const before = sent.length;
+    await add.listeners.click[0]();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const words = [];
+    (function walk(n) { if (n && n.textContent) words.push(n.textContent); (n.children || []).forEach(walk); })(list);
+    const consent = sent.slice(before).some((m) => m && (m.type === 'flow:outlook-consent-scope' || m.type === 'flow:microsoft-optional-scopes'));
+    check('הוסף הרשאה with Contacts.Read already granted says the contacts sentence and does not open consent',
+      words.indexOf('אנשי קשר כבר כלולים בכניסה.') >= 0 && words.indexOf('סמן את השירות שברצונך לחבר.') < 0 && consent === false,
+      { words: words.filter((w) => w.indexOf('אנשי') >= 0 || w.indexOf('סמן') >= 0), consent: consent });
+    const off = nodes.filter((n) => underMicrosoft(n) && n.getAttribute && n.getAttribute('data-glance-contacts-off') === '1')[0];
+    check('כבה stays hidden while Contacts is ticked', off && off.hidden === true, off && off.hidden);
+    contacts.checked = false;
+    contacts.listeners.change[0]();
+    check('unticking Contacts presents כבה', off.hidden === false);
+    const tokenBefore = JSON.stringify(panel.store().outlookAuth);
+    await off.listeners.click[0]();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const saved = panel.store();
+    const why = sent.filter((m) => m && m.type === 'flow:contacts-why')[0];
+    check('כבה stores Contacts off, leaves the Microsoft token, and logs contacts-toggle-off',
+      saved.glanceContactsChoice === false && JSON.stringify(saved.outlookAuth) === tokenBefore &&
+      why && why.reason === 'contacts-not-granted' && why.detail === 'contacts-toggle-off' &&
+      !JSON.stringify(why).includes('@'),
+      { choice: saved.glanceContactsChoice, why: why });
+  }
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

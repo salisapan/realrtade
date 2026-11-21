@@ -86,6 +86,12 @@ function installLaneMock(cfg) {
       return live.workbooks[itemId];
     }
 
+    const contactOne = path.match(/^\/v1\.0\/me\/contacts\/([^/]+)$/) || path.match(/^\/me\/contacts\/([^/?]+)$/);
+    if (contactOne && method === 'GET' && path.indexOf('?$') < 0 && path.indexOf('$search') < 0) {
+      const id = decodeURIComponent(contactOne[1]);
+      const row = (live.contacts || []).find((c) => c && String(c.id) === id);
+      return hit(row ? json(200, row) : json(404, { error: { code: 'ErrorItemNotFound' } }));
+    }
     if (path.indexOf('/me/contacts') >= 0 && method === 'GET') {
       return hit(json(200, { value: live.contacts }));
     }
@@ -225,7 +231,8 @@ async function grantScopes(glance, scopes) {
     token.grantedScopes = list;
     token.scopes = list.slice();
     token.scope = list.join(' ');
-    await chrome.storage.local.set({ outlookAuth: auth });
+    const choice = list.indexOf('Contacts.Read') >= 0;
+    await chrome.storage.local.set({ outlookAuth: auth, glanceContactsChoice: choice });
     return { ok: true };
   }, scopes);
 }

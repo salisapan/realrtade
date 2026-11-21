@@ -235,7 +235,9 @@ async function requestMicrosoftOptionalScopes(bucket, deps) {
   const merged = (typeof E.mergeMicrosoftScopes === 'function')
     ? E.mergeMicrosoftScopes(base, missing)
     : base.concat(missing);
-  const r = await A.signIn(outlookAuthDeps(deps && deps.launchInteractive), cfg, chrome.identity.getRedirectURL(), { scopes: merged });
+  const signInOpts = { scopes: merged };
+  if (deps && deps.prompt === 'consent') signInOpts.prompt = 'consent';
+  const r = await A.signIn(outlookAuthDeps(deps && deps.launchInteractive), cfg, chrome.identity.getRedirectURL(), signInOpts);
   if (!r || !r.ok || !r.token) return { ok: false, reason: (r && r.error) || 'cancelled' };
   await chrome.storage.local.set({
     [OUTLOOK_AUTH_KEY]: Object.assign({}, auth, {

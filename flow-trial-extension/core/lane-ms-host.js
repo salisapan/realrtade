@@ -79,15 +79,31 @@ async function graphCall(access, req) {
 
 async function makeDeps() {
   let bag = {};
-  try { bag = await globalThis.chrome.storage.local.get('outlookAuth'); } catch (e) { bag = {}; }
+  try { bag = await globalThis.chrome.storage.local.get(['outlookAuth', 'glanceContactsChoice']); } catch (e) { bag = {}; }
   const token = bag && bag.outlookAuth && bag.outlookAuth.token;
   const access = token && token.accessToken ? String(token.accessToken) : '';
   const scopes = token ? (token.grantedScopes || token.scopes || token.scope || null) : null;
   return {
     grantedScopes: scopes,
+    contactsChoice: !!(bag && bag.glanceContactsChoice === true),
     now: function () { return new Date().toISOString(); },
     call: function (req) { return graphCall(access, req || {}); }
   };
+}
+
+function logContactsWhy(reason, detail) {
+  const why = String(reason || 'contacts-not-granted');
+  try { console.info('[Glance] contacts why-not ' + why); } catch (e) { /* no console */ }
+  if (detail && String(detail) !== why) {
+    try { console.info('[Glance] contacts why-not ' + String(detail)); } catch (e) { /* no console */ }
+  }
+}
+
+function logContactsLookup(result) {
+  if (!result || result.queryHash == null || result.queryHash === '') return;
+  const count = typeof result.matchCount === 'number' ? result.matchCount : 0;
+  const status = result.status == null ? 0 : result.status;
+  try { console.info('[Glance] contacts lookup q=' + result.queryHash + ' matches=' + count + ' status=' + status); } catch (e) { /* no console */ }
 }
 
 function laneId(msg) {
@@ -113,7 +129,7 @@ async function dispatch(msg) {
   }
   const payload = msg.payload || {};
   const params = payload.params || {};
-  return mod.run({
+  const result = await mod.run({
     params: params,
     name: params.name,
     fileName: params.fileName,
@@ -121,9 +137,17 @@ async function dispatch(msg) {
     messageId: payload.messageId || '',
     explicitClick: payload.explicitClick === true
   }, deps);
+  if (id === 'outlookContacts' && result && result.reason === 'contacts-not-granted') logContactsWhy(result.reason, result.detail);
+  if (id === 'outlookContacts') logContactsLookup(result);
+  return result;
 }
 
 function laneListener(msg, sender, sendResponse) {
+  if (msg && msg.type === 'flow:contacts-why') {
+    logContactsWhy(msg.reason, msg.detail);
+    sendResponse({ ok: true, reason: String(msg.reason || 'contacts-not-granted'), detail: String(msg.detail || '') });
+    return true;
+  }
   if (!laneId(msg)) return;
   dispatch(msg).then(function (result) {
     sendResponse(result);

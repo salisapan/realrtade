@@ -748,7 +748,11 @@
         ? FlowOutlookConfig.connectServiceUi(svc, connectCtx)
         : { checked: Boolean(svc.required || svc.id === 'mail'), disabled: Boolean(svc.required || svc.id === 'mail'), granted: false };
       box.checked = !ui.granted && Object.prototype.hasOwnProperty.call(choices, svc.id) ? choices[svc.id] : ui.checked;
-      box.addEventListener('change', () => { choices[svc.id] = box.checked; });
+      if (svc.id === 'contacts' && tokenStatus === 'valid') box.checked = !!(state && state.glanceContactsChoice === true);
+      box.addEventListener('change', () => {
+        choices[svc.id] = box.checked;
+        if (svc.id === 'contacts') syncContactsOff();
+      });
       box.disabled = ui.disabled;
       if (ui.granted) lab.setAttribute('data-glance-granted', '1');
       boxes[svc.id] = box;
@@ -764,6 +768,25 @@
       screen.appendChild(lab);
     });
     card.appendChild(screen);
+    const contactsOff = el('button', 'ghost sm');
+    contactsOff.type = 'button';
+    contactsOff.textContent = 'כבה';
+    contactsOff.hidden = true;
+    contactsOff.setAttribute('data-glance-contacts-off', '1');
+    function syncContactsOff() {
+      const box = boxes.contacts;
+      contactsOff.hidden = !box || box.checked === true || !(state && state.glanceContactsChoice === true);
+    }
+    contactsOff.addEventListener('click', async () => {
+      contactsOff.disabled = true;
+      if (state) state.glanceContactsChoice = false;
+      if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+        try { await FlowStorage.set({ glanceContactsChoice: false }); } catch (e) { /* the next paint reads storage */ }
+      }
+      try { await send({ type: 'flow:contacts-why', reason: 'contacts-not-granted', detail: 'contacts-toggle-off' }); } catch (e) { /* the worker log is the record */ }
+      contactsOff.hidden = true;
+    });
+    card.appendChild(contactsOff);
     const err = el('p', 'conn-err');
     err.hidden = true;
     const btn = el('button', 'primary sm');
@@ -791,7 +814,16 @@
         });
         if (!add.length) {
           btn.disabled = false; setBtnLabel(btn, 'הוסף הרשאה');
-          err.textContent = 'סמן את השירות שברצונך לחבר.';
+          const contactsReady = boxes.contacts && boxes.contacts.checked === true && granted.indexOf('Contacts.Read') >= 0;
+          if (contactsReady) {
+            err.textContent = 'אנשי קשר כבר כלולים בכניסה.';
+            if (state) state.glanceContactsChoice = true;
+            if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+              try { await FlowStorage.set({ glanceContactsChoice: true }); } catch (e) { /* the tick is already on */ }
+            }
+          } else {
+            err.textContent = 'סמן את השירות שברצונך לחבר.';
+          }
           err.hidden = false;
           return;
         }
@@ -1970,6 +2002,11 @@
           note.textContent = sentence;
           return;
         }
+        const contactsOn = !!(boxes.contacts && boxes.contacts.checked);
+        if (state) state.glanceContactsChoice = contactsOn;
+        if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+          try { await FlowStorage.set({ glanceContactsChoice: contactsOn }); } catch (e) { /* the next paint reads storage */ }
+        }
         await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
       });
       screen.appendChild(c);
@@ -1991,6 +2028,16 @@
           : { checked: false, disabled: false, granted: false };
         box.checked = ui.checked;
         box.disabled = ui.disabled;
+        if (svc.id === 'contacts') {
+          box.checked = !!(state && state.glanceContactsChoice === true);
+          box.addEventListener('change', () => {
+            const on = box.checked === true;
+            if (state) state.glanceContactsChoice = on;
+            if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+              FlowStorage.set({ glanceContactsChoice: on }).catch(() => {});
+            }
+          });
+        }
         if (ui.granted) lab.setAttribute('data-glance-granted', '1');
         scopeBoxes[svc.id] = box;
         lab.appendChild(box);
@@ -2010,30 +2057,54 @@
         const code = r && (r.reason || r.error);
         return SCOPE_NOTES[code] || (code ? 'ההרשאה לא נוספה (' + code + ').' : 'ההרשאה לא נוספה.');
       }
+      function contactsAlreadySentence(box, scopes) {
+        if (!box || box.checked !== true) return '';
+        return (scopes || []).indexOf('Contacts.Read') >= 0 ? 'אנשי קשר כבר כלולים בכניסה.' : '';
+      }
       const addScope = el('button', 'ghost sm', 'הוסף הרשאה');
       addScope.type = 'button';
       addScope.setAttribute('data-glance-add-scope', '1');
+      const bucketForOutlookService = globalThis.FlowConnectEcosystem && FlowConnectEcosystem.optionalScopeBucketForOutlookService;
       addScope.addEventListener('click', async () => {
         addScope.disabled = true;
-        const add = scopeServices.filter((svc) => {
-          const box = scopeBoxes[svc.id];
-          if (!box || !box.checked || box.disabled) return false;
-          return (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0);
-        });
+        const contactsBox = scopeBoxes.contacts;
+        let contactsNoted = '';
+        const Contacts = globalThis.FlowOutlookContacts;
+        if (contactsBox && Contacts && Contacts.consentPlan) {
+          const plan = Contacts.consentPlan({ ticked: contactsBox.checked === true, scopes: grantedNow });
+          if (state) state.glanceContactsChoice = plan.choice === true;
+          try { await FlowStorage.set({ glanceContactsChoice: plan.choice === true }); } catch (e) {}
+          if (plan.request) {
+            const grantedScope = await send({ type: 'flow:microsoft-optional-scopes', bucket: 'contacts', prompt: 'consent' });
+            if (!grantedScope || grantedScope.ok !== true) {
+              addScope.disabled = false; note.hidden = false;
+              note.textContent = (grantedScope && (grantedScope.reason || grantedScope.error)) || 'ההרשאה לא נוספה.';
+              return;
+            }
+          } else if (plan.already) {
+            contactsBox.checked = true;
+            contactsNoted = plan.line;
+            if (state) state.glanceContactsNoted = plan.line;
+          }
+        }
+        const add = scopeServices.filter((svc) => svc.id !== 'contacts' && scopeBoxes[svc.id] && scopeBoxes[svc.id].checked && !scopeBoxes[svc.id].disabled && (svc.scopes || []).some((sc) => grantedNow.indexOf(sc) < 0));
         let consentedNow = [];
-        const ticked = scopeServices.some((svc) => { const b = scopeBoxes[svc.id]; return b && b.checked && !b.disabled; });
-        if (ticked && !add.length) {
-          // Ticked, and every scope of it is already on the token: nothing to ask, and the person is told so.
-          addScope.disabled = false;
-          note.hidden = false;
-          note.textContent = 'ההרשאות שסימנת כבר ניתנו.';
+        const ticked = scopeServices.some((svc) => svc.id !== 'contacts' && scopeBoxes[svc.id] && scopeBoxes[svc.id].checked && !scopeBoxes[svc.id].disabled);
+        if (!add.length && (ticked || contactsNoted || contactsAlreadySentence(contactsBox, grantedNow))) {
+          const contactsLine = contactsNoted || contactsAlreadySentence(contactsBox, grantedNow);
+          addScope.disabled = false; note.hidden = false;
+          note.textContent = contactsLine || 'ההרשאות שסימנת כבר ניתנו.';
+          if (contactsLine) {
+            if (state) state.glanceContactsNoted = contactsLine;
+            if (state) state.glanceContactsChoice = true;
+            try { await FlowStorage.set({ glanceContactsChoice: true }); } catch (e) {}
+            await renderSurfaces();
+          }
           return;
         }
         for (let i = 0; i < add.length; i++) {
           const svc = add[i];
-          const bucket = (globalThis.FlowConnectEcosystem && typeof FlowConnectEcosystem.optionalScopeBucketForOutlookService === 'function')
-            ? FlowConnectEcosystem.optionalScopeBucketForOutlookService(svc.id)
-            : null;
+          const bucket = typeof bucketForOutlookService === 'function' ? bucketForOutlookService(svc.id) : null;
           if (bucket) {
             const grantedScope = await send({ type: 'flow:microsoft-optional-scopes', bucket: bucket });
             if (!grantedScope || grantedScope.ok !== true) {
@@ -2078,7 +2149,16 @@
       });
       const off = el('button', 'ghost sm', 'כבה');
       off.type = 'button';
-      off.addEventListener('click', async () => { off.disabled = true; await o.disconnect(); await renderSurfaces(); await renderOutlookCards(); });
+      off.setAttribute('data-glance-contacts-off', '1');
+      off.addEventListener('click', async () => {
+        off.disabled = true;
+        if (state) state.glanceContactsChoice = false;
+        if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.set === 'function') {
+          try { await FlowStorage.set({ glanceContactsChoice: false }); } catch (e) { /* the next paint reads storage */ }
+        }
+        await renderSurfaces();
+        await renderOutlookCards();
+      });
       acts.appendChild(chk);
       // Turn off sits on its own row, away from Check now.
       offRow = el('div', 'wait-acts wait-off-row');
@@ -2109,6 +2189,11 @@
     }
     row.appendChild(acts);
     if (offRow) row.appendChild(offRow);
+    if (state && state.glanceContactsNoted) {
+      note.hidden = false;
+      note.textContent = state.glanceContactsNoted;
+      state.glanceContactsNoted = '';
+    }
     row.appendChild(note);
     if (gen !== surfaceGen) return;
     host.appendChild(row);

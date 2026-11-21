@@ -6130,6 +6130,223 @@ async function outlookPreferredFrom(explicit) {
   }
   return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
 }
+function outlookLookupHit(proven, how, rows) {
+  const aliases = [];
+  let conversationId = '';
+  let internetMessageId = '';
+  (rows || []).forEach((row) => {
+    if (!row || row.isDraft === true) return;
+    if (row.id) aliases.push(String(row.id));
+    if (!conversationId && row.conversationId) conversationId = String(row.conversationId);
+    if (!internetMessageId && row.internetMessageId) internetMessageId = String(row.internetMessageId);
+  });
+  if (proven.id && aliases.indexOf(String(proven.id)) < 0) aliases.push(String(proven.id));
+  return {
+    id: proven.id,
+    immutable: proven.immutable === true,
+    how: how,
+    aliases: aliases,
+    conversationId: conversationId,
+    internetMessageId: internetMessageId
+  };
+}
+
+function outlookNormSubject(value) {
+  return String(value || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function outlookPlainBody(value) {
+  return String(value || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/\s+/g, ' ').trim();
+}
+
+function outlookBodyHash(value) {
+  const plain = outlookPlainBody(value);
+  return plain ? hashCandidate(plain) : '';
+}
+
+const CONTACTS_DRAFT_KEY = 'glanceContactsDrafts';
+
+function outlookDraftAliasKeys(parts) {
+  const out = [];
+  (parts && parts.ids || []).forEach((id) => {
+    const c = outlookCanonId(id);
+    if (c && c.length >= 8) out.push('id:' + c);
+  });
+  const subject = outlookNormSubject(parts && parts.subject);
+  const conv = outlookCanonId(parts && parts.conversationId);
+  if (conv && subject) out.push('conv:' + conv + '|' + subject);
+  const net = String((parts && parts.internetMessageId) || '').trim().toLowerCase();
+  if (net && net.indexOf('@') > 0) out.push('inet:' + net);
+  return out.filter((k, i) => k && out.indexOf(k) === i);
+}
+
+async function outlookContactsDraftStore() {
+  const bag = await chrome.storage.local.get(CONTACTS_DRAFT_KEY);
+  const raw = bag && bag[CONTACTS_DRAFT_KEY];
+  const keys = raw && raw.keys && typeof raw.keys === 'object' ? Object.assign({}, raw.keys) : {};
+  const records = raw && raw.records && typeof raw.records === 'object' ? Object.assign({}, raw.records) : {};
+  return { keys: keys, records: records };
+}
+
+async function outlookSaveContactsDraftStore(store) {
+  const keys = store.keys || {};
+  const names = Object.keys(keys);
+  if (names.length > 80) names.slice(0, names.length - 80).forEach((k) => { delete keys[k]; });
+  const records = store.records || {};
+  const ids = Object.keys(records);
+  if (ids.length > 40) ids.slice(0, ids.length - 40).forEach((id) => { delete records[id]; });
+  await chrome.storage.local.set({ [CONTACTS_DRAFT_KEY]: { keys: keys, records: records } });
+}
+
+function outlookContactsDraftFind(store, aliasKeys) {
+  const keys = aliasKeys || [];
+  for (let i = 0; i < keys.length; i++) {
+    const recId = store.keys[keys[i]];
+    if (recId && store.records[recId] && store.records[recId].draftId) return store.records[recId];
+  }
+  return null;
+}
+
+function logContactsDraftReuse(incomingId, mapHit, priorGetStatus, isDraft, skipReason) {
+  const draftFlag = isDraft == null ? '' : (isDraft ? '1' : '0');
+  try {
+    console.info('[Glance] contacts draft reuse incomingId=' + hashCandidate(incomingId) + ' mapHit=' + (mapHit ? '1' : '0') + ' priorGetStatus=' + (priorGetStatus == null ? '' : priorGetStatus) + ' isDraft=' + draftFlag + ' skipReason=' + (skipReason || ''));
+  } catch (e) { /* no console */ }
+}
+
+async function outlookReadDraftMessage(draftId, immutable) {
+  const prefers = immutable ? ['IdType="ImmutableId"', null] : [null, 'IdType="ImmutableId"'];
+  const statuses = [];
+  for (let i = 0; i < prefers.length; i++) {
+    const headers = prefers[i] ? { Prefer: prefers[i] } : {};
+    const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft,body';
+    outlookAssertNotSend(url);
+    let res = null;
+    try { res = await outlookFetch(url, { method: 'GET', headers: headers }); } catch (e) { res = null; }
+    const status = res && typeof res.status === 'number' ? res.status : 0;
+    statuses.push(status);
+    if (!res || !res.ok) continue;
+    let body = null;
+    try { body = await res.json(); } catch (e) { body = null; }
+    if (!body || !body.id || Array.isArray(body.value)) continue;
+    const content = body.body && body.body.content;
+    return {
+      ok: true,
+      id: String(body.id),
+      isDraft: body.isDraft === false ? false : (body.isDraft === true ? true : null),
+      bodyText: outlookPlainBody(content),
+      status: statuses.join(','),
+      immutable: Boolean(prefers[i])
+    };
+  }
+  return { ok: false, id: '', isDraft: null, bodyText: '', status: statuses.join(','), immutable: false };
+}
+
+async function outlookReuseContactsDraft(p, incomingId, aliasIds, lookedConv, lookedNet) {
+  const store = await outlookContactsDraftStore();
+  const remembered = await outlookDraftMap();
+  const aliasKeys = outlookDraftAliasKeys({
+    ids: aliasIds,
+    conversationId: lookedConv || (p && p.conversationId) || '',
+    subject: (p && p.subject) || '',
+    internetMessageId: lookedNet || (p && p.internetMessageId) || ''
+  });
+  let record = outlookContactsDraftFind(store, aliasKeys);
+  if (!record) {
+    const legacy = remembered.map[String(incomingId)] || '';
+    if (legacy) record = { draftId: String(legacy), createdBodyHash: '', immutable: false };
+  }
+  if (!record) {
+    logContactsDraftReuse(incomingId, false, '', null, 'map-miss');
+    return { reuse: false };
+  }
+  const got = await outlookReadDraftMessage(record.draftId, record.immutable === true);
+  const stillDraft = got.ok && got.isDraft !== false;
+  if (stillDraft) {
+    logContactsDraftReuse(incomingId, true, got.status, got.isDraft, 'reused');
+    return {
+      reuse: true,
+      result: {
+        ok: true,
+        ref: got.id || record.draftId,
+        reused: true,
+        reason: 'draft-already',
+        createdBodyHash: record.createdBodyHash || '',
+        immutable: got.immutable === true,
+        written: 'Reply draft already in Outlook Drafts. Not sent.'
+      }
+    };
+  }
+  if (got.ok && got.isDraft === false) {
+    logContactsDraftReuse(incomingId, true, got.status, false, 'not-draft');
+    return { reuse: false };
+  }
+  const missing = String(got.status || '').split(',').indexOf('404') >= 0 && !got.ok;
+  logContactsDraftReuse(incomingId, true, got.status, got.isDraft, missing ? 'gone' : 'prior-get');
+  if (missing) return { reuse: false };
+  return {
+    reuse: true,
+    result: { ok: false, reason: 'draft-unreadable', status: 0, reused: false, how: 'subject-from', errorCode: 'prior-get' }
+  };
+}
+
+async function outlookRememberContactsDraft(p, incomingId, aliasIds, lookedConv, lookedNet, draftId, immutable, comment) {
+  const store = await outlookContactsDraftStore();
+  const recId = hashCandidate(String(draftId));
+  const createdBodyHash = outlookBodyHash(comment);
+  store.records[recId] = { draftId: String(draftId), createdBodyHash: createdBodyHash, immutable: immutable === true };
+  outlookDraftAliasKeys({
+    ids: aliasIds,
+    conversationId: lookedConv || (p && p.conversationId) || '',
+    subject: (p && p.subject) || '',
+    internetMessageId: lookedNet || (p && p.internetMessageId) || ''
+  }).forEach((key) => { store.keys[key] = recId; });
+  await outlookSaveContactsDraftStore(store);
+  return createdBodyHash;
+}
+
+async function outlookContactsDraftRecall(p) {
+  const store = await outlookContactsDraftStore();
+  let record = outlookContactsDraftFind(store, outlookDraftAliasKeys({
+    ids: [],
+    conversationId: (p && p.conversationId) || '',
+    subject: (p && p.subject) || '',
+    internetMessageId: (p && p.internetMessageId) || ''
+  }));
+  let incomingId = (p && p.conversationId) || (p && p.subject) || '';
+  if (!record && p && p.subject) {
+    const gets = [];
+    const looked = await outlookLookupOpenMessage(p, gets);
+    if (looked && looked.id && !looked.ambiguous) {
+      incomingId = looked.id;
+      record = outlookContactsDraftFind(store, outlookDraftAliasKeys({
+        ids: [looked.id].concat(looked.aliases || []),
+        conversationId: looked.conversationId || (p && p.conversationId) || '',
+        subject: (p && p.subject) || '',
+        internetMessageId: looked.internetMessageId || (p && p.internetMessageId) || ''
+      }));
+    }
+  }
+  if (!record) {
+    logContactsDraftReuse(incomingId, false, '', null, 'map-miss');
+    return { ok: false, reason: 'no-record' };
+  }
+  const got = await outlookReadDraftMessage(record.draftId, record.immutable === true);
+  if (!got.ok || got.isDraft === false) {
+    logContactsDraftReuse(record.draftId, true, got.status, got.isDraft, got.ok ? 'not-draft' : 'prior-get');
+    return { ok: false, reason: got.ok ? 'not-draft' : 'prior-get' };
+  }
+  logContactsDraftReuse(record.draftId, true, got.status, true, 'reused');
+  return {
+    ok: true,
+    ref: got.id || record.draftId,
+    reused: true,
+    body: got.bodyText || '',
+    createdBodyHash: record.createdBodyHash || '',
+    immutable: got.immutable === true
+  };
+}
+
 async function outlookDraftMap() {
   const bag = await chrome.storage.local.get(OUTLOOK_STATE_KEY);
   const st = bag[OUTLOOK_STATE_KEY] || {};
@@ -6283,32 +6500,383 @@ async function outlookRefuseIfEdited(url, snapshot, prefer) {
   return null;
 }
 
+function outlookIdSpellings(id) {
+  const raw = String(id || '').trim();
+  if (!raw) return [];
+  let canon = raw;
+  try { canon = decodeURIComponent(raw); } catch (e) { /* already decoded */ }
+  canon = canon.replace(/^ol:/, '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '').trim();
+  const out = [];
+  if (canon) out.push(canon);
+  if (raw && raw !== canon && out.indexOf(raw) < 0) out.push(raw);
+  return out;
+}
+
+async function outlookReadError(res) {
+  const status = res && typeof res.status === 'number' ? res.status : 0;
+  let code = '';
+  let message = '';
+  try {
+    const text = res && typeof res.text === 'function' ? await res.text() : '';
+    if (text) {
+      try {
+        const body = JSON.parse(text);
+        const err = body && body.error;
+        if (err) {
+          code = String(err.code || '').slice(0, 80);
+          message = String(err.message || '');
+        } else message = text;
+      } catch (e) { message = text; }
+    }
+  } catch (e) { /* the status is still the fact */ }
+  message = message.replace(/bearer\s+\S+/gi, '').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Za-z]{2,}/gi, '').replace(/\s+/g, ' ').trim().slice(0, 180);
+  return { status: status, code: code, message: message };
+}
+
+function logContactsDraftFail(status, err, how, immutable) {
+  const code = err && err.code ? err.code : '';
+  const message = err && err.message ? err.message : '';
+  try {
+    console.info('[Glance] contacts draft http=' + (status || 0) + ' code=' + code + ' message=' + message + ' how=' + (how || '') + ' immutable=' + (immutable ? '1' : '0'));
+  } catch (e) { /* no console */ }
+}
+
+function hashCandidate(value) {
+  let h = 5381;
+  const s = String(value || '');
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(16);
+}
+
+function logContactsDraftTrace(candidates, gets, how, status, err, immutable) {
+  const hashes = (candidates || []).map(hashCandidate).filter(Boolean).join(',');
+  const statuses = (gets || []).map((row) => (row && row.status) || 0).join(',');
+  try {
+    console.info('[Glance] contacts draft lookup candidates=' + hashes + ' gets=' + statuses + ' how=' + (how || 'unproven'));
+  } catch (e) { /* no console */ }
+  logContactsDraftFail(status, err, how || 'unproven', immutable);
+}
+
+function outlookOdataQuote(value) {
+  return String(value || '').replace(/'/g, "''");
+}
+
+function outlookSameMailbox(a, b, known) {
+  const x = String(a || '').trim().toLowerCase();
+  const y = String(b || '').trim().toLowerCase();
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const set = new Set();
+  (known || []).forEach((raw) => {
+    const e = String(raw || '').trim().toLowerCase();
+    if (e && e.indexOf('@') > 0) set.add(e);
+  });
+  if (set.has(x) && set.has(y)) return true;
+  const opaque = (addr) => /^outlook_[0-9a-f]+@outlook\.com$/i.test(addr);
+  if ((opaque(x) || opaque(y)) && (set.has(x) || set.has(y))) return true;
+  return false;
+}
+
+async function outlookOwnAddresses() {
+  const st = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
+  const auth = st && st[OUTLOOK_AUTH_KEY];
+  const out = [];
+  function add(raw) {
+    const e = String(raw || '').trim().toLowerCase();
+    if (e && e.indexOf('@') > 0 && out.indexOf(e) < 0) out.push(e);
+  }
+  if (!auth) return out;
+  if (auth.account) { add(auth.account.address); add(auth.account.mail); }
+  (auth.ownAddresses || []).forEach(add);
+  if (auth.profile) {
+    add(auth.profile.mail);
+    add(auth.profile.userPrincipalName);
+    (auth.profile.proxyAddresses || []).forEach((p) => {
+      const m = String(p || '').match(/^smtp:(.+)$/i);
+      if (m) add(m[1]);
+    });
+  }
+  return out;
+}
+
+function outlookRowAddress(row) {
+  const from = row && row.from && row.from.emailAddress && row.from.emailAddress.address;
+  const sender = row && row.sender && row.sender.emailAddress && row.sender.emailAddress.address;
+  return { from: String(from || '').trim().toLowerCase(), sender: String(sender || '').trim().toLowerCase() };
+}
+
+async function outlookListMessages(filter, gets) {
+  const url = OUTLOOK_GRAPH + '/me/messages?$filter=' + encodeURIComponent(filter) + '&$select=id,subject,from,sender,isDraft,parentFolderId,conversationId,receivedDateTime,internetMessageId&$top=25';
+  outlookAssertNotSend(url);
+  let res = null;
+  try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
+  gets.push({ status: res && typeof res.status === 'number' ? res.status : 0 });
+  if (!res || !res.ok) return [];
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  return body && Array.isArray(body.value) ? body.value : [];
+}
+
+function outlookBracketInternetId(raw) {
+  let s = String(raw || '').trim();
+  if (!s || s.indexOf('@') < 1) return '';
+  if (s.charAt(0) !== '<') s = '<' + s;
+  if (s.charAt(s.length - 1) !== '>') s = s + '>';
+  return s;
+}
+
+function outlookPageFromSource(p) {
+  const sender = String((p && p.senderEmail) || '').trim().toLowerCase();
+  const own = String((p && p.ownSenderEmail) || '').trim().toLowerCase();
+  const open = String((p && p.openSenderEmail) || '').trim().toLowerCase();
+  if (sender && sender.indexOf('@') > 0) return { from: sender, field: 'sender' };
+  if (own && own.indexOf('@') > 0) return { from: own, field: 'own' };
+  if (open && open.indexOf('@') > 0) return { from: open, field: 'open' };
+  return { from: '', field: 'none' };
+}
+
+function logContactsBranch(how, listStatus, rows, why, fromField, page) {
+  const fromBit = fromField ? ' from=' + fromField : '';
+  const skipBit = fromField === 'none'
+    ? ' headerHasAt=' + (page && page.headerHasAt ? 1 : 0) + ' skip=' + ((page && page.senderSkip) || 'none')
+    : '';
+  try {
+    console.info('[Glance] contacts draft branch how=' + (how || '') + ' list=' + (listStatus == null ? '' : listStatus) + ' rows=' + (rows == null ? '' : rows) + ' why=' + (why || '') + fromBit + skipBit);
+  } catch (e) { /* no console */ }
+}
+
+function logContactsNarrow(rows, afterDrafts, afterFolder, why) {
+  try {
+    console.info('[Glance] contacts draft narrow rows=' + rows + ' afterDrafts=' + afterDrafts + ' afterFolder=' + afterFolder + ' why=' + (why || ''));
+  } catch (e) { /* no console */ }
+}
+
+function outlookCanonId(id) {
+  return String(id || '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '').trim().toLowerCase();
+}
+
+async function outlookFolderId(name) {
+  const url = OUTLOOK_GRAPH + '/me/mailFolders/' + encodeURIComponent(name) + '?$select=id';
+  outlookAssertNotSend(url);
+  let res = null;
+  try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { res = null; }
+  if (!res || !res.ok) return '';
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  return body && body.id ? String(body.id) : '';
+}
+
+// Inbox and Sent Items are two copies of one self-sent mail. Drop drafts,
+// keep the open conversation, then keep the folder the person has open.
+async function outlookNarrowCopies(rows, p) {
+  const start = (rows || []).length;
+  let kept = (rows || []).filter((row) => row && row.isDraft !== true);
+  const afterDrafts = kept.length;
+  const conv = outlookCanonId(p && p.conversationId);
+  if (conv) {
+    const matched = kept.filter((row) => outlookCanonId(row && row.conversationId) === conv);
+    if (matched.length) kept = matched;
+    else kept = [];
+  }
+  const open = String((p && p.openFolder) || '').trim().toLowerCase();
+  if (kept.length > 1 && (open === 'inbox' || open === 'sentitems' || open === 'drafts')) {
+    const inboxId = await outlookFolderId('inbox');
+    const sentId = await outlookFolderId('sentitems');
+    const draftsId = await outlookFolderId('drafts');
+    if (draftsId) kept = kept.filter((row) => String(row.parentFolderId || '') !== draftsId);
+    if (open === 'inbox' && sentId) kept = kept.filter((row) => String(row.parentFolderId || '') !== sentId);
+    else if (open === 'sentitems' && inboxId) kept = kept.filter((row) => String(row.parentFolderId || '') !== inboxId);
+    const wantId = open === 'inbox' ? inboxId : (open === 'sentitems' ? sentId : draftsId);
+    if (wantId && kept.length > 1) {
+      const inOpen = kept.filter((row) => String(row.parentFolderId || '') === wantId);
+      if (inOpen.length) kept = inOpen;
+    }
+  }
+  const afterFolder = kept.length;
+  const why = kept.length > 1 ? 'ambiguous' : (kept.length ? '' : 'empty-list');
+  logContactsNarrow(start, afterDrafts, afterFolder, why);
+  return kept;
+}
+
+// GET /me/messages/{id} with both spellings and both Prefer values. The id
+// createReply may use is the id in a 200 body, with the Prefer that got it.
+async function outlookProveMessage(candidates, gets) {
+  const seen = new Set();
+  const ids = [];
+  (candidates || []).forEach((id) => {
+    outlookIdSpellings(id).forEach((spelling) => {
+      if (!spelling || seen.has(spelling)) return;
+      seen.add(spelling);
+      ids.push(spelling);
+    });
+  });
+  const prefers = [null, 'IdType="ImmutableId"'];
+  for (let i = 0; i < ids.length; i++) {
+    for (let p = 0; p < prefers.length; p++) {
+      const headers = prefers[p] ? { Prefer: prefers[p] } : {};
+      const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ids[i]) + '?$select=id';
+      outlookAssertNotSend(url);
+      let res = null;
+      try { res = await outlookFetch(url, { method: 'GET', headers: headers }); } catch (e) { res = null; }
+      const status = res && typeof res.status === 'number' ? res.status : 0;
+      if (gets) gets.push({ status: status });
+      if (!res || !res.ok) continue;
+      let body = null;
+      try { body = await res.json(); } catch (e) { body = null; }
+      if (body && body.id && !Array.isArray(body.value)) {
+        return { id: String(body.id), immutable: Boolean(prefers[p]), how: 'get-message' };
+      }
+    }
+  }
+  return null;
+}
+
+// Page and URL ids are not Graph ids on this mailbox. List by internet
+// message id first. A miss, or no id on the page, still tries subject.
+// One row in the last day is the mail. More than one is not a guess.
+async function outlookLookupOpenMessage(p, gets) {
+  const net = outlookBracketInternetId(p && p.internetMessageId);
+  if (!net) {
+    logContactsBranch('internetMessageId', '', 0, 'no-internetMessageId');
+  } else {
+    const before = gets.length;
+    const rows = await outlookListMessages("internetMessageId eq '" + outlookOdataQuote(net) + "'", gets);
+    const listed = gets[gets.length - 1];
+    const listStatus = gets.length > before && listed ? listed.status : 0;
+    if (rows.length > 1) {
+      logContactsBranch('internetMessageId', listStatus, rows.length, 'ambiguous');
+      return { ambiguous: true, how: 'internetMessageId' };
+    }
+    if (rows.length === 1 && rows[0] && rows[0].id) {
+      const proven = await outlookProveMessage([rows[0].id], gets);
+      if (proven && proven.id) {
+        logContactsBranch('internetMessageId', listStatus, 1, '');
+        return outlookLookupHit(proven, 'internetMessageId', rows);
+      }
+      logContactsBranch('internetMessageId', listStatus, 1, 'prove-failed');
+    } else {
+      logContactsBranch('internetMessageId', listStatus, rows.length, rows.length ? 'prove-failed' : 'empty-list');
+    }
+  }
+  const subject = String((p && p.subject) || '').trim();
+  const src = outlookPageFromSource(p);
+  if (!subject) {
+    logContactsBranch('subject-from', '', 0, 'missing-subject', src.field, p);
+    return null;
+  }
+  const from = src.from;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const filter = "receivedDateTime ge " + since + " and subject eq '" + outlookOdataQuote(subject) + "'";
+  const before = gets.length;
+  const rows = await outlookListMessages(filter, gets);
+  const listed = gets[gets.length - 1];
+  const listStatus = gets.length > before && listed ? listed.status : 0;
+  const known = await outlookOwnAddresses();
+  if (from) known.push(from);
+  const hits = from ? rows.filter((row) => {
+    const who = outlookRowAddress(row);
+    return outlookSameMailbox(who.from, from, known) || outlookSameMailbox(who.sender, from, known);
+  }) : rows.slice();
+  const why = !from ? 'missing-from' : (hits.length ? '' : 'empty-list');
+  logContactsBranch('subject-from', listStatus, hits.length, why || (hits.length > 1 ? 'ambiguous' : ''), src.field, p);
+  const narrowed = await outlookNarrowCopies(hits, p);
+  if (narrowed.length > 1) return { ambiguous: true, how: 'subject-from' };
+  if (narrowed.length === 1 && narrowed[0] && narrowed[0].id) {
+    const proven = await outlookProveMessage([narrowed[0].id], gets);
+    if (proven && proven.id) return outlookLookupHit(proven, 'subject-from', hits);
+    logContactsBranch('subject-from', listStatus, 1, 'prove-failed', src.field, p);
+    return null;
+  }
+  return null;
+}
+
+const outlookDraftFlights = new Map();
+
+function outlookFlightKey(p) {
+  if (!p || p.requireProvenId !== true) return '';
+  const ids = [];
+  if (p.outlookIncomingId) ids.push(p.outlookIncomingId);
+  if (p.messageId) ids.push(p.messageId);
+  (p.outlookCandidates || []).forEach((id) => { if (id) ids.push(id); });
+  return [String(p.subject || ''), String(p.internetMessageId || ''), ids.join(',')].join('|');
+}
+
 async function outlookDraftWrite(p) {
-  const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
+  const flightKey = outlookFlightKey(p);
+  if (flightKey && outlookDraftFlights.has(flightKey)) return outlookDraftFlights.get(flightKey);
+  const job = outlookDraftWriteJob(p);
+  if (flightKey) outlookDraftFlights.set(flightKey, job);
+  try {
+    return await job;
+  } finally {
+    if (flightKey && outlookDraftFlights.get(flightKey) === job) outlookDraftFlights.delete(flightKey);
+  }
+}
+
+async function outlookDraftWriteJob(p) {
+  let incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
+  let immutable = p && p.outlookImmutableId === true;
+  let how = (p && p.outlookIdHow) || '';
+  let traceGets = null;
+  let traceCandidates = null;
+  let lookedAliases = [];
+  let lookedConv = '';
+  let lookedNet = '';
+  if (p && p.requireProvenId === true) {
+    const candidates = [];
+    if (incomingId) candidates.push(incomingId);
+    (p.outlookCandidates || []).forEach((id) => { if (id) candidates.push(id); });
+    traceCandidates = candidates;
+    traceGets = [];
+    const proven = await outlookProveMessage(candidates, traceGets);
+    if (proven && proven.id) {
+      incomingId = proven.id;
+      immutable = proven.immutable === true;
+      how = proven.how;
+    } else {
+      const looked = await outlookLookupOpenMessage(p, traceGets);
+      if (looked && looked.ambiguous) {
+        logContactsDraftTrace(candidates, traceGets, looked.how, 0, { code: 'ambiguous', message: 'more than one message' }, false);
+        return { ok: false, reason: 'ambiguous', status: 0, how: looked.how, immutable: false, errorCode: 'ambiguous' };
+      }
+      if (!looked || !looked.id) {
+        logContactsDraftTrace(candidates, traceGets, 'unproven', 0, { code: 'unproven', message: 'no GET accepted a message id' }, false);
+        return { ok: false, reason: 'unproven-id', status: 0, how: 'unproven', immutable: false, errorCode: 'unproven' };
+      }
+      incomingId = looked.id;
+      immutable = looked.immutable === true;
+      how = looked.how;
+      lookedAliases = looked.aliases || [];
+      lookedConv = looked.conversationId || '';
+      lookedNet = looked.internetMessageId || '';
+    }
+  }
   if (!incomingId) return { ok: false, reason: 'no-message' };
-  const remembered = await outlookDraftMap();
-  const priorId = remembered.map[String(incomingId)] || '';
-  if (priorId) {
-    const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(priorId) + '?$select=id,isDraft,webLink';
-    outlookAssertNotSend(getUrl);
-    const got = await outlookFetch(getUrl, { method: 'GET' });
-    if (got && got.ok) {
-      let existing = null;
-      try { existing = await got.json(); } catch (e) { existing = null; }
-      if (existing && existing.isDraft !== false) {
+  const aliasIds = [incomingId];
+  (p && p.outlookAliases || []).forEach((id) => { if (id) aliasIds.push(id); });
+  if (lookedAliases) lookedAliases.forEach((id) => { if (id) aliasIds.push(id); });
+  let prior = null;
+  if (p && p.requireProvenId === true) {
+    prior = await outlookReuseContactsDraft(p, incomingId, aliasIds, lookedConv, lookedNet);
+    if (prior && prior.reuse) return prior.result;
+  } else {
+    const remembered = await outlookDraftMap();
+    const priorId = remembered.map[String(incomingId)] || '';
+    if (priorId) {
+      const got = await outlookReadDraftMessage(priorId, immutable === true);
+      if (got.ok && got.isDraft !== false) {
         return {
           ok: true,
-          ref: existing.id || priorId,
-          where: existing.webLink || null,
-          url: existing.webLink || null,
+          ref: got.id || priorId,
           reused: true,
           reason: 'draft-already',
           written: 'Reply draft already in Outlook Drafts. Not sent.'
         };
       }
-    } else if (!got || got.status === 404) {
-      delete remembered.map[String(incomingId)];
-      await outlookSaveDraftMap(remembered.st, remembered.map);
+      if (!got.ok && String(got.status || '').split(',').indexOf('404') >= 0) {
+        delete remembered.map[String(incomingId)];
+        await outlookSaveDraftMap(remembered.st, remembered.map);
+      }
     }
   }
   // Same draft as Gmail: the payload Gmail's buildActionPayload sends ({ params, senderName, senderEmail, subject }) through the
@@ -6321,14 +6889,26 @@ async function outlookDraftWrite(p) {
   }
   const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
   outlookAssertNotSend(url);
-  const immutable = p && p.outlookImmutableId === true;
-  const prefer = immutable ? { Prefer: 'IdType="ImmutableId"' } : {};
-  const res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }), timeoutMs: outlookWriteMs() });
+  const preferFor = (flag) => (flag ? { Prefer: 'IdType="ImmutableId"' } : {});
+  let prefer = preferFor(immutable);
+  let res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }), timeoutMs: outlookWriteMs() });
+  if (p && p.requireProvenId === true && res && res.status === 400) {
+    immutable = !immutable;
+    prefer = preferFor(immutable);
+    res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }), timeoutMs: outlookWriteMs() });
+  }
   if (res.notConnected) return { ok: false, reason: 'not-connected' };
   if (res.timedOut) return { ok: false, reason: 'timeout' };
   if (res.status === 401) return { ok: false, reason: 'not-connected', needsSignIn: true };
   if (res.status === 403) return { ok: false, reason: 'consent', error: 'Outlook draft permission not granted yet: open Glance and reconnect Outlook once.' };
-  if (!res.ok) return { ok: false, reason: 'http-' + res.status };
+  if (!res.ok) {
+    const err = await outlookReadError(res);
+    if (p && p.requireProvenId === true) logContactsDraftTrace(traceCandidates, traceGets, how, err.status || res.status, err, immutable);
+    return { ok: false, reason: 'http-' + res.status, status: res.status, errorCode: err.code, errorMessage: err.message, how: how, immutable: immutable };
+  }
+  if (p && p.requireProvenId === true && (how === 'internetMessageId' || how === 'subject-from')) {
+    logContactsDraftTrace(traceCandidates, traceGets, how, res.status, { code: '', message: '' }, immutable);
+  }
   const draft = await res.json();
   if (!draft || !draft.id) return { ok: false, reason: 'no-draft' };
   // Prefer connected human From alias over opaque outlook_HEX@outlook.com CID.
@@ -6388,14 +6968,32 @@ async function outlookDraftWrite(p) {
   const keys = Object.keys(saved.map);
   if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => { delete saved.map[k]; });
   await outlookSaveDraftMap(saved.st, saved.map);
+  let createdBodyHash = '';
+  if (p && p.requireProvenId === true) {
+    createdBodyHash = await outlookRememberContactsDraft(p, incomingId, aliasIds, lookedConv, lookedNet, draft.id, immutable, comment);
+  }
   const read = await outlookDraftRead(patchUrl + '?$select=id,subject,body,toRecipients,ccRecipients,importance,categories', prefer);
+  if (p && p.requireProvenId === true && read && read.snap && read.snap.body) {
+    const rawBody = typeof read.snap.body === 'string' ? read.snap.body : (read.snap.body.content || '');
+    const hashed = outlookBodyHash(rawBody);
+    if (hashed) {
+      createdBodyHash = hashed;
+      const store = await outlookContactsDraftStore();
+      const recId = hashCandidate(String(draft.id));
+      if (store.records[recId]) {
+        store.records[recId].createdBodyHash = hashed;
+        await outlookSaveContactsDraftStore(store);
+      }
+    }
+  }
   const base = {
     ref: draft.id,
     where: draft.webLink || null,
     url: draft.webLink || null,
     attachmentId: attachmentId,
     fromAddress: wantFrom || null,
-    fromSet: fromSet
+    fromSet: fromSet,
+    createdBodyHash: createdBodyHash
   };
   if (!read.ok) {
     return Object.assign({}, base, {
@@ -7435,8 +8033,9 @@ async function outlookDraftUndo(ref, hint) {
   const id = typeof ref === 'string' ? ref : (ref && (ref.draftId || ref.id));
   if (!id) return { ok: false };
   const snapshot = (hint && hint.created) || (ref && typeof ref === 'object' ? ref.created : null);
-  // No creation snapshot means Undo cannot tell an edit from the original. Leave the draft.
-  if (!outlookHasSnap(snapshot)) return outlookUnconfirmed();
+  const bodyHash = hint && hint.createdBodyHash ? String(hint.createdBodyHash) : '';
+  // No creation snapshot and no body hash means Undo cannot tell an edit from the original. Leave the draft.
+  if (!outlookHasSnap(snapshot) && !bodyHash) return outlookUnconfirmed();
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
   const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id) + '?$select=id,isDraft,subject,body,toRecipients,ccRecipients,importance,categories';
   outlookAssertNotSend(getUrl);
@@ -7451,9 +8050,15 @@ async function outlookDraftUndo(ref, hint) {
   try { msg = await got.json(); } catch (e) { msg = null; }
   if (!msg) return outlookUnconfirmed();
   if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
-  const verdict = outlookEditVerdict(snapshot, msg);
-  if (verdict === 'edited') return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
-  if (verdict === 'unconfirmed') return outlookUnconfirmed();
+  if (bodyHash) {
+    const liveHash = outlookBodyHash(msg.body && msg.body.content);
+    if (!liveHash) return outlookUnconfirmed();
+    if (liveHash !== bodyHash) return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
+  } else {
+    const verdict = outlookEditVerdict(snapshot, msg);
+    if (verdict === 'edited') return { ok: false, reason: 'user-edited', written: outlookUserEditedLine() };
+    if (verdict === 'unconfirmed') return outlookUnconfirmed();
+  }
   const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(id);
   outlookAssertNotSend(delUrl);
   const del = await outlookFetch(delUrl, { method: 'DELETE', headers: prefer });
@@ -7889,7 +8494,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:microsoft-optional-scopes') {
     if (!sender || sender.id !== (chrome.runtime && chrome.runtime.id)) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-allowed' }));
     const bucket = msg.bucket || msg.optionalBucket;
-    return reply(sendResponse, requestMicrosoftOptionalScopes(bucket, { launchInteractive: outlookLaunchInteractive }));
+    return reply(sendResponse, requestMicrosoftOptionalScopes(bucket, {
+      launchInteractive: outlookLaunchInteractive,
+      prompt: msg.prompt === 'consent' ? 'consent' : ''
+    }));
   }
 
   if (msg.type === 'flow:connect') {
@@ -7985,6 +8593,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:user-context-event') {
     if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
     return reply(sendResponse, applyUserContextEvent(msg));
+  }
+
+  if (msg.type === 'flow:outlook-draft-recall') {
+    if (!sender || sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    return reply(sendResponse, outlookContactsDraftRecall(msg.payload || {}));
   }
 
   if (msg.type === 'flow:execute-action') {
