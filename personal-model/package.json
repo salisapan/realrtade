@@ -1,0 +1,10 @@
+{
+  "name": "personal-model",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned on-device fallback for Glance's personal model. Model weights are not in this package.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "libphonenumber-js": "1.13.17"
+  }
+}

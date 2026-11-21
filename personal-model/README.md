@@ -14,4 +14,10 @@ Slice 3 is work facts with evidence offsets, a review when two addresses share a
 
 Slice 4 is a passive bandit that stays off, a lift report of `model_assist` on against holdout, and the same confirmed facts for the Gmail add-on. Flow on a customer's server and iPhone stay on this contract and are not built in this slice.
 
-A later slice adds provenance so inbound mail cannot instruct the model, retrieval weights, memory spaces, and crypto-shred.
+## Cloud inference
+
+Embeddings (`intfloat/multilingual-e5-small`, MIT) and Hebrew NER (`dicta-il/dictabert-ner`, CC-BY-4.0) run on Glance's own cloud, on the existing glance-assist host. The client switch in `flow-trial-extension/core/personal-inference.js` is off until the CTO adds the `personal-infer` action. That action must accept short spans only, use TLS, drop the raw text after the response, and not train on it unless the person opts in. Category consent still decides whether a span may be sent. Results land in the encrypted model on this computer.
+
+There is no optional model download and no ONNX bundle. Offline, the same call uses rules and `libphonenumber-js@1.13.17`.
+
+A third-party sentence is a candidate. It does not change a draft or a Do It until the person confirms it, or their own sent mail corroborates it. Retrieval score is normalized recency, importance, and cosine with weights 0.4, 0.3, and 0.3. Nightly consolidation closes stale rows and may add a derived row. It does not hard-delete. Forget-all destroys the key.
