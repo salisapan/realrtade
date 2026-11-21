@@ -32,6 +32,8 @@ Slice 4 keeps a LinUCB bandit off. It does not explore a Do It, and it does not 
 
 Slice 5 runs embeddings and Hebrew NER on Glance's own cloud, behind a switch that is off until the existing glance-assist host grows a stateless `personal-infer` action. Nothing is downloaded to the browser. An inbound instruction cannot change a draft. Offline, rules and libphonenumber answer.
 
+Slice 6 pins the cloud catalog: Qwen3-Embedding-0.6B, Qwen3-Reranker-0.6B, Gemma-4-31B, and DictaBERT-joint. e5-small stays the offline embedder. Speech recognition stays off. Retrieval is hybrid, then a rerank, then a walk of the person graph. A third-party fact stays a candidate until heat and two first-party notes, or a confirm. The cloud flag stays off.
+
 ## Surfaces
 
 | Surface | Status |

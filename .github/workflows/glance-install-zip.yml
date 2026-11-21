@@ -24,7 +24,7 @@ jobs:
       - name: Closed-intent ledger contract
         run: node ledger/check.cjs && node flow-trial-extension/test/closed-intent-ledger-corpus.cjs
       - name: Personal model contract
-        run: node personal-model/check.cjs && node flow-trial-extension/test/personal-model-corpus.cjs && node flow-trial-extension/test/personal-model-s5-corpus.cjs
+        run: node personal-model/check.cjs && node flow-trial-extension/test/personal-model-corpus.cjs && node flow-trial-extension/test/personal-model-s5-corpus.cjs && node flow-trial-extension/test/personal-model-s6-corpus.cjs
       - name: Personal model fallback audit
         working-directory: personal-model
         run: npm ci && npm audit --omit=dev

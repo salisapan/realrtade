@@ -1,0 +1,106 @@
+# Glance cloud model catalog. Weights are not downloaded by CI or the extension.
+# The client flag that would call these models stays off until the owner approves the host.
+allowed_licenses: [Apache-2.0, MIT, BSD, PostgreSQL, CC-BY-4.0]
+vector_store: pgvector
+cloud_enabled: false
+models:
+  - role: embed
+    rank: champion
+    id: Qwen/Qwen3-Embedding-0.6B
+    revision: 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+    license: Apache-2.0
+    size: 0.6B
+    serving: tei
+    trust_remote_code: false
+    enabled: true
+    where: cloud
+  - role: embed
+    rank: challenger
+    id: intfloat/multilingual-e5-large-instruct
+    revision: 274baa43b0e13e37fafa6428dbc7938e62e5c439
+    license: MIT
+    size: 560M
+    serving: tei
+    trust_remote_code: false
+    enabled: true
+    where: cloud
+  - role: embed
+    rank: offline
+    id: intfloat/multilingual-e5-small
+    revision: 614241f622f53c4eeff9890bdc4f31cfecc418b3
+    license: MIT
+    size: 118M
+    serving: extension
+    trust_remote_code: false
+    enabled: true
+    where: extension
+  - role: rerank
+    rank: champion
+    id: Qwen/Qwen3-Reranker-0.6B
+    revision: e61197ed45024b0ed8a2d74b80b4d909f1255473
+    license: Apache-2.0
+    size: 0.6B
+    serving: tei
+    trust_remote_code: false
+    enabled: true
+    where: cloud
+  - role: rerank
+    rank: challenger
+    id: BAAI/bge-reranker-v2-m3
+    revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    license: Apache-2.0
+    size: 568M
+    serving: tei
+    trust_remote_code: false
+    enabled: true
+    where: cloud
+  - role: extract
+    rank: champion
+    id: google/gemma-4-31B-it
+    revision: 842da3794eaa0b77d5f08bae87a17459d91ff475
+    license: Apache-2.0
+    size: 31B-FP8
+    serving: vllm
+    trust_remote_code: false
+    enabled: true
+    where: cloud
+  - role: extract
+    rank: challenger
+    id: dicta-il/DictaLM-3.0-24B-Thinking
+    revision: 165442be7f7dd86c1f516c5a1796f3e787d0845b
+    license: Apache-2.0
+    size: 24B
+    serving: vllm
+    trust_remote_code: false
+    enabled: true
+    where: cloud
+  - role: extract
+    rank: challenger
+    id: google/gemma-4-26B-A4B-it
+    revision: 4d7ae4984b7db7de8f8457170b3f1a419ee76d52
+    license: Apache-2.0
+    size: 26B
+    serving: vllm
+    trust_remote_code: false
+    enabled: true
+    where: cloud
+  - role: ner
+    rank: champion
+    id: dicta-il/dictabert-joint
+    revision: 7b1256fc0846e22d1af431eae299e2dcecee2778
+    license: CC-BY-4.0
+    size: 184M
+    serving: tei
+    trust_remote_code: false
+    enabled: true
+    where: cloud
+  - role: asr
+    rank: champion
+    id: ivrit-ai/whisper-large-v3-turbo
+    revision: f33172a8c3c6efbc040a7200e00835257cac0447
+    license: Apache-2.0
+    size: large-v3-turbo
+    serving: vllm
+    trust_remote_code: false
+    enabled: false
+    where: cloud

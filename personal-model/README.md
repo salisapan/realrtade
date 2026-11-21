@@ -16,7 +16,7 @@ Slice 4 is a passive bandit that stays off, a lift report of `model_assist` on a
 
 ## Cloud inference
 
-Embeddings (`intfloat/multilingual-e5-small`, MIT) and Hebrew NER (`dicta-il/dictabert-ner`, CC-BY-4.0) run on Glance's own cloud, on the existing glance-assist host. The client switch in `flow-trial-extension/core/personal-inference.js` is off until the CTO adds the `personal-infer` action. That action must accept short spans only, use TLS, drop the raw text after the response, and not train on it unless the person opts in. Category consent still decides whether a span may be sent. Results land in the encrypted model on this computer.
+The cloud default embedder is `Qwen/Qwen3-Embedding-0.6B` (Apache-2.0). `intfloat/multilingual-e5-small` stays the offline fallback in the extension. Hebrew NER on the cloud is `dicta-il/dictabert-joint` (CC-BY-4.0). The client switch in `flow-trial-extension/core/personal-inference.js` is off until the owner approves the host and the CTO adds the `personal-infer` action. That action must accept short spans only, use TLS, drop the raw text after the response, and not train on it unless the person opts in. Category consent still decides whether a span may be sent. Results land in the encrypted model on this computer.
 
 There is no optional model download and no ONNX bundle. Offline, the same call uses rules and `libphonenumber-js@1.13.17`.
 

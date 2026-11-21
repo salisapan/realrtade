@@ -10,15 +10,21 @@ const FlowPersonalInference = (() => {
   const HOST = 'https://theflow-ai.com/.netlify/functions/glance-assist';
   const MODELS = {
     embed: {
+      id: 'Qwen/Qwen3-Embedding-0.6B',
+      revision: '97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3',
+      sha256: '0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd',
+      license: 'Apache-2.0'
+    },
+    embedOffline: {
       id: 'intfloat/multilingual-e5-small',
       revision: '614241f622f53c4eeff9890bdc4f31cfecc418b3',
       sha256: '1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477',
       license: 'MIT'
     },
     ner: {
-      id: 'dicta-il/dictabert-ner',
-      revision: '05ed61bc99437b13bc2bdef8154c52f8b44eaad6',
-      sha256: 'beeea5e7bfb6a8acf6765abc22400b27d0ae88afb177a89009574ddc0c1f4188',
+      id: 'dicta-il/dictabert-joint',
+      revision: '7b1256fc0846e22d1af431eae299e2dcecee2778',
+      sha256: 'c59db02c002b69fd3c072c310e3ba578d036386477248d1c8576d896cc06aa1c',
       license: 'CC-BY-4.0'
     }
   };

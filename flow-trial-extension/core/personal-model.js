@@ -727,6 +727,9 @@ const FlowPersonalModel = (() => {
           confidence: confidence
         });
       });
+      if (typeof FlowPersonalSlice6 !== 'undefined' && typeof FlowPersonalSlice6.orderCandidates === 'function') {
+        return FlowPersonalSlice6.orderCandidates(scored, q, { now: at });
+      }
       scored.sort((a, b) => b.confidence - a.confidence);
       const top = scored[0];
       const second = scored[1];
