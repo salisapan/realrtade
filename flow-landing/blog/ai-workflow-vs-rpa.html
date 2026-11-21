@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="When classic RPA breaks on a UI change, and when an AI workflow still must wait for a human before writing to a system of record.">
+<meta name="theme-color" content="#07090F">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="canonical" href="https://theflow-ai.com/blog/ai-workflow-vs-rpa.html">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<meta property="og:type" content="article">
+<meta property="og:title" content="AI Workflow vs RPA: When You Need Human Approval Before Every Write — Flow">
+<meta property="og:description" content="When classic RPA breaks on a UI change, and when an AI workflow still must wait for a human before writing to a system of record.">
+<meta property="og:url" content="https://theflow-ai.com/blog/ai-workflow-vs-rpa.html">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI Workflow vs RPA: When You Need Human Approval Before Every Write — Flow">
+<meta name="twitter:description" content="When classic RPA breaks on a UI change, and when an AI workflow still must wait for a human before writing to a system of record.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<title>AI Workflow vs RPA: When You Need Human Approval Before Every Write &mdash; Flow</title>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "AI Workflow vs RPA: When You Need Human Approval Before Every Write",
+  "description": "When classic RPA breaks on a UI change, and when an AI workflow still must wait for a human before writing to a system of record.",
+  "author": { "@type": "Organization", "name": "Flow" },
+  "publisher": { "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/" },
+  "mainEntityOfPage": "https://theflow-ai.com/blog/ai-workflow-vs-rpa.html",
+  "image": "https://theflow-ai.com/og.jpg",
+  "datePublished": "2026-10-28"
+}
+</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Do we need to replace all RPA bots with AI agents?", "acceptedAnswer": {"@type": "Answer", "text": "No. Keep RPA on stable, high-volume paths. Add an AI workflow where the input is unstructured and a person must approve the write. The practical pattern is hybrid."}}, {"@type": "Question", "name": "Why do RPA bots break when the UI changes?", "acceptedAnswer": {"@type": "Answer", "text": "They depend on selectors and recorded clicks. A layout change breaks the path. An AI workflow is aimed at intent, then a deterministic adapter (an API or an accessibility-tree action), so the judgment is not stored as a brittle click script."}}, {"@type": "Question", "name": "Does Flow auto-write to client systems?", "acceptedAnswer": {"@type": "Answer", "text": "No. Sensitive writes wait for a human approval of the specific action and the destination. Flow does not treat a model guess as permission to change a system of record."}}, {"@type": "Question", "name": "Where can Flow run?", "acceptedAnswer": {"@type": "Answer", "text": "The office chooses between three setups: Flow's dedicated secure cloud with masking before any processing, Flow-Edge on the employee's own computer, or Flow-Onprem on a dedicated server inside the office network."}}]}</script>
+<link rel="stylesheet" href="/assets/fonts.css">
+<link rel="stylesheet" href="/assets/flow-premium.css">
+<link rel="stylesheet" href="/assets/blog-article.css">
+<script>
+(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
+</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
+</script>
+<link rel="alternate" type="application/rss+xml" title="Flow Insights" href="/blog/rss.xml">
+<link rel="stylesheet" href="/assets/site-nav.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div id="progress"></div>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async"></a>
+    <nav class="site-bar">
+      <div class="site-links">
+        <a href="/trial.html" data-nav="glance">Glance</a>
+        <a href="/#organization" data-nav="flow">Flow</a>
+        <a href="/pricing.html" data-nav="pricing">Pricing</a>
+        <a href="/security.html" data-nav="security">Security</a>
+        <a href="/contact.html" data-nav="contact">Contact</a>
+      </div>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+      </button>
+      
+      <button class="lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<div class="mobile-nav" id="mobileNav" hidden>
+  <a href="/">Home</a><a href="/#how">Product</a><a href="/solutions/">Solutions</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a>
+  <div class="mobile-nav-legal"><a href="/trial.html">Glance</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+</div>
+<div class="ish-hero"><div class="ish-scene"><div class="ish-space"><a class="ish-card ish-r" href="/blog/ai-workflow-vs-rpa.html" style="animation-delay:0.000s" aria-label="AI Workflow vs RPA: When You Need Human Approval Before Every Write"><picture><source srcset="/blog/img/ai-workflow-vs-rpa.webp" type="image/webp"><img src="/blog/img/ai-workflow-vs-rpa.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/ai-workflow-vs-rpa.html" style="animation-delay:0.000s" aria-label="AI Workflow vs RPA: When You Need Human Approval Before Every Write"><picture><source srcset="/blog/img/ai-workflow-vs-rpa.webp" type="image/webp"><img src="/blog/img/ai-workflow-vs-rpa.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/hr-hiring-ai-bias-fcra.html" style="animation-delay:-2.000s" aria-label="AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook"><picture><source srcset="/blog/img/hr-hiring-ai-bias-fcra.webp" type="image/webp"><img src="/blog/img/hr-hiring-ai-bias-fcra.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/hr-hiring-ai-bias-fcra.html" style="animation-delay:-2.000s" aria-label="AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook"><picture><source srcset="/blog/img/hr-hiring-ai-bias-fcra.webp" type="image/webp"><img src="/blog/img/hr-hiring-ai-bias-fcra.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/human-in-the-loop-ai-system-design.html" style="animation-delay:-4.000s" aria-label="Designing Human-in-the-Loop Systems People Actually Use"><picture><source srcset="/blog/img/human-in-the-loop-ai-system-design.webp" type="image/webp"><img src="/blog/img/human-in-the-loop-ai-system-design.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/human-in-the-loop-ai-system-design.html" style="animation-delay:-4.000s" aria-label="Designing Human-in-the-Loop Systems People Actually Use"><picture><source srcset="/blog/img/human-in-the-loop-ai-system-design.webp" type="image/webp"><img src="/blog/img/human-in-the-loop-ai-system-design.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/insurance-claims-ai-automation.html" style="animation-delay:-6.000s" aria-label="AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight"><picture><source srcset="/blog/img/insurance-claims-ai-automation.webp" type="image/webp"><img src="/blog/img/insurance-claims-ai-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/insurance-claims-ai-automation.html" style="animation-delay:-6.000s" aria-label="AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight"><picture><source srcset="/blog/img/insurance-claims-ai-automation.webp" type="image/webp"><img src="/blog/img/insurance-claims-ai-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/insurance-underwriting-ai-rate-filing.html" style="animation-delay:-8.000s" aria-label="AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard"><picture><source srcset="/blog/img/insurance-underwriting-ai-rate-filing.webp" type="image/webp"><img src="/blog/img/insurance-underwriting-ai-rate-filing.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/insurance-underwriting-ai-rate-filing.html" style="animation-delay:-8.000s" aria-label="AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard"><picture><source srcset="/blog/img/insurance-underwriting-ai-rate-filing.webp" type="image/webp"><img src="/blog/img/insurance-underwriting-ai-rate-filing.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/legal-ai-workflow-automation.html" style="animation-delay:-10.000s" aria-label="Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility"><picture><source srcset="/blog/img/legal-ai-workflow-automation.webp" type="image/webp"><img src="/blog/img/legal-ai-workflow-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/legal-ai-workflow-automation.html" style="animation-delay:-10.000s" aria-label="Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility"><picture><source srcset="/blog/img/legal-ai-workflow-automation.webp" type="image/webp"><img src="/blog/img/legal-ai-workflow-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/manufacturing-ai-export-controls.html" style="animation-delay:-12.000s" aria-label="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing"><picture><source srcset="/blog/img/manufacturing-ai-export-controls.webp" type="image/webp"><img src="/blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/manufacturing-ai-export-controls.html" style="animation-delay:-12.000s" aria-label="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing"><picture><source srcset="/blog/img/manufacturing-ai-export-controls.webp" type="image/webp"><img src="/blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/pharma-life-sciences-ai-21-cfr-part-11.html" style="animation-delay:-14.000s" aria-label="AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records"><picture><source srcset="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.webp" type="image/webp"><img src="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/pharma-life-sciences-ai-21-cfr-part-11.html" style="animation-delay:-14.000s" aria-label="AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records"><picture><source srcset="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.webp" type="image/webp"><img src="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/prompt-injection-ai-threat-modeling.html" style="animation-delay:-16.000s" aria-label="Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation"><picture><source srcset="/blog/img/prompt-injection-ai-threat-modeling.webp" type="image/webp"><img src="/blog/img/prompt-injection-ai-threat-modeling.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/prompt-injection-ai-threat-modeling.html" style="animation-delay:-16.000s" aria-label="Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation"><picture><source srcset="/blog/img/prompt-injection-ai-threat-modeling.webp" type="image/webp"><img src="/blog/img/prompt-injection-ai-threat-modeling.jpg" alt="" loading="lazy"></picture></a></div></div><div class="ish-scrim"></div><div class="ish-overlay"><span class="eyebrow">AI Workflows</span><h1 class="ish-title">AI Workflow vs RPA: When You Need Human Approval Before Every Write</h1><p class="ish-lead">When classic RPA breaks on a UI change, and when an AI workflow still must wait for a human before writing to a system of record.</p></div></div>
+<main id="main">
+  <div class="wrap">
+    <div class="meta"><span class="dot"></span>Flow Research · 4 min read</div>
+    <article class="post">
+
+<p class="lead">RPA is a scripted bot on a predictable screen or API. An AI workflow reads intent in messy documents and events, then runs a deterministic step. In regulated work, neither should write to a system of record until a person has approved that write.</p>
+
+      <h3>RPA</h3>
+<p>A recorded path: this control, this selector, this field. Fast when the screen never moves. Fragile when it does. Little judgment on an unstructured email or a PDF that is not the form the bot was taught.</p>
+<h3>AI workflow</h3>
+<p>Intent and judgment on the messy input, then one determined execution step. Still not a license to write. The sensitive step waits for a person.</p>
+
+      <h2>Why RPA breaks</h2>
+      <p>RPA stores the path, not the point. When a button moves, the selector misses and the bot stops, or it clicks the wrong control. Unstructured mail and PDFs fail the same way: the bot has no reading of what the document is asking, only a map of where it expected the pixels to be.</p>
+
+      <h2>Where an AI workflow fits</h2>
+      <p>The fit is friction across files, core systems, and the apps a team already uses. Watch the work, propose one execution, wait. Email can be one of those surfaces. It is not the product.</p>
+
+      <h2>Approval before the write</h2>
+      <p>Intent can be model-assisted. The write should not be a series of guessed clicks. Execution is a determined step: an API call, or an action on the accessibility tree, after a person approves the sensitive ones. The approval shows the proposed action and the destination. It is not a checkbox after the record has already changed. Where a step is designed to be reversible, the write can be undone. That reverse belongs to the step. It is not a claim that every system of record supports undo.</p>
+
+      <h2>Hybrid, not a replacement</h2>
+      <p>Keep RPA where the path is stable and the volume is high. Use a Flow-class layer where the input is a document or an event that needs judgment, and the close crosses more than one app. You do not retire every bot to add approval before a write.</p>
+
+      <h2>Glance is a different product</h2>
+      <p><a href="/blog/close-from-gmail-without-a-prompt.html">Glance</a> closes a clear personal intent from Gmail with one Do It, and it stays quiet when it is not sure. It is not a trial of Flow, and it is not how a firm samples this deployment.</p>
+      <h2 id="faq">Common questions</h2>
+      <h3>Do we need to replace all RPA bots with AI agents?</h3>
+<p>No. Keep RPA on stable, high-volume paths. Add an AI workflow where the input is unstructured and a person must approve the write. The practical pattern is hybrid.</p>
+<h3>Why do RPA bots break when the UI changes?</h3>
+<p>They depend on selectors and recorded clicks. A layout change breaks the path. An AI workflow is aimed at intent, then a deterministic adapter (an API or an accessibility-tree action), so the judgment is not stored as a brittle click script.</p>
+<h3>Does Flow auto-write to client systems?</h3>
+<p>No. Sensitive writes wait for a human approval of the specific action and the destination. Flow does not treat a model guess as permission to change a system of record.</p>
+<h3>Where can Flow run?</h3>
+<p>The office chooses between three setups: Flow's dedicated secure cloud, which masks all sensitive data before any processing; Flow-Edge, where data is stored only on the employee's own computer and never leaves it; and Flow-Onprem, a dedicated server inside the office's internal network with no data going to an external cloud. See <a href="/solutions/deployment.html">the deployment page</a>.</p>
+
+
+    </article>
+    <div class="related">
+      <h2>Related Reading</h2>
+      <div class="related-list">
+        <a href="/blog/human-in-the-loop-ai-system-design.html"><span class="rcat">AI Architecture</span><span class="rtitle">Designing Human-in-the-Loop Systems People Actually Use</span></a>
+        <a href="/blog/auditability-by-design-ai-systems.html"><span class="rcat">Architecture & Security</span><span class="rtitle">Auditability by Design: Logging, Provenance, and Human Oversight in Regulated AI Systems</span></a>
+        <a href="/blog/edge-vs-cloud-ai-architecture.html"><span class="rcat">Architecture & Security</span><span class="rtitle">Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data</span></a>
+      </div>
+    </div>
+    <div class="cta">
+      <p>See how Flow applies this in practice — in Flow's dedicated secure cloud with masking, on your own computers with Flow-Edge, or on a dedicated server in your network with Flow-Onprem.</p>
+      <a class="doit" href="/#waitlist" data-ga="blog_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get a deployment plan</a>
+      <p class="sol-link"><a href="/solutions/deployment.html">The three deployment setups &rarr;</a></p>
+    </div>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">&copy; 2026 Flow. <a href="/">theflow-ai.com</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/blog/rss.xml">RSS</a></div>
+</footer>
+<script>
+(function(){
+  var bar = document.getElementById('progress');
+  var art = document.querySelector('article');
+  function update(){
+    var rect = art.getBoundingClientRect();
+    var total = rect.height - innerHeight * 0.5;
+    var seen = Math.min(Math.max(-rect.top, 0), total);
+    bar.style.width = (total > 0 ? (seen / total) * 100 : 0) + '%';
+  }
+  addEventListener('scroll', update, {passive:true});
+  addEventListener('resize', update);
+  update();
+  var tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try{localStorage.setItem('flow_theme', next);}catch(e){}
+  });
+})();
+</script>
+<script>document.addEventListener("visibilitychange",function(){document.documentElement.classList.toggle("ish-tab-hidden",document.hidden);});document.addEventListener("click",function(ev){var a=ev.target.closest(".ish-card"); if(a && typeof gtag==="function") gtag("event","ish_card_click",{article_path:a.getAttribute("href")});});</script>
+<script>
+(function(){
+  var mb=document.getElementById('menuBtn'), mn=document.getElementById('mobileNav');
+  if(!mb||!mn) return;
+  function close(){ mn.classList.remove('open'); mb.setAttribute('aria-expanded','false'); setTimeout(function(){ mn.hidden=true; },250); }
+  function open(){ mn.hidden=false; requestAnimationFrame(function(){ mn.classList.add('open'); }); mb.setAttribute('aria-expanded','true'); }
+  mb.addEventListener('click',function(){ mn.hidden ? open() : close(); });
+  mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
+  mn.addEventListener('click',function(e){ if(e.target===mn) close(); });
+  document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && !mn.hidden) close(); });
+})();
+</script>
+<script src="/assets/flow-premium.js" defer></script>
+<script src="/assets/site-nav.js" defer></script>
+</body>
+</html>

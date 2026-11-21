@@ -3,7 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FROM = 'Flow <hello@theflow-ai.com>';
+const FROM = 'Flow <info@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
 const LOG_PREFIX = '[send-playbook]';
@@ -67,8 +67,8 @@ function htmlBody(lang) {
 
   var greeting = isHe ? 'שלום,' : 'Hi,';
   var intro = isHe
-    ? 'תודה שהשארתם לנו פרטים על הארגון שלכם. זה בדיוק מה שאנחנו צריכים כדי לבנות תוכנית פריסה אמיתית של Flow אצלכם — לא הצעה גנרית, אלא מיפוי של המודל המדויק (ענן מאובטח, או Flow-Edge / Flow-OnPrem) ומספר אמיתי לצעד הבא.'
-    : "Thanks for telling us about your organization. That's exactly what we need to put together a real Flow deployment plan — not a generic pitch, but a mapping of the exact model (Secure Cloud, or Flow-Edge / Flow-OnPrem) and a real number for the next step.";
+    ? 'תודה שהשארתם לנו פרטים על הארגון שלכם. זה בדיוק מה שאנחנו צריכים כדי לבנות תוכנית פריסה אמיתית של Flow אצלכם — לא הצעה גנרית, אלא מיפוי של המודל המדויק (ענן מאובטח, או Flow-Edge / Flow-Onprem) ומספר אמיתי לצעד הבא.'
+    : "Thanks for telling us about your organization. That's exactly what we need to put together a real Flow deployment plan — not a generic pitch, but a mapping of the exact model (Secure Cloud, or Flow-Edge / Flow-Onprem) and a real number for the next step.";
   var pitch = isHe
     ? 'בדרך לכך, מצורף גם <b>The Hybrid Automation Playbook</b> — הסיפור המלא על איך תעשיות מוסדרות מבטלות הזנת נתונים ידנית, ללא סיכון רגולטורי. אבל הצעד הבא האמיתי הוא לקבוע זמן קצר לדבר על הפריסה אצלכם.'
     : "Along the way, attached is <b>The Hybrid Automation Playbook</b> — the full story on how regulated industries eliminate manual data entry with zero compliance risk. But the real next step is a short conversation about deploying it at your organization.";

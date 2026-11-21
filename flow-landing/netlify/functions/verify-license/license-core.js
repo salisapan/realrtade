@@ -106,7 +106,7 @@ function verifyStripeSignature(rawBody, header, secret, now, toleranceSec) {
 
 
 const SITE_URL = 'https://theflow-ai.com';
-const FROM_GLANCE = 'Glance <hello@theflow-ai.com>';
+const FROM_GLANCE = 'Glance <info@theflow-ai.com>';
 
 async function sendMail(apiKey, opts) {
   const res = await withTimeout((signal) => fetch('https://api.resend.com/emails', {

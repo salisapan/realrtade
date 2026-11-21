@@ -14,11 +14,11 @@
 // the database so someone can record it by hand, with every submitted field
 // in the body. If the write succeeds and the email fails, the visitor still
 // gets success and the failure is logged. The visitor gets an error, pointing
-// at hello@theflow-ai.com, only when both channels fail.
+// at info@theflow-ai.com, only when both channels fail.
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FROM = 'Flow <hello@theflow-ai.com>';
+const FROM = 'Flow <info@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const SB_URL = 'https://zjquktirlrhbqcnkfaok.supabase.co';
 const LOG_PREFIX = '[submit-lead]';
@@ -31,7 +31,7 @@ const LIMITS = { email: 200, name: 120, company: 160, role: 120, seats: 40, depl
 // Free-text is rejected on these rather than trusted, so the columns stay
 // analysable and a caller cannot smuggle arbitrary content through them.
 const SEATS = ['1-10', '11-25', '26-50', '51-200', '200+'];
-const DEPLOYMENT = ['masked-cloud', 'flow-edge', 'not-sure'];
+const DEPLOYMENT = ['masked-cloud', 'flow-edge', 'flow-onprem', 'not-sure'];
 const TIMELINE = ['now', 'this-quarter', 'this-year', 'exploring'];
 
 // In-memory, per-container rate limiting. Netlify may run several containers,
@@ -168,9 +168,9 @@ async function notifyOwner(lead, apiKey, stored, log, logErr) {
 
 function failureResponse(serviceKey) {
   if (!serviceKey) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Lead capture is not configured. Please email hello@theflow-ai.com.' }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Lead capture is not configured. Please email info@theflow-ai.com.' }) };
   }
-  return { statusCode: 502, body: JSON.stringify({ error: 'We could not record that. Please email hello@theflow-ai.com.' }) };
+  return { statusCode: 502, body: JSON.stringify({ error: 'We could not record that. Please email info@theflow-ai.com.' }) };
 }
 
 exports.handler = async function (event) {

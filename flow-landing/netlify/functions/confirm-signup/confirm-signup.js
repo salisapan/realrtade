@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SITE_URL = 'https://theflow-ai.com';
 const GA_ID = 'G-ESYDFQYCDV';
-const FROM_GLANCE = 'Glance <hello@theflow-ai.com>';
+const FROM_GLANCE = 'Glance <info@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 
 // Bottom-up adoption inside a company with sensitive data is a good thing
